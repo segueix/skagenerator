@@ -25,7 +25,7 @@
     </section>
     <section class="band-settings" aria-label="Estil i instruments">
       <div class="style-guide"><strong id="style-summary"></strong><span id="style-description"></span><small>Tempos i tonalitats preseleccionats per a aquest taller; no són límits del gènere.</small></div>
-      <fieldset class="instrument-picker"><legend>INSTRUMENTS</legend><div id="song-instruments"></div><small>Activa els instruments que vols fer sonar.</small><div class="audio-bank-status"><span class="live-dot"></span><span id="audio-status" role="status">So enregistrat · GeneralUser GS</span><a href="licenses/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Crèdits</a></div></fieldset>
+      <fieldset class="instrument-picker"><legend>INSTRUMENTS BASE DE LA CANÇÓ</legend><div id="song-instruments"></div><small>Configuració inicial per a les parts. Després pots escollir una combinació diferent a cada secció.</small><div class="audio-bank-status"><span class="live-dot"></span><span id="audio-status" role="status">So enregistrat · GeneralUser GS</span><a href="licenses/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Crèdits</a></div></fieldset>
     </section>
     <section class="arrangement" aria-labelledby="arrangement-title">
       <div class="section-heading"><h2 id="arrangement-title">El mapa de la cançó</h2><span id="duration-total">4/4 · Estructura estàndard</span></div>
@@ -39,6 +39,11 @@
         <div class="editor-title-line"><h2 id="part-title">Intro</h2><span class="part-badge" id="part-status">Per començar</span></div>
         <p id="part-description" class="part-description"></p>
         <div class="part-options"><label><span class="field-label">DURADA</span><select id="part-bars"><option value="4">4 compassos</option><option value="8">8 compassos</option><option value="12">12 compassos</option><option value="16">16 compassos</option></select></label><label class="energy-field"><span class="field-label">INTENSITAT <output id="energy-value" for="part-energy">35 %</output></span><input id="part-energy" aria-label="Intensitat de la part" type="range" min="10" max="100" step="5" value="35"><span class="range-labels"><span>Suau</span><span>Enèrgica</span></span></label></div>
+        <fieldset class="part-instrument-panel" aria-describedby="part-instrument-mode">
+          <legend>INSTRUMENTS D’AQUESTA PART</legend>
+          <div id="part-instruments" class="part-instrument-grid"></div>
+          <div class="part-instrument-footer"><span id="part-instrument-mode">Segueix els instruments base de la cançó</span><button type="button" id="reset-part-instruments" class="text-button" hidden>↶ Recupera la formació base</button></div>
+        </fieldset>
         <div class="sound-preview" id="sound-preview"><div class="waveform" id="waveform" aria-hidden="true"></div><span id="preview-label">El primer compàs comença aquí.</span><span class="preview-duration" id="part-duration">00:09</span></div>
         <div class="lyrics-heading"><label class="field-label" for="part-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="part-lyrics" rows="3" maxlength="5000" placeholder="Escriu la lletra o les idees per a aquesta part…"></textarea>
         <p class="instrumental-note"><span aria-hidden="true">♫</span> Generació instrumental. La lletra queda desada com a anotació; encara no es canta.</p>
