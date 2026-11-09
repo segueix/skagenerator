@@ -1738,7 +1738,7 @@
     }
     // ── Cançons per seccions ────────────────────────────────────────────
     // Comparteix els instruments del motor original. Tempo i tonalitat són
-    // globals; les tornades reutilitzen la llavor perquè conservin el motiu.
+    // globals; cada secció pot sobrescriure els instruments base sense canviar el motiu.
     const SONG_PARTS = {
         intro: { name: 'Intro', bars: 4, energy: 35, description: 'Presenta el ritme i el caràcter de la cançó.' },
         verse: { name: 'Estrofa', bars: 8, energy: 55, description: 'Desenvolupa la història i deixa espai per a la veu.' },
@@ -1765,7 +1765,7 @@
         if (!Object.hasOwn(SONG_STYLES, settings.style) || ![4, 8, 12, 16].includes(bars)
             || !Number.isInteger(bpm) || bpm < style.bpm.min || bpm > style.bpm.max
             || !style.keys.some(([key, mode]) => key === tonic && mode === settings.mode)) throw new Error('Configuració musical no vàlida per a aquest estil');
-        const instruments = settings.instruments === undefined ? Object.keys(SONG_INSTRUMENTS) : settings.instruments;
+        const instruments = part.instruments === undefined ? (settings.instruments === undefined ? Object.keys(SONG_INSTRUMENTS) : settings.instruments) : part.instruments;
         if (!Array.isArray(instruments) || !instruments.length || new Set(instruments).size !== instruments.length
             || instruments.some(instrument => !Object.hasOwn(SONG_INSTRUMENTS, instrument))) throw new Error('Selecciona instruments vàlids');
         const energy = Number(part.energy);
