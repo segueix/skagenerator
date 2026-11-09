@@ -198,7 +198,11 @@
       const row = document.createElement('div'); row.className = `variant-row${chosen ? ' chosen' : ''}`;
       const label = document.createElement('div'); label.className = 'variant-title';
       const name = document.createElement('strong'); name.textContent = `Versió ${index + 1}`;
-      const note = document.createElement('span'); note.textContent = chosen ? '✓ Escollida per a la cançó' : 'Alternativa musical';
+      const grooves = song.settings.style === 'ska'
+        ? ['Baix caminant', 'Baix dub espaiat', 'Octaves i contratemps', 'Baix melòdic', 'Baix sincopat']
+        : ['Punk de corxeres', 'Punk a mig temps', 'Punk galopant', 'Baix amb riff', 'Punk sincopat'];
+      const note = document.createElement('span');
+      note.textContent = `${grooves[index]}${chosen ? ' · ✓ Escollida' : ''}`;
       label.append(name, note);
       const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'button variant-listen';
       listen.textContent = '▷ Escolta'; listen.disabled = busy;
