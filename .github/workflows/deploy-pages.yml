@@ -1,0 +1,58 @@
+name: Publicar Ska Generator amb els instruments reals
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ska-generator-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compilar la web i el banc d’instruments
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtenir el codi
+        uses: actions/checkout@v4
+      - name: Preparar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Instal·lar les dependències
+        run: npm ci
+      - name: Passar els tests
+        run: npm test
+      - name: Construir la web
+        run: npm run build
+      - name: Comprovar els recursos necessaris
+        run: |
+          test -s dist/index.html
+          test -s dist/sample-worker.js
+          test -s dist/assets/generaluser-ska-punk.sf2
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+      - name: Pujar els fitxers compilats
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    name: Publicar la versió compilada
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Desplegar a GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
