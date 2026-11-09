@@ -48,3 +48,9 @@ El banc conserva les mostres i els moduladors dels presets seleccionats. Els son
 La primera generació carrega el banc de mostres. La pantalla informa del progrés i permet tornar-ho a provar si falla. El càlcul es fa en un worker per mantenir la interfície disponible. L’escolta individual, la cançó sencera i el WAV fan servir les mateixes mostres estèreo.
 
 Crèdits, llicències i modificacions del banc: [licenses/THIRD_PARTY_NOTICES.md](licenses/THIRD_PARTY_NOTICES.md).
+
+## Publicació i compatibilitat
+
+La web necessita `dist/sample-worker.js` i `dist/assets/generaluser-ska-punk.sf2` per reproduir les mostres enregistrades. GitHub Pages publicat directament des de l’arrel de `main` només processa els fitxers de codi font amb Jekyll i no construeix aquestes dependències: la pàgina es mostra, però el motor de mostres no hi és. Per publicar els instruments enregistrats cal fer servir el workflow `.github/workflows/deploy-pages.yml` amb l’origen de GitHub Pages configurat com a **GitHub Actions** (Settings → Pages → Build and deployment → Source).
+
+Si una còpia de la web no conté aquests dos recursos o el motor d’àudio falla, el generador canvia automàticament al sintetitzador local i avisa «Mode compatible · àudio sintetitzat». Continua permetent generar, escoltar, comparar les cinc versions, desar i exportar en WAV. Per recuperar les mostres enregistrades, publica el resultat de `npm run build`.
