@@ -9,6 +9,7 @@
   const id = () => window.crypto.randomUUID();
   const seed = () => window.crypto.getRandomValues(new Uint32Array(1))[0] || 1;
   const makePart = type => ({ id: id(), type, bars: engine.SONG_PARTS[type].bars, energy: engine.SONG_PARTS[type].energy, lyrics: '', generated: false, revision: 1 });
+  const fiveVersions = part => ['intro', 'verse', 'chorus'].includes(part.type);
   let recoveredMigration = false;
   const newSong = () => ({ version: 1, title: 'Nova cançó', settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: seed(), instruments: Object.keys(engine.SONG_INSTRUMENTS) }, parts: ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'].map(makePart), chorusRevision: 1 });
   function validateSong(value) {
@@ -61,7 +62,6 @@
   const totalSeconds = () => song.parts.reduce((sum, p) => sum + seconds(p), 0);
   const time = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
   const instrumentsFor = part => part.instruments === undefined ? song.settings.instruments : part.instruments;
-  const fiveVersions = part => ['intro', 'verse', 'chorus'].includes(part.type);
   const hasVersions = part => fiveVersions(part) && part.generated && Array.isArray(part.variants) && part.variants.length === 5;
   const cacheKey = (part, revision = part.revision) => `${part.id}:${revision}`;
   function clearPartCache(part) {
