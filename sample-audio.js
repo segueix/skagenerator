@@ -3,7 +3,7 @@
   const base = document.currentScript.src;
   const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.3-1', base).href;
   const workerURL = new URL('sample-worker.js', base).href;
-  let worker, ready, serial = 0;
+  let worker, ready, serial = 0, fallback = false;
   const requests = new Map();
   function destroy(error) {
     worker?.terminate(); worker = null; ready = null;
@@ -52,8 +52,25 @@
   }
   window.SkaSampleAudio = {
     async render(spec, sampleRate = 44100, options = {}) {
-      await load(options.onProgress);
-      return send('render', { spec, sampleRate }, options.onProgress);
+      if (!fallback) {
+        try {
+          await load(options.onProgress);
+          return await send('render', { spec, sampleRate }, options.onProgress);
+        } catch (error) {
+          // La web també es pot obrir sense el worker o el banc compilat
+          // (p. ex. GitHub Pages publicat directament des de la branca).
+          // Recuperació automàtica: conservem la composició i el projecte.
+          fallback = true;
+          destroy(error);
+          console.warn('Ska Generator: mostres no disponibles; s’utilitza el sintetitzador local.', error);
+        }
+      }
+      options.onProgress?.({ stage: 'fallback', value: 0 });
+      const engine = window.ElTaulerRadioAmbient;
+      if (!engine?.songPartSamples) throw new Error('No hi ha cap motor d’àudio disponible.');
+      const mono = await engine.songPartSamples(spec, sampleRate);
+      options.onProgress?.({ stage: 'fallback', value: 1 });
+      return [mono, new Float32Array(mono)];
     },
     dispose() { destroy(new Error('Motor d’àudio tancat')); }
   };
