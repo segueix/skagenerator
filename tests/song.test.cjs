@@ -89,3 +89,30 @@ test('cada part admet una combinació instrumental pròpia independent de la for
     assert.throws(() => engine.composeSongPart(base, { ...intro, instruments }));
   }
 });
+
+test('cinc versions de cada intro, estrofa i tornada són diferents i recuperables', () => {
+  const base = { ...settings, instruments: ['guitar', 'drums', 'bass', 'trumpet', 'trombone'] };
+  for (const type of ['intro', 'verse', 'chorus']) {
+    const revisions = [11, 12, 13, 14, 15];
+    const alternatives = revisions.map((revision, index) =>
+      engine.composeSongPart(base, { ...part(type, 8), revision, variants: revisions, selectedVariant: index }));
+    assert.equal(new Set(alternatives.map(spec => JSON.stringify([spec.chords.map(chord => chord.root), spec.melody]))).size, 5);
+    assert.deepEqual(alternatives.map(spec => spec.variation), [0, 1, 2, 3, 4]);
+    assert(alternatives.every(spec => spec.beat === 60 / base.bpm && spec.tonic === base.tonic));
+    const restored = JSON.parse(JSON.stringify({ ...part(type, 8), revision: revisions[3], variants: revisions, selectedVariant: 3 }));
+    assert.deepEqual(engine.composeSongPart(base, restored), alternatives[3]);
+  }
+  assert.throws(() => engine.composeSongPart(base, { ...part('bridge'), variantIndex: 3 }));
+  assert.throws(() => engine.composeSongPart(base, { ...part('intro'), variantIndex: 6 }));
+});
+
+test('les cinc versions donen ritmes de bateria diferents al motor de mostres', () => {
+  const performance = require('../audio/performance.cjs');
+  const drums = { ...settings, instruments: ['drums'] };
+  const patterns = [0, 1, 2, 3, 4].map(index => {
+    const spec = engine.composeSongPart(drums, { ...part('verse'), revision: index + 10, variantIndex: index });
+    return performance.createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 9)
+      .map(e => [e.note, Math.round(e.time / spec.beat * 10) / 10]);
+  });
+  assert.equal(new Set(patterns.map(JSON.stringify)).size, 5);
+});
