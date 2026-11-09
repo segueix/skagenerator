@@ -116,3 +116,36 @@ test('les cinc versions donen ritmes de bateria diferents al motor de mostres', 
   });
   assert.equal(new Set(patterns.map(JSON.stringify)).size, 5);
 });
+
+test('les cinc versions tenen línies de baix diferents en ska i punk', () => {
+  const performance = require('../audio/performance.cjs');
+  for (const style of ['ska', 'punk']) {
+    const cfg = { ...settings, style, bpm: style === 'punk' ? 180 : 128, instruments: ['bass'] };
+    for (const type of ['intro', 'verse', 'chorus']) {
+      const versions = [21, 22, 23, 24, 25].map((revision, index) =>
+        engine.composeSongPart(cfg, { ...part(type, 4), revision, variants: [21, 22, 23, 24, 25], selectedVariant: index }));
+      assert.equal(new Set(versions.map(s => JSON.stringify(s.bassLine))).size, 5);
+      for (const spec of versions) {
+        assert(spec.bassLine.length >= 10);
+        assert(spec.bassLine.every(([bar, beat, pitch, length, strength]) =>
+          Number.isInteger(bar) && bar >= 0 && beat >= 0 && beat < 4 &&
+          Number.isInteger(pitch) && pitch >= 28 && pitch <= 75 && length > 0 && strength > 0));
+        const notes = performance.createPerformance(spec).events.filter(e => e.channel === 2 && e.type === 'on');
+        assert.equal(notes.length, spec.bassLine.length);
+        assert(notes.some(e => e.velocity >= 90));
+      }
+    }
+  }
+});
+
+test('el motor alternatiu fa cinc àudios audibles amb només baix', async () => {
+  const cfg = { ...settings, instruments: ['bass'] }, versions = [101,102,103,104,105], sounds = [];
+  for (let index = 0; index < 5; index++) {
+    const spec = engine.composeSongPart(cfg, { ...part('verse', 4),
+      revision: versions[index], variants: versions, selectedVariant: index });
+    const audio = await engine.songPartSamples(spec, 4000);
+    assert(audio.some(value => Math.abs(value) > .01));
+    sounds.push(Buffer.from(audio.buffer).toString('base64'));
+  }
+  assert.equal(new Set(sounds).size, 5);
+});
