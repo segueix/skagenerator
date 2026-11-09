@@ -1813,31 +1813,74 @@
         const phrase = composePhrase(r, ctx, [0, 1, 2, 3], rhythms).notes;
         const melody = [];
         for (let b = 0; b < bars; b += 4) phrase.forEach(n => melody.push([n[0] + b, n[1], n[2], n[3]]));
+        // El baix té un riff propi per a cada alternativa; una única partitura
+        // alimenta tant el motor de mostres com el sintetitzador de reserva.
+        const bassPatterns = settings.style === 'ska' ? [
+            [[0,'root',.85,1.13],[1,'third',.8,1],[2,'fifth',.8,1.08],[3,'approach',.72,1.08]],
+            [[0,'root',1.3,1.2],[1.5,'fifth',.8,.92],[2.5,'octave',1,1.04]],
+            [[0,'root',.42,1.18],[.5,'octave',.42,.88],[1.5,'fifth',.43,1.04],[2,'root',.75,1.13],[3,'third',.85,1.02]],
+            [[0,'root',.65,1.14],[.75,'third',.65,.95],[1.5,'fifth',.65,1.08],[2.25,'octave',.57,.98],[3,'approach',.7,1.1]],
+            [[0,'root',.8,1.2],[1,'fifth',.7,.95],[2.5,'third',.65,1.03],[3.5,'approach',.37,1.16]]
+        ] : [
+            [[0,'root',.42,1.16],[.5,'root',.42,1],[1,'root',.42,1.09],[1.5,'root',.42,1],
+             [2,'root',.42,1.13],[2.5,'fifth',.42,.96],[3,'root',.42,1.12],[3.5,'approach',.42,1.05]],
+            [[0,'root',.9,1.2],[1,'octave',.75,1.04],[2,'root',.9,1.2],[3,'fifth',.7,1.06]],
+            [[0,'root',.4,1.17],[.5,'root',.18,.83],[.75,'fifth',.19,.92],[1.5,'root',.45,1.1],
+             [2,'root',.4,1.15],[2.5,'root',.18,.86],[2.75,'octave',.2,.98],[3.5,'approach',.35,1.04]],
+            [[0,'root',.42,1.19],[.5,'third',.42,.89],[1,'fifth',.42,1.04],[1.5,'octave',.42,.97],
+             [2,'root',.42,1.14],[2.5,'fifth',.42,1.02],[3,'third',.42,.92],[3.5,'approach',.4,1.1]],
+            [[0,'root',.65,1.19],[.75,'root',.48,.93],[1.5,'fifth',.42,1.01],
+             [2,'root',.66,1.13],[2.75,'octave',.4,1.02],[3.25,'approach',.5,1.12]]
+        ];
+        const classic = settings.style === 'punk'
+            ? [[0,'root',.42,1.1],[.5,'root',.42,.9],[1,'root',.42,1.05],[1.5,'root',.42,.9],
+               [2,'root',.42,1.08],[2.5,'root',.42,.9],[3,'root',.42,1.08],[3.5,'root',.42,.9]]
+            : [[0,'root',.8,1.1],[1,'third',.78,.98],[2,'fifth',.78,1.04],[3,'approach',.75,1.02]];
+        const bassLine = [];
+        for (let b = 0; b < bars; b++) {
+            const chord = chords[b], root = chord.root, next = chords[(b+1)%bars].root;
+            const tones = { root, third: nearestTone(root+4,chord.pcs,root,root+12),
+                fifth: nearestTone(root+7,chord.pcs,root,root+12), octave: root+12,
+                approach: next===root ? root+7 : next+(next>root ? -1 : 1) };
+            const pattern = part.type==='outro' && b===bars-1
+                ? [[0,'root',3.3,1.18]] : variation>=0 ? bassPatterns[variation] : classic;
+            for (const [at,tone,length,strength] of pattern)
+                bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
+        }
         return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
-            seconds: bars * 4 * 60 / bpm, chords, melody, instruments: instruments.slice(), variation };
+            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;
         const has = name => spec.instruments.includes(name), punk = spec.style === 'punk';
+        const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
         const guitar = punk
             ? { decay: 0.28, partials: [1, 0.8, 0.6, 0.42, 0.32, 0.2], damp: 0.3, gain: 0.065, attack: 0.002 }
             : { decay: 0.14, partials: [1, 0.6, 0.25], damp: 1.5, gain: 0.09, attack: 0.003 };
         spec.chords.forEach((chord, b) => {
             const t0 = b * bar, ending = spec.type === 'outro' && b === spec.bars - 1;
             const soft = spec.type === 'intro' || spec.type === 'bridge';
-            const stabs = ending ? [0] : punk ? [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] : [0.5, 1.5, 2.5, 3.5];
+            const guitarPatterns = punk
+                ? [[0,.5,1,1.5,2,2.5,3,3.5],[0,1,1.5,2,3,3.5],
+                   [0,.5,1.5,2,2.5,3.5],[0,.5,1,1.5,2.5,3],[0,1,2,2.5,3,3.5]]
+                : [[.5,1.5,2.5,3.5],[.5,1.5,2.5,3.5,3.75],
+                   [.5,1.5,3.5],[.5,1.75,2.5,3.5],[.5,1.5,2.75,3.5]];
+            const stabs = ending ? [0] : guitarPatterns[Math.max(0,variation)];
             const voicing = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes;
             if (has('guitar')) stabs.forEach((t, hit) => voicing.forEach((n, k) => {
                 syn.pluck(t0 + t * beat + k * 0.004, n, intensity * (punk && hit % 2 ? 0.5 : 0.75), guitar);
             }));
-            if (has('bass')) {
+            if (has('bass') && !Array.isArray(spec.bassLine)) {
                 const hits = ending ? [0] : punk ? [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 1, 2, 3];
                 hits.forEach((t, k) => syn.bass(t0 + t * beat,
                     punk ? chord.root : k === 3 ? chord.root + 7 : k === 1 ? bassOf(chord.pcs[1]) : chord.root,
                     intensity * (k % 2 ? 0.65 : 0.85), ending ? 0.8 : 0.21));
             }
             if (has('drums')) {
-                (ending ? [0] : punk ? [0, 1.5, 2, 2.5] : [0, 2]).forEach(t => syn.kick(t0 + t * beat, intensity * (punk ? 0.85 : 0.65)));
+                const kicks = punk
+                    ? [[0,1.5,2,2.5],[0,1,2,3],[0,.5,2,3],[0,1.5,2.5,3],[0,1,2,2.5]]
+                    : [[0,2],[0,2,3.5],[0,2.5],[0,1.5,2],[0,2,3]];
+                (ending ? [0] : kicks[Math.max(0,variation)]).forEach(t => syn.kick(t0 + t * beat, intensity * (punk ? .85 : .65)));
                 if (!ending) {
                     [1, 3].forEach(t => {
                         syn.brush(t0 + t * beat, intensity * (soft ? 0.3 : punk ? 0.95 : 0.65), punk ? 0.11 : 0.07, false);
@@ -1852,6 +1895,10 @@
                 if (has('trombone')) syn.brass(t0, chord.root + 24, bar * 0.7, intensity * 0.65, 'trombone');
             }
         });
+        if (has('bass') && Array.isArray(spec.bassLine)) {
+            for (const [b,t,pitch,length,strength] of spec.bassLine)
+                syn.bass((b*4+t)*beat, pitch, intensity*strength*1.13, length*beat);
+        }
         spec.melody.forEach(([b, t, n, d]) => {
             if (spec.type === 'outro' && b === spec.bars - 1) return;
             // Els metalls entren al final de la intro, com a presentació del motiu.
