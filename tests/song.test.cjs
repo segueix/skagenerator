@@ -29,8 +29,8 @@ test('les tornades repeteixen exactament el motiu i es reprodueixen igual despr�
 });
 test('els estils i els extrems de tempo generen àudio finit', async () => {
   for (const style of Object.keys(engine.SONG_STYLES)) {
-    for (const bpm of [60, 180]) {
-      const spec = engine.composeSongPart({ ...settings, style, bpm, tonic: 11, mode: 'minor' }, part('chorus'));
+    for (const bpm of [engine.SONG_STYLES[style].bpm.min, engine.SONG_STYLES[style].bpm.max]) {
+      const spec = engine.composeSongPart({ ...settings, style, bpm, tonic: engine.SONG_STYLES[style].keys[0][0], mode: engine.SONG_STYLES[style].keys[0][1] }, part('chorus'));
       const data = await engine.songPartSamples(spec, 4000);
       assert.equal(data.length, Math.round(16 * 60 / bpm * 4000));
       assert(data.every(Number.isFinite));
@@ -45,4 +45,30 @@ test('rebutja configuracions impossibles i conserva el compositor original', () 
   assert.throws(() => engine.composeSongPart(settings, { ...part('intro'), energy: NaN }));
   const original = engine.composeJingle('rumba', 12345, { loop: true });
   assert.equal(original.style, 'rumba'); assert(original.chords.length > 0); assert(original.melody.length > 0);
+});
+
+test('els perfils només admeten ska i punk, amb els seus tempos i tonalitats', () => {
+  assert.deepEqual(Object.keys(engine.SONG_STYLES), ['ska', 'punk']);
+  assert.throws(() => engine.composeSongPart({ ...settings, style: 'pop' }, part('intro')));
+  assert.throws(() => engine.composeSongPart({ ...settings, bpm: 99 }, part('intro')));
+  assert.throws(() => engine.composeSongPart({ ...settings, bpm: 181 }, part('intro')));
+  assert.throws(() => engine.composeSongPart({ ...settings, style: 'punk', bpm: 139 }, part('intro')));
+  assert.throws(() => engine.composeSongPart({ ...settings, style: 'punk', bpm: 221 }, part('intro')));
+  for (const [style, profile] of Object.entries(engine.SONG_STYLES)) {
+    for (const [tonic, mode] of profile.keys) assert.doesNotThrow(() => engine.composeSongPart({ ...settings, style, bpm: profile.bpm.default, tonic, mode }, part('intro')));
+  }
+  assert.throws(() => engine.composeSongPart({ ...settings, tonic: 11, mode: 'major' }, part('intro')));
+});
+test('els cinc instruments generen àudio propi i trompeta i trombó són diferents', async () => {
+  const samples = [];
+  for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) {
+    const spec = engine.composeSongPart({ ...settings, instruments: [instrument] }, part('chorus'));
+    assert.deepEqual(spec.instruments, [instrument]);
+    const audio = await engine.songPartSamples(spec, 4000);
+    assert(audio.every(Number.isFinite)); assert(audio.some(n => Math.abs(n) > .01));
+    samples.push(audio);
+  }
+  for (let i = 0; i < samples.length; i++) for (let j = i + 1; j < samples.length; j++) assert.notDeepEqual(samples[i], samples[j]);
+  assert.throws(() => engine.composeSongPart({ ...settings, instruments: [] }, part('intro')));
+  assert.throws(() => engine.composeSongPart({ ...settings, instruments: ['piano'] }, part('intro')));
 });

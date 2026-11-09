@@ -8,12 +8,26 @@
   const id = () => window.crypto.randomUUID();
   const seed = () => window.crypto.getRandomValues(new Uint32Array(1))[0] || 1;
   const makePart = type => ({ id: id(), type, bars: engine.SONG_PARTS[type].bars, energy: engine.SONG_PARTS[type].energy, lyrics: '', generated: false, revision: 1 });
-  const newSong = () => ({ version: 1, title: 'Nova cançó', settings: { style: 'ska', bpm: 112, tonic: 0, mode: 'major', seed: seed() }, parts: ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'].map(makePart), chorusRevision: 1 });
+  let recoveredMigration = false;
+  const newSong = () => ({ version: 1, title: 'Nova cançó', settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: seed(), instruments: Object.keys(engine.SONG_INSTRUMENTS) }, parts: ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'].map(makePart), chorusRevision: 1 });
   function validateSong(value) {
     if (!value || value.version !== 1 || typeof value.title !== 'string' || value.title.length > 100 || !value.settings
       || !Number.isInteger(value.settings.seed) || value.settings.seed < 1 || value.settings.seed > 4294967295
       || !Array.isArray(value.parts) || !value.parts.length || value.parts.length > 16
       || !Number.isInteger(value.chorusRevision) || value.chorusRevision < 1 || value.chorusRevision > 1000000) throw new Error('Projecte no vàlid');
+    // Els projectes antics conserven la lletra i l’estructura. El nou
+    // arranjament instrumental es torna a generar amb la configuració admesa.
+    const legacy = value.settings.instruments === undefined || ['rumba', 'funk', 'pop'].includes(value.settings.style);
+    if (legacy) {
+      if (['rumba', 'funk', 'pop'].includes(value.settings.style)) value.settings.style = 'ska';
+      const profile = engine.SONG_STYLES[value.settings.style];
+      if (!Object.hasOwn(engine.SONG_STYLES, value.settings.style)) throw new Error('Estil no vàlid');
+      if (Number.isInteger(value.settings.bpm)) value.settings.bpm = Math.max(profile.bpm.min, Math.min(profile.bpm.max, value.settings.bpm));
+      if (!profile.keys.some(([tonic, mode]) => tonic === value.settings.tonic && mode === value.settings.mode)) [value.settings.tonic, value.settings.mode] = profile.keys[0];
+      value.settings.instruments ||= Object.keys(engine.SONG_INSTRUMENTS);
+      value.parts.forEach(part => { part.generated = false; });
+      recoveredMigration = true;
+    }
     const seen = new Set();
     for (const part of value.parts) {
       if (!part || typeof part.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(part.id) || seen.has(part.id)
@@ -51,12 +65,26 @@
     $('confirm-title').textContent = title; $('confirm-message').textContent = message; dialog.returnValue = 'cancel';
     return new Promise(resolve => { dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true }); dialog.showModal(); });
   }
-  for (const mode of ['major', 'minor']) for (let n = 0; n < 12; n++) {
-    const option = document.createElement('option'); option.value = `${n}:${mode}`; option.textContent = `${noteNames[n]} ${mode === 'major' ? 'major' : 'menor'}`; $('song-key').append(option);
+  for (const [instrument, name] of Object.entries(engine.SONG_INSTRUMENTS)) {
+    const label = document.createElement('label'); label.className = 'instrument-toggle';
+    const input = document.createElement('input'); input.type = 'checkbox'; input.id = `instrument-${instrument}`; input.value = instrument;
+    const text = document.createElement('span'); text.textContent = name; label.append(input, text); $('song-instruments').append(label);
+    input.addEventListener('change', changeSettings);
   }
   function updateSettingsUI() {
+    const profile = engine.SONG_STYLES[song.settings.style];
     $('song-title').value = song.title; $('song-style').value = song.settings.style;
-    $('song-bpm').value = song.settings.bpm; $('song-key').value = `${song.settings.tonic}:${song.settings.mode}`;
+    $('song-bpm').min = profile.bpm.min; $('song-bpm').max = profile.bpm.max;
+    $('song-bpm').value = song.settings.bpm;
+    $('song-key').replaceChildren();
+    for (const [tonic, mode] of profile.keys) {
+      const option = document.createElement('option'); option.value = `${tonic}:${mode}`;
+      option.textContent = `${noteNames[tonic]} ${mode === 'major' ? 'major' : 'menor'}`; $('song-key').append(option);
+    }
+    $('song-key').value = `${song.settings.tonic}:${song.settings.mode}`;
+    $('style-summary').textContent = `${profile.name} · ${profile.bpm.min}–${profile.bpm.max} BPM`;
+    $('style-description').textContent = profile.description;
+    for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) $(`instrument-${instrument}`).checked = song.settings.instruments.includes(instrument);
   }
   function render() {
     const part = current(), position = song.parts.indexOf(part), ready = song.parts.filter(p => p.generated).length;
@@ -98,6 +126,7 @@
     $('remove-part').disabled = busy || song.parts.length === 1;
     $('play-part').disabled = busy || !part.generated; $('play-song').disabled = busy || !allReady;
     $('download-song').disabled = busy || !allReady; $('stop-playback').disabled = !isPlaying && !busy;
+    for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) $(`instrument-${instrument}`).disabled = busy;
     document.body.classList.toggle('busy', busy);
     renderWave(part);
   }
@@ -204,13 +233,21 @@
   $('stop-playback').addEventListener('click', () => { stop(); render(); }); $('download-song').addEventListener('click', downloadWav);
   $('next-part').addEventListener('click', () => { const i = song.parts.indexOf(current()); select(song.parts[(i + 1) % song.parts.length].id); });
   $('song-title').addEventListener('input', event => { song.title = event.target.value; $('transport-title').textContent = song.title || 'Nova cançó'; save(); });
-  async function changeSettings() {
-    const [tonic, mode] = $('song-key').value.split(':'), bpm = Number($('song-bpm').value);
-    const settings = { ...song.settings, style: $('song-style').value, bpm, tonic: Number(tonic), mode };
-    if (!Number.isInteger(bpm) || bpm < 60 || bpm > 180) { notify('Tria un tempo entre 60 i 180 BPM.'); updateSettingsUI(); return; }
+  async function changeSettings(event) {
+    const style = $('song-style').value, profile = engine.SONG_STYLES[style];
+    const changingStyle = event.target.id === 'song-style';
+    let [tonic, mode] = $('song-key').value.split(':'); tonic = Number(tonic);
+    if (!profile.keys.some(([key, keyMode]) => key === tonic && keyMode === mode)) [tonic, mode] = profile.keys[0];
+    const bpm = changingStyle ? profile.bpm.default : Number($('song-bpm').value);
+    const instruments = Object.keys(engine.SONG_INSTRUMENTS).filter(name => $(`instrument-${name}`).checked);
+    if (!instruments.length) { notify('Mantén com a mínim un instrument activat.'); updateSettingsUI(); return; }
+    if (!Number.isInteger(bpm) || bpm < profile.bpm.min || bpm > profile.bpm.max) {
+      notify(`Per a ${profile.name.toLowerCase()}, tria un tempo entre ${profile.bpm.min} i ${profile.bpm.max} BPM.`); updateSettingsUI(); return;
+    }
+    const settings = { ...song.settings, style, bpm, tonic, mode, instruments };
     if (JSON.stringify(settings) === JSON.stringify(song.settings)) return;
     updateSettingsUI();
-    if (song.parts.some(p => p.generated) && !await ask('Canviar la base musical?', 'Les parts generades tornaran a quedar pendents per compartir el nou tempo, estil i tonalitat. La lletra es conservarà.')) return;
+    if (song.parts.some(p => p.generated) && !await ask('Canviar la base musical?', 'Les parts generades tornaran a quedar pendents per compartir l’estil, el tempo, la tonalitat i els instruments. La lletra es conservarà.')) return;
     stop(); song.settings = settings; song.parts.forEach(p => { p.generated = false; }); cache.clear(); updateSettingsUI(); save(); render();
   }
   ['song-style', 'song-bpm', 'song-key'].forEach(key => $(key).addEventListener('change', changeSettings));
@@ -242,5 +279,6 @@
   });
   window.addEventListener('pagehide', stop);
   updateSettingsUI(); render();
+  if (recoveredMigration && storageAvailable) { save(); notify('Projecte adaptat als nous estils i instruments. Genera de nou les parts; la lletra s’ha conservat.'); }
   if (!storageAvailable) notify('No s’ha pogut recuperar l’esborrany. Obre un projecte desat o comença una cançó nova.');
 })();

@@ -19,9 +19,13 @@
     <div class="page-heading"><div><p class="eyebrow">ESTUDI DE COMPOSICIÓ <span>/</span> PROJECTE NOU</p><h1>Una cançó, peça a peça<span>.</span></h1><p class="intro-copy">Troba el ritme. Construeix les parts. Dona forma a la teva cançó.</p></div><span class="draft-badge" id="save-state">Esborrany local</span></div>
     <section class="song-settings" aria-label="Configuració de la cançó">
       <label class="title-field"><span class="field-label">NOM DEL PROJECTE</span><input id="song-title" maxlength="100" value="Nova cançó" aria-label="Nom de la cançó"></label>
-      <label><span class="field-label">ESTIL</span><select id="song-style"><option value="ska">Ska</option><option value="rumba">Rumba catalana</option><option value="funk">Funk</option><option value="pop">Pop</option></select></label>
-      <label class="tempo-field"><span class="field-label">TEMPO <span>4/4</span></span><div class="tempo-control"><input id="song-bpm" type="number" min="60" max="180" step="1" value="112" aria-label="Tempo en pulsacions per minut"><span>BPM</span></div></label>
+      <label><span class="field-label">ESTIL</span><select id="song-style"><option value="ska">Ska</option><option value="punk">Punk</option></select></label>
+      <label class="tempo-field"><span class="field-label">TEMPO <span>4/4</span></span><div class="tempo-control"><input id="song-bpm" type="number" min="100" max="180" step="1" value="128" aria-label="Tempo en pulsacions per minut"><span>BPM</span></div></label>
       <label><span class="field-label">TONALITAT</span><select id="song-key" aria-label="Tonalitat"></select></label>
+    </section>
+    <section class="band-settings" aria-label="Estil i instruments">
+      <div class="style-guide"><strong id="style-summary"></strong><span id="style-description"></span><small>Tempos i tonalitats preseleccionats per a aquest taller; no són límits del gènere.</small></div>
+      <fieldset class="instrument-picker"><legend>INSTRUMENTS</legend><div id="song-instruments"></div><small>Activa els instruments que vols fer sonar.</small></fieldset>
     </section>
     <section class="arrangement" aria-labelledby="arrangement-title">
       <div class="section-heading"><h2 id="arrangement-title">El mapa de la cançó</h2><span id="duration-total">4/4 · Estructura estàndard</span></div>
