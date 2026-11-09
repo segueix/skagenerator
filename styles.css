@@ -15,3 +15,21 @@
 .part-instrument-footer .text-button{font-size:10px;text-align:right}
 .part-instrument-panel + .sound-preview{margin-top:18px}
 @media(max-width:680px){.part-instrument-panel{padding:13px;margin-top:19px}.part-instrument-footer{flex-wrap:wrap;gap:4px}.part-instrument-footer .text-button{margin-left:auto}}
+
+
+/* Tria entre cinc arranjaments per a la intro, estrofa i tornada. */
+.variant-panel{margin:0 0 23px;border:1px solid #dbe3d1;background:#fbfcf8;border-radius:10px;padding:16px}
+.variant-panel[hidden]{display:none}
+.variant-header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.variant-header strong{font-size:10px;letter-spacing:.8px;color:#526b55}
+.variant-header span{font-size:9px;color:#899785}
+.variant-panel>p{font-size:11px;line-height:1.5;color:#728173;margin:9px 0 12px}
+.variant-list{display:grid;gap:7px}
+.variant-row{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid #e1e6da;border-radius:7px;background:white}
+.variant-row.chosen{border-color:#95af86;background:#eef5e8}
+.variant-title{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.variant-title strong{font-size:12px}
+.variant-title span{font-size:9px;color:#7c8b77}
+.variant-row .button{min-height:34px;font-size:10px;padding:7px 10px}
+.variant-row.chosen .variant-choose{background:#dfeecf;color:#365737;border-color:#b8d1ab}
+@media(max-width:680px){.variant-panel{padding:12px}.variant-row{gap:5px;padding:7px}.variant-row .button{font-size:9px;padding:7px 8px}.variant-title strong{font-size:11px}}
