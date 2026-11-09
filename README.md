@@ -14,7 +14,7 @@ Guitarres, bateria, baix, trompeta i trombó es poden activar independentment. E
 
 En recuperar un projecte anterior, es conserva l’estructura i la lletra, s’adapta la configuració als dos estils i es deixen les parts pendents de regenerar.
 
-Cada part es genera i s’escolta individualment, amb durada i intensitat pròpies. Tota la cançó comparteix estil, tempo i tonalitat. Les tornades comparteixen el motiu musical i les estrofes conserven la mateixa base. També es poden afegir pretornades i parts instrumentals, reordenar seccions i eliminar-les.
+Cada part es genera i s’escolta individualment, amb durada i intensitat pròpies. Tota la cançó comparteix estil, tempo i tonalitat. Per a cada intro, estrofa o tornada, el botó «Genera 5 versions diferents» crea cinc propostes amb progressions d’acords, melodies i patrons rítmics alternatius. Es poden escoltar per separat i escollir la versió definitiva, que és la que es reprodueix a la cançó completa i s’exporta al WAV. Les altres alternatives continuen disponibles. Les seccions repetides (estrofes i tornades) poden tenir una elecció independent. Les cinc composicions es calculen al moment, mentre que l’àudio de les alternatives no seleccionades només es prepara quan s’escolten. La tria i les llavors queden desades al JSON i al navegador. També es poden afegir pretornades i parts instrumentals, reordenar seccions i eliminar-les.
 
 La música instrumental es reprodueix amb mostres enregistrades de GeneralUser GS 2.0.3, mitjançant SpessaSynth Core 4.4.9 dins d’un Web Worker. Les lletres són anotacions: no es genera veu ni cant. No necessita claus d’API ni serveis de generació externs.
 
