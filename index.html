@@ -45,6 +45,11 @@
           <div class="part-instrument-footer"><span id="part-instrument-mode">Segueix els instruments base de la cançó</span><button type="button" id="reset-part-instruments" class="text-button" hidden>↶ Recupera la formació base</button></div>
         </fieldset>
         <div class="sound-preview" id="sound-preview"><div class="waveform" id="waveform" aria-hidden="true"></div><span id="preview-label">El primer compàs comença aquí.</span><span class="preview-duration" id="part-duration">00:09</span></div>
+        <section class="variant-panel" id="variant-panel" aria-label="Cinc versions de la secció" hidden>
+          <div class="variant-header"><strong>5 VERSIONS PER ESCOLLIR</strong><span>Només intro, estrofes i tornades</span></div>
+          <p id="variant-intro"></p>
+          <div id="variant-list" class="variant-list"></div>
+        </section>
         <div class="lyrics-heading"><label class="field-label" for="part-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="part-lyrics" rows="3" maxlength="5000" placeholder="Escriu la lletra o les idees per a aquesta part…"></textarea>
         <p class="instrumental-note"><span aria-hidden="true">♫</span> Generació instrumental. La lletra queda desada com a anotació; encara no es canta.</p>
         <div class="editor-actions"><button id="generate-part" class="button primary"><span aria-hidden="true">✦</span> <span id="generate-label">Genera la intro</span></button><button id="play-part" class="button listen" disabled><span aria-hidden="true">▷</span> Escolta la part</button><button id="next-part" class="text-button">Següent part <span aria-hidden="true">→</span></button></div>
