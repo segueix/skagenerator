@@ -10,7 +10,7 @@ Intro (4 compassos) → estrofa (8) → tornada (8) → estrofa (8) → tornada 
 
 Només hi ha ska i punk. L’ska té una selecció de 100–180 BPM (128 per defecte) i el punk de 140–220 BPM (180 per defecte). Cada estil ofereix una preselecció de tonalitats majors i menors adequada per treballar amb guitarra i metalls. Són decisions de configuració del taller, no restriccions teòriques dels gèneres.
 
-Guitarres, bateria, baix, trompeta i trombó es poden activar independentment. L’ska utilitza guitarra curta a contratemps i baix caminant; el punk utilitza quintes en corxeres i bateria més directa. Trompeta i trombó tenen mostres i registres diferenciats. No intervenen piano, vibràfon ni coixins de cordes en les noves cançons.
+Guitarres, bateria, baix, trompeta i trombó es poden activar independentment. Els instruments base serveixen de formació inicial per a la cançó. Cada intro, estrofa, tornada, pont, pretornada, instrumental o final pot activar diversos instruments propis; la selecció es desa per secció i no afecta les altres. L’opció «Recupera la formació base» restableix l’herència dels instruments generals. Canviar la formació base només invalida l’àudio de les seccions que la segueixen; canviar l’estil, el tempo o la tonalitat continua afectant-les totes. L’ska utilitza guitarra curta a contratemps i baix caminant; el punk utilitza quintes en corxeres i bateria més directa. Trompeta i trombó tenen mostres i registres diferenciats. No intervenen piano, vibràfon ni coixins de cordes en les noves cançons.
 
 En recuperar un projecte anterior, es conserva l’estructura i la lletra, s’adapta la configuració als dos estils i es deixen les parts pendents de regenerar.
 
