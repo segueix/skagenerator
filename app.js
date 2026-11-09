@@ -29,11 +29,17 @@
       value.parts.forEach(part => { part.generated = false; });
       recoveredMigration = true;
     }
+    if (!Array.isArray(value.settings.instruments) || !value.settings.instruments.length
+      || new Set(value.settings.instruments).size !== value.settings.instruments.length
+      || value.settings.instruments.some(name => !Object.hasOwn(engine.SONG_INSTRUMENTS, name))) throw new Error('Instruments base no vàlids');
     const seen = new Set();
     for (const part of value.parts) {
       if (!part || typeof part.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(part.id) || seen.has(part.id)
         || typeof part.lyrics !== 'string' || part.lyrics.length > 5000 || typeof part.generated !== 'boolean'
         || !Number.isInteger(part.revision) || part.revision < 1 || part.revision > 1000000) throw new Error('Secció no vàlida');
+      if (part.instruments !== undefined && (!Array.isArray(part.instruments) || !part.instruments.length
+        || new Set(part.instruments).size !== part.instruments.length
+        || part.instruments.some(name => !Object.hasOwn(engine.SONG_INSTRUMENTS, name)))) throw new Error('Instruments de la part no vàlids');
       seen.add(part.id);
       engine.composeSongPart(value.settings, part);
     }
@@ -48,6 +54,7 @@
   const seconds = p => p.bars * 4 * 60 / song.settings.bpm;
   const totalSeconds = () => song.parts.reduce((sum, p) => sum + seconds(p), 0);
   const time = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
+  const instrumentsFor = part => part.instruments === undefined ? song.settings.instruments : part.instruments;
   const partLabel = p => {
     const peers = song.parts.filter(q => q.type === p.type);
     return engine.SONG_PARTS[p.type].name + (peers.length > 1 ? ` ${peers.findIndex(q => q.id === p.id) + 1}` : '');
@@ -71,7 +78,25 @@
     const input = document.createElement('input'); input.type = 'checkbox'; input.id = `instrument-${instrument}`; input.value = instrument;
     const text = document.createElement('span'); text.textContent = name; label.append(input, text); $('song-instruments').append(label);
     input.addEventListener('change', changeSettings);
+    const partLabelElement = document.createElement('label'); partLabelElement.className = 'instrument-toggle';
+    const partInput = document.createElement('input'); partInput.type = 'checkbox'; partInput.id = `part-instrument-${instrument}`; partInput.value = instrument;
+    const partName = document.createElement('span'); partName.textContent = name;
+    partLabelElement.append(partInput, partName); $('part-instruments').append(partLabelElement);
+    partInput.addEventListener('change', changePartInstruments);
   }
+  function changePartInstruments() {
+    if (busy) return;
+    const part = current();
+    const instruments = Object.keys(engine.SONG_INSTRUMENTS).filter(name => $(`part-instrument-${name}`).checked);
+    if (!instruments.length) { notify('Cada part ha de tenir com a mínim un instrument.'); render(); return; }
+    if (JSON.stringify(instruments) === JSON.stringify(instrumentsFor(part))) return;
+    part.instruments = instruments;
+    invalidate(part); save(); render();
+  }
+  $('reset-part-instruments').addEventListener('click', () => {
+    if (busy || current().instruments === undefined) return;
+    const part = current(); delete part.instruments; invalidate(part); save(); render();
+  });
   function updateSettingsUI() {
     const profile = engine.SONG_STYLES[song.settings.style];
     $('song-title').value = song.title; $('song-style').value = song.settings.style;
@@ -96,12 +121,12 @@
       block.style.setProperty('--color', colors[p.type]); block.style.setProperty('--bars', p.bars);
       block.setAttribute('aria-pressed', String(p.id === selected)); block.setAttribute('aria-label', `${partLabel(p)}, ${p.bars} compassos, ${p.generated ? 'generada' : 'pendent'}`);
       const title = document.createElement('strong'); title.textContent = partLabel(p);
-      const info = document.createElement('span'); info.textContent = `${p.bars} comp. ${p.generated ? '✓' : ''}`;
+      const info = document.createElement('span'); info.textContent = `${p.bars} comp. · ${instrumentsFor(p).length} instr. ${p.generated ? '✓' : ''}`;
       block.append(title, info); block.disabled = busy; block.addEventListener('click', () => select(p.id)); $('timeline').append(block);
       const li = document.createElement('li'), button = document.createElement('button'); button.className = `section-row${p.id === selected ? ' selected' : ''}`;
       button.setAttribute('aria-pressed', String(p.id === selected)); button.disabled = busy; button.style.setProperty('--color', colors[p.type]);
       const number = document.createElement('span'); number.className = 'section-number'; number.textContent = String(i + 1).padStart(2, '0');
-      const text = document.createElement('span'), name = document.createElement('strong'), sub = document.createElement('small'); name.textContent = partLabel(p); sub.textContent = `${p.bars} compassos · ${time(seconds(p))}`; text.append(name, sub);
+      const text = document.createElement('span'), name = document.createElement('strong'), sub = document.createElement('small'); name.textContent = partLabel(p); sub.textContent = `${p.bars} compassos · ${instrumentsFor(p).length} instruments · ${time(seconds(p))}`; text.append(name, sub);
       const status = document.createElement('span'); status.className = p.generated ? 'row-status' : 'pending-circle'; status.setAttribute('aria-label', p.generated ? 'Generada' : 'Pendent'); status.textContent = p.generated ? '✓' : '';
       button.append(number, text, status); button.addEventListener('click', () => select(p.id)); li.append(button); $('section-list').append(li);
     });
@@ -112,6 +137,11 @@
     $('part-status').textContent = busy ? 'Preparant el so…' : part.generated ? 'Generada ✓' : 'Per començar'; $('part-status').className = `part-badge${part.generated ? ' ready' : ''}`;
     $('part-bars').value = part.bars; $('part-energy').value = part.energy; $('energy-value').textContent = `${part.energy} %`;
     $('part-lyrics').value = part.lyrics; $('part-duration').textContent = time(seconds(part));
+    for (const name of Object.keys(engine.SONG_INSTRUMENTS)) $(`part-instrument-${name}`).checked = instrumentsFor(part).includes(name);
+    const custom = part.instruments !== undefined;
+    $('part-instrument-mode').textContent = custom ? 'Selecció pròpia d’aquesta part' : 'Segueix els instruments base de la cançó';
+    $('reset-part-instruments').hidden = !custom;
+    $('reset-part-instruments').disabled = busy || !custom;
     $('generate-label').textContent = busy ? 'Preparant el so…' : part.generated ? 'Genera una altra versió' : `Genera ${part.type === 'intro' ? 'la intro' : part.type === 'verse' ? 'l’estrofa' : part.type === 'chorus' ? 'la tornada' : part.type === 'outro' ? 'el final' : part.type === 'bridge' ? 'el pont' : part.type === 'solo' ? 'l’instrumental' : 'la pretornada'}`;
     $('sound-preview').classList.toggle('ready', part.generated);
     $('preview-label').textContent = part.generated ? 'La teva música · vista de l’àudio' : position === 0 ? 'El primer compàs comença aquí.' : 'Una nova part per donar forma a la cançó.';
@@ -127,7 +157,7 @@
     $('remove-part').disabled = busy || song.parts.length === 1;
     $('play-part').disabled = busy || !part.generated; $('play-song').disabled = busy || !allReady;
     $('download-song').disabled = busy || !allReady; $('stop-playback').disabled = !isPlaying;
-    for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) $(`instrument-${instrument}`).disabled = busy;
+    for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) { $(`instrument-${instrument}`).disabled = busy; $(`part-instrument-${instrument}`).disabled = busy; }
     document.body.classList.toggle('busy', busy);
     renderWave(part);
   }
@@ -254,9 +284,17 @@
     }
     const settings = { ...song.settings, style, bpm, tonic, mode, instruments };
     if (JSON.stringify(settings) === JSON.stringify(song.settings)) return;
+    const musicChanged = style !== song.settings.style || bpm !== song.settings.bpm || tonic !== song.settings.tonic || mode !== song.settings.mode;
+    // Els canvis de formació base només afecten les parts que encara la segueixen.
+    const affected = musicChanged ? song.parts : song.parts.filter(p => p.instruments === undefined);
     updateSettingsUI();
-    if (song.parts.some(p => p.generated) && !await ask('Canviar la base musical?', 'Les parts generades tornaran a quedar pendents per compartir l’estil, el tempo, la tonalitat i els instruments. La lletra es conservarà.')) return;
-    stop(); song.settings = settings; song.parts.forEach(p => { p.generated = false; }); cache.clear(); updateSettingsUI(); save(); render();
+    if (affected.some(p => p.generated) && !await ask('Canviar la base musical?',
+      musicChanged
+        ? 'Canviar l’estil, el tempo o la tonalitat deixa totes les parts pendents de regenerar. Es conservaran els instruments triats a cada part i la lletra.'
+        : 'Les parts que segueixen els instruments base quedaran pendents de regenerar. Les parts amb instruments propis i la lletra es conservaran.')) return;
+    stop(); song.settings = settings;
+    affected.forEach(p => { p.generated = false; cache.delete(p.id); });
+    updateSettingsUI(); save(); render();
   }
   ['song-style', 'song-bpm', 'song-key'].forEach(key => $(key).addEventListener('change', changeSettings));
   $('part-bars').addEventListener('change', event => { const p = current(); p.bars = Number(event.target.value); invalidate(p); save(); render(); });
