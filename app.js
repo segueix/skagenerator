@@ -40,6 +40,12 @@
       if (part.instruments !== undefined && (!Array.isArray(part.instruments) || !part.instruments.length
         || new Set(part.instruments).size !== part.instruments.length
         || part.instruments.some(name => !Object.hasOwn(engine.SONG_INSTRUMENTS, name)))) throw new Error('Instruments de la part no vàlids');
+      if (part.variants !== undefined) {
+        if (!fiveVersions(part) || !Array.isArray(part.variants) || part.variants.length !== 5
+          || new Set(part.variants).size !== 5 || part.variants.some(rev => !Number.isInteger(rev) || rev < 1 || rev > 1000000)
+          || !Number.isInteger(part.selectedVariant) || part.selectedVariant < 0 || part.selectedVariant > 4
+          || part.revision !== part.variants[part.selectedVariant]) throw new Error('Versions de la secció no vàlides');
+      } else if (part.selectedVariant !== undefined) throw new Error('Selecció de versió no vàlida');
       seen.add(part.id);
       engine.composeSongPart(value.settings, part);
     }
@@ -55,6 +61,17 @@
   const totalSeconds = () => song.parts.reduce((sum, p) => sum + seconds(p), 0);
   const time = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
   const instrumentsFor = part => part.instruments === undefined ? song.settings.instruments : part.instruments;
+  const fiveVersions = part => ['intro', 'verse', 'chorus'].includes(part.type);
+  const hasVersions = part => fiveVersions(part) && part.generated && Array.isArray(part.variants) && part.variants.length === 5;
+  const cacheKey = (part, revision = part.revision) => `${part.id}:${revision}`;
+  function clearPartCache(part) {
+    for (const key of cache.keys()) if (key.startsWith(`${part.id}:`)) cache.delete(key);
+  }
+  function chooseVersion(part, index) {
+    if (busy || !hasVersions(part) || index < 0 || index >= 5) return;
+    stop(); part.selectedVariant = index; part.revision = part.variants[index]; save(); render();
+    notify(`${partLabel(part)} · versió ${index + 1} escollida per a la cançó.`);
+  }
   const partLabel = p => {
     const peers = song.parts.filter(q => q.type === p.type);
     return engine.SONG_PARTS[p.type].name + (peers.length > 1 ? ` ${peers.findIndex(q => q.id === p.id) + 1}` : '');
@@ -142,10 +159,16 @@
     $('part-instrument-mode').textContent = custom ? 'Selecció pròpia d’aquesta part' : 'Segueix els instruments base de la cançó';
     $('reset-part-instruments').hidden = !custom;
     $('reset-part-instruments').disabled = busy || !custom;
-    $('generate-label').textContent = busy ? 'Preparant el so…' : part.generated ? 'Genera una altra versió' : `Genera ${part.type === 'intro' ? 'la intro' : part.type === 'verse' ? 'l’estrofa' : part.type === 'chorus' ? 'la tornada' : part.type === 'outro' ? 'el final' : part.type === 'bridge' ? 'el pont' : part.type === 'solo' ? 'l’instrumental' : 'la pretornada'}`;
+    $('generate-label').textContent = busy ? 'Preparant el so…'
+      : fiveVersions(part) ? (hasVersions(part) ? 'Genera 5 versions noves' : 'Genera 5 versions diferents')
+      : part.generated ? 'Genera una altra versió'
+      : `Genera ${part.type === 'outro' ? 'el final' : part.type === 'bridge' ? 'el pont' : part.type === 'solo' ? 'l’instrumental' : 'la pretornada'}`;
+    renderVersions(part);
     $('sound-preview').classList.toggle('ready', part.generated);
     $('preview-label').textContent = part.generated ? 'La teva música · vista de l’àudio' : position === 0 ? 'El primer compàs comença aquí.' : 'Una nova part per donar forma a la cançó.';
-    $('section-hint').textContent = part.type === 'chorus' ? 'Les tornades comparteixen el motiu. Una nova versió actualitza també les tornades ja generades.' : 'Genera, escolta i prova una altra versió fins que trobis la que t’agrada.';
+    $('section-hint').textContent = fiveVersions(part)
+      ? 'Escolta les cinc propostes, tria’n una i serà la que es farà servir en la cançó i en el WAV.'
+      : 'Genera, escolta i prova una altra versió fins que trobis la que t’agrada.';
     $('transport-title').textContent = song.title || 'Nova cançó'; $('ready-count').textContent = `${ready} de ${song.parts.length} parts generades`;
     if (!isPlaying) $('transport-subtitle').textContent = allReady ? 'La cançó està a punt per escoltar' : ready ? 'Continua amb les parts pendents' : 'Comença generant la intro';
     if (!isPlaying) $('playback-duration').textContent = time(totalSeconds());
@@ -161,8 +184,35 @@
     document.body.classList.toggle('busy', busy);
     renderWave(part);
   }
+  function renderVersions(part) {
+    const panel = $('variant-panel'); panel.hidden = !fiveVersions(part);
+    if (!fiveVersions(part)) return;
+    const ready = hasVersions(part), list = $('variant-list');
+    $('variant-intro').textContent = ready
+      ? 'Escolta cada proposta i decideix quina utilitzar. Les altres es conservaran per si canvies d’opinió.'
+      : 'Genera cinc idees amb melodies, acords i ritmes diferents; després les podràs escoltar i triar.';
+    list.replaceChildren();
+    if (!ready) return;
+    part.variants.forEach((revision, index) => {
+      const chosen = index === part.selectedVariant;
+      const row = document.createElement('div'); row.className = `variant-row${chosen ? ' chosen' : ''}`;
+      const label = document.createElement('div'); label.className = 'variant-title';
+      const name = document.createElement('strong'); name.textContent = `Versió ${index + 1}`;
+      const note = document.createElement('span'); note.textContent = chosen ? '✓ Escollida per a la cançó' : 'Alternativa musical';
+      label.append(name, note);
+      const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'button variant-listen';
+      listen.textContent = '▷ Escolta'; listen.disabled = busy;
+      listen.setAttribute('aria-label', `Escoltar ${partLabel(part)}, versió ${index + 1}`);
+      listen.addEventListener('click', () => play(false, index));
+      const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'button variant-choose';
+      choose.textContent = chosen ? '✓ Escollida' : 'Escull'; choose.disabled = busy || chosen;
+      choose.setAttribute('aria-label', `Escollir ${partLabel(part)}, versió ${index + 1}`);
+      choose.addEventListener('click', () => chooseVersion(part, index));
+      row.append(label, listen, choose); list.append(row);
+    });
+  }
   function renderWave(part) {
-    const wave = $('waveform'); wave.replaceChildren(); const data = cache.get(part.id)?.[0];
+    const wave = $('waveform'); wave.replaceChildren(); const data = cache.get(cacheKey(part))?.[0];
     for (let k = 0; k < 80; k++) {
       const bar = document.createElement('i'); let height = 8;
       if (data) {
@@ -177,7 +227,7 @@
   }
   function select(partId) { if (busy) return; selected = partId; render(); }
   function setBusy(value) { busy = value; render(); }
-  function invalidate(part) { part.generated = false; cache.delete(part.id); stop(); }
+  function invalidate(part) { part.generated = false; clearPartCache(part); stop(); }
   function audioProgress(progress) {
     const status = $('audio-status');
     status.parentElement.classList.remove('error');
@@ -191,23 +241,41 @@
     $('audio-status').parentElement.classList.remove('loading'); $('audio-status').parentElement.classList.add('error');
     console.error(error);
   }
-  async function getSamples(part) {
-    if (!cache.has(part.id)) cache.set(part.id, await sampleAudio.render(engine.composeSongPart(song.settings, part), RATE, { onProgress: audioProgress }));
-    return cache.get(part.id);
+  async function getSamples(part, versionIndex = null) {
+    const revision = versionIndex === null ? part.revision : part.variants?.[versionIndex];
+    if (!Number.isInteger(revision)) throw new Error('La versió no existeix');
+    const key = cacheKey(part, revision);
+    if (!cache.has(key)) {
+      const specPart = { ...part, revision };
+      if (versionIndex !== null) specPart.variantIndex = versionIndex;
+      cache.set(key, await sampleAudio.render(engine.composeSongPart(song.settings, specPart), RATE, { onProgress: audioProgress }));
+    }
+    return cache.get(key);
   }
   async function generate() {
     if (busy) return; stop(); const part = current();
-    const revision = part.type === 'chorus' ? (part.generated ? song.chorusRevision + 1 : song.chorusRevision) : (part.generated ? part.revision + 1 : part.revision);
+    const latest = Math.max(part.revision, ...(part.variants || []));
+    const multiple = fiveVersions(part), count = multiple ? 5 : 1;
+    let start = part.generated || part.variants ? latest + 1 : part.revision;
+    if (start + count - 1 > 1000000) start = 1;
     setBusy(true);
     try {
-      const data = await sampleAudio.render(engine.composeSongPart(song.settings, { ...part, revision }), RATE, { onProgress: audioProgress });
-      if (part.type === 'chorus') {
-        song.chorusRevision = revision;
-        song.parts.filter(p => p.type === 'chorus').forEach(p => { p.revision = revision; cache.delete(p.id); });
-      }
-      part.revision = revision; part.generated = true; cache.set(part.id, data); save();
-      notify(`${partLabel(part)} generada. Ja la pots escoltar.`);
-    } catch (error) { audioError(error); notify('No s’han pogut preparar els instruments. Comprova la connexió i torna-ho a provar.'); }
+      const versions = Array.from({ length: count }, (_, i) => start + i);
+      const specs = versions.map((revision, index) => engine.composeSongPart(song.settings,
+        { ...part, revision, variants: multiple ? versions : undefined, variantIndex: multiple ? index : undefined }));
+      if (multiple && new Set(specs.map(spec => JSON.stringify([spec.chords.map(chord => chord.root), spec.melody]))).size !== 5)
+        throw new Error('No s’han pogut diferenciar les cinc composicions');
+      // Es calcula l'àudio de la primera proposta. Les altres quatre s'han
+      // compost, i es renderitzen en escoltar-les per evitar esperes i consum de memòria.
+      const data = await sampleAudio.render(specs[0], RATE, { onProgress: audioProgress });
+      clearPartCache(part);
+      if (multiple) { part.variants = versions; part.selectedVariant = 0; }
+      else { delete part.variants; delete part.selectedVariant; }
+      part.revision = start; part.generated = true; cache.set(cacheKey(part), data); save();
+      notify(multiple
+        ? `${partLabel(part)}: 5 versions diferents creades. Escolta-les i escull-ne una.`
+        : `${partLabel(part)} generada. Ja la pots escoltar.`);
+    } catch (error) { audioError(error); notify('No s’han pogut preparar les versions. Comprova la connexió i torna-ho a provar.'); }
     finally { setBusy(false); }
   }
   function stop() {
@@ -218,7 +286,7 @@
     $('playback-duration').textContent = time(totalSeconds());
   }
   const join = parts => audioUtils.joinStereo(parts);
-  async function play(whole) {
+  async function play(whole, versionIndex = null) {
     if (isPlaying && whole) { stop(); render(); return; }
     if (busy) return; stop(); const token = playToken; const part = current();
     const Audio = window.AudioContext || window.webkitAudioContext;
@@ -226,7 +294,7 @@
     try {
       // Creació i resume dins del clic per respectar el permís d’àudio en mòbils.
       context ||= new Audio(); const resume = context.resume(); setBusy(true); await resume;
-      const data = whole ? join(await collectSamples()) : await getSamples(part);
+      const data = whole ? join(await collectSamples()) : await getSamples(part, versionIndex);
       if (token !== playToken) return;
       const buffer = context.createBuffer(2, data[0].length, RATE); buffer.copyToChannel(data[0], 0); buffer.copyToChannel(data[1], 1);
       source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination);
@@ -234,7 +302,7 @@
       source.onended = () => { if (token === playToken) { gain.disconnect(); stop(); render(); } };
       playStarted = context.currentTime; playSeconds = data[0].length / RATE; playingPart = whole ? null : part.id;
       isPlaying = true; source.start(); document.body.classList.add('playing');
-      $('transport-subtitle').textContent = whole ? 'Escoltant la cançó completa' : `Escoltant · ${partLabel(part)}`;
+      $('transport-subtitle').textContent = whole ? 'Escoltant la cançó completa' : `Escoltant · ${partLabel(part)}${versionIndex !== null ? ` · versió ${versionIndex + 1}` : ''}`;
       $('play-song').textContent = '■'; $('playback-duration').textContent = time(playSeconds);
       const tick = () => {
         if (!isPlaying) return;
@@ -307,7 +375,7 @@
   $('remove-part').addEventListener('click', async () => {
     const p = current(); if (song.parts.length === 1) return;
     if ((p.generated || p.lyrics) && !await ask(`Eliminar ${partLabel(p).toLowerCase()}?`, 'S’eliminaran aquesta part i les seves anotacions. La resta de la cançó es conservarà.')) return;
-    stop(); const i = song.parts.indexOf(p); song.parts.splice(i, 1); cache.delete(p.id); selected = song.parts[Math.min(i, song.parts.length - 1)].id; save(); render();
+    stop(); const i = song.parts.indexOf(p); song.parts.splice(i, 1); clearPartCache(p); selected = song.parts[Math.min(i, song.parts.length - 1)].id; save(); render();
   });
   $('new-song').addEventListener('click', async () => {
     if ((song.parts.some(p => p.generated || p.lyrics) || song.title !== 'Nova cançó') && !await ask('Començar una cançó nova?', 'Es reemplaçarà l’esborrany actual. Desa primer el projecte si el vols recuperar després.')) return;
