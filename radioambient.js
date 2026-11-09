@@ -1718,7 +1718,96 @@
         players.add(api);
         return api;
     }
+    // ── Cançons per seccions ────────────────────────────────────────────
+    // Comparteix els instruments del motor original. Tempo i tonalitat són
+    // globals; les tornades reutilitzen la llavor perquè conservin el motiu.
+    const SONG_PARTS = {
+        intro: { name: 'Intro', bars: 4, energy: 35, description: 'Presenta el ritme i el caràcter de la cançó.' },
+        verse: { name: 'Estrofa', bars: 8, energy: 55, description: 'Desenvolupa la història i deixa espai per a la veu.' },
+        prechorus: { name: 'Pretornada', bars: 4, energy: 70, description: 'Fa créixer la tensió abans de la tornada.' },
+        chorus: { name: 'Tornada', bars: 8, energy: 85, description: 'El motiu principal: memorable i amb més intensitat.' },
+        bridge: { name: 'Pont', bars: 4, energy: 45, description: 'Aporta contrast abans de l’última tornada.' },
+        solo: { name: 'Instrumental', bars: 8, energy: 75, description: 'Dona protagonisme a la melodia instrumental.' },
+        outro: { name: 'Final', bars: 4, energy: 30, description: 'Recupera el motiu i tanca la cançó.' }
+    };
+    const SONG_STYLES = {
+        ska: { name: 'Ska', lead: 'horn' },
+        rumba: { name: 'Rumba catalana', lead: 'guitar' },
+        funk: { name: 'Funk', lead: 'epiano' },
+        pop: { name: 'Pop', lead: 'vibes' }
+    };
+    function composeSongPart(settings, part) {
+        if (!Object.hasOwn(SONG_PARTS, part.type)) throw new Error('Tipus de secció desconegut');
+        const bars = Number(part.bars), bpm = Number(settings.bpm), tonic = Number(settings.tonic);
+        if (![4, 8, 12, 16].includes(bars) || !Number.isFinite(bpm) || bpm < 60 || bpm > 180
+            || !Number.isInteger(tonic) || tonic < 0 || tonic > 11 || !Object.hasOwn(SCALES, settings.mode)
+            || !Object.hasOwn(SONG_STYLES, settings.style)) throw new Error('Configuració musical no vàlida');
+        const energy = Number(part.energy);
+        if (!Number.isFinite(energy) || energy < 0 || energy > 100) throw new Error('Intensitat no vàlida');
+        const family = part.type === 'chorus' ? 31 : part.type === 'verse' ? 17 : Object.keys(SONG_PARTS).indexOf(part.type) * 47 + 3;
+        const seed = ((settings.seed >>> 0) + Math.imul(family, 7919) + Math.imul(part.revision || 1, 104729)) >>> 0;
+        const r = seededRng(seed), mode = settings.mode;
+        const choices = PHRASES[mode];
+        let degrees = pickOf(r, part.type === 'bridge' ? choices.b : choices.a).slice();
+        if (part.type === 'chorus') degrees = mode === 'major' ? [0, 4, 5, 3] : [0, 5, 2, 6];
+        if (part.type === 'intro') degrees = [0, 0, 3, 4];
+        degrees = Array.from({ length: bars }, (_, i) => degrees[i % degrees.length]);
+        if (part.type === 'outro') degrees[bars - 1] = 0;
+        const chords = degrees.map(d => buildChord(tonic, mode, d, { chordBase: 55 }, settings.style === 'funk'));
+        const ctx = { chords, scalePcs: SCALES[mode].map(n => (tonic + n) % 12), lo: 64, hi: part.type === 'chorus' ? 84 : 79, center: 72, maxJump: 3 };
+        ctx.prev = nearestTone(72, chords[0].pcs, 64, 79);
+        const rhythms = part.type === 'chorus' ? [RHYTHMS.r2, RHYTHMS.r5, RHYTHMS.r2, RHYTHMS.r7] : [RHYTHMS.r9, RHYTHMS.r3, RHYTHMS.r5, RHYTHMS.r7];
+        const phrase = composePhrase(r, ctx, [0, 1, 2, 3], rhythms).notes;
+        const melody = [];
+        for (let b = 0; b < bars; b += 4) phrase.forEach(n => melody.push([n[0] + b, n[1], n[2], n[3]]));
+        return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
+            seconds: bars * 4 * 60 / bpm, chords, melody, lead: SONG_STYLES[settings.style].lead };
+    }
+    function songPartScore(syn, spec) {
+        const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;
+        const guitar = { decay: 0.16, partials: [1, 0.6, 0.25], damp: 1.5, gain: 0.09, attack: 0.003 };
+        spec.chords.forEach((chord, b) => {
+            const t0 = b * bar;
+            const ending = spec.type === 'outro' && b === spec.bars - 1;
+            const soft = spec.type === 'intro' || spec.type === 'bridge';
+            const stabs = ending ? [0] : spec.style === 'ska' ? [0.5, 1.5, 2.5, 3.5]
+                : spec.style === 'rumba' ? [0, 1.5, 2, 3.5] : spec.style === 'funk' ? [0, 1.5, 2.5] : [0, 2];
+            stabs.forEach(t => chord.notes.forEach((n, k) => {
+                if (spec.style === 'ska' || spec.style === 'rumba') syn.pluck(t0 + t * beat + k * 0.006, n, intensity * 0.75, guitar);
+                else syn.epiano(t0 + t * beat + k * 0.006, n, intensity * 0.6);
+            }));
+            (ending ? [0] : [0, 1, 2, 3]).forEach((t, k) => syn.bass(t0 + t * beat, chord.root + (k % 2 ? 7 : 0), intensity * 0.8, ending ? 0.8 : 0.25));
+            (ending ? [0] : [0, 2]).forEach(t => syn.kick(t0 + t * beat, intensity * 0.65));
+            if (!ending) {
+                [1, 3].forEach(t => syn.brush(t0 + t * beat, intensity * (soft ? 0.25 : 0.65), 0.07, false));
+                for (let k = 0; k < 8; k++) syn.brush(t0 + k * beat / 2, intensity * (k % 2 ? 0.16 : 0.22), 0.015, true);
+            }
+            if (spec.type === 'chorus' || spec.type === 'outro') chord.notes.forEach(n => syn.pad(t0, n, bar * 0.85, 0.012 * intensity, 0.15));
+        });
+        spec.melody.forEach(([b, t, n, d]) => {
+            if ((spec.type === 'intro' && b < 2) || (spec.type === 'outro' && b === spec.bars - 1)) return;
+            playLead(syn, spec.lead, b * bar + t * beat, n, d * beat - 0.04,
+                intensity * (spec.type === 'verse' ? 0.45 : 0.8));
+        });
+        return TARGET_RMS;
+    }
+    function songPartSamples(spec, sampleRate = 22050, opts = {}) {
+        // Els instruments originals treballen circularment. Un marge final
+        // evita que les cues de l’últim compàs reapareguin al començament.
+        const seconds = Math.ceil(spec.seconds + 4);
+        return renderAsync(syn => songPartScore(syn, spec), seconds, sampleRate, seededRng(spec.seed), opts).then(raw => {
+            const data = raw.slice(0, Math.round(spec.seconds * sampleRate));
+            const level = 0.5 + spec.energy / 200;
+            for (let i = 0; i < data.length; i++) data[i] *= level;
+            const fade = Math.min(data.length, Math.round((spec.type === 'outro' ? 0.7 : 0.012) * sampleRate));
+            for (let i = 0; i < fade; i++) data[data.length - 1 - i] *= i / fade;
+            for (let i = 0; i < Math.min(110, data.length); i++) data[i] *= i / 110;
+            return data;
+        });
+    }
+
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
+        SONG_PARTS, SONG_STYLES, composeSongPart, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

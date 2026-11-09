@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172c28">
+  <meta name="description" content="Compon una cançó instrumental, part per part. Genera, escolta i treballa cada secció al teu ritme.">
+  <title>Ska Generator · Nova cançó</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23172c28'/%3E%3Cpath d='M12 28V15l16-4v13M12 19l16-4' stroke='%23d5f28b' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="radioambient.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Ska Generator, inici"><span class="brand-icon" aria-hidden="true">♫</span><span>ska<span class="brand-light">generator</span><small>EL TEU TALLER DE CANÇONS</small></span></a>
+    <span class="top-note"><span class="live-dot"></span> Fet al teu navegador</span>
+    <button class="button new-song" id="new-song"><span aria-hidden="true">＋</span> Nova cançó</button>
+  </header>
+  <main>
+    <div class="page-heading"><div><p class="eyebrow">ESTUDI DE COMPOSICIÓ <span>/</span> PROJECTE NOU</p><h1>Una cançó, peça a peça<span>.</span></h1><p class="intro-copy">Troba el ritme. Construeix les parts. Dona forma a la teva cançó.</p></div><span class="draft-badge" id="save-state">Esborrany local</span></div>
+    <section class="song-settings" aria-label="Configuració de la cançó">
+      <label class="title-field"><span class="field-label">NOM DEL PROJECTE</span><input id="song-title" maxlength="100" value="Nova cançó" aria-label="Nom de la cançó"></label>
+      <label><span class="field-label">ESTIL</span><select id="song-style"><option value="ska">Ska</option><option value="rumba">Rumba catalana</option><option value="funk">Funk</option><option value="pop">Pop</option></select></label>
+      <label class="tempo-field"><span class="field-label">TEMPO <span>4/4</span></span><div class="tempo-control"><input id="song-bpm" type="number" min="60" max="180" step="1" value="112" aria-label="Tempo en pulsacions per minut"><span>BPM</span></div></label>
+      <label><span class="field-label">TONALITAT</span><select id="song-key" aria-label="Tonalitat"></select></label>
+    </section>
+    <section class="arrangement" aria-labelledby="arrangement-title">
+      <div class="section-heading"><h2 id="arrangement-title">El mapa de la cançó</h2><span id="duration-total">4/4 · Estructura estàndard</span></div>
+      <div id="timeline" class="timeline" aria-label="Seccions de la cançó"></div>
+      <div class="timeline-caption"><span><i class="legend-dot"></i> Generada <i class="legend-dot pending"></i> Pendent de generar</span><span>Selecciona una part per treballar-hi <span aria-hidden="true">↗</span></span></div>
+    </section>
+    <div class="studio-grid">
+      <aside class="structure-panel" aria-labelledby="structure-title"><div class="section-heading"><h2 id="structure-title">Estructura</h2><span class="count-pill" id="part-count">8 parts</span></div><ol id="section-list" class="section-list"></ol><div class="add-section"><select id="add-type" aria-label="Tipus de part per afegir"><option value="prechorus">Pretornada</option><option value="intro">Intro</option><option value="verse">Estrofa</option><option value="chorus">Tornada</option><option value="bridge">Pont</option><option value="solo">Instrumental</option><option value="outro">Final</option></select><button id="add-part" class="button" aria-label="Afegir una part després de la seleccionada">＋ Afegir</button></div><p class="aside-tip">Una estructura per començar.<br>Adapta-la al que et demani la cançó.</p></aside>
+      <section class="editor-panel" aria-labelledby="part-title">
+        <div class="editor-topline"><p class="eyebrow" id="part-position">PART 01 / 08</p><div class="part-tools"><button class="icon-button" id="move-up" aria-label="Moure la part amunt" title="Moure amunt">↑</button><button class="icon-button" id="move-down" aria-label="Moure la part avall" title="Moure avall">↓</button><button class="icon-button" id="remove-part" aria-label="Eliminar la part" title="Eliminar part">×</button></div></div>
+        <div class="editor-title-line"><h2 id="part-title">Intro</h2><span class="part-badge" id="part-status">Per començar</span></div>
+        <p id="part-description" class="part-description"></p>
+        <div class="part-options"><label><span class="field-label">DURADA</span><select id="part-bars"><option value="4">4 compassos</option><option value="8">8 compassos</option><option value="12">12 compassos</option><option value="16">16 compassos</option></select></label><label class="energy-field"><span class="field-label">INTENSITAT <output id="energy-value" for="part-energy">35 %</output></span><input id="part-energy" aria-label="Intensitat de la part" type="range" min="10" max="100" step="5" value="35"><span class="range-labels"><span>Suau</span><span>Enèrgica</span></span></label></div>
+        <div class="sound-preview" id="sound-preview"><div class="waveform" id="waveform" aria-hidden="true"></div><span id="preview-label">El primer compàs comença aquí.</span><span class="preview-duration" id="part-duration">00:09</span></div>
+        <div class="lyrics-heading"><label class="field-label" for="part-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="part-lyrics" rows="3" maxlength="5000" placeholder="Escriu la lletra o les idees per a aquesta part…"></textarea>
+        <p class="instrumental-note"><span aria-hidden="true">♫</span> Generació instrumental. La lletra queda desada com a anotació; encara no es canta.</p>
+        <div class="editor-actions"><button id="generate-part" class="button primary"><span aria-hidden="true">✦</span> <span id="generate-label">Genera la intro</span></button><button id="play-part" class="button listen" disabled><span aria-hidden="true">▷</span> Escolta la part</button><button id="next-part" class="text-button">Següent part <span aria-hidden="true">→</span></button></div>
+        <p class="section-hint" id="section-hint"></p>
+      </section>
+    </div>
+    <div class="bottom-notes"><span><span class="live-dot"></span> Es desa automàticament en aquest navegador</span><button class="text-button" id="export-project">↓ Desa el projecte</button><label class="text-button import-label" for="import-project">↑ Obre un projecte<input type="file" id="import-project" accept=".json,application/json" hidden></label></div>
+  </main>
+  <footer class="transport" aria-label="Reproductor de la cançó"><div class="transport-content"><button id="play-song" class="transport-play" aria-label="Escoltar la cançó completa" disabled>▶</button><div class="transport-title"><strong id="transport-title">Nova cançó</strong><span id="transport-subtitle">Comença generant la intro</span></div><div class="transport-progress"><div class="progress-label"><span id="playback-time">00:00</span><span id="ready-count">0 de 8 parts generades</span><span id="playback-duration">01:51</span></div><progress id="song-progress" value="0" max="1" aria-label="Progrés de reproducció"></progress></div><button id="stop-playback" class="icon-button" aria-label="Aturar reproducció" disabled>■</button><button id="download-song" class="button download" disabled>↓ Exporta WAV</button></div></footer>
+  <p id="notice" class="notice" role="status" aria-live="polite"></p>
+  <dialog id="confirm-dialog"><form method="dialog"><h2 id="confirm-title">Començar una cançó nova?</h2><p id="confirm-message">Desa el projecte si el vols recuperar després.</p><div class="dialog-actions"><button class="button" value="cancel">Cancel·la</button><button class="button primary" value="confirm">Continua</button></div></form></dialog>
+</body>
+</html>
