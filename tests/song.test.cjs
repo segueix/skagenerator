@@ -72,3 +72,20 @@ test('els cinc instruments generen àudio propi i trompeta i trombó són difere
   assert.throws(() => engine.composeSongPart({ ...settings, instruments: [] }, part('intro')));
   assert.throws(() => engine.composeSongPart({ ...settings, instruments: ['piano'] }, part('intro')));
 });
+
+test('cada part admet una combinació instrumental pròpia independent de la formació base', () => {
+  const base = { ...settings, instruments: ['guitar', 'drums', 'bass'] };
+  const intro = { ...part('intro'), instruments: ['guitar', 'trumpet', 'trombone'] };
+  const verse = { ...part('verse'), instruments: ['bass', 'drums'] };
+  const chorus = { ...part('chorus'), instruments: ['guitar', 'drums', 'bass', 'trumpet', 'trombone'] };
+  assert.deepEqual(engine.composeSongPart(base, intro).instruments, intro.instruments);
+  assert.deepEqual(engine.composeSongPart(base, verse).instruments, verse.instruments);
+  assert.deepEqual(engine.composeSongPart(base, chorus).instruments, chorus.instruments);
+  assert.deepEqual(engine.composeSongPart(base, part('outro')).instruments, base.instruments);
+  assert.deepEqual(base.instruments, ['guitar', 'drums', 'bass']);
+  assert.deepEqual(engine.composeSongPart(base, JSON.parse(JSON.stringify(intro))).instruments, intro.instruments);
+  assert.deepEqual(engine.composeSongPart({ ...base, instruments: ['drums'] }, intro).instruments, intro.instruments);
+  for (const instruments of [[], ['piano'], ['bass', 'bass'], null, 'bass']) {
+    assert.throws(() => engine.composeSongPart(base, { ...intro, instruments }));
+  }
+});
