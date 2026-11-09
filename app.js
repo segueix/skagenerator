@@ -2,7 +2,8 @@
   'use strict';
   const engine = window.ElTaulerRadioAmbient;
   const $ = id => document.getElementById(id);
-  const KEY = 'skagenerator.song.v1', RATE = 22050;
+  const KEY = 'skagenerator.song.v1', RATE = 44100;
+  const sampleAudio = window.SkaSampleAudio, audioUtils = window.SkaAudioUtils;
   const colors = { intro: '#90b8ad', verse: '#bab4d8', prechorus: '#d2b19a', chorus: '#e6b572', bridge: '#91b4cf', solo: '#c1bf8c', outro: '#aebc91' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const id = () => window.crypto.randomUUID();
@@ -125,13 +126,13 @@
     $('move-up').disabled = busy || position === 0; $('move-down').disabled = busy || position === song.parts.length - 1;
     $('remove-part').disabled = busy || song.parts.length === 1;
     $('play-part').disabled = busy || !part.generated; $('play-song').disabled = busy || !allReady;
-    $('download-song').disabled = busy || !allReady; $('stop-playback').disabled = !isPlaying && !busy;
+    $('download-song').disabled = busy || !allReady; $('stop-playback').disabled = !isPlaying;
     for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) $(`instrument-${instrument}`).disabled = busy;
     document.body.classList.toggle('busy', busy);
     renderWave(part);
   }
   function renderWave(part) {
-    const wave = $('waveform'); wave.replaceChildren(); const data = cache.get(part.id);
+    const wave = $('waveform'); wave.replaceChildren(); const data = cache.get(part.id)?.[0];
     for (let k = 0; k < 80; k++) {
       const bar = document.createElement('i'); let height = 8;
       if (data) {
@@ -147,8 +148,21 @@
   function select(partId) { if (busy) return; selected = partId; render(); }
   function setBusy(value) { busy = value; render(); }
   function invalidate(part) { part.generated = false; cache.delete(part.id); stop(); }
+  function audioProgress(progress) {
+    const status = $('audio-status');
+    status.parentElement.classList.remove('error');
+    status.parentElement.classList.toggle('loading', progress.stage === 'loading');
+    if (progress.stage === 'loading') status.textContent = `Carregant instruments${progress.value === null ? '…' : ` · ${Math.round(progress.value * 100)} %`}`;
+    else if (progress.stage === 'rendering') status.textContent = progress.value === 1 ? 'So enregistrat · Instruments a punt' : `Preparant la part · ${Math.round(progress.value * 100)} %`;
+    else status.textContent = 'So enregistrat · Instruments a punt';
+  }
+  function audioError(error) {
+    $('audio-status').textContent = 'No s’ha pogut preparar el so · Torna-ho a provar';
+    $('audio-status').parentElement.classList.remove('loading'); $('audio-status').parentElement.classList.add('error');
+    console.error(error);
+  }
   async function getSamples(part) {
-    if (!cache.has(part.id)) cache.set(part.id, await engine.songPartSamples(engine.composeSongPart(song.settings, part), RATE));
+    if (!cache.has(part.id)) cache.set(part.id, await sampleAudio.render(engine.composeSongPart(song.settings, part), RATE, { onProgress: audioProgress }));
     return cache.get(part.id);
   }
   async function generate() {
@@ -156,27 +170,24 @@
     const revision = part.type === 'chorus' ? (part.generated ? song.chorusRevision + 1 : song.chorusRevision) : (part.generated ? part.revision + 1 : part.revision);
     setBusy(true);
     try {
-      const data = await engine.songPartSamples(engine.composeSongPart(song.settings, { ...part, revision }), RATE);
+      const data = await sampleAudio.render(engine.composeSongPart(song.settings, { ...part, revision }), RATE, { onProgress: audioProgress });
       if (part.type === 'chorus') {
         song.chorusRevision = revision;
         song.parts.filter(p => p.type === 'chorus').forEach(p => { p.revision = revision; cache.delete(p.id); });
       }
       part.revision = revision; part.generated = true; cache.set(part.id, data); save();
       notify(`${partLabel(part)} generada. Ja la pots escoltar.`);
-    } catch (error) { console.error(error); notify('No s’ha pogut generar la part. Torna-ho a provar.'); }
+    } catch (error) { audioError(error); notify('No s’han pogut preparar els instruments. Comprova la connexió i torna-ho a provar.'); }
     finally { setBusy(false); }
   }
   function stop() {
     playToken++; if (source) { source.onended = null; try { source.stop(); } catch {} source = null; }
     if (playbackGain) { playbackGain.disconnect(); playbackGain = null; }
     cancelAnimationFrame(animation); isPlaying = false; playingPart = null; document.body.classList.remove('playing');
-    $('song-progress').value = 0; $('playback-time').textContent = '00:00'; $('play-song').textContent = '▶'; $('stop-playback').disabled = !busy;
+    $('song-progress').value = 0; $('playback-time').textContent = '00:00'; $('play-song').textContent = '▶'; $('stop-playback').disabled = true;
     $('playback-duration').textContent = time(totalSeconds());
   }
-  function join(parts) {
-    const length = parts.reduce((sum, p) => sum + p.length, 0), data = new Float32Array(length); let offset = 0;
-    parts.forEach(p => { data.set(p, offset); offset += p.length; }); return data;
-  }
+  const join = parts => audioUtils.joinStereo(parts);
   async function play(whole) {
     if (isPlaying && whole) { stop(); render(); return; }
     if (busy) return; stop(); const token = playToken; const part = current();
@@ -187,11 +198,11 @@
       context ||= new Audio(); const resume = context.resume(); setBusy(true); await resume;
       const data = whole ? join(await collectSamples()) : await getSamples(part);
       if (token !== playToken) return;
-      const buffer = context.createBuffer(1, data.length, RATE); buffer.copyToChannel(data, 0);
+      const buffer = context.createBuffer(2, data[0].length, RATE); buffer.copyToChannel(data[0], 0); buffer.copyToChannel(data[1], 1);
       source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination);
       const gain = playbackGain = context.createGain(); gain.gain.value = .8; source.disconnect(); source.connect(gain); gain.connect(context.destination);
       source.onended = () => { if (token === playToken) { gain.disconnect(); stop(); render(); } };
-      playStarted = context.currentTime; playSeconds = data.length / RATE; playingPart = whole ? null : part.id;
+      playStarted = context.currentTime; playSeconds = data[0].length / RATE; playingPart = whole ? null : part.id;
       isPlaying = true; source.start(); document.body.classList.add('playing');
       $('transport-subtitle').textContent = whole ? 'Escoltant la cançó completa' : `Escoltant · ${partLabel(part)}`;
       $('play-song').textContent = '■'; $('playback-duration').textContent = time(playSeconds);
@@ -205,7 +216,7 @@
         }
         animation = requestAnimationFrame(tick);
       }; tick();
-    } catch (error) { console.error(error); stop(); notify('No s’ha pogut reproduir l’àudio. Torna a prémer Escolta.'); }
+    } catch (error) { audioError(error); stop(); notify('No s’ha pogut reproduir l’àudio. Torna a prémer Escolta.'); }
     finally { setBusy(false); }
   }
   async function collectSamples() {
@@ -221,12 +232,9 @@
     if (busy || song.parts.some(p => !p.generated)) return;
     stop(); setBusy(true);
     try {
-      const data = join(await collectSamples()), wav = new ArrayBuffer(44 + data.length * 2), view = new DataView(wav);
-      const ascii = (offset, text) => { for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)); };
-      ascii(0, 'RIFF'); view.setUint32(4, 36 + data.length * 2, true); ascii(8, 'WAVE'); ascii(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, RATE, true); view.setUint32(28, RATE * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); ascii(36, 'data'); view.setUint32(40, data.length * 2, true);
-      for (let i = 0; i < data.length; i++) { const n = Math.max(-1, Math.min(1, data[i])); view.setInt16(44 + i * 2, n * (n < 0 ? 32768 : 32767), true); }
-      download(new Blob([wav], { type: 'audio/wav' }), `${fileName()}.wav`); notify('Cançó exportada en format WAV.');
-    } catch (error) { console.error(error); notify('No s’ha pogut exportar la cançó.'); }
+      const data = join(await collectSamples()), wav = audioUtils.encodeWav(data, RATE);
+      download(new Blob([wav], { type: 'audio/wav' }), `${fileName()}.wav`); notify('Cançó exportada en WAV estèreo de 44,1 kHz.');
+    } catch (error) { audioError(error); notify('No s’ha pogut exportar la cançó.'); }
     finally { setBusy(false); }
   }
   $('generate-part').addEventListener('click', generate); $('play-part').addEventListener('click', () => play(false)); $('play-song').addEventListener('click', () => play(true));

@@ -5,7 +5,14 @@
   "description": "Editor de cançons instrumentals per seccions",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test tests/*.test.cjs",
-    "check": "node --check app.js && node --check radioambient.js"
+    "test": "node --test tests/*.test.cjs tests/*.test.mjs",
+    "check": "node --check app.js && node --check radioambient.js && node --check sample-audio.js && node --check audio-utils.js && node --check audio/worker.mjs && node --check audio/render.mjs",
+    "pretest": "node scripts/prepare-soundbank.mjs"
+  },
+  "dependencies": {
+    "spessasynth_core": "4.4.9"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
   }
 }
