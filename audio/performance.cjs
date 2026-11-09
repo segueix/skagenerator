@@ -11,6 +11,7 @@ function createPerformance(spec) {
     || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone'].includes(i))) throw new Error('Partitura no vàlida');
   const random = rng(spec.seed), punk = spec.style === 'punk', beat = spec.beat, bar = beat * 4;
   const has = name => spec.instruments.includes(name), energy = .55 + spec.energy / 200;
+  const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
   const events = [];
   const channels = [
     { channel: 0, program: punk ? 30 : 27, pan: 42, volume: 85 },
@@ -36,7 +37,10 @@ function createPerformance(spec) {
   for (let b = 0; b < spec.chords.length; b++) {
     const chord = spec.chords[b], t0 = b * bar, ending = spec.type === 'outro' && b === spec.chords.length - 1;
     const soft = spec.type === 'intro' || spec.type === 'bridge';
-    const hits = ending ? [0] : punk ? [0, .5, 1, 1.5, 2, 2.5, 3, 3.5] : [.5, 1.5, 2.5, 3.5];
+    const guitarPatterns = punk
+      ? [[0, .5, 1, 1.5, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 3, 3.5], [0, .5, 1.5, 2, 2.5, 3.5], [0, .5, 1, 1.5, 2.5, 3], [0, 1, 2, 2.5, 3, 3.5]]
+      : [[.5, 1.5, 2.5, 3.5], [.5, 1.5, 2.5, 3.5, 3.75], [.5, 1.5, 3.5], [.5, 1.75, 2.5, 3.5], [.5, 1.5, 2.75, 3.5]];
+    const hits = ending ? [0] : variation >= 0 ? guitarPatterns[variation] : punk ? guitarPatterns[0] : guitarPatterns[0];
     if (has('guitar')) hits.forEach((t, hit) => {
       const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
       const duration = ending ? bar * .75 : beat * (punk ? .4 : .22);
@@ -52,7 +56,10 @@ function createPerformance(spec) {
     });
     if (has('drums')) {
       if (b === 0 || ending) note(9, 49, t0, .35, ending ? 90 : 73);
-      (ending ? [0] : punk ? [0, 1.5, 2, 2.5] : [0, 2]).forEach(t => note(9, 36, t0 + t * beat, .08, 105, .002));
+      const kicks = punk
+        ? [[0, 1.5, 2, 2.5], [0, 1, 2, 3], [0, .5, 2, 3], [0, 1.5, 2.5, 3], [0, 1, 2, 2.5]]
+        : [[0, 2], [0, 2, 3.5], [0, 2.5], [0, 1.5, 2], [0, 2, 3]];
+      (ending ? [0] : kicks[Math.max(0, variation)]).forEach(t => note(9, 36, t0 + t * beat, .08, 105, .002));
       if (!ending) {
         [1, 3].forEach(t => note(9, 38, t0 + t * beat, .08, soft ? 76 : 109, .003));
         for (let k = 0; k < 8; k++) note(9, k === 7 && !soft ? 46 : 42, t0 + k * beat / 2, beat * .3, k % 2 ? 53 : 72, .003);
