@@ -4,3 +4,14 @@
 .band-settings{display:grid;grid-template-columns:1fr 1.4fr;gap:24px;margin-top:12px;padding:17px 22px;background:#eef2e8;border:1px solid #dfe6d7;border-radius:10px}.style-guide{display:flex;flex-direction:column;gap:5px}.style-guide strong{font-size:12px}.style-guide>span{font-size:11px;color:#718064}.style-guide small,.instrument-picker>small{font-size:9px;line-height:1.5;color:#8b9780}.instrument-picker{border:0;padding:0;margin:0;min-width:0}.instrument-picker legend{font-size:9px;letter-spacing:1px;font-weight:700;color:#7d877e;margin-bottom:10px}.instrument-picker>div{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px}.instrument-toggle{display:flex;gap:6px;align-items:center;border:1px solid #d5ddcc;background:#fffefb;border-radius:6px;padding:7px 9px;font-size:11px;cursor:pointer}.instrument-toggle:has(input:checked){border-color:#94a881;background:#e4edda}.instrument-toggle input{accent-color:#192d29;width:13px;height:13px;margin:0}.instrument-toggle:has(input:disabled){opacity:.5}@media(max-width:950px){.band-settings{grid-template-columns:1fr;gap:15px}}@media(max-width:680px){.band-settings{padding:16px}.instrument-toggle{font-size:10px;padding:8px}.style-guide small{font-size:8px}}
 
 .audio-bank-status{display:flex;align-items:center;gap:6px;font-size:9px;color:#738366;margin-top:8px}.audio-bank-status a{color:#738366;margin-left:auto}.audio-bank-status.loading .live-dot{background:#b99548}.audio-bank-status.error .live-dot{background:#b05743}
+
+
+/* Instruments independents per secció. */
+.part-instrument-panel{border:1px solid #dce5d4;background:#f8faf4;border-radius:9px;margin:23px 0 0;padding:15px 17px;min-width:0}
+.part-instrument-panel legend{font-size:9px;letter-spacing:1px;font-weight:700;color:#758473;padding:0 5px}
+.part-instrument-grid{display:flex;gap:8px;flex-wrap:wrap}
+.part-instrument-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:26px;margin-top:10px}
+.part-instrument-footer>span{font-size:10px;color:#809078}
+.part-instrument-footer .text-button{font-size:10px;text-align:right}
+.part-instrument-panel + .sound-preview{margin-top:18px}
+@media(max-width:680px){.part-instrument-panel{padding:13px;margin-top:19px}.part-instrument-footer{flex-wrap:wrap;gap:4px}.part-instrument-footer .text-button{margin-left:auto}}
