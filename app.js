@@ -238,7 +238,8 @@
     else status.textContent = 'So enregistrat · Instruments a punt';
   }
   function audioError(error) {
-    $('audio-status').textContent = 'No s’ha pogut preparar el so · Torna-ho a provar';
+    const reason = String(error?.message || error || 'Error desconegut').slice(0, 140);
+    $('audio-status').textContent = `Error del motor: ${reason}`;
     $('audio-status').parentElement.classList.remove('loading'); $('audio-status').parentElement.classList.add('error');
     console.error(error);
   }
@@ -362,7 +363,7 @@
         ? 'Canviar l’estil, el tempo o la tonalitat deixa totes les parts pendents de regenerar. Es conservaran els instruments triats a cada part i la lletra.'
         : 'Les parts que segueixen els instruments base quedaran pendents de regenerar. Les parts amb instruments propis i la lletra es conservaran.')) return;
     stop(); song.settings = settings;
-    affected.forEach(p => { p.generated = false; cache.delete(p.id); });
+    affected.forEach(p => { p.generated = false; clearPartCache(p); });
     updateSettingsUI(); save(); render();
   }
   ['song-style', 'song-bpm', 'song-key'].forEach(key => $(key).addEventListener('change', changeSettings));
