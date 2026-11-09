@@ -1770,6 +1770,12 @@
             || instruments.some(instrument => !Object.hasOwn(SONG_INSTRUMENTS, instrument))) throw new Error('Selecciona instruments vàlids');
         const energy = Number(part.energy);
         if (!Number.isFinite(energy) || energy < 0 || energy > 100) throw new Error('Intensitat no vàlida');
+        const eligible = ['intro', 'verse', 'chorus'].includes(part.type);
+        const variation = part.variantIndex === undefined
+            ? (eligible && Array.isArray(part.variants) ? part.variants.indexOf(part.revision) : -1)
+            : part.variantIndex;
+        if (!Number.isInteger(variation) || variation < -1 || variation > 4 || (variation !== -1 && !eligible))
+            throw new Error('Versió musical no vàlida');
         const family = part.type === 'chorus' ? 31 : part.type === 'verse' ? 17 : Object.keys(SONG_PARTS).indexOf(part.type) * 47 + 3;
         const seed = ((settings.seed >>> 0) + Math.imul(family, 7919) + Math.imul(part.revision || 1, 104729)) >>> 0;
         const r = seededRng(seed), mode = settings.mode;
@@ -1777,17 +1783,38 @@
         let degrees = pickOf(r, part.type === 'bridge' ? choices.b : choices.a).slice();
         if (part.type === 'chorus') degrees = mode === 'major' ? [0, 4, 5, 3] : [0, 5, 2, 6];
         if (part.type === 'intro') degrees = [0, 0, 3, 4];
+        // Cinc recorreguts harmònics i motius rítmics diferenciats per secció.
+        // Manté la tonalitat i el tempo comuns, però no recicla la mateixa idea.
+        if (variation >= 0) {
+            const progressions = {
+                intro: [[0, 0, 3, 4], [0, 5, 3, 4], [0, 4, 3, 0], [5, 3, 4, 0], [0, 3, 5, 4]],
+                verse: [[0, 3, 4, 0], [0, 5, 4, 3], [5, 4, 0, 3], [0, 4, 5, 0], [0, 3, 5, 4]],
+                chorus: [[0, 4, 5, 3], [0, 5, 3, 4], [0, 3, 4, 5], [5, 3, 0, 4], [0, 4, 3, 5]]
+            };
+            degrees = progressions[part.type][variation].slice();
+            if (mode === 'minor' && variation === 0 && part.type === 'chorus') degrees = [0, 5, 2, 6];
+        }
         degrees = Array.from({ length: bars }, (_, i) => degrees[i % degrees.length]);
         if (part.type === 'outro') degrees[bars - 1] = 0;
         const chords = degrees.map(d => buildChord(tonic, mode, d, { chordBase: 55 }, false));
         const ctx = { chords, scalePcs: SCALES[mode].map(n => (tonic + n) % 12), lo: 64, hi: part.type === 'chorus' ? 84 : 79, center: 72, maxJump: 3 };
         ctx.prev = nearestTone(72, chords[0].pcs, 64, 79);
-        const rhythms = part.type === 'chorus' ? [RHYTHMS.r2, RHYTHMS.r5, RHYTHMS.r2, RHYTHMS.r7] : [RHYTHMS.r9, RHYTHMS.r3, RHYTHMS.r5, RHYTHMS.r7];
+        let rhythms = part.type === 'chorus' ? [RHYTHMS.r2, RHYTHMS.r5, RHYTHMS.r2, RHYTHMS.r7] : [RHYTHMS.r9, RHYTHMS.r3, RHYTHMS.r5, RHYTHMS.r7];
+        if (variation >= 0) {
+            const patterns = [
+                [RHYTHMS.r2, RHYTHMS.r5, RHYTHMS.r2, RHYTHMS.r7],
+                [RHYTHMS.r9, RHYTHMS.r3, RHYTHMS.r5, RHYTHMS.r7],
+                [RHYTHMS.r3, RHYTHMS.r7, RHYTHMS.r9, RHYTHMS.r5],
+                [RHYTHMS.r5, RHYTHMS.r2, RHYTHMS.r7, RHYTHMS.r3],
+                [RHYTHMS.r7, RHYTHMS.r9, RHYTHMS.r3, RHYTHMS.r2]
+            ];
+            rhythms = patterns[variation];
+        }
         const phrase = composePhrase(r, ctx, [0, 1, 2, 3], rhythms).notes;
         const melody = [];
         for (let b = 0; b < bars; b += 4) phrase.forEach(n => melody.push([n[0] + b, n[1], n[2], n[3]]));
         return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
-            seconds: bars * 4 * 60 / bpm, chords, melody, instruments: instruments.slice() };
+            seconds: bars * 4 * 60 / bpm, chords, melody, instruments: instruments.slice(), variation };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;
