@@ -16,7 +16,7 @@ function createPerformance(spec) {
   const channels = [
     { channel: 0, program: punk ? 30 : 27, pan: 42, volume: 85 },
     { channel: 1, program: punk && spec.type === 'chorus' ? 29 : 28, pan: 84, volume: 60 },
-    { channel: 2, program: punk ? 34 : 33, pan: 64, volume: 100 },
+    { channel: 2, program: punk ? 34 : 33, pan: 64, volume: 115 },
     { channel: 3, program: 56, pan: 50, volume: 85 },
     { channel: 4, program: 57, pan: 79, volume: 87 },
     { channel: 9, program: punk ? 16 : 0, pan: 64, volume: 106, drums: true }
@@ -50,7 +50,7 @@ function createPerformance(spec) {
         if (punk || hit % 2 === 1) note(1, pitch, t0 + t * beat + .012 + k * .006, duration * .85, punk ? 70 : 46);
       });
     });
-    if (has('bass')) (ending ? [0] : punk ? [0, .5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 1, 2, 3]).forEach((t, k) => {
+    if (has('bass') && !Array.isArray(spec.bassLine)) (ending ? [0] : punk ? [0, .5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 1, 2, 3]).forEach((t, k) => {
       const pitch = punk || k % 4 === 0 ? chord.root : k % 4 === 1 ? nearest(chord.root + 4, chord.pcs, chord.root, chord.root + 12) : k % 4 === 2 ? chord.root + 7 : chord.root + 12;
       note(2, pitch, t0 + t * beat, ending ? bar * .8 : beat * (punk ? .43 : .8), k % 2 ? 88 : 103, .003);
     });
@@ -70,6 +70,10 @@ function createPerformance(spec) {
       if (has('trumpet')) note(3, chord.notes.at(-1) + 12, t0 + .006, bar * .68, 84);
       if (has('trombone')) note(4, chord.root + 24, t0 + .012, bar * .7, 83);
     }
+  }
+  if (has('bass') && Array.isArray(spec.bassLine)) {
+    for (const [b,t,pitch,length,strength] of spec.bassLine)
+      note(2,pitch,(b*4+t)*beat,length*beat,Math.min(127,Math.round(113*strength)),.002);
   }
   for (const [b, t, pitch, duration] of spec.melody) {
     if (spec.type === 'intro' && b < 2 || spec.type === 'outro' && b === spec.chords.length - 1) continue;
