@@ -2,8 +2,8 @@
   'use strict';
   const base = document.currentScript.src;
   const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.3-1', base).href;
-  const workerURL = new URL('sample-worker.js', base).href;
-  let worker, ready, serial = 0, fallback = false;
+  const workerURL = new URL('sample-worker.js?v=20261110-samples', base).href;
+  let worker, ready, serial = 0;
   const requests = new Map();
   function destroy(error) {
     worker?.terminate(); worker = null; ready = null;
@@ -15,21 +15,14 @@
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => destroy(new Error('El motor d’àudio ha trigat massa. Torna-ho a provar.')), 120000);
       requests.set(id, { resolve, reject, progress, timer });
-      worker.postMessage({ id, type, ...data }, transfer);
+      try { worker.postMessage({ id, type, ...data }, transfer); }
+      catch (error) { clearTimeout(timer); requests.delete(id); reject(error); }
     });
   }
   async function load(progress) {
     if (ready) return ready;
     ready = (async () => {
       progress?.({ stage: 'loading', value: 0 });
-      worker = new Worker(workerURL);
-      worker.onmessage = ({ data }) => {
-        const request = requests.get(data.id); if (!request) return;
-        if (data.type === 'progress') { request.progress?.({ stage: 'rendering', value: data.value }); return; }
-        clearTimeout(request.timer); requests.delete(data.id);
-        if (data.type === 'error') request.reject(new Error(data.message)); else request.resolve(data.channels);
-      };
-      worker.onerror = () => destroy(new Error('No s’ha pogut iniciar el motor d’instruments.'));
       const response = await fetch(bankURL, { cache: 'force-cache', signal: AbortSignal.timeout(60000) });
       if (!response.ok) throw new Error('No s’han pogut carregar els instruments. Comprova la connexió i torna-ho a provar.');
       const bytes = Number(response.headers.get('content-length'));
@@ -45,6 +38,14 @@
         for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.length; }
         buffer = joined.buffer;
       } else buffer = await response.arrayBuffer();
+      worker = new Worker(workerURL);
+      worker.onmessage = ({ data }) => {
+        const request = requests.get(data.id); if (!request) return;
+        if (data.type === 'progress') { request.progress?.({ stage: 'rendering', value: data.value }); return; }
+        clearTimeout(request.timer); requests.delete(data.id);
+        if (data.type === 'error') request.reject(new Error(data.message)); else request.resolve(data.channels);
+      };
+      worker.onerror = () => destroy(new Error('No s’ha pogut iniciar el motor d’instruments.'));
       await send('init', { buffer }, progress, [buffer]);
       progress?.({ stage: 'ready', value: 1 });
     })().catch(error => { destroy(error); throw error; });
@@ -52,25 +53,17 @@
   }
   window.SkaSampleAudio = {
     async render(spec, sampleRate = 44100, options = {}) {
-      if (!fallback) {
+      // Una incidència temporal no ha de substituir els instruments enregistrats.
+      // Reintentem amb un worker nou; si falla, la part continua pendent.
+      for (let attempt = 0; attempt < 2; attempt++) {
         try {
           await load(options.onProgress);
           return await send('render', { spec, sampleRate }, options.onProgress);
         } catch (error) {
-          // La web també es pot obrir sense el worker o el banc compilat
-          // (p. ex. GitHub Pages publicat directament des de la branca).
-          // Recuperació automàtica: conservem la composició i el projecte.
-          fallback = true;
           destroy(error);
-          console.warn('Ska Generator: mostres no disponibles; s’utilitza el sintetitzador local.', error);
+          if (attempt === 1) throw error;
         }
       }
-      options.onProgress?.({ stage: 'fallback', value: 0 });
-      const engine = window.ElTaulerRadioAmbient;
-      if (!engine?.songPartSamples) throw new Error('No hi ha cap motor d’àudio disponible.');
-      const mono = await engine.songPartSamples(spec, sampleRate);
-      options.onProgress?.({ stage: 'fallback', value: 1 });
-      return [mono, new Float32Array(mono)];
     },
     dispose() { destroy(new Error('Motor d’àudio tancat')); }
   };

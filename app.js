@@ -238,7 +238,6 @@
     status.parentElement.classList.toggle('loading', progress.stage === 'loading');
     if (progress.stage === 'loading') status.textContent = `Carregant instruments${progress.value === null ? '…' : ` · ${Math.round(progress.value * 100)} %`}`;
     else if (progress.stage === 'rendering') status.textContent = progress.value === 1 ? 'So enregistrat · Instruments a punt' : `Preparant la part · ${Math.round(progress.value * 100)} %`;
-    else if (progress.stage === 'fallback') status.textContent = progress.value === 1 ? 'Mode compatible · àudio sintetitzat' : 'Preparant so alternatiu (sense banc de mostres)…';
     else status.textContent = 'So enregistrat · Instruments a punt';
   }
   function audioError(error) {
