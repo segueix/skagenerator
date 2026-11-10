@@ -135,6 +135,24 @@ function makeSample(bank, name, data, rate, key, cents = 0, loop = null) {
   return sample;
 }
 const timecents = seconds => Math.round(1200 * Math.log2(seconds));
+// Sonoritat d'una mostra: la RMS més alta en finestres de 30 ms (val igual
+// per a una nota llarga que per a un cop d'staccato).
+function loudness(data, rate) {
+  const size = Math.round(rate * .03); let best = 0;
+  for (let start = 0; start + size <= data.length; start += size >> 1) {
+    let sum = 0; for (let i = start; i < start + size; i++) sum += data[i] * data[i];
+    best = Math.max(best, sum / size);
+  }
+  return Math.sqrt(best);
+}
+// Iguala totes les notes: cada dinàmica té el mateix nivell a tota la tessitura
+// (les gravacions originals varien més de 20 dB d'una nota a l'altra).
+function level(data, rate, targetDb) {
+  const now = loudness(data, rate); if (!now) return;
+  let peak = 0; for (const x of data) peak = Math.max(peak, Math.abs(x));
+  const gain = Math.min(10 ** (targetDb / 20) / now, .95 / peak);
+  for (let i = 0; i < data.length; i++) data[i] *= gain;
+}
 
 // ── VSCO 2 CE: metalls a partir dels WAV ─────────────────────────────
 const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
@@ -155,16 +173,25 @@ async function buildVsco(bank, config, log) {
       loaded.push({ named, layer: Number(match[3]), data, cents });
     }
     if (!loaded.length) throw new Error(`No hi ha mostres per a ${spec.name}`);
-    // Mateix nivell relatiu entre dinàmiques; el més fort queda a 0,9.
-    let peak = 0; for (const s of loaded) for (const x of s.data) peak = Math.max(peak, Math.abs(x));
-    for (const s of loaded) for (let i = 0; i < s.data.length; i++) s.data[i] *= .9 / peak;
+    // Mateix nivell per a totes les notes i per a staccato i sostingut; la
+    // dinàmica suau queda 4 dB per sota (la força de la nota fa la resta);
+    // l'staccato queda 5 dB per sota perquè les notes curtes no sobresurtin.
+    const loudest = Math.max(...loaded.map(s => s.layer));
+    const [loud, soft] = spec.levelDb || [-12, -16];
+    for (const s of loaded) level(s.data, RATE, s.layer === loudest ? loud : soft);
     const instrument = new BasicInstrument(); instrument.name = spec.name.slice(0, 19);
     const layers = [...new Set(loaded.map(s => s.layer))].sort((a, b) => a - b);
     const notes = [...new Set(loaded.map(s => s.named))].sort((a, b) => a - b);
     layers.forEach((layer, li) => {
       const velMin = Math.round(li * 128 / layers.length), velMax = Math.round((li + 1) * 128 / layers.length) - 1;
       notes.forEach((note, ni) => {
-        const source = loaded.find(s => s.named === note && s.layer === layer) || loaded.find(s => s.named === note);
+        let source = loaded.find(s => s.named === note && s.layer === layer);
+        if (!source) {
+          // Falta aquesta dinàmica: es reutilitza una altra gravació igualada al nivell de la capa.
+          const other = loaded.find(s => s.named === note);
+          source = { ...other, data: other.data.slice() };
+          level(source.data, RATE, layer === loudest ? loud : soft);
+        }
         const keyMin = ni === 0 ? 0 : Math.floor((notes[ni - 1] + note) / 2) + 1;
         const keyMax = ni === notes.length - 1 ? 127 : Math.floor((note + notes[ni + 1]) / 2);
         const sample = makeSample(bank, `${spec.program}${spec.bank}${note}v${layer}`, source.data, RATE, note, source.cents);

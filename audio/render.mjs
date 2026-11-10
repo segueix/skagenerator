@@ -16,6 +16,7 @@ export const EQ_PRESETS = {
   guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-2, 2, 0], sax: [-3, 2, 1], organ: [-5, 1, 1],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
+export const SONG_GAIN = 10 ** (5.5 / 20);
 export const EQ_BANDS = { low: 120, mid: 900, high: 6000 };
 // Reverberació: el baix sec, la bateria curta, metalls i orgue amb sala.
 const REVERB = { drums: 14, electronicDrums: 8, bass: 4, synthBass: 0, guitar: 30, trumpet: 40, trombone: 38, sax: 40, organ: 30, synthLead: 32, synthPad: 40 };
@@ -116,7 +117,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     if (masterEq) for (let i = 0; i < length; i++) { left[i] = masterEq.process(0, left[i]); right[i] = masterEq.process(1, right[i]); }
     if (options.raw) return [left, right]; // Només per a proves: sense dinàmica ni nivell.
     // Compressor de bus suau (2,5:1) per cohesionar la banda.
-    const attack = Math.exp(-1 / (.008 * sampleRate)), release = Math.exp(-1 / (.15 * sampleRate)), threshold = .16, ratio = 2.5;
+    const attack = Math.exp(-1 / (.012 * sampleRate)), release = Math.exp(-1 / (.3 * sampleRate)), threshold = .16, ratio = 2.2;
     let envelope = 0, peak = 0;
     for (let i = 0; i < length; i++) {
       if (!Number.isFinite(left[i]) || !Number.isFinite(right[i])) throw new Error('El motor ha produït àudio no vàlid');
@@ -126,9 +127,10 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       left[i] *= reduction; right[i] *= reduction;
       peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
     }
-    // Nivell: una secció plena queda prop del màxim i una de buida, més avall,
-    // però només a mig camí. Així la tornada creix sense que la intro es perdi.
-    const gain = (peak > 0 ? Math.min(.93, .9 * Math.sqrt(peak / .3)) / peak : 1) * 10 ** ((master.volume || 0) / 20);
+    // Nivell fix per a tota la cançó: cada secció rep el mateix guany, de manera
+    // que un instrument que passa d'una secció a l'altra no canvia de volum. Les
+    // seccions plenes sonen més fortes perquè hi toquen més instruments.
+    const gain = SONG_GAIN * 10 ** ((master.volume || 0) / 20);
     const fade = Math.round(.4 * sampleRate);
     const soft = x => { const a = Math.abs(x); return a < .82 ? x : Math.sign(x) * (.82 + .11 * Math.tanh((a - .82) / .11)); };
     for (let i = 0; i < length; i++) {

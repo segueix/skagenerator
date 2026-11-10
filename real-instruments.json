@@ -12,7 +12,11 @@
         "program": 56,
         "match": "Brass/Trumpet/sus/",
         "maxSeconds": 2.6,
-        "release": 0.14
+        "release": 0.14,
+        "levelDb": [
+          -12,
+          -16
+        ]
       },
       {
         "name": "Trompeta staccato (VSCO 2 CE)",
@@ -20,7 +24,11 @@
         "program": 56,
         "match": "Brass/Trumpet/stac/",
         "maxSeconds": 0.9,
-        "release": 0.08
+        "release": 0.08,
+        "levelDb": [
+          -17,
+          -21
+        ]
       },
       {
         "name": "Trombó (VSCO 2 CE)",
@@ -28,7 +36,11 @@
         "program": 57,
         "match": "Brass/Tenor Trombone/sus/",
         "maxSeconds": 2.6,
-        "release": 0.16
+        "release": 0.16,
+        "levelDb": [
+          -12,
+          -16
+        ]
       },
       {
         "name": "Trombó staccato (VSCO 2 CE)",
@@ -36,7 +48,11 @@
         "program": 57,
         "match": "Brass/Tenor Trombone/stac/",
         "maxSeconds": 0.9,
-        "release": 0.08
+        "release": 0.08,
+        "levelDb": [
+          -17,
+          -21
+        ]
       }
     ],
     "files": [
