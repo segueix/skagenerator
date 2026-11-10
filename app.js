@@ -24,7 +24,7 @@
     bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
     drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
     trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
-    trombone: [['auto', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
+    trombone: [['auto', 'Saxo tenor · gravat (recomanat)'], ['vsco', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
     vocal: [['auto', 'Clarinet · gravat (recomanat)'], ['oohs', 'Veu «uh» GM'], ['flute', 'Flauta GM'], ['ocarina', 'Ocarina GM'], ['clarinetGm', 'Clarinet GM']]
   };
   const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto' });

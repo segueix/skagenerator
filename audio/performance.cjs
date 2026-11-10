@@ -17,7 +17,9 @@ function createPerformance(spec) {
     bass: { auto: null, finger: [2, 33], pick: [2, 34], fingerGm: [0, 33], pickGm: [0, 34] },
     drums: { auto: null, real: [0, 64], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
-    trombone: { auto: null, gm: [0, 57], warm: [1, 57] }
+    // La segona veu de vent sona per defecte amb saxo tenor gravat: articulació més
+    // clara que la vara del trombó. El trombó gravat (VSCO) queda com a opció.
+    trombone: { auto: null, vsco: [2, 57], gm: [0, 57], warm: [1, 57] }
   };
   // Les guitarres 2 i 3 tenen els mateixos sons que la primera.
   presets.guitar2 = presets.guitar; presets.guitar3 = presets.guitar;
@@ -32,19 +34,19 @@ function createPerformance(spec) {
   const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
   const events = [];
   const patch = (channel, [bank, program], pan, volume) => ({ channel, bank, program, pan, volume });
-  const realBrass = { 3: !chosen('trumpet'), 4: !chosen('trombone') };
+  const realBrass = { 3: !chosen('trumpet'), 4: spec.timbres?.trombone === 'vsco' };
   const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
     patch(0, chosen('guitar') ?? (punk ? [0, 30] : [2, 27]), 42, 94),
     patch(1, chosen('guitar') ?? (punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
     patch(2, chosen('bass') ?? (punk ? [2, 34] : [2, 33]), 64, 115),
     patch(3, chosen('trumpet') ?? [2, 56], 50, 116),
-    patch(4, chosen('trombone') ?? [2, 57], 79, 112),
+    patch(4, chosen('trombone') ?? [2, 66], 79, 112),
     // Staccato gravat per a les notes curtes de trompeta i trombó.
     patch(12, [3, 56], 50, 116), patch(13, [3, 57], 79, 127),
     patch(16, chosen('vocal') ?? [2, 71], 64, 112),
     patch(14, chosen('guitar2') ?? (punk ? [0, 30] : [2, 27]), 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
-    patch(8, [2, 66], 30, 86),
+    patch(8, [2, 66], 30, 94),
     { channel: 11, program: 16, pan: 92, volume: 84 },
     { channel: 5, program: 81, pan: 58, volume: 106 },
     { channel: 6, program: 89, pan: 76, volume: 90 },
@@ -238,7 +240,7 @@ function createPerformance(spec) {
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
-  const level = { '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
+  const level = { '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume; });
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
 }
