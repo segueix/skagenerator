@@ -53,6 +53,18 @@
           -17,
           -21
         ]
+      },
+      {
+        "name": "Clarinet (VSCO 2 CE)",
+        "bank": 2,
+        "program": 71,
+        "match": "Woodwinds/Clarinet/susLong/",
+        "maxSeconds": 2.8,
+        "release": 0.18,
+        "levelDb": [
+          -12,
+          -16
+        ]
       }
     ],
     "files": [
@@ -131,7 +143,29 @@
       "Brass/Trumpet/sus/Sum_SHTrumpet_sus_F4_v1_rr1.wav",
       "Brass/Trumpet/sus/Sum_SHTrumpet_sus_F4_v3_rr1.wav",
       "Brass/Trumpet/sus/Sum_SHTrumpet_sus_G3_v1_rr1.wav",
-      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_G3_v3_rr1.wav"
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_G3_v3_rr1.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_A#3_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_A#3_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_A#4_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_A#4_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D2_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D2_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D3_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D3_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D4_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D4_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D5_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_D5_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F#5_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F#5_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F2_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F2_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F3_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F3_v3_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v1_rr1_sum.wav",
+      "Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v3_rr1_sum.wav"
     ]
   },
   "freepats": [

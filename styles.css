@@ -382,3 +382,20 @@ body.recording .transport-play { background: #ef4444; }
 .clip-tone .slider-hint { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
 @media (min-width: 900px) { .clip-tone { grid-template-columns: 1.2fr 1.2fr 1fr 1fr; } .section-fields .energy-field { grid-column: auto; } }
 @media (max-width: 899px) { .volume-row { grid-template-columns: 1fr 62px; } .volume-row input { grid-column: 1 / -1; grid-row: 2; } }
+
+/* Tempo: etiqueta sempre visible, tempo per secció i ritme per instrument */
+.title-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.title-line strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tempo-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--pink) 16%, var(--surface)); color: color-mix(in srgb, var(--pink) 75%, var(--text)); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.song-tempo input { font-weight: 800; font-size: 18px; color: var(--pink); }
+.line-section.tempo-change::before { content: '♩'; position: absolute; top: 2px; right: 6px; font-size: 13px; font-weight: 800; color: var(--text); opacity: .7; }
+.bpm-field input::placeholder { color: var(--faint); }
+.volume-row.with-feel { grid-template-columns: minmax(90px, 140px) 1fr 62px 150px; }
+.feel-select { min-height: 36px !important; padding: 4px 8px !important; font-size: 13px !important; }
+.clip-tone.only-feel { grid-template-columns: repeat(2, minmax(0, 260px)); }
+@media (max-width: 899px) {
+  .volume-row.with-feel { grid-template-columns: 1fr 62px; }
+  .volume-row.with-feel .feel-select { grid-column: 1 / -1; grid-row: 3; }
+}
+.lyrics-info { margin: 6px 2px 0; font-size: 13px; color: color-mix(in srgb, #f472b6 70%, var(--text)); font-weight: 600; }
+.lyrics-info:empty { display: none; }

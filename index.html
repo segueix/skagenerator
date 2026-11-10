@@ -23,7 +23,7 @@
     <section class="song-settings" data-panel="song" aria-label="Configuració de la cançó">
       <label class="title-field"><span class="field-label">NOM DEL PROJECTE</span><input id="song-title" maxlength="100" value="Nova cançó" aria-label="Nom de la cançó"></label>
       <label><span class="field-label">ESTIL</span><select id="song-style"><option value="ska">Ska</option><option value="punk">Punk</option><option value="urban">Urban</option></select></label>
-      <label class="tempo-field"><span class="field-label">TEMPO <span>4/4</span></span><div class="tempo-control"><input id="song-bpm" type="number" min="100" max="180" step="1" value="128" aria-label="Tempo en pulsacions per minut"><span>BPM</span></div></label>
+      <label class="tempo-field song-tempo"><span class="field-label">TEMPO DE LA CANÇÓ <span>4/4</span></span><div class="tempo-control"><input id="song-bpm" type="number" min="100" max="180" step="1" value="128" aria-label="Tempo en pulsacions per minut"><span>BPM</span></div></label>
       <label><span class="field-label">TONALITAT</span><select id="song-key" aria-label="Tonalitat"></select></label>
       <label class="tempo-field"><span class="field-label">DURADA <span id="song-time">02:00</span></span><div class="tempo-control"><input id="song-bars" type="number" min="8" max="128" step="1" value="64" aria-label="Durada de la cançó en compassos"><span>COMPASSOS</span></div></label>
       <button type="button" class="button primary next-step mobile-only" data-go="base">Següent: la base musical →</button>
@@ -45,6 +45,7 @@
           <label><span class="field-label">KIT DE BATERIA</span><select id="timbre-drums" aria-label="Kit de bateria"></select></label>
           <label><span class="field-label">SO DE TROMPETA</span><select id="timbre-trumpet" aria-label="So de trompeta"></select></label>
           <label><span class="field-label">SO DE TROMBÓ</span><select id="timbre-trombone" aria-label="So de trombó"></select></label>
+          <label><span class="field-label">SO DE LA MELODIA DE VEU</span><select id="timbre-vocal" aria-label="So de la melodia de veu"></select></label>
         </div>
         <details class="eq-panel" id="song-eq-panel"><summary>Equalitzador de la cançó <span>greus, mitjos, aguts i volum de cada instrument</span></summary>
           <p class="eq-help">0 dB és el so de l’estil: cada instrument ja porta una corba pensada per a la banda (baix rodó, guitarra prima, metalls presents). Els canvis s’apliquen a tota la cançó.</p>
@@ -78,6 +79,7 @@
           <label><span class="field-label">TIPUS DE SECCIÓ</span><select id="section-type"></select></label>
           <label><span class="field-label">COMENÇA AL COMPÀS <span id="section-start-time"></span></span><input id="section-start" type="number" min="1" step="1" aria-label="Compàs on comença la secció"></label>
           <label><span class="field-label">DURADA <span id="section-time"></span></span><div class="tempo-control"><input id="section-bars" type="number" min="1" max="32" step="1" aria-label="Durada de la secció en compassos"><span>COMPASSOS</span></div></label>
+          <label class="bpm-field"><span class="field-label">TEMPO DE LA SECCIÓ <span id="section-bpm-hint"></span></span><div class="tempo-control"><input id="section-bpm" type="number" min="40" max="240" step="1" inputmode="numeric" aria-label="Tempo d’aquesta secció en BPM; buit per seguir el de la cançó"><span>BPM</span></div></label>
           <label class="energy-field"><span class="field-label">INTENSITAT <output id="section-energy-value">55 %</output></span><input id="section-energy" type="range" min="10" max="100" step="5" aria-label="Intensitat de la secció"><small class="slider-hint"><span>Suau</span><span>Força de tots els instruments</span><span>Enèrgica</span></small></label>
         </div>
         <p class="chords-line"><span id="section-chords" class="chords"></span><button type="button" id="section-reharmonize" class="text-button">↻ Altres acords</button></p>
@@ -95,7 +97,7 @@
           <div id="section-eq" class="eq-list"></div>
         </details>
         <div class="step-actions"><button type="button" id="play-section" class="button listen">▷ Escolta la secció</button><button type="button" id="play-song-inline" class="button listen">▷ Escolta tota la cançó</button></div>
-        <div class="lyrics-heading"><label class="field-label" for="section-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="section-lyrics" rows="2" maxlength="5000" placeholder="Escriu la lletra o les idees per a aquesta secció…"></textarea>
+        <div class="lyrics-heading"><label class="field-label" for="section-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="section-lyrics" rows="3" maxlength="5000" placeholder="Escriu la lletra: una línia per vers…"></textarea><p class="lyrics-info" id="lyrics-info"></p>
       </div>
     </section>
     <section class="step-panel step-voice" data-panel="voice" aria-labelledby="voice-title">
@@ -120,7 +122,7 @@
     </section>
     <div class="bottom-notes" data-panel="song"><span><span class="live-dot"></span> Es desa automàticament en aquest navegador</span><button class="text-button" id="export-project">↓ Desa el projecte</button><label class="text-button import-label" for="import-project">↑ Obre un projecte<input type="file" id="import-project" accept=".json,application/json" hidden></label></div>
   </main>
-  <footer class="transport" aria-label="Reproductor de la cançó"><div class="transport-content"><button id="play-song" class="transport-play" aria-label="Escoltar la cançó completa" disabled>▶</button><div class="transport-title"><strong id="transport-title">Nova cançó</strong><span id="transport-subtitle">Comença generant la base</span></div><div class="transport-progress"><div class="progress-label"><span id="playback-time">00:00</span><span id="ready-count">Genera la base per començar</span><span id="playback-duration">01:51</span></div><progress id="song-progress" value="0" max="1" aria-label="Progrés de reproducció"></progress></div><button id="stop-playback" class="icon-button" aria-label="Aturar reproducció" disabled>■</button><button id="download-song" class="button download" disabled aria-label="Exporta la cançó en WAV">↓ <span class="download-label">Exporta WAV</span></button></div></footer>
+  <footer class="transport" aria-label="Reproductor de la cançó"><div class="transport-content"><button id="play-song" class="transport-play" aria-label="Escoltar la cançó completa" disabled>▶</button><div class="transport-title"><span class="title-line"><strong id="transport-title">Nova cançó</strong><span class="tempo-badge" id="tempo-badge">♩ 128 BPM</span></span><span id="transport-subtitle">Comença generant la base</span></div><div class="transport-progress"><div class="progress-label"><span id="playback-time">00:00</span><span id="ready-count">Genera la base per començar</span><span id="playback-duration">01:51</span></div><progress id="song-progress" value="0" max="1" aria-label="Progrés de reproducció"></progress></div><button id="stop-playback" class="icon-button" aria-label="Aturar reproducció" disabled>■</button><button id="download-song" class="button download" disabled aria-label="Exporta la cançó en WAV">↓ <span class="download-label">Exporta WAV</span></button></div></footer>
   <nav class="tabbar" aria-label="Passos de la cançó">
     <button type="button" class="tab" data-tab="song"><span class="tab-icon" aria-hidden="true">♪</span><span>Cançó</span></button>
     <button type="button" class="tab" data-tab="base"><span class="tab-icon" aria-hidden="true">◉</span><span>Base</span><i class="tab-badge" id="tab-base"></i></button>

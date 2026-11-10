@@ -6,9 +6,9 @@ function rng(seed) {
 }
 function createPerformance(spec) {
   if (!spec || !['ska', 'punk', 'urban'].includes(spec.style) || !Number.isFinite(spec.beat) || spec.beat <= 0
-    || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 180 || !Array.isArray(spec.chords)
+    || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 400 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
-    || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ', 'guitar2', 'guitar3'].includes(i))) throw new Error('Partitura no vàlida');
+    || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ', 'guitar2', 'guitar3', 'vocal'].includes(i))) throw new Error('Partitura no vàlida');
   // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
   // FreePats); banc 3: staccato de VSCO; banc 1: variacions GS; banc 0: GM.
   // Kit 64: Muldjord (gravat). La resta són sons de GeneralUser GS.
@@ -21,6 +21,8 @@ function createPerformance(spec) {
   };
   // Les guitarres 2 i 3 tenen els mateixos sons que la primera.
   presets.guitar2 = presets.guitar; presets.guitar3 = presets.guitar;
+  // Melodia de veu: clarinet gravat (VSCO) o sons GM semblants a la veu.
+  presets.vocal = { auto: null, oohs: [0, 53], flute: [0, 73], ocarina: [0, 79], clarinetGm: [0, 71] };
   if (spec.timbres !== undefined && (!spec.timbres || typeof spec.timbres !== 'object' || Array.isArray(spec.timbres)
     || Object.entries(spec.timbres).some(([family, preset]) => !Object.hasOwn(presets, family) || !Object.hasOwn(presets[family], preset))))
     throw new Error('Timbres no vàlids');
@@ -31,7 +33,7 @@ function createPerformance(spec) {
   const events = [];
   const patch = (channel, [bank, program], pan, volume) => ({ channel, bank, program, pan, volume });
   const realBrass = { 3: !chosen('trumpet'), 4: !chosen('trombone') };
-  const instrumentOf = { 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
+  const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
     patch(0, chosen('guitar') ?? (punk ? [0, 30] : [2, 27]), 42, 94),
     patch(1, chosen('guitar') ?? (punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
@@ -40,6 +42,7 @@ function createPerformance(spec) {
     patch(4, chosen('trombone') ?? [2, 57], 79, 112),
     // Staccato gravat per a les notes curtes de trompeta i trombó.
     patch(12, [3, 56], 50, 116), patch(13, [3, 57], 79, 127),
+    patch(16, chosen('vocal') ?? [2, 71], 64, 112),
     patch(14, chosen('guitar2') ?? (punk ? [0, 30] : [2, 27]), 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
     patch(8, [2, 66], 30, 86),
     { channel: 11, program: 16, pan: 92, volume: 84 },
@@ -56,8 +59,29 @@ function createPerformance(spec) {
     const at = start / bar + 1e-6;
     return list.some(([from, to]) => at >= from && at < to);
   }
+  // Ritme relatiu de cada instrument respecte del tempo de la secció.
+  //  ×2 (doble temps): el patró de cada compàs es toca dues vegades, el doble de ràpid.
+  //  ½ (mig temps): el patró de cada parell de compassos s'estira sobre tots dos; les
+  //  notes que cauen al compàs següent s'ajusten al seu acord.
+  if (spec.feel !== undefined && (!spec.feel || typeof spec.feel !== 'object' || Object.values(spec.feel).some(f => ![.5, 1, 2].includes(f))))
+    throw new Error('Ritme no vàlid');
+  function feel(channel, start, duration, pitch) {
+    const factor = spec.feel?.[instrumentOf[channel]] ?? 1;
+    if (factor === 1) return [[start, duration, pitch]];
+    const abs = start / beat + 1e-9, index = Math.floor(abs / 4), within = abs - index * 4;
+    if (factor === 2) return [0, 2].map(offset => [(index * 4 + within / 2 + offset) * beat, duration / 2, pitch]);
+    if (index % 2) return [];
+    const target = index * 4 + within * 2, destination = Math.floor(target / 4 + 1e-9);
+    let moved = pitch;
+    if (pitch !== undefined && channel !== 9 && channel !== 10 && destination !== index && spec.chords[destination])
+      moved = nearest(pitch, spec.chords[destination].pcs, pitch - 3, pitch + 3); // en una tríada sempre n'hi ha una a ±3
+    return [[target * beat, duration * 2, moved]];
+  }
   function note(channel, pitch, start, duration, velocity, jitter = .004, exact = false) {
-    if (!audible(channel, start)) return;
+    for (const [at, length, tone] of feel(channel, start, duration, pitch)) play(channel, tone, at, length, velocity, jitter, exact);
+  }
+  function play(channel, pitch, start, duration, velocity, jitter, exact) {
+    if (start >= spec.seconds || !audible(channel, start)) return;
     const at = Math.max(0, Math.min(spec.seconds - .02, start + (random() - .5) * jitter));
     const end = Math.min(spec.seconds - .005, at + Math.max(.025, duration));
     const midi = Math.max(0, Math.min(127, Math.round(pitch)));
@@ -65,10 +89,10 @@ function createPerformance(spec) {
     events.push({ time: at, type: 'on', channel, note: midi, velocity: vel });
     events.push({ time: end, type: 'off', channel, note: midi });
   }
-  const control = (channel, time, controller, value) =>
-    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, time)), type: 'cc', channel, controller, value: Math.round(Math.max(0, Math.min(127, value))) });
-  const bend = (channel, time, value) =>
-    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, time)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) });
+  const control = (channel, time, controller, value) => { for (const [at] of feel(channel, time, 0)) if (at < spec.seconds)
+    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'cc', channel, controller, value: Math.round(Math.max(0, Math.min(127, value))) }); };
+  const bend = (channel, time, value) => { for (const [at] of feel(channel, time, 0)) if (at < spec.seconds)
+    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) }); };
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
   function horn(channel, pitch, start, duration, velocity, accent) {
@@ -180,6 +204,14 @@ function createPerformance(spec) {
         if (has('synthBass')) note(7,Math.max(24,pitch-12),(b*4+t)*beat,length*beat,Math.min(127,Math.round(105*strength)),0);
       }
   }
+  // Melodia de veu: lligada (com si es cantés) i amb la mateixa articulació
+  // expressiva dels metalls: entrada suau, crescendo i vibrato a les notes llargues.
+  const vocalLine = Array.isArray(spec.lines?.vocal) ? spec.lines.vocal : spec.melody;
+  if (has('vocal')) for (const [b, t, pitch, duration] of vocalLine) {
+    const at = b * bar + t * beat, next = vocalLine.find(n => n[0] * 4 + n[1] > b * 4 + t);
+    const legato = next && Math.abs(next[0] * 4 + next[1] - (b * 4 + t + duration)) < .01;
+    horn(16, pitch, at, Math.max(.08, duration * beat - (legato ? .01 : .06)), 80, t % 1 === 0);
+  }
   for (const instrument of ['synthLead', 'trumpet', 'trombone', 'sax']) {
     if (!has(instrument)) continue;
     const own = Array.isArray(spec.lines?.[instrument]), line = own ? spec.lines[instrument] : spec.melody;
@@ -201,7 +233,7 @@ function createPerformance(spec) {
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
-  const level = { '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
+  const level = { '2:71': 112, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume; });
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
 }

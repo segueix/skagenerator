@@ -12,6 +12,7 @@ export const TAIL_SECONDS = 1.5;
 // per a una mescla de banda: baix rodó, guitarra prima i brillant, metalls
 // presents. L'equalitzador de l'usuari se suma a aquesta corba.
 export const EQ_PRESETS = {
+  vocal: [-4, 2, 1],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
   guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-2, 2, 0], sax: [-3, 2, 1], organ: [-5, 1, 1],
@@ -20,7 +21,7 @@ export const EQ_PRESETS = {
 export const SONG_GAIN = 10 ** (5.5 / 20);
 export const EQ_BANDS = { low: 120, mid: 900, high: 6000 };
 // Reverberació: el baix sec, la bateria curta, metalls i orgue amb sala.
-const REVERB = { guitar2: 30, guitar3: 34, drums: 14, electronicDrums: 8, bass: 4, synthBass: 0, guitar: 30, trumpet: 40, trombone: 38, sax: 40, organ: 30, synthLead: 32, synthPad: 40 };
+const REVERB = { vocal: 34, guitar2: 30, guitar3: 34, drums: 14, electronicDrums: 8, bass: 4, synthBass: 0, guitar: 30, trumpet: 40, trombone: 38, sax: 40, organ: 30, synthLead: 32, synthPad: 40 };
 
 // Filtres biquadràtics (Robert Bristow-Johnson, «Audio EQ Cookbook»).
 function biquad(type, frequency, gainDb, sampleRate, q = .8) {
@@ -117,6 +118,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
   try {
     synth.soundBankManager.addSoundBank(bank, 'generaluser');
     await synth.ready;
+    // La melodia de veu fa servir un canal més enllà dels 16 del MIDI.
+    while (synth.midiChannels.length <= Math.max(...score.channels.map(c => c.channel))) synth.createMIDIChannel();
     for (const patch of score.channels) {
       if (patch.drums) synth.midiChannels[patch.channel].setDrums(true);
       if (patch.bank) synth.controllerChange(patch.channel, 0, patch.bank);
@@ -141,7 +144,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       const fx = createGuitarFx(score.fx?.[patch.instrument], sampleRate);
       if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);
     }
-    const outputs = Array.from({ length: 16 }, (_, channel) => eqs.has(channel) ? [new Float32Array(BLOCK), new Float32Array(BLOCK)] : dummy);
+    const outputs = Array.from({ length: synth.midiChannels.length }, (_, channel) => eqs.has(channel) ? [new Float32Array(BLOCK), new Float32Array(BLOCK)] : dummy);
     const blockL = new Float32Array(BLOCK), blockR = new Float32Array(BLOCK);
     let event = 0, offset = 0, lastProgress = 0;
     const scheduled = score.events.map(e => ({ ...e, frame: Math.round(e.time * sampleRate) }));

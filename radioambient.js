@@ -1750,7 +1750,7 @@
     };
     // Preseleccions de treball: no són límits teòrics dels gèneres.
     const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue',
-        guitar2: 'Guitarra 2 (aguda)', guitar3: 'Guitarra 3 (arpegis)' };
+        guitar2: 'Guitarra 2 (aguda)', guitar3: 'Guitarra 3 (arpegis)', vocal: 'Melodia de veu (guia)' };
     // Efectes de guitarra que aplica el motor de mostres (vegeu audio/render.mjs).
     const GUITAR_FX = { none: 'Net, sense efecte', boost: 'Boost net', tape: 'Saturació de cinta', crunch: 'Crunch',
         overdrive: 'Overdrive (pedal verd)', distortion: 'Distorsió', metal: 'Metal (guany alt)', fuzz: 'Fuzz', lofi: 'Lo-fi (8 bits)' };
@@ -1879,6 +1879,75 @@
         }
         return line;
     }
+    // ── Melodia de veu (guia per cantar) ────────────────────────────────
+    // Frases de dos compassos amb respiracions: cada línia de la lletra és una
+    // frase i té tantes notes com síl·labes. Sense lletra, frases amb pauses i
+    // una tornada amb un motiu que es repeteix. Registre cantable, salts curts,
+    // notes de l'acord als temps forts i final de frase en una nota estable.
+    function composeVocal(r, chords, bars, type, scalePcs, syllables, register) {
+        const shift = register * 5, lo = 57 + shift, hi = 74 + shift;
+        const center = (type === 'chorus' ? 67 : type === 'prechorus' ? 66 : type === 'verse' ? 63 : 64) + shift;
+        const notes = [], lyrics = Array.isArray(syllables) && syllables.length > 0;
+        const longest = lyrics ? Math.max(...syllables) : 0, phraseBars = longest > 11 && bars >= 4 ? 4 : 2;
+        const rhythmFor = (count, span) => {
+            const pickup = r() < .45 ? .5 : r() < .5 ? 0 : 1, rest = type === 'chorus' ? 1 : 1.5;
+            const end = span - rest;
+            let grid = .5;
+            if ((count - 1) * grid + 1 > end - pickup) grid = .25;
+            count = Math.max(1, Math.min(count, Math.floor((end - pickup - .5) / grid) + 1));
+            const last = Math.max(.5, Math.min(type === 'chorus' ? 2 : 1.5, end - pickup - (count - 1) * grid));
+            const lengths = Array(count - 1).fill(grid);
+            let extra = end - pickup - last - (count - 1) * grid;
+            for (let guard = 0; extra >= grid - 1e-9 && lengths.length && guard < 64; guard++) {
+                const k = Math.floor(r() * lengths.length); lengths[k] += grid; extra -= grid;
+            }
+            const out = []; let at = pickup;
+            for (const length of lengths) { out.push([at, length]); at += length; }
+            out.push([at, last]);
+            return out;
+        };
+        const pitchesFor = (rhythm, startBar) => {
+            const peak = .35 + r() * .3, out = [];
+            // Comença a prop d'on va acabar la frase anterior (o del centre del registre).
+            const from = lastNote ?? center - 2 + Math.round(r() * 4);
+            let prev = nearestTone(Math.round((from * 2 + center) / 3) + (r() < .5 ? 1 : -1), chords[startBar].pcs, lo, hi);
+            rhythm.forEach(([at], k) => {
+                const bar = Math.min(bars - 1, startBar + Math.floor(at / 4)), chord = chords[bar], pos = k / Math.max(1, rhythm.length - 1);
+                const target = center + (pos < peak ? 3 : -2), dir = prev === target ? (r() < .5 ? -1 : 1) : Math.sign(target - prev);
+                let n;
+                if (k === rhythm.length - 1) n = nearestTone(prev - 1, [chord.pcs[0], chord.pcs[1]], lo, hi);
+                else if (k > 0 && r() < .18) n = prev; // síl·labes repetides a la mateixa nota
+                else if (at % 1 === 0) n = nearestTone(prev + dir * (1 + Math.floor(r() * 3)), chord.pcs, lo, hi);
+                else n = stepScale(prev, dir, scalePcs, chord, lo, hi);
+                if (Math.abs(n - prev) > 7) n = nearestTone(prev + Math.sign(n - prev) * 4, chord.pcs, lo, hi);
+                out.push(n); prev = n;
+            });
+            lastNote = prev;
+            return out;
+        };
+        let hook = null, line = 0, lastNote = null;
+        for (let start = 0, phrase = 0; start < bars; start += phraseBars, phrase++) {
+            const span = Math.min(phraseBars, bars - start) * 4;
+            if (span < 2) break;
+            let count;
+            if (lyrics) { if (line >= syllables.length) break; count = syllables[line++]; }
+            else {
+                // Respiracions: el pont i la intro canten frase sí, frase no.
+                if ((type === 'bridge' || type === 'intro' || type === 'outro') && phrase % 2 === 1) continue;
+                count = type === 'chorus' ? 5 + Math.floor(r() * 3) : 6 + Math.floor(r() * 4);
+            }
+            let rhythm, pitches;
+            // A la tornada sense lletra, la frase 1 i la 3 són el mateix motiu.
+            if (!lyrics && type === 'chorus' && hook && phrase % 2 === 0) [rhythm, pitches] = hook;
+            else { rhythm = rhythmFor(count, span); pitches = pitchesFor(rhythm, start); }
+            if (!lyrics && type === 'chorus' && !hook) hook = [rhythm, pitches];
+            rhythm.forEach(([at, length], k) => {
+                const absolute = start * 4 + at;
+                if (absolute < bars * 4) notes.push([Math.floor(absolute / 4), absolute % 4, pitches[k], Math.min(length, bars * 4 - absolute)]);
+            });
+        }
+        return notes;
+    }
     function composeSongPart(settings, part) {
         if (!Object.hasOwn(SONG_PARTS, part.type)) throw new Error('Tipus de secció desconegut');
         const bars = Number(part.bars), bpm = Number(settings.bpm), tonic = Number(settings.tonic);
@@ -1886,6 +1955,16 @@
         if (!Object.hasOwn(SONG_STYLES, settings.style) || !Number.isInteger(bars) || bars < 1 || bars > 64
             || !Number.isInteger(bpm) || bpm < style.bpm.min || bpm > style.bpm.max
             || !style.keys.some(([key, mode]) => key === tonic && mode === settings.mode)) throw new Error('Configuració musical no vàlida per a aquest estil');
+        // Tempo propi del tram (canvis de tempo dins la cançó): 40–240 BPM.
+        if (part.bpm !== undefined && (!Number.isInteger(part.bpm) || part.bpm < 40 || part.bpm > 240)) throw new Error('Tempo de la secció no vàlid');
+        const tempo = part.bpm ?? bpm;
+        // Ritme relatiu de cada instrument: mig temps (0,5), normal o doble temps (2).
+        if (part.feel !== undefined && (!part.feel || typeof part.feel !== 'object' || Array.isArray(part.feel)
+            || Object.entries(part.feel).some(([name, factor]) => !Object.hasOwn(SONG_INSTRUMENTS, name) || ![.5, 1, 2].includes(factor))))
+            throw new Error('Ritme d’instrument no vàlid');
+        if (part.syllables !== undefined && (!Array.isArray(part.syllables) || part.syllables.length > 32
+            || part.syllables.some(n => !Number.isInteger(n) || n < 1 || n > 24))) throw new Error('Síl·labes de la lletra no vàlides');
+        if (part.register !== undefined && ![-1, 0, 1].includes(part.register)) throw new Error('Registre de la veu no vàlid');
         const instruments = part.instruments === undefined ? (settings.instruments === undefined ? style.instruments : settings.instruments) : part.instruments;
         if (!Array.isArray(instruments) || !instruments.length || new Set(instruments).size !== instruments.length
             || instruments.some(instrument => !Object.hasOwn(SONG_INSTRUMENTS, instrument))) throw new Error('Selecciona instruments vàlids');
@@ -1964,6 +2043,11 @@
         Object.keys(layers).forEach(name => {
             const rev = layers[name], salt = name.split('').reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
             layerIndex[name] = (rev - 1) % 5;
+            if (name === 'vocal') {
+                const vr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
+                lines.vocal = composeVocal(vr, chords, bars, part.type, ctx.scalePcs, part.syllables, part.register || 0);
+                return;
+            }
             if (!['trumpet', 'trombone', 'synthLead', 'sax'].includes(name)) return;
             const lr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
             const lctx = { ...ctx, prev: nearestTone(name === 'trombone' ? 67 : 72, chords[0].pcs, 64, 79) };
@@ -2011,13 +2095,14 @@
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
         }
-        return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
-            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
+        return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo,
+            seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             ranges: JSON.parse(JSON.stringify(ranges)),
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: { ...(settings.mix || {}), ...(part.mix || {}) },
-            fx: { ...(settings.fx || {}), ...(part.fx || {}) } };
+            fx: { ...(settings.fx || {}), ...(part.fx || {}) },
+            feel: { ...(part.feel || {}) } };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;
@@ -2041,6 +2126,8 @@
             if (has('guitar')) stabs.forEach((t, hit) => voicing.forEach((n, k) => {
                 syn.pluck(t0 + t * beat + k * 0.004, n, intensity * (punk && hit % 2 ? 0.5 : 0.75), guitar);
             }));
+            if (has('vocal') && b === 0) (spec.lines?.vocal || spec.melody).forEach(([nb, t, n, d]) =>
+                syn.brass(nb * bar + t * beat, n, Math.max(.06, d * beat - .03), intensity * .5, 'trumpet'));
             if (has('guitar2')) (ending ? [0] : [.5, 1.5, 2.5, 3.5]).forEach(t => voicing.forEach((n, k) =>
                 syn.pluck(t0 + t * beat + .01 + k * .004, n + 12, intensity * .45, guitar)));
             if (has('guitar3')) (ending ? [0] : [0, .5, 1, 1.5, 2, 2.5, 3, 3.5]).forEach((t, k) =>
