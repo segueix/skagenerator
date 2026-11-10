@@ -53,12 +53,12 @@ function createPerformance(spec) {
     const at = start / bar + 1e-6;
     return list.some(([from, to]) => at >= from && at < to);
   }
-  function note(channel, pitch, start, duration, velocity, jitter = .004) {
+  function note(channel, pitch, start, duration, velocity, jitter = .004, exact = false) {
     if (!audible(channel, start)) return;
     const at = Math.max(0, Math.min(spec.seconds - .02, start + (random() - .5) * jitter));
     const end = Math.min(spec.seconds - .005, at + Math.max(.025, duration));
     const midi = Math.max(0, Math.min(127, Math.round(pitch)));
-    const vel = Math.max(1, Math.min(127, Math.round(velocity * energy + (random() - .5) * 9)));
+    const vel = Math.max(1, Math.min(127, Math.round(exact ? velocity : velocity * energy + (random() - .5) * 9)));
     events.push({ time: at, type: 'on', channel, note: midi, velocity: vel });
     events.push({ time: end, type: 'off', channel, note: midi });
   }
@@ -74,11 +74,16 @@ function createPerformance(spec) {
     const at = Math.max(0, start), long = duration > beat * .9;
     bend(channel, at - .002, accent && random() < .55 ? 8192 - 700 - random() * 500 : 8192);
     if (accent) for (let k = 1; k <= 4; k++) bend(channel, at + k * .016, 8192 - (4 - k) * 260 * (1 - k / 5));
-    control(channel, at - .002, 11, long ? 96 : 118);
-    if (long) for (let k = 1; k <= 3; k++) control(channel, at + duration * .12 * k, 96 + k * 10);
+    // Crescendo subtil a les notes llargues (uns 2 dB): més fort sonava com si la nota s'apagués.
+    control(channel, at - .002, 11, long ? 112 : 124);
+    if (long) for (let k = 1; k <= 3; k++) control(channel, at + duration * .12 * k, 112 + k * 5);
     control(channel, at - .002, 1, 0);
     if (duration > .55) { control(channel, at + duration * .45, 1, 28); control(channel, at + duration * .7, 1, 46); }
-    note(channel, pitch, start, duration, velocity, .006);
+    // Els metalls gravats tenen dues dinàmiques (canvi a 64). La força s'allunya
+    // d'aquesta frontera perquè la trompeta no salti de mostra nota a nota.
+    let vel = Math.round(velocity * energy);
+    vel = (vel < 64 ? Math.min(vel, 58) : Math.max(vel, 70)) + Math.round((random() - .5) * 4);
+    note(channel, pitch, start, duration, vel, .006, true);
   }
   const nearest = (target, pcs, lo, hi) => {
     let result = lo, dist = Infinity;
@@ -173,7 +178,7 @@ function createPerformance(spec) {
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
-  const level = { '2:27': 77, '2:33': 99, '2:34': 99, '2:57': 127 };
+  const level = { '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume; });
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {} };
 }

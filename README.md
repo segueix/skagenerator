@@ -41,6 +41,8 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 | Bateria | Muldjord Kit, de Lars Muldjord (via FreePats) | CC BY 4.0 |
 
 - VSCO només publica els WAV: el build llegeix el nom de cada fitxer (nota i dinàmica), en mesura l’afinació, el remostreja i en crea les zones de tecla i de força. Les notes curtes de trompeta i trombó fan servir les mostres d’staccato, que donen els cops secs típics de l’ska.
+- Les gravacions de VSCO tenen nivells molt desiguals (més de 20 dB entre notes). El build iguala la sonoritat de cada mostra: totes les notes d’una dinàmica sonen igual, la dinàmica suau queda 4 dB per sota de la forta i l’staccato 5 dB per sota del sostingut. La força dels metalls s’allunya del canvi de dinàmica perquè no saltin de mostra nota a nota.
+- Totes les seccions reben el mateix guany (abans cada secció es normalitzava per separat i un instrument que passava d’una secció a l’altra pujava o baixava de volum). Un compressor suau i un limitador controlen els pics.
 - FreePats ja publica aquests instruments en SF2: no cal convertir l’SFZ. El build els remostreja a 32 kHz (baixos a 22 kHz), treu els bucles i escurça les cues.
 - El kit Muldjord original ocupa 209 MB i té un mapa de tecles propi: se’n construeix un kit GM nou (bombo, caixa, cop de vora, charleston, plats, ride i timbals) amb tres capes de força.
 - El banc final ocupa uns 30 MB i es carrega una sola vegada. Les descàrregues i el banc convertit es guarden a `.cache/` i a la memòria cau de GitHub Actions.

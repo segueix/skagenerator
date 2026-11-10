@@ -133,3 +133,27 @@ test('l’equalitzador canvia el volum i el timbre de cada instrument per separa
   const normal = await renderSampledPart(bank, sp(undefined), 16000);
   assert(normal.every(ch => ch.every(x => Number.isFinite(x) && Math.abs(x) <= .931)));
 });
+
+test('la trompeta i el trombó gravats tenen un nivell igualat a tota la tessitura', () => {
+  const loud = data => { const n = 960; let best = 0; for (let s = 0; s + n <= data.length; s += n / 2) { let e = 0; for (let i = s; i < s + n; i++) e += data[i] * data[i]; best = Math.max(best, e / n); } return 10 * Math.log10(best); };
+  for (const [bankMSB, program] of [[2, 56], [2, 57], [3, 56], [3, 57]]) {
+    const preset = bank.presets.find(p => p.bankMSB === bankMSB && p.program === program);
+    const byLayer = new Map();
+    for (const zone of preset.zones[0].instrument.zones) {
+      const key = zone.velRange.min;
+      if (!byLayer.has(key)) byLayer.set(key, []);
+      byLayer.get(key).push(loud(zone.sample.getAudioData()));
+    }
+    for (const levels of byLayer.values()) assert(Math.max(...levels) - Math.min(...levels) < 3, `${bankMSB}:${program} varia ${(Math.max(...levels) - Math.min(...levels)).toFixed(1)} dB`);
+  }
+});
+
+test('totes les seccions reben el mateix guany: un instrument no canvia de volum en passar d’una a l’altra', async () => {
+  const rms = d => Math.sqrt(d[0].reduce((s, x) => s + x * x, 0) / d[0].length);
+  const gains = [];
+  for (const type of ['intro', 'verse', 'bridge']) {
+    const sp = engine.composeSongPart({ ...settings, instruments: ['bass', 'trumpet'] }, { type, bars: 4, energy: engine.SONG_PARTS[type].energy, revision: 2, layers: { trumpet: 3 } });
+    gains.push(20 * Math.log10(rms(await renderSampledPart(bank, sp, 16000)) / rms(await renderSampledPart(bank, sp, 16000, { raw: true }))));
+  }
+  assert(Math.max(...gains) - Math.min(...gains) < 1, gains.join(', '));
+});

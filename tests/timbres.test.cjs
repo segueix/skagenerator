@@ -96,3 +96,13 @@ test('per defecte sonen els instruments gravats i les notes curtes dels metalls 
   assert(gm.events.every(e => e.channel === 3));
   assert.equal(gm.channels.find(p => p.channel === 3).bank, 0);
 });
+
+test('la força dels metalls s’allunya del canvi de dinàmica perquè no salti de mostra', () => {
+  for (const type of ['intro', 'verse', 'bridge', 'chorus', 'outro']) {
+    const spec = engine.composeSongPart({ ...config, instruments: ['trumpet', 'trombone'] },
+      { type, bars: 8, energy: engine.SONG_PARTS[type].energy, revision: 4, layers: { trumpet: 2, trombone: 3 } });
+    const velocities = createPerformance(spec).events.filter(e => e.type === 'on').map(e => e.velocity);
+    assert(velocities.every(v => v <= 60 || v >= 68), `${type}: ${velocities.filter(v => v > 60 && v < 68)}`);
+    assert(Math.max(...velocities) - Math.min(...velocities) <= 25);
+  }
+});

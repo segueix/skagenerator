@@ -15,7 +15,7 @@ function loadClient({ Worker, fetch, songPartSamples }) {
     window,
     document: { currentScript: { src: 'https://example.test/skagenerator/sample-audio.js' } },
     Worker, fetch, URL, Float32Array, Uint8Array, setTimeout, clearTimeout,
-    AbortSignal, console: { warn() {} }
+    AbortSignal, AbortController, console: { warn() {} }
   };
   vm.runInNewContext(script, context);
   return window.SkaSampleAudio;
@@ -40,7 +40,8 @@ test('un banc absent informa de l’error i permet recuperar les mostres en el s
   available = true;
   const audio = await client.render({ type: 'verse' });
   assert(audio[0][1] > .3);
-  assert.equal(fetches, 3); assert.equal(fallbackCalls, 0);
+  // Dos intents fallits (cadascun torna a demanar el banc sense memòria cau) i un d'encertat.
+  assert.equal(fetches, 5); assert.equal(fallbackCalls, 0);
   client.dispose();
 });
 
@@ -101,4 +102,29 @@ test('si el navegador no admet workers, es comunica l’error sense substituir e
   });
   await assert.rejects(client.render({ type: 'intro' }), /Worker unavailable/);
   await assert.rejects(client.render({ type: 'verse' }), /Worker unavailable/);
+});
+
+test('un error desat a la memòria cau del navegador es torna a demanar sense memòria cau', async () => {
+  const modes = [];
+  class Worker {
+    terminate() {}
+    postMessage(data) {
+      queueMicrotask(() => this.onmessage({ data: { id: data.id, type: data.type === 'init' ? 'ready' : 'rendered',
+        channels: [Float32Array.from([0, .5, 0]), Float32Array.from([0, .5, 0])] } }));
+    }
+  }
+  const client = loadClient({ Worker, songPartSamples() {},
+    async fetch(url, options) {
+      modes.push(options.cache);
+      const ok = options.cache === 'reload';
+      return { ok, status: ok ? 200 : 404, headers: { get() { return null; } }, arrayBuffer: async () => new ArrayBuffer(8) };
+    } });
+  const audio = await client.render({ type: 'verse' });
+  assert(audio[0][1] > .4);
+  assert.deepEqual(modes, ['force-cache', 'reload']);
+  client.dispose();
+  const missing = loadClient({ Worker, songPartSamples() {},
+    async fetch() { return { ok: false, status: 404, headers: { get() { return null; } } }; } });
+  await assert.rejects(missing.render({ type: 'verse' }), /error 404/);
+  missing.dispose();
 });
