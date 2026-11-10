@@ -42,3 +42,36 @@
 .timbre-picker select:disabled{opacity:.5;cursor:not-allowed}
 .timbre-picker.per-part{margin:16px 0 12px}
 @media(max-width:680px){.timbre-picker{grid-template-columns:1fr;gap:10px}.timbre-picker select{min-height:40px}}
+
+/* Base rítmica i graella d'arranjament */
+.step{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--lime);font-size:10px;font-weight:700;margin-right:8px;vertical-align:1px}
+.groove-panel{margin-top:22px;background:white;border:1px solid var(--line);border-radius:12px;padding:19px 24px 16px}
+.groove-panel .section-heading{margin-bottom:0;flex-wrap:wrap}
+.groove-panel>small{display:block;font-size:10px;line-height:1.5;color:#8b9780}
+.groove-picker{grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end;border-top:0;padding-top:0}
+.groove-picker .button{min-height:39px}
+.button.primary:disabled,.button.listen:disabled{opacity:.45}
+.matrix-scroll{overflow-x:auto;margin-top:14px;background:white;border:1px solid var(--line);border-radius:10px}
+.matrix{border-collapse:collapse;width:100%;font-size:11px}
+.matrix th,.matrix td{padding:0;border-bottom:1px solid #eef1ea;text-align:center}
+.matrix tbody tr:last-child th,.matrix tbody tr:last-child td{border-bottom:0}
+.matrix th[scope=row],.matrix thead th:first-child{position:sticky;left:0;z-index:1;background:white;text-align:left;padding:0 14px;font-weight:600;white-space:nowrap;color:#4d5e55}
+.matrix thead th:first-child{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#7d877e;font-weight:700}
+.matrix-part{width:100%;min-width:74px;min-height:36px;border:0;border-bottom:3px solid var(--color);background:color-mix(in srgb,var(--color) 18%,white);font-size:10px;font-weight:650;padding:6px 8px;white-space:nowrap}
+.matrix-part.selected{background:color-mix(in srgb,var(--color) 48%,white)}
+.matrix td label{display:grid;place-items:center;min-height:36px;cursor:pointer}
+.matrix td input{position:absolute;opacity:0;width:1px;height:1px}
+.matrix td span{width:calc(100% - 8px);height:24px;border-radius:5px;background:#f3f5ef;transition:background .12s}
+.matrix td.on span{background:color-mix(in srgb,var(--color) 78%,#5d6f63)}
+.matrix td.selected{background:#f6f8f1}
+.matrix td label:hover span{outline:2px solid #b9c7ab}
+.matrix td input:focus-visible+span{outline:3px solid #73a396;outline-offset:1px}
+.matrix td:has(input:disabled) label{cursor:not-allowed;opacity:.55}
+.matrix-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:11px}
+.matrix-actions>span{font-size:10px;color:#849080;flex:1;min-width:210px;line-height:1.5}
+.matrix-actions .text-button{flex-basis:auto;margin:0;font-size:10px}
+.part-chords{margin:-8px 0 20px;font-size:12px;font-weight:600;color:#4d5e55;letter-spacing:.2px}
+.part-chords[hidden],.apply-peers[hidden],.matrix-actions .text-button[hidden]{display:none}
+.apply-peers{display:block;margin:-12px 0 20px auto;font-size:10px}
+@media(max-width:950px){.groove-picker{grid-template-columns:repeat(3,minmax(0,1fr))}.groove-picker .button{grid-column:1/-1}}
+@media(max-width:680px){.groove-panel{padding:16px}.groove-picker{grid-template-columns:1fr}.matrix-actions .button{flex:1}}

@@ -25,7 +25,7 @@ test('el worker compilat genera totes les parts i les cinc alternatives amb les 
       assert.equal(result.type, 'rendered', `${style}/${type}/${i}: ${result.message}`);
       assert.equal(result.channels.length, 2);
       for (const channel of result.channels) {
-        assert.equal(channel.length, Math.round(spec.seconds * 44100));
+        assert.equal(channel.length, Math.round(spec.seconds * 44100) + Math.round(1.5 * 44100));
         assert(channel.every(Number.isFinite));
         assert(channel.some(n => Math.abs(n) > .01));
       }

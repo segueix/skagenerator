@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseSoundBank, renderSampledPart } from '../audio/render.mjs';
+import { parseSoundBank, renderSampledPart, TAIL_SECONDS } from '../audio/render.mjs';
 import { createPerformance } from '../audio/performance.cjs';
 import engine from '../radioambient.js';
 import audioUtils from '../audio-utils.js';
-const { encodeWav, joinStereo } = audioUtils;
+const { encodeWav, joinStereo, mixSections } = audioUtils;
 
 const raw = await readFile(new URL('../dist/assets/generaluser-ska-punk.sf2', import.meta.url));
 const bank = parseSoundBank(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
@@ -42,7 +42,7 @@ test('els nou instruments produeixen àudio estèreo finit a partir del banc rea
     const solo = { ...spec, instruments: [instrument] };
     const channels = await renderSampledPart(bank, solo, 16000);
     assert.equal(channels.length, 2);
-    assert.equal(channels[0].length, Math.round(spec.seconds * 16000));
+    assert.equal(channels[0].length, Math.round(spec.seconds * 16000) + Math.round(TAIL_SECONDS * 16000));
     let sum = 0;
     for (const channel of channels) {
       assert(channel.every(Number.isFinite)); assert(channel.every(n => Math.abs(n) <= .931));
@@ -58,11 +58,20 @@ test('ska i punk es renderitzen a 44,1 kHz amb separació estèreo i durada de c
   for (const style of ['ska', 'punk']) {
     const sp = engine.composeSongPart({ ...settings, style, bpm: engine.SONG_STYLES[style].bpm.default }, part);
     const channels = await renderSampledPart(bank, sp);
-    assert.equal(channels[0].length, Math.round(sp.seconds * 44100));
+    const body = Math.round(sp.seconds * 44100), tail = Math.round(TAIL_SECONDS * 44100);
+    assert.equal(channels[0].length, body + tail);
     assert.notDeepEqual(channels[0], channels[1]);
     const joined = joinStereo([channels, channels]);
     assert.equal(joined[0].length, channels[0].length * 2);
     assert.deepEqual(joined[1].slice(channels[0].length), channels[1]);
+    // A la cançó, la cua de cada secció sona sobre l'inici de la següent.
+    const song = mixSections([channels, channels], [body, body]);
+    assert.equal(song[0].length, body * 2 + tail);
+    assert.deepEqual(song[0].slice(0, body), channels[0].slice(0, body));
+    assert(song[0].every(n => Number.isFinite(n) && Math.abs(n) <= 1));
+    assert(channels[0].slice(body, body + 4410).some(n => Math.abs(n) > .001), 'la cua ha de contenir la ressonància');
+    assert.notDeepEqual(song[0].slice(body, body + tail), channels[0].slice(0, tail));
+    assert.throws(() => mixSections([channels], [channels[0].length + 1]));
   }
 });
 test('el WAV exportat conserva els canals, la freqüència, les mostres i la durada', () => {

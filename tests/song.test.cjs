@@ -149,3 +149,53 @@ test('el motor alternatiu fa cinc àudios audibles amb només baix', async () =>
   }
   assert.equal(new Set(sounds).size, 5);
 });
+
+test('la base rítmica es manté en les cinc versions i es pot canviar per secció', () => {
+  const performance = require('../audio/performance.cjs');
+  assert.deepEqual(Object.keys(engine.SONG_GROOVES), Object.keys(engine.SONG_STYLES));
+  const base = { ...settings, instruments: ['guitar', 'drums', 'bass'], groove: { drums: 1, bass: 2, guitar: 3 } };
+  const versions = [0, 1, 2, 3, 4].map(index => engine.composeSongPart(base, { ...part('verse'), revision: index + 1, variantIndex: index }));
+  // Les versions canvien acords i melodia, però comparteixen la bateria i el ritme.
+  assert.equal(new Set(versions.map(spec => JSON.stringify(spec.drumLine))).size, 1);
+  assert.equal(new Set(versions.map(spec => JSON.stringify(spec.bassLine.map(([b, t, , length]) => [b, t, length])))).size, 1);
+  assert.equal(new Set(versions.map(spec => JSON.stringify(spec.melody))).size, 5);
+  assert.deepEqual(versions[0].groove, { drums: 1, bass: 2, guitar: 3 });
+  const own = engine.composeSongPart(base, { ...part('verse'), groove: { drums: 4 } });
+  assert.deepEqual(own.groove, { drums: 4, bass: 2, guitar: 3 });
+  assert.notDeepEqual(own.drumLine, versions[0].drumLine);
+  assert.deepEqual(own.melody, engine.composeSongPart(base, part('verse')).melody);
+  for (const style of Object.keys(engine.SONG_STYLES)) {
+    const cfg = { ...settings, style, bpm: engine.SONG_STYLES[style].bpm.default,
+      tonic: engine.SONG_STYLES[style].keys[0][0], mode: engine.SONG_STYLES[style].keys[0][1], instruments: ['drums'] };
+    const lines = engine.SONG_GROOVES[style].drums.map((_, drums) => engine.composeSongPart({ ...cfg, groove: { drums } }, part('verse')).drumLine);
+    assert.equal(new Set(lines.map(JSON.stringify)).size, lines.length);
+    for (const line of lines) assert(line.every(([bar, beat, note, force]) =>
+      Number.isInteger(bar) && bar >= 0 && bar < 4 && beat >= 0 && beat < 4 && note >= 35 && note <= 59 && force > 0 && force <= 127));
+    const guitars = engine.SONG_GROOVES[style].guitar.map((_, guitar) => performance.createPerformance(
+      engine.composeSongPart({ ...cfg, instruments: ['guitar'], groove: { guitar } }, part('verse')))
+      .events.filter(e => e.type === 'on' && e.channel === 0).length);
+    assert(new Set(guitars).size > 1);
+  }
+  for (const groove of [{ drums: 6 }, { bass: -1 }, { guitar: 1.5 }, { piano: 0 }, [], null, 'ska'])
+    assert.throws(() => engine.composeSongPart({ ...settings, groove }, part('verse')), /Base rítmica/);
+  assert.throws(() => engine.composeSongPart(settings, { ...part('verse'), groove: { drums: 9 } }), /Base rítmica/);
+});
+
+test('la bateria segueix la forma de cada secció', () => {
+  const cfg = { ...settings, groove: { drums: 0, bass: 0, guitar: 0 } };
+  const drums = (type, bars = 4, energy) => engine.composeSongPart(cfg, { ...part(type, bars), ...(energy ? { energy } : {}) }).drumLine;
+  const at = (line, bar, note) => line.filter(hit => hit[0] === bar && hit[2] === note);
+  const chorus = drums('chorus', 8);
+  assert.equal(at(chorus, 0, 49).length, 1, 'plat a l’entrada de la tornada');
+  assert(chorus.filter(hit => hit[0] === 7 && hit[1] >= 2.5 && [38, 43, 45, 48].includes(hit[2])).length >= 5, 'redoble final');
+  assert.equal(at(chorus, 3, 38).some(hit => hit[1] === 3.75), true, 'avís al final de la frase');
+  const intro = drums('intro');
+  assert.equal(at(intro, 0, 38).length + at(intro, 0, 37).length, 0, 'la intro comença sense caixa');
+  assert(at(intro, 2, 37).length > 0, 'la base completa entra a mitja intro');
+  const pre = drums('prechorus');
+  const roll = at(pre, 3, 38);
+  assert(roll.length >= 12 && roll.at(-1)[3] > roll[0][3], 'crescendo abans de la tornada');
+  const outro = drums('outro');
+  assert.deepEqual(outro.filter(hit => hit[0] === 3).map(hit => hit[1]), [0, 0, 0]);
+  assert.notDeepEqual(drums('verse', 4, 30), drums('verse', 4, 90));
+});
