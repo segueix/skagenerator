@@ -21,6 +21,13 @@ La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro
 
 Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
 
+## Mòbil, colors i mode fosc
+
+- **Al mòbil** l’editor es fa pas a pas amb una barra de pestanyes inferior: **Cançó** (nom, estil, tempo, tonalitat i durada), **Base**, **Línia** i **Secció**. Cada pantalla té un botó «Següent» i, en tocar una secció a la línia, s’obre directament el seu editor. Les pestanyes mostren l’estat (base generada ✓, nombre de seccions, instruments pendents de generar). El reproductor queda sempre visible just a sobre de les pestanyes.
+- Els controls tenen una mida tàctil de 44 px com a mínim i els camps fan servir lletra de 16 px perquè l’iPhone no s’apropi en tocar-los. A la línia, els noms de les pistes queden fixos en desplaçar-se i les vores de seccions i clips són més amples al tacte.
+- **Colors**: cada pas té el seu color (base turquesa, línia rosa, secció ambre), i seccions i instruments tenen colors vius que funcionen en els dos modes.
+- **Mode fosc**: segueix el del sistema i es pot canviar amb el botó ☾/☀ de la capçalera; l’elecció es recorda en aquest navegador.
+
 ## Instruments gravats nota a nota
 
 Per defecte sonen instruments gravats per músics, nota a nota i amb diverses dinàmiques, que el build converteix i afegeix al banc:
