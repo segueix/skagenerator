@@ -1,0 +1,241 @@
+{
+  "version": 3,
+  "title": "Rude Boys del Raval",
+  "settings": {
+    "style": "ska",
+    "bpm": 132,
+    "tonic": 0,
+    "mode": "major",
+    "seed": 1101,
+    "bars": 60,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "auto",
+      "drums": "auto",
+      "trumpet": "auto",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 0,
+      "bass": 0,
+      "guitar": 0
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 3,
+    "verse": 2,
+    "prechorus": 4,
+    "chorus": 1,
+    "solo": 6,
+    "outro": 2
+  },
+  "sections": [
+    {
+      "id": "ska-rude-boys-del-raval-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s2",
+      "start": 4,
+      "lyrics": "Baixo pel carrer amb sabates de xarol\nla ciutat fa olor de mar i de cafè\nel bus de nit ja no passa pel barri\nperò el ritme m’empeny endavant",
+      "type": "verse",
+      "bars": 8
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s3",
+      "start": 12,
+      "lyrics": "Puja el volum que comença\ntothom a la pista ara",
+      "type": "prechorus",
+      "bars": 4
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s4",
+      "start": 16,
+      "lyrics": "Rude boys del Raval\nballant a contratemps\nrude boys del Raval\nningú no ens atura avui",
+      "type": "chorus",
+      "bars": 8
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s5",
+      "start": 24,
+      "lyrics": "La mare em diu que torni aviat\nperò la banda encara no ha acabat\nel trombó riu i la trompeta crida\ni jo segueixo el baix fins a l’alba",
+      "type": "verse",
+      "bars": 8
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s6",
+      "start": 32,
+      "lyrics": "Rude boys del Raval\nballant a contratemps\nrude boys del Raval\nningú no ens atura avui",
+      "type": "chorus",
+      "bars": 8
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s7",
+      "start": 40,
+      "lyrics": "",
+      "type": "solo",
+      "bars": 8,
+      "energy": 80
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s8",
+      "start": 48,
+      "lyrics": "Rude boys del Raval\nballant a contratemps\nrude boys del Raval\nningú no ens atura avui",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95,
+      "transpose": 2
+    },
+    {
+      "id": "ska-rude-boys-del-raval-s9",
+      "start": 56,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "transpose": 2
+    }
+  ],
+  "clips": [
+    {
+      "id": "ska-rude-boys-del-raval-c1",
+      "instrument": "trumpet",
+      "start": 0,
+      "bars": 4,
+      "revision": 38,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c2",
+      "instrument": "trombone",
+      "start": 0,
+      "bars": 4,
+      "revision": 2,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c3",
+      "instrument": "organ",
+      "start": 4,
+      "bars": 8,
+      "revision": 2,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c4",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 20,
+      "revision": 28,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c5",
+      "instrument": "trumpet",
+      "start": 16,
+      "bars": 8,
+      "revision": 3,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c6",
+      "instrument": "trombone",
+      "start": 16,
+      "bars": 8,
+      "revision": 5,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c7",
+      "instrument": "organ",
+      "start": 24,
+      "bars": 8,
+      "revision": 2,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c8",
+      "instrument": "vocal",
+      "start": 24,
+      "bars": 16,
+      "revision": 24,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c9",
+      "instrument": "trumpet",
+      "start": 32,
+      "bars": 8,
+      "revision": 3,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c10",
+      "instrument": "trombone",
+      "start": 32,
+      "bars": 8,
+      "revision": 5,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c11",
+      "instrument": "sax",
+      "start": 40,
+      "bars": 8,
+      "revision": 19,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c12",
+      "instrument": "organ",
+      "start": 40,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c13",
+      "instrument": "vocal",
+      "start": 48,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c14",
+      "instrument": "trumpet",
+      "start": 48,
+      "bars": 12,
+      "revision": 2,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c15",
+      "instrument": "trombone",
+      "start": 48,
+      "bars": 12,
+      "revision": 19,
+      "generated": true
+    },
+    {
+      "id": "ska-rude-boys-del-raval-c16",
+      "instrument": "sax",
+      "start": 48,
+      "bars": 12,
+      "revision": 9,
+      "generated": true
+    }
+  ]
+}

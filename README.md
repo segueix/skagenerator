@@ -2,6 +2,25 @@
 
 Taller web en català per compondre cançons instrumentals, secció per secció.
 
+## Cançons d’exemple
+
+A la primera pantalla hi ha **10 cançons fetes amb el taller** (5 de ska i 5 de punk), guardades com a projectes a [`exemples/`](exemples/). Un clic les obre per escoltar-les, editar-les o fer-les servir de punt de partida. Mostren la varietat que permet el sistema: estils, tempos i tonalitats diferents, canvis de tempo i de to, mig temps i doble temps, guitarres amb efectes (inclòs l’horror punk), seccions de vents, orgue, sintetitzadors, kits diferents i melodia de veu amb lletra original en català.
+
+| Cançó | Estil | BPM | Durada | Què hi mostra |
+|---|---|---|---|---|
+| Rude Boys del Raval | Ska | 132 | 1:49 | Ska 2-tone clàssic: guitarra a contratemps, orgue «bubble», trompeta i saxo a les tornades, veu guia amb lletra i pujada de to a l’última tornada. |
+| Skatalites al Port | Ska | 116 | 2:15 | Ska jamaicà instrumental: kit de jazz, baix caminant, trompeta, trombó gravat i saxo fent el tema, solo de saxo i pont amb la bateria a mig temps. |
+| Rocksteady de Matinada | Ska | 100 | 2:19 | Rocksteady lent en La menor: one drop, baix dub, orgue de fons, trompeta amb sordina, veu guia greu i pont més lent amb coixí de sintetitzador. |
+| Ska-punk a Cent Vuitanta | Ska | 168 | 1:19 | Ska-punk: estrofes a contratemps i tornades amb guitarra distorsionada, metalls a l’uníson, pont a mig temps i última tornada més ràpida i mig to amunt. |
+| Dub de Sant Joan | Ska | 112 | 1:55 | Ska amb aire dub: steppers, baix dub, guitarres amb cinta i lo-fi, bateria electrònica i sintetitzadors al pont, i un final que s’alenteix. |
+| Nit de Difunts | Punk | 184 | 1:17 | Horror punk a l’estil dels Misfits: guitarres «serra mecànica» doblades a banda i banda, quintes a cops avall, veu greu, orgue de terror a la intro i «whoa-oh» al pont. |
+| Tres Acords i la Veritat | Punk | 200 | 1:22 | Punk del 77, ràpid i directe: corxeres a tota velocitat, distorsió de pedal, kit de rock i tornades per cridar a cor. |
+| Hardcore de Barri | Punk | 216 | 1:29 | Hardcore en Si menor: D-beat a 216 BPM, fuzz, tornades en doble temps tipus skate punk i un «breakdown» a la meitat de tempo amb guitarra metal. |
+| Estiu, no te’n vagis | Punk | 172 | 1:29 | Pop-punk d’estiu: guitarra aguda amb overdrive a les tornades, arpegis a les estrofes, veu aguda, pretornada que empeny i última tornada un to amunt. |
+| Mig Temps | Punk | 150 | 1:33 | Punk fosc i melòdic en Mi menor: patró a mig temps, baix amb riff molt present, arpegis amb crunch, guitarra metal a les tornades i un pont que baixa de to. |
+
+Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques).
+
 ## Flux de treball
 
 Hi ha una sola vista, que es treballa de baix cap amunt:

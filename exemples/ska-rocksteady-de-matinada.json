@@ -1,0 +1,214 @@
+{
+  "version": 3,
+  "title": "Rocksteady de Matinada",
+  "settings": {
+    "style": "ska",
+    "bpm": 100,
+    "tonic": 9,
+    "mode": "minor",
+    "seed": 3313,
+    "bars": 56,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "finger",
+      "drums": "auto",
+      "trumpet": "muted",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 1,
+      "bass": 1,
+      "guitar": 2
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar",
+      "organ"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 4,
+    "verse": 3,
+    "chorus": 5,
+    "bridge": 7,
+    "outro": 4
+  },
+  "sections": [
+    {
+      "id": "ska-rocksteady-de-matinada-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "energy": 30
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-s2",
+      "start": 4,
+      "lyrics": "Les cinc del matí i el carrer és buit\nel fum de l’últim cigarret se’n va\ntu dorms encara i jo canto baixet\nuna cançó que no sap acabar",
+      "type": "verse",
+      "bars": 8,
+      "energy": 45
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-s3",
+      "start": 12,
+      "lyrics": "Poc a poc, poc a poc\nla nit es fa de dia\npoc a poc, poc a poc\nets la meva melodia",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 60
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-s4",
+      "start": 20,
+      "lyrics": "El tramvia passa sense ningú\nles gavines canten sobre el port\nguardo la teva veu dins la butxaca\ncom una moneda de la sort",
+      "type": "verse",
+      "bars": 8,
+      "energy": 45
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-s5",
+      "start": 28,
+      "lyrics": "Poc a poc, poc a poc\nla nit es fa de dia\npoc a poc, poc a poc\nets la meva melodia",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 65
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-s6",
+      "start": 36,
+      "lyrics": "Si el sol arriba massa aviat\ndeixa’m quedar una mica més",
+      "type": "bridge",
+      "bars": 8,
+      "bpm": 84,
+      "energy": 40
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-s7",
+      "start": 44,
+      "lyrics": "Poc a poc, poc a poc\nla nit es fa de dia\npoc a poc, poc a poc\nets la meva melodia",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 70
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-s8",
+      "start": 52,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "bpm": 92,
+      "energy": 30
+    }
+  ],
+  "clips": [
+    {
+      "id": "ska-rocksteady-de-matinada-c1",
+      "instrument": "trumpet",
+      "start": 0,
+      "bars": 4,
+      "revision": 2,
+      "generated": true
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c2",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 8,
+      "revision": 31,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c3",
+      "instrument": "vocal",
+      "start": 12,
+      "bars": 8,
+      "revision": 15,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c4",
+      "instrument": "trumpet",
+      "start": 12,
+      "bars": 8,
+      "revision": 4,
+      "generated": true
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c5",
+      "instrument": "vocal",
+      "start": 20,
+      "bars": 8,
+      "revision": 31,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c6",
+      "instrument": "vocal",
+      "start": 28,
+      "bars": 8,
+      "revision": 15,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c7",
+      "instrument": "trumpet",
+      "start": 28,
+      "bars": 8,
+      "revision": 4,
+      "generated": true
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c8",
+      "instrument": "synthPad",
+      "start": 36,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c9",
+      "instrument": "vocal",
+      "start": 36,
+      "bars": 8,
+      "revision": 38,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c10",
+      "instrument": "vocal",
+      "start": 44,
+      "bars": 8,
+      "revision": 15,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c11",
+      "instrument": "trumpet",
+      "start": 44,
+      "bars": 12,
+      "revision": 4,
+      "generated": true
+    },
+    {
+      "id": "ska-rocksteady-de-matinada-c12",
+      "instrument": "trombone",
+      "start": 44,
+      "bars": 12,
+      "revision": 60,
+      "generated": true
+    }
+  ]
+}

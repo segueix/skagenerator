@@ -402,3 +402,17 @@ body.recording .transport-play { background: #ef4444; }
 .variety-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; padding: 12px; border-radius: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--pink) 12%, var(--surface)), color-mix(in srgb, var(--primary) 12%, var(--surface))); }
 .variety-bar > span { flex: 1 1 220px; font-size: 13px; color: var(--muted); }
 .variety-bar .text-button { margin: 0; }
+
+/* Cançons d'exemple */
+.examples { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; border-top: 4px solid var(--amber); }
+.example-list { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 6px; }
+.example-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--text); min-height: 44px; transition: border-color .15s, transform .12s; }
+.example-card:hover { border-color: var(--example, var(--primary)); transform: translateY(-1px); }
+.example-card.ska { --example: var(--teal); } .example-card.punk { --example: var(--pink); }
+.example-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.example-tag { padding: 2px 9px; border-radius: 999px; background: var(--example); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.example-head small { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+.example-card strong { font: 800 16px 'Manrope', sans-serif; }
+.example-text { font-size: 13px; color: var(--muted); line-height: 1.4; }
+@media (min-width: 700px) { .example-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .example-list { grid-template-columns: repeat(5, minmax(0, 1fr)); } }

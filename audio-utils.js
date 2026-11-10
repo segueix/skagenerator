@@ -30,7 +30,7 @@
     // Limitador suau: només actua quan una cua i una entrada forta coincideixen.
     for (const out of result) for (let k = 0; k < out.length; k++) {
       const a = Math.abs(out[k]);
-      if (a > .94) out[k] = Math.sign(out[k]) * (.94 + .06 * Math.tanh((a - .94) / .06));
+      if (a > .93) out[k] = Math.sign(out[k]) * (.93 + .055 * Math.tanh((a - .93) / .055));
     }
     return result;
   }
@@ -51,7 +51,7 @@
       for (const channel of out) {
         let v = channel[i] + y * gain;
         const level = Math.abs(v);
-        if (level > .94) v = Math.sign(v) * (.94 + .06 * Math.tanh((level - .94) / .06));
+        if (level > .93) v = Math.sign(v) * (.93 + .055 * Math.tanh((level - .93) / .055));
         channel[i] = v;
       }
     }

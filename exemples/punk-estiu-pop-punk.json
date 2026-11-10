@@ -1,0 +1,292 @@
+{
+  "version": 3,
+  "title": "Estiu, no te’n vagis",
+  "settings": {
+    "style": "punk",
+    "bpm": 172,
+    "tonic": 2,
+    "mode": "major",
+    "seed": 9931,
+    "bars": 64,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "finger",
+      "drums": "auto",
+      "trumpet": "auto",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 0,
+      "bass": 1,
+      "guitar": 1
+    },
+    "fx": {
+      "guitar": {
+        "type": "overdrive",
+        "drive": 55,
+        "tone": 60
+      },
+      "guitar2": {
+        "type": "overdrive",
+        "drive": 55,
+        "tone": 60
+      },
+      "guitar3": {
+        "type": "overdrive",
+        "drive": 55,
+        "tone": 60
+      }
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 3,
+    "verse": 2,
+    "prechorus": 5,
+    "chorus": 2,
+    "bridge": 4,
+    "outro": 3
+  },
+  "sections": [
+    {
+      "id": "punk-estiu-pop-punk-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "energy": 75
+    },
+    {
+      "id": "punk-estiu-pop-punk-s2",
+      "start": 4,
+      "lyrics": "Tota la colla a la furgoneta\ncap a la costa amb la ràdio a tope\ncrema solar i patates fregides\ni un estiu que no vull que s’acabi",
+      "type": "verse",
+      "bars": 8,
+      "energy": 60
+    },
+    {
+      "id": "punk-estiu-pop-punk-s3",
+      "start": 12,
+      "lyrics": "I si demà tot canvia\nrecorda aquesta nit",
+      "type": "prechorus",
+      "bars": 4,
+      "energy": 80,
+      "bpm": 180
+    },
+    {
+      "id": "punk-estiu-pop-punk-s4",
+      "start": 16,
+      "lyrics": "Estiu, no te’n vagis\nqueda’t una mica més\nestiu, no te’n vagis\nque encara tinc tant per fer",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95
+    },
+    {
+      "id": "punk-estiu-pop-punk-s5",
+      "start": 24,
+      "lyrics": "Les nostres ombres llargues a la sorra\nel mar encara calent a les deu\nalgú ha trobat una guitarra vella\ni tothom canta sense saber la lletra",
+      "type": "verse",
+      "bars": 8,
+      "energy": 60
+    },
+    {
+      "id": "punk-estiu-pop-punk-s6",
+      "start": 32,
+      "lyrics": "I si demà tot canvia\nrecorda aquesta nit",
+      "type": "prechorus",
+      "bars": 4,
+      "energy": 80,
+      "bpm": 180
+    },
+    {
+      "id": "punk-estiu-pop-punk-s7",
+      "start": 36,
+      "lyrics": "Estiu, no te’n vagis\nqueda’t una mica més\nestiu, no te’n vagis\nque encara tinc tant per fer",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95
+    },
+    {
+      "id": "punk-estiu-pop-punk-s8",
+      "start": 44,
+      "lyrics": "Setembre truca a la porta\nperò encara no l’obrirem",
+      "type": "bridge",
+      "bars": 8,
+      "energy": 55,
+      "feel": {
+        "drums": 0.5
+      }
+    },
+    {
+      "id": "punk-estiu-pop-punk-s9",
+      "start": 52,
+      "lyrics": "Estiu, no te’n vagis\nqueda’t una mica més\nestiu, no te’n vagis\nque encara tinc tant per fer",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100,
+      "transpose": 2
+    },
+    {
+      "id": "punk-estiu-pop-punk-s10",
+      "start": 60,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "transpose": 2
+    }
+  ],
+  "clips": [
+    {
+      "id": "punk-estiu-pop-punk-c1",
+      "instrument": "guitar2",
+      "start": 0,
+      "bars": 4,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-estiu-pop-punk-c2",
+      "instrument": "guitar3",
+      "start": 4,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "none",
+        "drive": 50,
+        "tone": 50
+      }
+    },
+    {
+      "id": "punk-estiu-pop-punk-c3",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 8,
+      "revision": 39,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c4",
+      "instrument": "vocal",
+      "start": 12,
+      "bars": 4,
+      "revision": 31,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c5",
+      "instrument": "vocal",
+      "start": 16,
+      "bars": 8,
+      "revision": 42,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c6",
+      "instrument": "guitar2",
+      "start": 16,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-estiu-pop-punk-c7",
+      "instrument": "guitar3",
+      "start": 24,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "none",
+        "drive": 50,
+        "tone": 50
+      }
+    },
+    {
+      "id": "punk-estiu-pop-punk-c8",
+      "instrument": "vocal",
+      "start": 24,
+      "bars": 8,
+      "revision": 39,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c9",
+      "instrument": "vocal",
+      "start": 32,
+      "bars": 4,
+      "revision": 31,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c10",
+      "instrument": "vocal",
+      "start": 36,
+      "bars": 8,
+      "revision": 42,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c11",
+      "instrument": "guitar2",
+      "start": 36,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-estiu-pop-punk-c12",
+      "instrument": "vocal",
+      "start": 44,
+      "bars": 8,
+      "revision": 4,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c13",
+      "instrument": "guitar3",
+      "start": 44,
+      "bars": 8,
+      "revision": 3,
+      "generated": true,
+      "fx": {
+        "type": "none",
+        "drive": 50,
+        "tone": 50
+      }
+    },
+    {
+      "id": "punk-estiu-pop-punk-c14",
+      "instrument": "vocal",
+      "start": 52,
+      "bars": 8,
+      "revision": 42,
+      "generated": true,
+      "register": 1
+    },
+    {
+      "id": "punk-estiu-pop-punk-c15",
+      "instrument": "guitar2",
+      "start": 52,
+      "bars": 12,
+      "revision": 1,
+      "generated": true
+    }
+  ]
+}

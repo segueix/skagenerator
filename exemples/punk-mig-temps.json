@@ -1,0 +1,255 @@
+{
+  "version": 3,
+  "title": "Mig Temps",
+  "settings": {
+    "style": "punk",
+    "bpm": 150,
+    "tonic": 4,
+    "mode": "minor",
+    "seed": 10457,
+    "bars": 56,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "pick",
+      "drums": "room",
+      "trumpet": "auto",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 1,
+      "bass": 3,
+      "guitar": 4
+    },
+    "mix": {
+      "bass": {
+        "low": 2,
+        "mid": 2,
+        "high": 1,
+        "volume": 3
+      }
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 5,
+    "verse": 4,
+    "chorus": 3,
+    "bridge": 8,
+    "outro": 5
+  },
+  "sections": [
+    {
+      "id": "punk-mig-temps-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "bpm": 120,
+      "energy": 40
+    },
+    {
+      "id": "punk-mig-temps-s2",
+      "start": 4,
+      "lyrics": "Les finestres plenes de pluja\nels fanals parpellegen al carrer\ncamino sol entre les ombres\nbuscant el que vaig perdre ahir",
+      "type": "verse",
+      "bars": 8,
+      "energy": 55
+    },
+    {
+      "id": "punk-mig-temps-s3",
+      "start": 12,
+      "lyrics": "Mig temps, mig cor\nmig camí cap a casa\nmig temps, mig cor\ni la nit que no passa",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 85
+    },
+    {
+      "id": "punk-mig-temps-s4",
+      "start": 20,
+      "lyrics": "El teu nom escrit a la paret\nmig esborrat per la tardor\nencara sento la teva rialla\nquan passo pel bar del racó",
+      "type": "verse",
+      "bars": 8,
+      "energy": 55
+    },
+    {
+      "id": "punk-mig-temps-s5",
+      "start": 28,
+      "lyrics": "Mig temps, mig cor\nmig camí cap a casa\nmig temps, mig cor\ni la nit que no passa",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 90
+    },
+    {
+      "id": "punk-mig-temps-s6",
+      "start": 36,
+      "lyrics": "Potser demà\npotser mai",
+      "type": "bridge",
+      "bars": 8,
+      "bpm": 132,
+      "transpose": -2,
+      "energy": 50
+    },
+    {
+      "id": "punk-mig-temps-s7",
+      "start": 44,
+      "lyrics": "Mig temps, mig cor\nmig camí cap a casa\nmig temps, mig cor\ni la nit que no passa",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100
+    },
+    {
+      "id": "punk-mig-temps-s8",
+      "start": 52,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "bpm": 140,
+      "energy": 40
+    }
+  ],
+  "clips": [
+    {
+      "id": "punk-mig-temps-c1",
+      "instrument": "guitar3",
+      "start": 0,
+      "bars": 12,
+      "revision": 2,
+      "generated": true,
+      "fx": {
+        "type": "crunch",
+        "drive": 45,
+        "tone": 55
+      }
+    },
+    {
+      "id": "punk-mig-temps-c2",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 8,
+      "revision": 5,
+      "generated": true
+    },
+    {
+      "id": "punk-mig-temps-c3",
+      "instrument": "vocal",
+      "start": 12,
+      "bars": 8,
+      "revision": 13,
+      "generated": true
+    },
+    {
+      "id": "punk-mig-temps-c4",
+      "instrument": "guitar2",
+      "start": 12,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "metal",
+        "drive": 65,
+        "tone": 50
+      }
+    },
+    {
+      "id": "punk-mig-temps-c5",
+      "instrument": "guitar3",
+      "start": 20,
+      "bars": 8,
+      "revision": 2,
+      "generated": true,
+      "fx": {
+        "type": "crunch",
+        "drive": 45,
+        "tone": 55
+      }
+    },
+    {
+      "id": "punk-mig-temps-c6",
+      "instrument": "vocal",
+      "start": 20,
+      "bars": 8,
+      "revision": 5,
+      "generated": true
+    },
+    {
+      "id": "punk-mig-temps-c7",
+      "instrument": "vocal",
+      "start": 28,
+      "bars": 8,
+      "revision": 13,
+      "generated": true
+    },
+    {
+      "id": "punk-mig-temps-c8",
+      "instrument": "guitar2",
+      "start": 28,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "metal",
+        "drive": 65,
+        "tone": 50
+      }
+    },
+    {
+      "id": "punk-mig-temps-c9",
+      "instrument": "synthPad",
+      "start": 36,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-mig-temps-c10",
+      "instrument": "vocal",
+      "start": 36,
+      "bars": 8,
+      "revision": 41,
+      "generated": true
+    },
+    {
+      "id": "punk-mig-temps-c11",
+      "instrument": "vocal",
+      "start": 44,
+      "bars": 8,
+      "revision": 13,
+      "generated": true
+    },
+    {
+      "id": "punk-mig-temps-c12",
+      "instrument": "guitar2",
+      "start": 44,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "metal",
+        "drive": 75,
+        "tone": 55
+      }
+    },
+    {
+      "id": "punk-mig-temps-c13",
+      "instrument": "guitar3",
+      "start": 52,
+      "bars": 4,
+      "revision": 2,
+      "generated": true,
+      "fx": {
+        "type": "crunch",
+        "drive": 45,
+        "tone": 55
+      }
+    }
+  ]
+}
