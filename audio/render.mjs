@@ -12,6 +12,7 @@ export const TAIL_SECONDS = 1.5;
 // per a una mescla de banda: baix rodó, guitarra prima i brillant, metalls
 // presents. L'equalitzador de l'usuari se suma a aquesta corba.
 export const EQ_PRESETS = {
+  guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
   guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-2, 2, 0], sax: [-3, 2, 1], organ: [-5, 1, 1],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
@@ -19,13 +20,17 @@ export const EQ_PRESETS = {
 export const SONG_GAIN = 10 ** (5.5 / 20);
 export const EQ_BANDS = { low: 120, mid: 900, high: 6000 };
 // Reverberació: el baix sec, la bateria curta, metalls i orgue amb sala.
-const REVERB = { drums: 14, electronicDrums: 8, bass: 4, synthBass: 0, guitar: 30, trumpet: 40, trombone: 38, sax: 40, organ: 30, synthLead: 32, synthPad: 40 };
+const REVERB = { guitar2: 30, guitar3: 34, drums: 14, electronicDrums: 8, bass: 4, synthBass: 0, guitar: 30, trumpet: 40, trombone: 38, sax: 40, organ: 30, synthLead: 32, synthPad: 40 };
 
 // Filtres biquadràtics (Robert Bristow-Johnson, «Audio EQ Cookbook»).
 function biquad(type, frequency, gainDb, sampleRate, q = .8) {
   const A = 10 ** (gainDb / 40), w = 2 * Math.PI * frequency / sampleRate, cos = Math.cos(w), sin = Math.sin(w);
   let b0, b1, b2, a0, a1, a2;
-  if (type === 'peak') {
+  if (type === 'lowpass' || type === 'highpass') {
+    const alpha = sin / (2 * q), lp = type === 'lowpass';
+    [b0, b1, b2] = lp ? [(1 - cos) / 2, 1 - cos, (1 - cos) / 2] : [(1 + cos) / 2, -(1 + cos), (1 + cos) / 2];
+    [a0, a1, a2] = [1 + alpha, -2 * cos, 1 - alpha];
+  } else if (type === 'peak') {
     const alpha = sin / (2 * q);
     [b0, b1, b2, a0, a1, a2] = [1 + alpha * A, -2 * cos, 1 - alpha * A, 1 + alpha / A, -2 * cos, 1 - alpha / A];
   } else {
@@ -55,6 +60,56 @@ export function createEqualizer(name, user, sampleRate) {
   };
 }
 
+// ── Efectes de guitarra ───────────────────────────────────────────────
+// Cadena de pedal i amplificador: filtre d'entrada → guany → saturació (amb
+// sobremostreig ×2 per evitar sorolls digitals) → pantalla d'altaveu (pas alt,
+// to, pas baix) → nivell compensat perquè sonin tan fort com la guitarra neta.
+const FX = {
+  boost: { gain: [6, 18], curve: x => Math.tanh(x), tight: 80, mid: 0, scoop: 0, cab: 9000 },
+  tape: { gain: [12, 28], curve: x => x / (1 + Math.abs(x) * .6), tight: 60, mid: 0, scoop: 0, cab: 7000 },
+  crunch: { gain: [30, 46], curve: x => Math.tanh(x), tight: 120, mid: 3, scoop: 0, cab: 6000 },
+  overdrive: { gain: [34, 52], curve: x => x > 0 ? Math.tanh(x) : Math.tanh(x * .7) / .7 * .85, tight: 200, mid: 8, scoop: 0, cab: 5500 },
+  distortion: { gain: [38, 58], curve: x => 2 / Math.PI * Math.atan(x * 1.6), tight: 150, mid: 4, scoop: 0, cab: 5000 },
+  metal: { gain: [46, 66], curve: x => Math.tanh(x * 1.4), tight: 220, mid: 2, scoop: -7, cab: 6000 },
+  fuzz: { gain: [48, 68], curve: x => { const h = Math.max(-.62, Math.min(.62, x)); return h * .8 + Math.abs(Math.tanh(x)) * .25; }, tight: 90, mid: 0, scoop: 0, cab: 4200 },
+  lofi: { gain: [10, 24], curve: x => Math.tanh(x), tight: 120, mid: 0, scoop: 0, cab: 4500, bits: true }
+};
+export const GUITAR_FX_TYPES = Object.keys(FX);
+export function createGuitarFx(fx, sampleRate) {
+  const def = fx && FX[fx.type];
+  if (!def) return null;
+  const drive = fx.drive / 100, tone = fx.tone / 100;
+  const pre = 10 ** ((def.gain[0] + (def.gain[1] - def.gain[0]) * drive) / 20);
+  const cutoff = Math.min(sampleRate * .45, def.cab * (.45 + tone * 1.1));
+  const side = () => ({
+    tight: biquad('highpass', def.tight, 0, sampleRate, .7), mid: biquad('peak', 720, def.mid, sampleRate, .9),
+    scoop: biquad('peak', 500, def.scoop, sampleRate, .7), low: biquad('highpass', 90, 0, sampleRate, .7),
+    cab1: biquad('lowpass', cutoff, 0, sampleRate, .7), cab2: biquad('lowpass', cutoff * 1.15, 0, sampleRate, .6),
+    last: 0, hold: 0, count: 0, inLevel: 1e-6, outLevel: 1e-6
+  });
+  const sides = [side(), side()], smooth = Math.exp(-1 / (.06 * sampleRate));
+  const bitStep = 2 / (2 ** (8 - drive * 4)), crushEvery = Math.max(1, Math.round(sampleRate / (8000 + tone * 14000)));
+  return {
+    reverb: def.gain[1] > 42 ? .3 : .6,
+    process(index, x) {
+      const s = sides[index];
+      let y = run(s.mid, run(s.tight, x)) * pre;
+      // Sobremostreig ×2: la mostra intermèdia redueix l'aliasing de la saturació.
+      const mid = (s.last + y) / 2; s.last = y;
+      y = (def.curve(mid) + def.curve(y)) / 2;
+      if (def.bits) {
+        if (s.count++ % crushEvery === 0) s.hold = Math.round(y / bitStep) * bitStep;
+        y = s.hold;
+      }
+      y = run(s.cab2, run(s.cab1, run(s.low, run(s.scoop, y))));
+      // Nivell compensat: segueix la sonoritat de la guitarra sense efecte.
+      s.inLevel = smooth * s.inLevel + (1 - smooth) * x * x;
+      s.outLevel = smooth * s.outLevel + (1 - smooth) * y * y;
+      return y * Math.min(8, Math.sqrt(s.inLevel / s.outLevel));
+    }
+  };
+}
+
 export async function renderSampledPart(bank, spec, sampleRate = 44100, options = {}) {
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
   const score = performance.createPerformance(spec);
@@ -70,7 +125,9 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       synth.controllerChange(patch.channel, 10, patch.pan);
       // L'enviament a la reverberació segueix el volum de l'instrument.
       const level = Math.min(1, 10 ** ((score.mix[patch.instrument]?.volume || 0) / 20));
-      synth.controllerChange(patch.channel, 91, Math.round((REVERB[patch.instrument] ?? 20) * level));
+      // Amb distorsió, menys sala: la reverberació surt de la guitarra neta.
+      const wet = createGuitarFx(score.fx?.[patch.instrument], sampleRate)?.reverb ?? 1;
+      synth.controllerChange(patch.channel, 91, Math.round((REVERB[patch.instrument] ?? 20) * level * wet));
       synth.controllerChange(patch.channel, 93, 0);
     }
     const body = Math.round(score.seconds * sampleRate), tail = Math.round(TAIL_SECONDS * sampleRate);
@@ -81,7 +138,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     const BLOCK = 128, eqs = new Map(), dummy = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
     for (const patch of score.channels) {
       const eq = createEqualizer(patch.instrument, score.mix[patch.instrument], sampleRate);
-      if (eq) eqs.set(patch.channel, eq);
+      const fx = createGuitarFx(score.fx?.[patch.instrument], sampleRate);
+      if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);
     }
     const outputs = Array.from({ length: 16 }, (_, channel) => eqs.has(channel) ? [new Float32Array(BLOCK), new Float32Array(BLOCK)] : dummy);
     const blockL = new Float32Array(BLOCK), blockR = new Float32Array(BLOCK);

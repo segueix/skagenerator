@@ -8,7 +8,7 @@ function createPerformance(spec) {
   if (!spec || !['ska', 'punk', 'urban'].includes(spec.style) || !Number.isFinite(spec.beat) || spec.beat <= 0
     || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 180 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
-    || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ'].includes(i))) throw new Error('Partitura no vàlida');
+    || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ', 'guitar2', 'guitar3'].includes(i))) throw new Error('Partitura no vàlida');
   // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
   // FreePats); banc 3: staccato de VSCO; banc 1: variacions GS; banc 0: GM.
   // Kit 64: Muldjord (gravat). La resta són sons de GeneralUser GS.
@@ -19,6 +19,8 @@ function createPerformance(spec) {
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
     trombone: { auto: null, gm: [0, 57], warm: [1, 57] }
   };
+  // Les guitarres 2 i 3 tenen els mateixos sons que la primera.
+  presets.guitar2 = presets.guitar; presets.guitar3 = presets.guitar;
   if (spec.timbres !== undefined && (!spec.timbres || typeof spec.timbres !== 'object' || Array.isArray(spec.timbres)
     || Object.entries(spec.timbres).some(([family, preset]) => !Object.hasOwn(presets, family) || !Object.hasOwn(presets[family], preset))))
     throw new Error('Timbres no vàlids');
@@ -29,7 +31,7 @@ function createPerformance(spec) {
   const events = [];
   const patch = (channel, [bank, program], pan, volume) => ({ channel, bank, program, pan, volume });
   const realBrass = { 3: !chosen('trumpet'), 4: !chosen('trombone') };
-  const instrumentOf = { 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
+  const instrumentOf = { 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
     patch(0, chosen('guitar') ?? (punk ? [0, 30] : [2, 27]), 42, 94),
     patch(1, chosen('guitar') ?? (punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
@@ -38,6 +40,7 @@ function createPerformance(spec) {
     patch(4, chosen('trombone') ?? [2, 57], 79, 112),
     // Staccato gravat per a les notes curtes de trompeta i trombó.
     patch(12, [3, 56], 50, 116), patch(13, [3, 57], 79, 127),
+    patch(14, chosen('guitar2') ?? (punk ? [0, 30] : [2, 27]), 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
     patch(8, [2, 66], 30, 86),
     { channel: 11, program: 16, pan: 92, volume: 84 },
     { channel: 5, program: 81, pan: 58, volume: 106 },
@@ -107,6 +110,25 @@ function createPerformance(spec) {
         if (punk || hit % 2 === 1) note(1, pitch, t0 + t * beat + .012 + k * .006, duration * .85, punk ? 70 : 46);
       });
     });
+    // Guitarra 2: rítmica aguda (acords una octava amunt) amb el seu propi patró.
+    if (has('guitar2')) {
+      const index = ((spec.layers?.guitar2 ?? 2) + 2) % guitarPatterns.length;
+      (ending ? [0] : guitarPatterns[index]).forEach((t, hit) => {
+        const pitches = punk ? [chord.root + 24, chord.root + 31] : chord.notes.map(n => n + 12).reverse();
+        pitches.forEach((pitch, k) => note(14, pitch, t0 + t * beat + .009 + k * .006, ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? hit % 2 ? 70 : 88 : 80));
+      });
+    }
+    // Guitarra 3: arpegis i punteig sobre l'acord.
+    if (has('guitar3')) {
+      const tones = [...chord.notes, chord.notes[0] + 12].map(n => n + 12), index = (spec.layers?.guitar3 ?? 0) % 5;
+      const shapes = [
+        [[0, 0], [.5, 1], [1, 2], [1.5, 3], [2, 0], [2.5, 1], [3, 2], [3.5, 3]],
+        [[0, 3], [.5, 2], [1, 1], [1.5, 0], [2, 3], [2.5, 2], [3, 1], [3.5, 0]],
+        [[0, 0], [.5, 2], [1, 1], [1.5, 3], [2, 2], [2.5, 1], [3, 3], [3.5, 2]],
+        [[0, 0], [.75, 2], [1.5, 3], [2.5, 1], [3, 2]],
+        [[.5, 1], [.75, 2], [1.5, 1], [2.5, 3], [2.75, 2], [3.5, 1]]];
+      for (const [t, k] of ending ? [[0, 0]] : shapes[index]) note(15, tones[k], t0 + t * beat, ending ? bar * .7 : beat * .45, t % 1 ? 70 : 82, .005);
+    }
     if (has('bass') && !Array.isArray(spec.bassLine)) (ending ? [0] : punk ? [0, .5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 1, 2, 3]).forEach((t, k) => {
       const pitch = punk || k % 4 === 0 ? chord.root : k % 4 === 1 ? nearest(chord.root + 4, chord.pcs, chord.root, chord.root + 12) : k % 4 === 2 ? chord.root + 7 : chord.root + 12;
       note(2, pitch, t0 + t * beat, ending ? bar * .8 : beat * (punk ? .43 : .8), k % 2 ? 88 : 103, .003);
@@ -167,9 +189,10 @@ function createPerformance(spec) {
       if (last) continue;
       // Sense capa pròpia, els metalls esperen a la segona meitat de la intro.
       if (!own && instrument !== 'synthLead' && spec.type === 'intro' && b < 2) continue;
-      const chord = spec.chords[b], velocity = spec.type === 'verse' ? 65 : 89;
+      // La força depèn només de la intensitat de la secció (abans l'estrofa baixava uns 9 dB).
+      const chord = spec.chords[b], velocity = 84;
       const length = Math.max(.07, duration * beat - .045), accent = t % 1 === 0 || duration >= 1;
-      if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), spec.type === 'verse' ? 67 : 86, 0);
+      if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0);
       else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent);
       else if (instrument === 'sax') horn(8, pitch - 12, at + .004, length, velocity - 3, accent);
       else horn(4, nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length * .94, velocity - 5, accent);
@@ -180,6 +203,6 @@ function createPerformance(spec) {
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
   const level = { '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume; });
-  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {} };
+  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
 }
 module.exports = { createPerformance };

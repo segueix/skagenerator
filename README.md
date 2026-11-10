@@ -21,6 +21,24 @@ La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro
 
 Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
 
+## Volum per seccions, diverses guitarres i efectes
+
+- **Intensitat de cada secció** (10–100 %): controla la força amb què toquen tots els instruments de la secció. Abans els metalls sonaven uns 9 dB més fluix a les estrofes de manera automàtica; ara depenen només d’aquesta intensitat.
+- **Volums d’aquesta secció**: un control de volum per instrument i per a la secció sencera, en dB respecte de la cançó (és el mateix volum que hi ha a l’equalitzador de la secció).
+- **Fins a tres guitarres a la mateixa secció**: Guitarra 1 (rítmica), Guitarra 2 (rítmica una octava amunt, amb un patró diferent) i Guitarra 3 (arpegis i punteig). Cadascuna té el seu canal, el seu clip, el seu so i el seu efecte.
+- **Efectes de guitarra** per a cada clip: boost net, saturació de cinta, crunch, overdrive, distorsió, metal, fuzz i lo-fi, amb **guany** i **to**. La cadena és la d’un pedal i un amplificador: filtre d’entrada, saturació amb sobremostreig ×2, pantalla d’altaveu i nivell compensat (la guitarra sona igual de forta amb efecte que sense). Amb efectes de guany alt, la reverberació es redueix.
+
+## Grava la teva veu
+
+Al pas **4 · La teva veu** (pestanya «Veu» al mòbil) pots cantar mentre sona la cançó:
+
+- «Grava des del principi» o «Grava des del compàs…» de la secció seleccionada. Aquesta segona opció substitueix només el tros que tornes a cantar i conserva la resta.
+- Mentre graves, es mostra la lletra de la secció que sona i un indicador del nivell del micròfon. ■ atura la gravació.
+- La veu es grava al mateix context d’àudio que reprodueix la música i es descompta la latència d’entrada i de sortida, de manera que queda alineada. Si cal, «Sincronia» l’avança o la retarda (±300 ms), per exemple amb auriculars Bluetooth.
+- Se suma a «Escolta la cançó», a l’escolta de cada secció i al WAV exportat, amb volum ajustable i un filtre que treu els sorolls greus. «Inclou la veu…» permet escoltar i exportar la música sola, i «Només la veu» en descarrega un WAV.
+- Amb auriculars el micròfon grava sense processaments (so més net). Sense auriculars cal desmarcar l’opció: s’activa la cancel·lació d’eco perquè el micròfon no torni a gravar la música.
+- La veu es desa en aquest navegador (IndexedDB), no dins del fitxer JSON del projecte: per portar-la a un altre lloc, descarrega-la en WAV.
+
 ## Mòbil, colors i mode fosc
 
 - **Al mòbil** l’editor es fa pas a pas amb una barra de pestanyes inferior: **Cançó** (nom, estil, tempo, tonalitat i durada), **Base**, **Línia** i **Secció**. Cada pantalla té un botó «Següent» i, en tocar una secció a la línia, s’obre directament el seu editor. Les pestanyes mostren l’estat (base generada ✓, nombre de seccions, instruments pendents de generar). El reproductor queda sempre visible just a sobre de les pestanyes.

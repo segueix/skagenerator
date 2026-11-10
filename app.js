@@ -10,9 +10,11 @@
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
   // Colors vius que funcionen en mode clar i fosc (la interfície els barreja amb el fons).
   const colors = { intro: '#14b8a6', verse: '#8b5cf6', prechorus: '#f97316', chorus: '#ec4899', bridge: '#3b82f6', solo: '#84cc16', outro: '#10b981' };
-  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e' };
+  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e', guitar2: '#84cc16', guitar3: '#10b981' };
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
+  const GUITARS = ['guitar', 'guitar2', 'guitar3'];
+  const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
@@ -113,7 +115,7 @@
     for (const s of value.sections) {
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
-        || s.start + s.bars > st.bars || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
+        || s.start + s.bars > st.bars || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
     if (!Array.isArray(value.clips) || value.clips.length > MAX_CLIPS || value.clips.some(c => !c || typeof c !== 'object')) fail('Instruments no vàlids');
@@ -123,7 +125,14 @@
         || base.instruments.includes(c.instrument) || !Number.isInteger(c.start) || !Number.isInteger(c.bars) || c.start < 0 || c.bars < 1
         || c.start + c.bars > st.bars || !Number.isInteger(c.revision) || c.revision < 1 || c.revision > MAX_REV || typeof c.generated !== 'boolean') fail('Instrument no vàlid');
       if (value.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start + c.bars && c.start < o.start + o.bars)) fail('Instruments encavalcats');
+      if (c.sound !== undefined && (!GUITARS.includes(c.instrument) || !timbreOptions.guitar.some(([key]) => key === c.sound))) fail('So de guitarra no vàlid');
+      if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
       ids.add(c.id);
+    }
+    if (value.voice !== undefined) {
+      const v = value.voice;
+      if (!v || typeof v.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(v.id) || typeof v.enabled !== 'boolean'
+        || !Number.isFinite(v.volume) || v.volume < -24 || v.volume > 12 || !Number.isFinite(v.offsetMs) || v.offsetMs < -500 || v.offsetMs > 500) fail('Veu no vàlida');
     }
     for (const seg of segmentsOf(value)) engine.composeSongPart(value.settings, partFor(value, seg));
     return value;
@@ -145,13 +154,17 @@
     if (options.baseOnly) return null;
     const active = s.clips.filter(c => c.generated && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
-    const layers = {}, ranges = {};
+    const layers = {}, ranges = {}, timbres = {}, fx = {};
     for (const c of active) {
+      if (!(c.instrument in layers)) {
+        if (c.sound && c.sound !== 'auto') timbres[c.instrument] = c.sound;
+        if (c.fx && c.fx.type !== 'none') fx[c.instrument] = c.fx;
+      }
       layers[c.instrument] ??= c.revision;
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
     }
     for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
-    return { layers, ranges };
+    return { layers, ranges, timbres, fx };
   }
   function partFor(s, seg, options = {}) {
     const base = s.base.instruments, extra = layersFor(s, seg, options);
@@ -162,12 +175,16 @@
       part = { type: last ? 'outro' : 'verse', bars: seg.bars, energy: last ? 40 : 55, revision: s.base.revision, groove: s.settings.groove };
     } else {
       const sec = seg.section, harmony = s.harmony[sec.type] || 1;
-      part = { type: sec.type, bars: sec.bars, energy: TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
+      part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
     part.instruments = [...base, ...Object.keys(extra?.layers || {})];
-    if (extra) { part.layers = extra.layers; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges; }
+    if (extra) {
+      part.layers = extra.layers; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges;
+      if (Object.keys(extra.timbres).length) part.timbres = extra.timbres;
+      if (Object.keys(extra.fx).length) part.fx = extra.fx;
+    }
     return part;
   }
   const specFor = (seg, options) => engine.composeSongPart(song.settings, partFor(song, seg, options));
@@ -263,7 +280,10 @@
     const pending = [], Native = window.AudioContext || window.webkitAudioContext;
     if (tone) { try { pending.push(tone.start()); } catch (error) { console.warn(error); } }
     if (Native) {
-      try { if (!context || context.state === 'closed') context = new Native(); pending.push(context.resume()); }
+      try {
+        if (!context || context.state === 'closed') { try { context = new Native({ sampleRate: RATE, latencyHint: 'interactive' }); } catch { context = new Native(); } }
+        pending.push(context.resume());
+      }
       catch (error) { context = null; console.warn(error); }
     }
     return Promise.allSettled(pending);
@@ -296,6 +316,7 @@
   }
   function stop() {
     playToken++;
+    if (recording) finishRecording();
     if (tonePlayer) { const player = tonePlayer; tonePlayer = null; player.onstop = () => {}; try { player.stop(); } catch {} player.dispose(); }
     if (source) { source.onended = null; try { source.stop(); } catch {} source = null; }
     if (gainNode) { gainNode.disconnect(); gainNode = null; }
@@ -312,28 +333,189 @@
     try {
       await unlocked;
       let data, startBar = 0, bars = song.settings.bars;
-      if (kind === 'section') { data = await renderSpec(specFor(segmentOf(sec))); startBar = sec.start; bars = sec.bars; }
-      else data = await songAudio({ baseOnly: kind === 'base' });
+      if (kind === 'section') { data = withVoice(await renderSpec(specFor(segmentOf(sec))), frames(sec.start)); startBar = sec.start; bars = sec.bars; }
+      else data = kind === 'base' ? await songAudio({ baseOnly: true }) : withVoice(await songAudio(), 0);
       if (token !== playToken) return;
       const clock = await startBuffer(data, token);
       playing = { kind, id: sec?.id, startBar, bars, seconds: data[0].length / RATE, clock };
       document.body.classList.add('playing');
-      const tick = () => {
-        if (!playing || token !== playToken) return;
-        const elapsed = Math.min(playing.seconds, playing.clock()), bar = playing.startBar + elapsed / barSeconds();
-        $('song-progress').value = elapsed / playing.seconds; $('playback-time').textContent = time(elapsed);
-        $('playhead').hidden = bar > playing.startBar + playing.bars;
-        $('playhead').style.setProperty('--pos', String(Math.min(1, bar / song.settings.bars)));
-        const active = song.sections.find(s => bar >= s.start && bar < s.start + s.bars);
-        $('transport-subtitle').textContent = kind === 'base' ? 'Escoltant · base musical'
-          : `Escoltant · ${active ? sectionLabel(active) : 'base'}${kind === 'section' ? ' (secció)' : ''}`;
-        animation = requestAnimationFrame(tick);
-      };
-      tick();
+      runTick(token);
     } catch (error) {
       audioError(error); stop();
       notify(`No s’ha pogut reproduir l’àudio: ${reasonOf(error)}`);
     } finally { setBusy(false); }
+  }
+
+  // Progrés, capçal de reproducció, secció activa i lletra (també en gravar).
+  function runTick(token) {
+    const tick = () => {
+      if (!playing || token !== playToken) return;
+      const elapsed = Math.min(playing.seconds, playing.clock()), bar = playing.startBar + elapsed / barSeconds();
+      $('song-progress').value = elapsed / playing.seconds; $('playback-time').textContent = time(elapsed);
+      $('playhead').hidden = bar > playing.startBar + playing.bars || bar < 0;
+      $('playhead').style.setProperty('--pos', String(Math.max(0, Math.min(1, bar / song.settings.bars))));
+      const active = song.sections.find(s => bar >= s.start && bar < s.start + s.bars);
+      $('transport-subtitle').textContent = playing.kind === 'record' ? `● Gravant · ${active ? sectionLabel(active) : 'base'}`
+        : playing.kind === 'base' ? 'Escoltant · base musical'
+        : `Escoltant · ${active ? sectionLabel(active) : 'base'}${playing.kind === 'section' ? ' (secció)' : ''}`;
+      if (playing.kind === 'record') {
+        $('voice-live-title').textContent = bar < playing.startBar ? 'Prepara’t…' : active ? sectionLabel(active) : 'Base';
+        $('voice-live-lyrics').textContent = active?.lyrics || (active ? 'Sense lletra en aquesta secció.' : '');
+        $('voice-meter').style.width = `${Math.min(100, Math.round(Math.sqrt(recording?.level || 0) * 140))}%`;
+        if (recording) recording.level *= .85;
+      }
+      animation = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+
+  // ── La teva veu ─────────────────────────────────────────────────────
+  // La veu es grava al mateix context d'àudio que reprodueix la música, de
+  // manera que la posició de cada mostra es coneix exactament. Es desa a
+  // IndexedDB (és massa gran per a localStorage) en 16 bits.
+  let voiceData = null, recording = null;
+  const voiceDb = {
+    open() {
+      return this.ready ??= new Promise((resolve, reject) => {
+        const request = indexedDB.open('skagenerator', 1);
+        request.onupgradeneeded = () => request.result.createObjectStore('voice');
+        request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+      });
+    },
+    async run(mode, action) {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('voice', mode), request = action(tx.objectStore('voice'));
+        tx.oncomplete = () => resolve(request?.result); tx.onerror = () => reject(tx.error);
+      });
+    },
+    get(id) { return this.run('readonly', store => store.get(id)); },
+    put(id, value) { return this.run('readwrite', store => store.put(value, id)); },
+    remove(id) { return this.run('readwrite', store => store.delete(id)); }
+  };
+  const toInt16 = data => { const out = new Int16Array(data.length); for (let i = 0; i < data.length; i++) out[i] = Math.max(-1, Math.min(1, data[i])) * 32767; return out; };
+  const toFloat = data => { const out = new Float32Array(data.length); for (let i = 0; i < data.length; i++) out[i] = data[i] / 32767; return out; };
+  async function loadVoice() {
+    voiceData = null;
+    if (!song.voice) return;
+    try { const stored = await voiceDb.get(song.voice.id); if (stored) voiceData = toFloat(new Int16Array(stored)); }
+    catch (error) { console.warn(error); }
+    render();
+  }
+  function withVoice(data, fromFrame) {
+    if (!voiceData || !song.voice?.enabled) return data;
+    return audioUtils.mixVoice(data, voiceData, { from: fromFrame, gainDb: song.voice.volume, offset: Math.round(song.voice.offsetMs / 1000 * RATE), rate: RATE });
+  }
+  async function captureNode(ctx, input, onBlock) {
+    if (ctx.audioWorklet && window.AudioWorkletNode) {
+      if (!ctx.skaRecorder) {
+        const code = `class SkaRecorder extends AudioWorkletProcessor { process(inputs) { const ch = inputs[0] && inputs[0][0];
+          if (ch) this.port.postMessage({ frame: currentFrame, data: ch.slice(0) }); return true; } }
+          registerProcessor('ska-recorder', SkaRecorder);`;
+        const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+        ctx.skaRecorder = ctx.audioWorklet.addModule(url).finally(() => URL.revokeObjectURL(url));
+      }
+      await ctx.skaRecorder;
+      const node = new AudioWorkletNode(ctx, 'ska-recorder', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: 'explicit' });
+      node.port.onmessage = ({ data }) => onBlock(data.frame, data.data);
+      input.connect(node); return node;
+    }
+    // Navegadors sense AudioWorklet: aproximació amb ScriptProcessor (l'ajust de sincronia ho afina).
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = event => onBlock(Math.round((event.playbackTime - 4096 / ctx.sampleRate) * ctx.sampleRate), event.inputBuffer.getChannelData(0).slice(0));
+    input.connect(node); return node;
+  }
+  async function startRecording(fromBar) {
+    if (busy || recording || !song.base.generated) return;
+    if (!navigator.mediaDevices?.getUserMedia || !(window.AudioContext || window.webkitAudioContext)) { notify('Aquest navegador no permet gravar amb el micròfon.'); return; }
+    stop();
+    const token = playToken, unlocked = unlockAudio(), headphones = $('voice-headphones').checked;
+    let stream;
+    setBusy(true);
+    try {
+      // Amb auriculars, sense processaments: so més net. Sense auriculars, la
+      // cancel·lació d'eco evita que el micròfon torni a gravar la música.
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: !headphones, noiseSuppression: !headphones, autoGainControl: false, channelCount: 1 } });
+      await unlocked;
+      if (!context || context.state !== 'running') throw new Error('El navegador no ha activat l’àudio. Torna-ho a provar.');
+      const data = await songAudio();
+      if (token !== playToken) { stream.getTracks().forEach(t => t.stop()); return; }
+      const ctx = context, from = frames(fromBar), lead = .35, startAt = ctx.currentTime + lead;
+      const input = ctx.createMediaStreamSource(stream), silent = ctx.createGain(); silent.gain.value = 0;
+      const blocks = [];
+      const rec = { stream, blocks, input, silent, ctx, from, startFrame: Math.round(startAt * ctx.sampleRate), fromBar, level: 0,
+        latency: (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + (stream.getAudioTracks()[0]?.getSettings?.().latency || 0) };
+      rec.node = await captureNode(ctx, input, (frame, block) => {
+        blocks.push([frame, block]);
+        let peak = 0; for (const x of block) peak = Math.max(peak, Math.abs(x));
+        rec.level = Math.max(rec.level, peak);
+      });
+      rec.node.connect(silent); silent.connect(ctx.destination);
+      source = ctx.createBufferSource(); source.buffer = makeBuffer(ctx, data);
+      gainNode = ctx.createGain(); gainNode.gain.value = .8; source.connect(gainNode); gainNode.connect(ctx.destination);
+      source.onended = () => { if (token === playToken) { stop(); render(); } };
+      source.start(startAt, from / RATE);
+      recording = rec;
+      playing = { kind: 'record', startBar: fromBar, bars: song.settings.bars - fromBar, seconds: data[0].length / RATE - from / RATE + lead,
+        clock: () => ctx.currentTime - startAt + lead };
+      // El capçal comença un instant abans perquè la primera nota no sorprengui.
+      playing.startBar = fromBar - lead / barSeconds();
+      document.body.classList.add('playing', 'recording');
+      runTick(token);
+      notify(fromBar ? `Gravant des del compàs ${fromBar + 1}. Prem ■ per acabar.` : 'Gravant. Canta mentre sona la cançó i prem ■ per acabar.');
+    } catch (error) {
+      stream?.getTracks().forEach(t => t.stop());
+      const denied = error?.name === 'NotAllowedError' || error?.name === 'SecurityError';
+      notify(denied ? 'No hi ha permís per fer servir el micròfon. Activa’l a la configuració del navegador.'
+        : error?.name === 'NotFoundError' ? 'No s’ha trobat cap micròfon.' : `No s’ha pogut començar a gravar: ${reasonOf(error)}`);
+      console.error(error);
+    } finally { setBusy(false); }
+  }
+  function finishRecording() {
+    const rec = recording; recording = null;
+    document.body.classList.remove('recording');
+    try { rec.input.disconnect(); rec.node.disconnect(); rec.silent.disconnect(); } catch {}
+    if (rec.node.port) rec.node.port.onmessage = null; else rec.node.onaudioprocess = null;
+    rec.stream.getTracks().forEach(t => t.stop());
+    if (!rec.blocks.length) return;
+    // Mostres seguides des del primer bloc; la posició a la cançó descompta
+    // l'arrencada i la latència d'entrada i de sortida.
+    const first = rec.blocks[0][0], total = rec.blocks.reduce((n, [, b]) => n + b.length, 0), raw = new Float32Array(total);
+    let at = 0; for (const [, block] of rec.blocks) { raw.set(block, at); at += block.length; }
+    const take = audioUtils.levelTake(audioUtils.resampleLinear(raw, rec.ctx.sampleRate, RATE));
+    const position = Math.round(((first - rec.startFrame) / rec.ctx.sampleRate - rec.latency) * RATE) + rec.from;
+    const keepFrom = Math.max(rec.from, position), start = Math.max(0, keepFrom - position);
+    const trimmed = take.subarray(start);
+    if (trimmed.length < RATE * .3) { notify('La gravació és massa curta i no s’ha desat.'); return; }
+    voiceData = audioUtils.placeTake(voiceData, trimmed, keepFrom, keepFrom);
+    song.voice ??= { id: uid(), enabled: true, volume: 0, offsetMs: 0 };
+    song.voice.enabled = true; save();
+    voiceDb.put(song.voice.id, toInt16(voiceData).buffer)
+      .then(() => notify('Veu desada. Prem «Escolta amb la veu» o ▶ per sentir-ho tot junt.'))
+      .catch(() => notify('La veu sona, però no s’ha pogut desar al navegador. Descarrega-la si la vols conservar.'));
+  }
+  async function deleteVoice() {
+    if (!song.voice || busy) return;
+    if (!await ask('Esborrar la veu?', 'S’eliminarà la veu gravada d’aquesta cançó. La música es conserva.')) return;
+    stop(); const id = song.voice.id; delete song.voice; voiceData = null; save(); render();
+    voiceDb.remove(id).catch(() => {});
+  }
+  function renderVoice() {
+    const has = !!voiceData, sec = current();
+    $('voice-state').textContent = recording ? '● Gravant' : has ? 'Veu gravada ✓' : song.voice ? 'No és en aquest navegador' : 'Sense gravar';
+    $('voice-state').classList.toggle('ready', has); $('voice-state').classList.toggle('live', !!recording);
+    $('voice-live').hidden = !recording; $('voice-controls').hidden = !has || !!recording;
+    $('record-song').textContent = has ? '● Torna a gravar des del principi' : '● Grava des del principi';
+    $('record-section').hidden = !sec;
+    if (sec) $('record-section').textContent = `● Grava des del compàs ${sec.start + 1} · ${sectionLabel(sec)}`;
+    for (const key of ['record-song', 'record-section']) $(key).disabled = busy || !!recording || !song.base.generated;
+    if (song.voice) {
+      $('voice-enabled').checked = song.voice.enabled;
+      $('voice-volume').value = song.voice.volume; $('voice-volume-value').textContent = `${song.voice.volume > 0 ? '+' : ''}${song.voice.volume} dB`;
+      $('voice-offset').value = song.voice.offsetMs; $('voice-offset-value').textContent = `${song.voice.offsetMs > 0 ? '+' : ''}${song.voice.offsetMs} ms`;
+    }
+    $('play-voice').textContent = playing?.kind === 'song' ? '■ Atura' : '▷ Escolta amb la veu';
+    for (const key of ['voice-enabled', 'voice-volume', 'voice-offset', 'play-voice', 'download-voice', 'delete-voice']) $(key).disabled = busy;
   }
 
   // ── Generació ───────────────────────────────────────────────────────
@@ -795,6 +977,9 @@
     $('section-start-time').textContent = time(sec.start * barSeconds());
     $('section-bars').value = sec.bars; $('section-bars').max = MAX_SECTION;
     $('section-time').textContent = time(sec.bars * barSeconds());
+    const energy = sec.energy ?? TYPES[sec.type].energy;
+    $('section-energy').value = energy; $('section-energy-value').textContent = `${energy} %${sec.energy === undefined ? ' · per defecte' : ''}`;
+    renderVolumes(sec);
     $('section-chords').textContent = `Acords: ${chordsOf(seg)}`;
     $('section-reharmonize').textContent = song.sections.filter(s => s.type === sec.type).length > 1 ? `↻ Altres acords per a totes ${plurals[sec.type]}` : '↻ Altres acords';
     $('section-lyrics').value = sec.lyrics;
@@ -820,7 +1005,9 @@
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-button'; remove.textContent = '×';
       remove.setAttribute('aria-label', `Eliminar ${clipLabel(clip)}`); remove.title = 'Elimina aquest clip'; remove.disabled = busy;
       remove.addEventListener('click', () => removeClip(clip));
-      item.append(number, text, generate, remove); list.append(item);
+      item.append(number, text, generate, remove);
+      if (GUITARS.includes(clip.instrument)) item.append(clipTone(clip));
+      list.append(item);
     });
     const available = Object.keys(INSTRUMENTS).filter(name => !song.base.instruments.includes(name) && !clips.some(c => c.instrument === name && c.start <= sec.start && endOf(c) >= endOf(sec)));
     const chosen = available.includes($('layer-instrument').value) ? $('layer-instrument').value : available[0];
@@ -832,6 +1019,55 @@
     const pending = clips.some(c => !c.generated);
     $('play-section').textContent = playing?.kind === 'section' && playing.id === sec.id ? '■ Atura' : `▷ Escolta la secció${pending ? ' (sense els pendents)' : ''}`;
     $('play-song-inline').textContent = playing?.kind === 'song' ? '■ Atura la cançó' : '▷ Escolta tota la cançó';
+  }
+  // So i efecte de cada clip de guitarra.
+  function clipTone(clip) {
+    const box = document.createElement('div'); box.className = 'clip-tone';
+    const fx = clip.fx || defaultFx();
+    const select = (label, entries, value, onChange) => {
+      const wrap = document.createElement('label'), caption = document.createElement('span'), input = document.createElement('select');
+      caption.className = 'field-label'; caption.textContent = label; fillSelect(input, entries, value); input.disabled = busy;
+      input.addEventListener('change', () => onChange(input.value)); wrap.append(caption, input); return wrap;
+    };
+    const slider = (label, key, left, right) => {
+      const wrap = document.createElement('label'), caption = document.createElement('span'), output = document.createElement('output'), input = document.createElement('input');
+      caption.className = 'field-label'; caption.textContent = label; output.textContent = `${fx[key]}`; caption.append(output);
+      input.type = 'range'; input.min = 0; input.max = 100; input.step = 5; input.value = fx[key]; input.disabled = busy || fx.type === 'none';
+      input.setAttribute('aria-label', `${label} · ${INSTRUMENTS[clip.instrument]}`);
+      input.addEventListener('input', () => { output.textContent = input.value; });
+      input.addEventListener('change', () => changeClipTone(clip, { fx: { ...fx, [key]: Number(input.value) } }));
+      const hint = document.createElement('small'); hint.className = 'slider-hint'; hint.innerHTML = '';
+      const a = document.createElement('span'), b = document.createElement('span'); a.textContent = left; b.textContent = right; hint.append(a, b);
+      wrap.append(caption, input, hint); return wrap;
+    };
+    box.append(
+      select('SO', timbreOptions.guitar.map(([k, v]) => [k, k === 'auto' ? 'Com la guitarra de la cançó' : v]), clip.sound || 'auto', value => changeClipTone(clip, { sound: value })),
+      select('EFECTE', Object.entries(engine.GUITAR_FX), fx.type, value => changeClipTone(clip, { fx: { ...fx, type: value } })),
+      slider('GUANY', 'drive', 'Poc', 'Molt'), slider('TO', 'tone', 'Fosc', 'Brillant'));
+    return box;
+  }
+  function changeClipTone(clip, change) {
+    if (busy) return;
+    if ('sound' in change) { if (change.sound === 'auto') delete clip.sound; else clip.sound = change.sound; }
+    if ('fx' in change) { if (change.fx.type === 'none' && change.fx.drive === 50 && change.fx.tone === 50) delete clip.fx; else clip.fx = change.fx; }
+    const replay = playing?.kind; stop(); save(); render();
+    if (replay === 'song' || replay === 'section') play(replay);
+  }
+  // Volums ràpids de la secció (fan servir l'equalitzador de la secció).
+  function renderVolumes(sec) {
+    const list = $('section-volumes'); list.replaceChildren();
+    for (const name of eqNames(sec)) {
+      const own = sec.mix?.[name], value = (own || song.settings.mix?.[name] || flatEq()).volume;
+      const row = document.createElement('label'); row.className = `volume-row${own && own.volume !== (song.settings.mix?.[name] || flatEq()).volume ? ' own' : ''}`;
+      if (name !== 'master') row.style.setProperty('--color', instrumentColors[name]);
+      const label = document.createElement('span'); label.textContent = name === 'master' ? 'Secció sencera' : INSTRUMENTS[name];
+      const input = document.createElement('input'); input.type = 'range'; input.min = -24; input.max = 6; input.step = 1; input.value = value; input.disabled = busy;
+      input.setAttribute('aria-label', `Volum de ${label.textContent} en aquesta secció`);
+      const output = document.createElement('output'); output.textContent = `${value > 0 ? '+' : ''}${value} dB`;
+      input.addEventListener('input', () => { const v = Number(input.value); output.textContent = `${v > 0 ? '+' : ''}${v} dB`; });
+      input.addEventListener('change', () => changeEq(sec, name, 'volume', Number(input.value)));
+      row.append(label, input, output); list.append(row);
+    }
   }
   // ── Equalitzadors ──────────────────────────────────────────────────
   function eqNames(sec) {
@@ -906,13 +1142,13 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy']) $(key).disabled = busy;
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
     $('add-section').disabled = busy || !ready;
     $('stop-playback').disabled = !playing;
     document.body.classList.toggle('busy', busy);
-    renderTabs();
+    renderTabs(); renderVoice();
   }
 
   // ── Mòbil: un pas per pantalla, amb pestanyes ──────────────────────
@@ -930,6 +1166,7 @@
     $('tab-line').textContent = song.sections.length ? String(song.sections.length) : '';
     const pending = song.clips.filter(c => !c.generated).length;
     $('tab-section').textContent = pending ? String(pending) : '';
+    $('tab-voice').textContent = recording ? '●' : voiceData ? '✓' : '';
     $('next-line').disabled = !song.base.generated;
     $('next-section').disabled = !current();
     $('next-section').textContent = current() ? `Edita ${sectionLabel(current()).toLowerCase()} →` : 'Edita la secció →';
@@ -971,6 +1208,14 @@
   });
   $('add-section').addEventListener('click', () => addSection(song.sections.length ? song.sections.at(-1).start + song.sections.at(-1).bars : 0));
   $('section-type').addEventListener('change', event => changeSection('type', event.target.value));
+  $('section-energy').addEventListener('input', event => { $('section-energy-value').textContent = `${event.target.value} %`; });
+  $('section-energy').addEventListener('change', event => {
+    const sec = current(); if (!sec || busy) return;
+    const value = Number(event.target.value), replay = playing?.kind;
+    if (value === TYPES[sec.type].energy) delete sec.energy; else sec.energy = value;
+    stop(); save(); render();
+    if (replay === 'song' || replay === 'section') play(replay);
+  });
   $('section-start').addEventListener('change', event => changeSection('start', event.target.value));
   $('section-bars').addEventListener('change', event => changeSection('bars', event.target.value));
   $('section-reharmonize').addEventListener('click', () => {
@@ -989,15 +1234,16 @@
   $('download-song').addEventListener('click', async () => {
     if (busy || !song.base.generated) return;
     stop(); setBusy(true);
-    try { download(new Blob([audioUtils.encodeWav(await songAudio(), RATE)], { type: 'audio/wav' }), `${fileName()}.wav`); notify('Cançó exportada en WAV estèreo de 44,1 kHz.'); }
+    try { download(new Blob([audioUtils.encodeWav(withVoice(await songAudio(), 0), RATE)], { type: 'audio/wav' }), `${fileName()}.wav`); notify(voiceData && song.voice?.enabled ? 'Cançó exportada amb la teva veu (WAV estèreo de 44,1 kHz).' : 'Cançó exportada en WAV estèreo de 44,1 kHz.'); }
     catch (error) { audioError(error); notify(`No s’ha pogut exportar la cançó: ${reasonOf(error)}`); }
     finally { setBusy(false); }
   });
   $('new-song').addEventListener('click', async () => {
     if ((song.base.generated || song.sections.length || song.title !== 'Nova cançó') && !await ask('Començar una cançó nova?', 'Es reemplaçarà l’esborrany actual. Desa primer el projecte si el vols recuperar després.')) return;
-    stop(); song = newSong(); selected = null; cache.clear(); cachedFrames = 0; updateSettingsUI(); save(); render();
+    stop(); const oldVoice = song.voice?.id; song = newSong(); selected = null; voiceData = null; cache.clear(); cachedFrames = 0; updateSettingsUI(); save(); render();
+    if (oldVoice) voiceDb.remove(oldVoice).catch(() => {});
   });
-  $('export-project').addEventListener('click', () => { download(new Blob([JSON.stringify(song, null, 2)], { type: 'application/json' }), `${fileName()}.json`); notify('Projecte desat amb la base, les seccions i els instruments.'); });
+  $('export-project').addEventListener('click', () => { download(new Blob([JSON.stringify(song, null, 2)], { type: 'application/json' }), `${fileName()}.json`); notify(song.voice ? 'Projecte desat. La veu es queda en aquest navegador: descarrega-la a part si la vols portar a un altre lloc.' : 'Projecte desat amb la base, les seccions i els instruments.'); });
   $('import-project').addEventListener('change', async event => {
     const file = event.target.files[0]; event.target.value = ''; if (!file) return;
     try {
@@ -1005,15 +1251,33 @@
       migrated = false;
       const imported = validateSong(JSON.parse(await file.text()));
       if (!await ask('Obrir aquest projecte?', 'El projecte importat reemplaçarà l’esborrany actual.')) return;
-      stop(); song = imported; selected = song.sections[0]?.id || null; cache.clear(); cachedFrames = 0; updateSettingsUI(); save(); render();
+      stop(); song = imported; selected = song.sections[0]?.id || null; cache.clear(); cachedFrames = 0; updateSettingsUI(); save(); render(); loadVoice();
       notify(migrated ? 'Projecte antic convertit: cada part és ara una secció de la línia.' : 'Projecte obert.');
     } catch { notify('Aquest fitxer no és un projecte vàlid de Ska Generator.'); }
   });
+  $('record-song').addEventListener('click', () => startRecording(0));
+  $('record-section').addEventListener('click', () => { const sec = current(); if (sec) startRecording(sec.start); });
+  $('record-stop').addEventListener('click', () => { stop(); render(); });
+  $('play-voice').addEventListener('click', () => play('song'));
+  $('delete-voice').addEventListener('click', deleteVoice);
+  $('download-voice').addEventListener('click', () => {
+    if (!voiceData) return;
+    download(new Blob([audioUtils.encodeWav([voiceData, voiceData], RATE)], { type: 'audio/wav' }), `${fileName()}-veu.wav`);
+  });
+  $('voice-enabled').addEventListener('change', event => { if (!song.voice) return; stop(); song.voice.enabled = event.target.checked; save(); render(); });
+  for (const [key, field, unit] of [['voice-volume', 'volume', 'dB'], ['voice-offset', 'offsetMs', 'ms']]) {
+    $(key).addEventListener('input', event => { const v = Number(event.target.value); $(`${key}-value`).textContent = `${v > 0 ? '+' : ''}${v} ${unit}`; });
+    $(key).addEventListener('change', event => {
+      if (!song.voice) return;
+      const replay = playing?.kind; stop(); song.voice[field] = Number(event.target.value); save(); render();
+      if (replay === 'song' || replay === 'section') play(replay);
+    });
+  }
   window.addEventListener('pagehide', stop);
   let firstTab = song.base.generated ? (song.sections.length ? 'line' : 'line') : 'song';
   try { firstTab = sessionStorage.getItem('skagenerator.tab') || firstTab; } catch {}
   setTab(firstTab, false);
-  updateSettingsUI(); render();
+  updateSettingsUI(); render(); loadVoice();
   if (migrated && storageAvailable) { save(); notify('Projecte anterior convertit al nou flux: cada part és ara una secció de la línia.'); }
   if (!storageAvailable) notify('No s’ha pogut recuperar l’esborrany. Obre un projecte desat o comença una cançó nova.');
 })();

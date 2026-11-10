@@ -1749,7 +1749,19 @@
         outro: { name: 'Final', bars: 4, energy: 30, description: 'Recupera el motiu i tanca la cançó.' }
     };
     // Preseleccions de treball: no són límits teòrics dels gèneres.
-    const SONG_INSTRUMENTS = { guitar: 'Guitarres', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue' };
+    const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue',
+        guitar2: 'Guitarra 2 (aguda)', guitar3: 'Guitarra 3 (arpegis)' };
+    // Efectes de guitarra que aplica el motor de mostres (vegeu audio/render.mjs).
+    const GUITAR_FX = { none: 'Net, sense efecte', boost: 'Boost net', tape: 'Saturació de cinta', crunch: 'Crunch',
+        overdrive: 'Overdrive (pedal verd)', distortion: 'Distorsió', metal: 'Metal (guany alt)', fuzz: 'Fuzz', lofi: 'Lo-fi (8 bits)' };
+    const GUITARS = ['guitar', 'guitar2', 'guitar3'];
+    function checkFx(fx) {
+        if (fx === undefined) return;
+        if (!fx || typeof fx !== 'object' || Array.isArray(fx) || Object.entries(fx).some(([name, value]) => !GUITARS.includes(name)
+            || !value || typeof value !== 'object' || !Object.hasOwn(GUITAR_FX, value.type)
+            || ![value.drive, value.tone].every(n => Number.isFinite(n) && n >= 0 && n <= 100)))
+            throw new Error('Efecte de guitarra no vàlid');
+    }
     // Equalitzador: greus, mitjos i aguts en dB respecte del so de l'estil, i volum.
     const MIX_LIMITS = { low: [-12, 12], mid: [-12, 12], high: [-12, 12], volume: [-24, 6] };
     function checkMix(mix) {
@@ -1886,7 +1898,7 @@
         if (!Number.isInteger(variation) || variation < -1 || variation > 4 || (variation !== -1 && !eligible))
             throw new Error('Versió musical no vàlida');
         checkGroove(settings.groove, settings.style); checkGroove(part.groove, settings.style);
-        checkMix(settings.mix); checkMix(part.mix);
+        checkMix(settings.mix); checkMix(part.mix); checkFx(settings.fx); checkFx(part.fx);
         // Sense base rítmica (projectes antics), cada versió porta el seu patró.
         const groove = {};
         for (const name of GROOVE_FAMILIES) groove[name] = part.groove?.[name] ?? settings.groove?.[name]
@@ -2004,7 +2016,8 @@
             ranges: JSON.parse(JSON.stringify(ranges)),
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
-            mix: { ...(settings.mix || {}), ...(part.mix || {}) } };
+            mix: { ...(settings.mix || {}), ...(part.mix || {}) },
+            fx: { ...(settings.fx || {}), ...(part.fx || {}) } };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;
@@ -2028,6 +2041,10 @@
             if (has('guitar')) stabs.forEach((t, hit) => voicing.forEach((n, k) => {
                 syn.pluck(t0 + t * beat + k * 0.004, n, intensity * (punk && hit % 2 ? 0.5 : 0.75), guitar);
             }));
+            if (has('guitar2')) (ending ? [0] : [.5, 1.5, 2.5, 3.5]).forEach(t => voicing.forEach((n, k) =>
+                syn.pluck(t0 + t * beat + .01 + k * .004, n + 12, intensity * .45, guitar)));
+            if (has('guitar3')) (ending ? [0] : [0, .5, 1, 1.5, 2, 2.5, 3, 3.5]).forEach((t, k) =>
+                syn.pluck(t0 + t * beat, chord.notes[k % chord.notes.length] + 12, intensity * .5, { ...guitar, decay: .3 }));
             if (has('bass') && !Array.isArray(spec.bassLine)) {
                 const hits = ending ? [0] : punk ? [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 1, 2, 3];
                 hits.forEach((t, k) => syn.bass(t0 + t * beat,
@@ -2090,7 +2107,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, composeSongPart, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, composeSongPart, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

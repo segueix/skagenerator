@@ -157,3 +157,22 @@ test('totes les seccions reben el mateix guany: un instrument no canvia de volum
   }
   assert(Math.max(...gains) - Math.min(...gains) < 1, gains.join(', '));
 });
+
+test('els efectes de guitarra distorsionen sense canviar el volum', async () => {
+  const { createGuitarFx, GUITAR_FX_TYPES } = await import('../audio/render.mjs');
+  assert.deepEqual(GUITAR_FX_TYPES, Object.keys(engine.GUITAR_FX).filter(type => type !== 'none'));
+  const rate = 44100, x = Float32Array.from({ length: rate }, (_, i) => .05 * Math.sin(2 * Math.PI * 220 * i / rate));
+  const harmonics = y => { const at = h => { let re = 0, im = 0; for (let i = rate / 2; i < rate; i++) { const a = 2 * Math.PI * 220 * h * i / rate; re += y[i] * Math.cos(a); im += y[i] * Math.sin(a); } return Math.hypot(re, im); };
+    return Math.sqrt([2, 3, 4, 5].reduce((s, h) => s + at(h) ** 2, 0)) / at(1); };
+  for (const type of ['distortion', 'metal', 'fuzz']) {
+    const fx = createGuitarFx({ type, drive: 80, tone: 50 }, rate), y = x.map(v => fx.process(0, v));
+    assert(y.every(Number.isFinite));
+    assert(harmonics(y) > .2, `${type} ha de distorsionar`);
+  }
+  assert.equal(createGuitarFx({ type: 'none', drive: 50, tone: 50 }, rate), null);
+  const rms = d => Math.sqrt(d[0].reduce((s, v) => s + v * v, 0) / d[0].length);
+  const sp = fx => engine.composeSongPart({ ...settings, instruments: ['guitar'], fx }, { ...part, layers: { guitar: 2 } });
+  const clean = rms(await renderSampledPart(bank, sp(undefined), 22050, { raw: true }));
+  const dirty = rms(await renderSampledPart(bank, sp({ guitar: { type: 'metal', drive: 90, tone: 50 } }), 22050, { raw: true }));
+  assert(Math.abs(20 * Math.log10(dirty / clean)) < 2, `${(20 * Math.log10(dirty / clean)).toFixed(1)} dB`);
+});
