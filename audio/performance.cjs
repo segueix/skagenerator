@@ -9,21 +9,30 @@ function createPerformance(spec) {
     || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 180 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
     || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums'].includes(i))) throw new Error('Partitura no vàlida');
+  const presets = {
+    guitar: { auto: null, clean: 27, muted: 28, overdrive: 29, distortion: 30 },
+    bass: { auto: null, finger: 33, pick: 34 },
+    drums: { auto: null, standard: 0, rock: 16, electronic: 24 }
+  };
+  if (spec.timbres !== undefined && (!spec.timbres || typeof spec.timbres !== 'object' || Array.isArray(spec.timbres)
+    || Object.entries(spec.timbres).some(([family, preset]) => !Object.hasOwn(presets, family) || !Object.hasOwn(presets[family], preset))))
+    throw new Error('Timbres no vàlids');
+  const chosen = family => presets[family][spec.timbres?.[family] || 'auto'];
   const random = rng(spec.seed), punk = spec.style === 'punk', beat = spec.beat, bar = beat * 4;
   const has = name => spec.instruments.includes(name), energy = .55 + spec.energy / 200;
   const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
   const events = [];
   const channels = [
-    { channel: 0, program: punk ? 30 : 27, pan: 42, volume: 85 },
-    { channel: 1, program: punk && spec.type === 'chorus' ? 29 : 28, pan: 84, volume: 60 },
-    { channel: 2, program: punk ? 34 : 33, pan: 64, volume: 115 },
+    { channel: 0, program: chosen('guitar') ?? (punk ? 30 : 27), pan: 42, volume: 85 },
+    { channel: 1, program: chosen('guitar') ?? (punk && spec.type === 'chorus' ? 29 : 28), pan: 84, volume: 60 },
+    { channel: 2, program: chosen('bass') ?? (punk ? 34 : 33), pan: 64, volume: 115 },
     { channel: 3, program: 56, pan: 50, volume: 85 },
     { channel: 4, program: 57, pan: 79, volume: 87 },
     { channel: 5, program: 81, pan: 58, volume: 80 },
     { channel: 6, program: 89, pan: 76, volume: 65 },
     { channel: 7, program: 38, pan: 64, volume: 110 },
     { channel: 10, program: 24, pan: 64, volume: 106, drums: true },
-    { channel: 9, program: punk ? 16 : 0, pan: 64, volume: 106, drums: true }
+    { channel: 9, program: chosen('drums') ?? (punk ? 16 : 0), pan: 64, volume: 106, drums: true }
   ];
   function note(channel, pitch, start, duration, velocity, jitter = .004) {
     const at = Math.max(0, Math.min(spec.seconds - .02, start + (random() - .5) * jitter));

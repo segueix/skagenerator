@@ -18,7 +18,15 @@ En recuperar un projecte anterior, es conserva l’estructura i la lletra, s’a
 
 Cada part es genera i s’escolta individualment, amb durada i intensitat pròpies. Tota la cançó comparteix estil, tempo i tonalitat. Per a cada intro, estrofa o tornada, el botó «Genera 5 versions diferents» crea cinc propostes amb progressions d’acords, melodies, patrons de bateria i línies de baix alternatius. El baix té una partitura pròpia en cada proposta (caminant, dub, octaves, melòdic o sincopat en ska; corxeres, mig temps, galop, riff o síncopes en punk). El motor de mostres interpreta aquesta mateixa línia de baix i els patrons diferenciats de guitarra i bombo. El canal del baix enregistrat té més presència. Es poden escoltar per separat i escollir la versió definitiva, que és la que es reprodueix a la cançó completa i s’exporta al WAV. Les altres alternatives continuen disponibles. Les seccions repetides (estrofes i tornades) poden tenir una elecció independent. Les cinc composicions es calculen al moment, mentre que l’àudio de les alternatives no seleccionades només es prepara quan s’escolten. La tria i les llavors queden desades al JSON i al navegador. També es poden afegir pretornades i parts instrumentals, reordenar seccions i eliminar-les.
 
-La música instrumental es reprodueix amb mostres enregistrades de GeneralUser GS 2.0.3, mitjançant SpessaSynth Core 4.4.9 dins d’un Web Worker. Les lletres són anotacions: no es genera veu ni cant. No necessita claus d’API ni serveis de generació externs.
+La música instrumental es prepara amb mostres enregistrades de GeneralUser GS 2.0.3, mitjançant SpessaSynth Core 4.4.9 dins d’un Web Worker. Tone.js 14.8.49 s'utilitza per reproduir les parts i la cançó sencera al navegador; si la biblioteca externa no es carrega, es manté el reproductor nadiu Web Audio. El WAV continua utilitzant exactament la mescla de les mateixes mostres. Les lletres són anotacions: no es genera veu ni cant. No necessita claus d’API ni serveis de generació externs.
+
+## Triar guitarres, baixos i bateries
+
+A «Instruments base de la cançó» es trien els instruments que sonaran i, a «So de guitarra», «So de baix» i «Kit de bateria», se selecciona un preset enregistrat. La guitarra té els sons net, apagat, saturat i distorsionat; el baix es pot tocar amb dits o pua; la bateria ofereix els kits acústic, rock i electrònic. «Segons l'estil» conserva els presets originals (ska net/baix amb dits/bateria acústica; punk distorsionat/baix amb pua/bateria rock).
+
+A cada secció, es poden triar altres instruments i modificar separadament els tres sons. «Com a la cançó» hereta el preset base, i «Recupera els instruments i sons base» elimina totes les excepcions de la part. Després d'escollir un nou timbre, cal tornar a generar les parts afectades; les altres parts i les lletres no canvien. Els presets s'apliquen igualment a les cinc versions disponibles i al WAV exportat.
+
+Tone.js gestiona la reproducció de les seccions ja renderitzades, no sintetitza les notes ni carrega els bancs SFZ. Els presets de la primera fase pertanyen al SF2 GeneralUser GS existent; no són encara les biblioteques FreePats ni Karoryfer. La biblioteca Tone.js es carrega des d'un CDN fixat a 14.8.49, amb retorn automàtic a Web Audio si no està disponible. Per a instal·lacions sense xarxa, cal servir-ne una còpia local autoritzada.
 
 ## Ús
 

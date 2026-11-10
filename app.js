@@ -6,12 +6,32 @@
   const sampleAudio = window.SkaSampleAudio, audioUtils = window.SkaAudioUtils;
   const colors = { intro: '#90b8ad', verse: '#bab4d8', prechorus: '#d2b19a', chorus: '#e6b572', bridge: '#91b4cf', solo: '#c1bf8c', outro: '#aebc91' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
+  const timbreOptions = {
+    guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta'], ['muted', 'Guitarra apagada'], ['overdrive', 'Guitarra saturada'], ['distortion', 'Guitarra distorsionada']],
+    bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits'], ['pick', 'Baix amb pua']],
+    drums: [['auto', 'Segons l’estil'], ['standard', 'Bateria acústica'], ['rock', 'Bateria rock'], ['electronic', 'Kit electrònic']]
+  };
+  const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto' });
+  const validTimbres = input => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
+    && Object.entries(input).every(([name, value]) => timbreOptions[name]?.some(([preset]) => preset === value));
+  const tone = window.Tone?.Player ? window.Tone : null;
+  for (const [name, options] of Object.entries(timbreOptions)) {
+    for (const scope of ['song', 'part']) {
+      const select = $(`${scope}-timbre-${name}`);
+      const values = scope === 'part' ? [['inherit', 'Com a la cançó'], ...options] : options;
+      for (const [value, label] of values) {
+        const option = document.createElement('option'); option.value = value; option.textContent = label;
+        select.append(option);
+      }
+    }
+  }
+  $('tone-status').textContent = tone ? 'Reproductor: Tone.js · instruments enregistrats' : 'Reproductor: Web Audio · Tone.js no disponible';
   const id = () => window.crypto.randomUUID();
   const seed = () => window.crypto.getRandomValues(new Uint32Array(1))[0] || 1;
   const makePart = type => ({ id: id(), type, bars: engine.SONG_PARTS[type].bars, energy: engine.SONG_PARTS[type].energy, lyrics: '', generated: false, revision: 1 });
   const fiveVersions = part => ['intro', 'verse', 'chorus'].includes(part.type);
   let recoveredMigration = false;
-  const newSong = () => ({ version: 1, title: 'Nova cançó', settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: seed(), instruments: engine.SONG_STYLES.ska.instruments.slice() }, parts: ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'].map(makePart), chorusRevision: 1 });
+  const newSong = () => ({ version: 1, title: 'Nova cançó', settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: seed(), instruments: engine.SONG_STYLES.ska.instruments.slice(), timbres: defaultTimbres() }, parts: ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'].map(makePart), chorusRevision: 1 });
   function validateSong(value) {
     if (!value || value.version !== 1 || typeof value.title !== 'string' || value.title.length > 100 || !value.settings
       || !Number.isInteger(value.settings.seed) || value.settings.seed < 1 || value.settings.seed > 4294967295
@@ -33,6 +53,8 @@
     if (!Array.isArray(value.settings.instruments) || !value.settings.instruments.length
       || new Set(value.settings.instruments).size !== value.settings.instruments.length
       || value.settings.instruments.some(name => !Object.hasOwn(engine.SONG_INSTRUMENTS, name))) throw new Error('Instruments base no vàlids');
+    if (!validTimbres(value.settings.timbres)) throw new Error('Sons base no vàlids');
+    value.settings.timbres = { ...defaultTimbres(), ...(value.settings.timbres || {}) };
     const seen = new Set();
     for (const part of value.parts) {
       if (!part || typeof part.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(part.id) || seen.has(part.id)
@@ -41,6 +63,7 @@
       if (part.instruments !== undefined && (!Array.isArray(part.instruments) || !part.instruments.length
         || new Set(part.instruments).size !== part.instruments.length
         || part.instruments.some(name => !Object.hasOwn(engine.SONG_INSTRUMENTS, name)))) throw new Error('Instruments de la part no vàlids');
+      if (!validTimbres(part.timbres)) throw new Error('Sons de la part no vàlids');
       if (part.variants !== undefined) {
         if (!fiveVersions(part) || !Array.isArray(part.variants) || part.variants.length !== 5
           || new Set(part.variants).size !== 5 || part.variants.some(rev => !Number.isInteger(rev) || rev < 1 || rev > 1000000)
@@ -55,13 +78,14 @@
   let song = newSong(), storageAvailable = true;
   try { const saved = localStorage.getItem(KEY); if (saved) song = validateSong(JSON.parse(saved)); }
   catch { storageAvailable = false; }
-  let selected = song.parts[0].id, busy = false, cache = new Map(), context, source, playbackGain, playToken = 0, animation;
+  let selected = song.parts[0].id, busy = false, cache = new Map(), context, source, playbackGain, tonePlayer, playToken = 0, animation;
   let playStarted = 0, playSeconds = 0, isPlaying = false, playingPart = null, noticeTimer;
   const current = () => song.parts.find(p => p.id === selected) || song.parts[0];
   const seconds = p => p.bars * 4 * 60 / song.settings.bpm;
   const totalSeconds = () => song.parts.reduce((sum, p) => sum + seconds(p), 0);
   const time = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
   const instrumentsFor = part => part.instruments === undefined ? song.settings.instruments : part.instruments;
+  const hasTimbreOverrides = part => !!part.timbres && Object.keys(part.timbres).length > 0;
   const hasVersions = part => fiveVersions(part) && part.generated && Array.isArray(part.variants) && part.variants.length === 5;
   const cacheKey = (part, revision = part.revision) => `${part.id}:${revision}`;
   function clearPartCache(part) {
@@ -110,9 +134,21 @@
     part.instruments = instruments;
     invalidate(part); save(); render();
   }
+  for (const family of Object.keys(timbreOptions)) {
+    $(`song-timbre-${family}`).addEventListener('change', changeSettings);
+    $(`part-timbre-${family}`).addEventListener('change', () => {
+      if (busy) return;
+      const part = current(), value = $(`part-timbre-${family}`).value;
+      const changed = { ...(part.timbres || {}) };
+      if (value === 'inherit') delete changed[family]; else changed[family] = value;
+      if (JSON.stringify(changed) === JSON.stringify(part.timbres || {})) return;
+      if (Object.keys(changed).length) part.timbres = changed; else delete part.timbres;
+      invalidate(part); save(); render();
+    });
+  }
   $('reset-part-instruments').addEventListener('click', () => {
-    if (busy || current().instruments === undefined) return;
-    const part = current(); delete part.instruments; invalidate(part); save(); render();
+    if (busy || current().instruments === undefined && !hasTimbreOverrides(current())) return;
+    const part = current(); delete part.instruments; delete part.timbres; invalidate(part); save(); render();
   });
   function updateSettingsUI() {
     const profile = engine.SONG_STYLES[song.settings.style];
@@ -128,6 +164,7 @@
     $('style-summary').textContent = `${profile.name} · ${profile.bpm.min}–${profile.bpm.max} BPM`;
     $('style-description').textContent = profile.description;
     for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) $(`instrument-${instrument}`).checked = song.settings.instruments.includes(instrument);
+    for (const family of Object.keys(timbreOptions)) $(`song-timbre-${family}`).value = song.settings.timbres[family] || 'auto';
   }
   function render() {
     const part = current(), position = song.parts.indexOf(part), ready = song.parts.filter(p => p.generated).length;
@@ -155,8 +192,14 @@
     $('part-bars').value = part.bars; $('part-energy').value = part.energy; $('energy-value').textContent = `${part.energy} %`;
     $('part-lyrics').value = part.lyrics; $('part-duration').textContent = time(seconds(part));
     for (const name of Object.keys(engine.SONG_INSTRUMENTS)) $(`part-instrument-${name}`).checked = instrumentsFor(part).includes(name);
-    const custom = part.instruments !== undefined;
-    $('part-instrument-mode').textContent = custom ? 'Selecció pròpia d’aquesta part' : 'Segueix els instruments base de la cançó';
+    const custom = part.instruments !== undefined || hasTimbreOverrides(part);
+    $('part-instrument-mode').textContent = custom ? 'Selecció pròpia d’aquesta part' : 'Segueix els instruments i sons base de la cançó';
+    for (const family of Object.keys(timbreOptions)) {
+      $(`part-timbre-${family}`).value = part.timbres?.[family] || 'inherit';
+      const inherited = $(`part-timbre-${family}`).options[0];
+      const label = timbreOptions[family].find(([value]) => value === (song.settings.timbres[family] || 'auto'))?.[1] || 'Segons l’estil';
+      inherited.textContent = `Com a la cançó (${label})`;
+    }
     $('reset-part-instruments').hidden = !custom;
     $('reset-part-instruments').disabled = busy || !custom;
     $('generate-label').textContent = busy ? 'Preparant el so…'
@@ -181,6 +224,10 @@
     $('play-part').disabled = busy || !part.generated; $('play-song').disabled = busy || !allReady;
     $('download-song').disabled = busy || !allReady; $('stop-playback').disabled = !isPlaying;
     for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) { $(`instrument-${instrument}`).disabled = busy; $(`part-instrument-${instrument}`).disabled = busy; }
+    for (const family of Object.keys(timbreOptions)) {
+      $(`song-timbre-${family}`).disabled = busy || !song.settings.instruments.includes(family);
+      $(`part-timbre-${family}`).disabled = busy || !instrumentsFor(part).includes(family);
+    }
     document.body.classList.toggle('busy', busy);
     renderWave(part);
   }
@@ -285,7 +332,14 @@
     finally { setBusy(false); }
   }
   function stop() {
-    playToken++; if (source) { source.onended = null; try { source.stop(); } catch {} source = null; }
+    playToken++;
+    if (tonePlayer) {
+      const playing = tonePlayer; tonePlayer = null;
+      playing.onstop = () => {};
+      try { playing.stop(); } catch {}
+      playing.dispose();
+    }
+    if (source) { source.onended = null; try { source.stop(); } catch {} source = null; }
     if (playbackGain) { playbackGain.disconnect(); playbackGain = null; }
     cancelAnimationFrame(animation); isPlaying = false; playingPart = null; document.body.classList.remove('playing');
     $('song-progress').value = 0; $('playback-time').textContent = '00:00'; $('play-song').textContent = '▶'; $('stop-playback').disabled = true;
@@ -294,25 +348,43 @@
   const join = parts => audioUtils.joinStereo(parts);
   async function play(whole, versionIndex = null) {
     if (isPlaying && whole) { stop(); render(); return; }
-    if (busy) return; stop(); const token = playToken; const part = current();
+    if (busy) return;
+    stop(); const token = playToken, part = current();
     const Audio = window.AudioContext || window.webkitAudioContext;
-    if (!Audio) { notify('Aquest navegador no admet la reproducció d’àudio.'); return; }
+    if (!Audio && !tone) { notify('Aquest navegador no admet la reproducció d’àudio.'); return; }
+    // Tone.start() s'invoca directament des del clic, abans de cap await.
+    const activation = tone ? tone.start() : null;
     try {
-      // Creació i resume dins del clic per respectar el permís d’àudio en mòbils.
-      context ||= new Audio(); const resume = context.resume(); setBusy(true); await resume;
+      if (!tone) { context ||= new Audio(); }
+      const resume = activation || context.resume();
+      setBusy(true); await resume;
       const data = whole ? join(await collectSamples()) : await getSamples(part, versionIndex);
       if (token !== playToken) return;
-      const buffer = context.createBuffer(2, data[0].length, RATE); buffer.copyToChannel(data[0], 0); buffer.copyToChannel(data[1], 1);
-      source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination);
-      const gain = playbackGain = context.createGain(); gain.gain.value = .8; source.disconnect(); source.connect(gain); gain.connect(context.destination);
-      source.onended = () => { if (token === playToken) { gain.disconnect(); stop(); render(); } };
-      playStarted = context.currentTime; playSeconds = data[0].length / RATE; playingPart = whole ? null : part.id;
-      isPlaying = true; source.start(); document.body.classList.add('playing');
+      const playbackContext = tone ? tone.getContext().rawContext : context;
+      const buffer = playbackContext.createBuffer(2, data[0].length, RATE);
+      buffer.copyToChannel(data[0], 0); buffer.copyToChannel(data[1], 1);
+      playSeconds = data[0].length / RATE; playingPart = whole ? null : part.id;
+      if (tone) {
+        // Tone.js gestiona la sortida i el control de la reproducció.
+        // Les mostres SF2 es continuen renderitzant al worker per al WAV idèntic.
+        tonePlayer = new tone.Player(buffer).toDestination();
+        tonePlayer.volume.value = -1.938; // 80 % d'amplitud
+        tonePlayer.onstop = () => { if (token === playToken) { stop(); render(); } };
+        playStarted = tone.now(); isPlaying = true;
+        tonePlayer.start(playStarted);
+      } else {
+        source = context.createBufferSource(); source.buffer = buffer;
+        const gain = playbackGain = context.createGain(); gain.gain.value = .8;
+        source.connect(gain); gain.connect(context.destination);
+        source.onended = () => { if (token === playToken) { stop(); render(); } };
+        playStarted = context.currentTime; isPlaying = true; source.start();
+      }
+      document.body.classList.add('playing');
       $('transport-subtitle').textContent = whole ? 'Escoltant la cançó completa' : `Escoltant · ${partLabel(part)}${versionIndex !== null ? ` · versió ${versionIndex + 1}` : ''}`;
       $('play-song').textContent = '■'; $('playback-duration').textContent = time(playSeconds);
       const tick = () => {
         if (!isPlaying) return;
-        const elapsed = Math.min(playSeconds, context.currentTime - playStarted);
+        const elapsed = Math.min(playSeconds, (tone ? tone.now() : context.currentTime) - playStarted);
         $('song-progress').value = elapsed / playSeconds; $('playback-time').textContent = time(elapsed);
         if (whole) {
           let offset = 0; const active = song.parts.find(p => { offset += seconds(p); return elapsed < offset; });
@@ -352,20 +424,24 @@
     if (!profile.keys.some(([key, keyMode]) => key === tonic && keyMode === mode)) [tonic, mode] = profile.keys[0];
     const bpm = changingStyle ? profile.bpm.default : Number($('song-bpm').value);
     const instruments = changingStyle ? profile.instruments.slice() : Object.keys(engine.SONG_INSTRUMENTS).filter(name => $(`instrument-${name}`).checked);
+    const timbres = Object.fromEntries(Object.keys(timbreOptions).map(name => [name, $(`song-timbre-${name}`).value]));
     if (!instruments.length) { notify('Mantén com a mínim un instrument activat.'); updateSettingsUI(); return; }
     if (!Number.isInteger(bpm) || bpm < profile.bpm.min || bpm > profile.bpm.max) {
       notify(`Per a ${profile.name.toLowerCase()}, tria un tempo entre ${profile.bpm.min} i ${profile.bpm.max} BPM.`); updateSettingsUI(); return;
     }
-    const settings = { ...song.settings, style, bpm, tonic, mode, instruments };
+    const settings = { ...song.settings, style, bpm, tonic, mode, instruments, timbres };
     if (JSON.stringify(settings) === JSON.stringify(song.settings)) return;
     const musicChanged = style !== song.settings.style || bpm !== song.settings.bpm || tonic !== song.settings.tonic || mode !== song.settings.mode;
-    // Els canvis de formació base només afecten les parts que encara la segueixen.
-    const affected = musicChanged ? song.parts : song.parts.filter(p => p.instruments === undefined);
-    updateSettingsUI();
+    // Un so base canviat només obliga a regenerar les parts que l'hereten.
+    const changedFamilies = Object.keys(timbreOptions).filter(name => timbres[name] !== song.settings.timbres[name]);
+    const formationChanged = JSON.stringify(instruments) !== JSON.stringify(song.settings.instruments);
+    const affected = musicChanged ? song.parts : song.parts.filter(p =>
+      (formationChanged && p.instruments === undefined) ||
+      changedFamilies.some(name => instrumentsFor(p).includes(name) && p.timbres?.[name] === undefined));
     if (affected.some(p => p.generated) && !await ask('Canviar la base musical?',
       musicChanged
         ? 'Canviar l’estil, el tempo o la tonalitat deixa totes les parts pendents de regenerar. Es conservaran els instruments triats a cada part i la lletra.'
-        : 'Les parts que segueixen els instruments base quedaran pendents de regenerar. Les parts amb instruments propis i la lletra es conservaran.')) return;
+        : 'Només les parts afectades pels instruments o sons base canviats quedaran pendents de regenerar. La lletra i la resta de parts es conservaran.')) { updateSettingsUI(); return; }
     stop(); song.settings = settings;
     affected.forEach(p => { p.generated = false; clearPartCache(p); });
     updateSettingsUI(); save(); render();

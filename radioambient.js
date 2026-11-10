@@ -1858,7 +1858,8 @@
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
         }
         return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
-            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation };
+            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation,
+            timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) } };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;

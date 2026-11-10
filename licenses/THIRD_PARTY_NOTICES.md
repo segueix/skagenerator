@@ -11,3 +11,6 @@
   MIT; llicència a fflate-LICENSE.txt.
 
 Les dependències són reproduïdes al bundle local sample-worker.js. Les llicències també es distribueixen amb la web.
+
+- Tone.js 14.8.49, Yotam Mann i col·laboradors: https://github.com/Tonejs/Tone.js
+  MIT; biblioteca carregada externament des de jsDelivr per al reproductor de l'editor, no inclosa dins del bundle local.

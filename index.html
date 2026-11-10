@@ -7,7 +7,7 @@
   <title>Ska Generator · Nova cançó</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23172c28'/%3E%3Cpath d='M12 28V15l16-4v13M12 19l16-4' stroke='%23d5f28b' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
-  <script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="app.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -25,7 +25,13 @@
     </section>
     <section class="band-settings" aria-label="Estil i instruments">
       <div class="style-guide"><strong id="style-summary"></strong><span id="style-description"></span><small>Tempos i tonalitats preseleccionats per a aquest taller; no són límits del gènere.</small></div>
-      <fieldset class="instrument-picker"><legend>INSTRUMENTS BASE DE LA CANÇÓ</legend><div id="song-instruments"></div><small>Configuració inicial per a les parts. Després pots escollir una combinació diferent a cada secció.</small><div class="audio-bank-status"><span class="live-dot"></span><span id="audio-status" role="status">So enregistrat · GeneralUser GS</span><a href="licenses/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Crèdits</a></div></fieldset>
+      <fieldset class="instrument-picker"><legend>INSTRUMENTS BASE DE LA CANÇÓ</legend><div id="song-instruments"></div><small>Configuració inicial per a les parts. Després pots escollir una combinació diferent a cada secció.</small><div class="timbre-picker" id="song-timbres" role="group" aria-label="Tria els sons de la formació base">
+  <label><span class="field-label">SO DE GUITARRA</span><select id="song-timbre-guitar" aria-label="So de guitarra de la cançó"></select></label>
+  <label><span class="field-label">SO DE BAIX</span><select id="song-timbre-bass" aria-label="So de baix de la cançó"></select></label>
+  <label><span class="field-label">KIT DE BATERIA</span><select id="song-timbre-drums" aria-label="Kit de bateria de la cançó"></select></label>
+</div>
+<small>Tria el timbre de cada instrument. «Segons l’estil» utilitza el so apropiat per a ska, punk o urban.</small>
+<div class="audio-bank-status"><span class="live-dot"></span><span id="audio-status" role="status">So enregistrat · GeneralUser GS</span><a href="licenses/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Crèdits</a></div><small id="tone-status">Reproductor preparat</small></fieldset>
     </section>
     <section class="arrangement" aria-labelledby="arrangement-title">
       <div class="section-heading"><h2 id="arrangement-title">El mapa de la cançó</h2><span id="duration-total">4/4 · Estructura estàndard</span></div>
@@ -42,7 +48,12 @@
         <fieldset class="part-instrument-panel" aria-describedby="part-instrument-mode">
           <legend>INSTRUMENTS D’AQUESTA PART</legend>
           <div id="part-instruments" class="part-instrument-grid"></div>
-          <div class="part-instrument-footer"><span id="part-instrument-mode">Segueix els instruments base de la cançó</span><button type="button" id="reset-part-instruments" class="text-button" hidden>↶ Recupera la formació base</button></div>
+          <div class="timbre-picker per-part" id="part-timbres" role="group" aria-label="Sons d’aquesta part">
+            <label><span class="field-label">GUITARRA</span><select id="part-timbre-guitar" aria-label="So de guitarra d’aquesta part"></select></label>
+            <label><span class="field-label">BAIX</span><select id="part-timbre-bass" aria-label="So de baix d’aquesta part"></select></label>
+            <label><span class="field-label">BATERIA</span><select id="part-timbre-drums" aria-label="Kit de bateria d’aquesta part"></select></label>
+          </div>
+          <div class="part-instrument-footer"><span id="part-instrument-mode">Segueix els instruments base de la cançó</span><button type="button" id="reset-part-instruments" class="text-button" hidden>↶ Recupera els instruments i sons base</button></div>
         </fieldset>
         <div class="sound-preview" id="sound-preview"><div class="waveform" id="waveform" aria-hidden="true"></div><span id="preview-label">El primer compàs comença aquí.</span><span class="preview-duration" id="part-duration">00:09</span></div>
         <section class="variant-panel" id="variant-panel" aria-label="Cinc versions de la secció" hidden>

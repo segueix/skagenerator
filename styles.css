@@ -33,3 +33,12 @@
 .variant-row .button{min-height:34px;font-size:10px;padding:7px 10px}
 .variant-row.chosen .variant-choose{background:#dfeecf;color:#365737;border-color:#b8d1ab}
 @media(max-width:680px){.variant-panel{padding:12px}.variant-row{gap:5px;padding:7px}.variant-row .button{font-size:9px;padding:7px 8px}.variant-title strong{font-size:11px}}
+
+/* Selecció de presets de guitarres, baixos i bateries. */
+.timbre-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:15px 0 9px;padding-top:15px;border-top:1px solid var(--line)}
+.timbre-picker label{min-width:0;display:block}
+.timbre-picker .field-label{margin-bottom:7px;font-size:9px}
+.timbre-picker select{display:block;width:100%;border:1px solid var(--line);border-radius:7px;background:#fafbf7;padding:9px 10px;font-size:11px;min-height:39px}
+.timbre-picker select:disabled{opacity:.5;cursor:not-allowed}
+.timbre-picker.per-part{margin:16px 0 12px}
+@media(max-width:680px){.timbre-picker{grid-template-columns:1fr;gap:10px}.timbre-picker select{min-height:40px}}
