@@ -1951,7 +1951,8 @@
     }
     function composeSongPart(settings, part) {
         if (!Object.hasOwn(SONG_PARTS, part.type)) throw new Error('Tipus de secció desconegut');
-        const bars = Number(part.bars), bpm = Number(settings.bpm), tonic = Number(settings.tonic);
+        const bars = Number(part.bars), bpm = Number(settings.bpm);
+        let tonic = Number(settings.tonic);
         const style = SONG_STYLES[settings.style];
         if (!Object.hasOwn(SONG_STYLES, settings.style) || !Number.isInteger(bars) || bars < 1 || bars > 64
             || !Number.isInteger(bpm) || bpm < style.bpm.min || bpm > style.bpm.max
@@ -1959,6 +1960,9 @@
         // Tempo propi del tram (canvis de tempo dins la cançó): 40–240 BPM.
         if (part.bpm !== undefined && (!Number.isInteger(part.bpm) || part.bpm < 40 || part.bpm > 240)) throw new Error('Tempo de la secció no vàlid');
         const tempo = part.bpm ?? bpm;
+        // Canvi de to de la secció (modulació), en semitons: p. ex. +2 a l'última tornada.
+        if (part.transpose !== undefined && (!Number.isInteger(part.transpose) || part.transpose < -6 || part.transpose > 6)) throw new Error('Canvi de to no vàlid');
+        tonic = (tonic + (part.transpose || 0) + 12) % 12;
         // Ritme relatiu de cada instrument: mig temps (0,5), normal o doble temps (2).
         if (part.feel !== undefined && (!part.feel || typeof part.feel !== 'object' || Array.isArray(part.feel)
             || Object.entries(part.feel).some(([name, factor]) => !Object.hasOwn(SONG_INSTRUMENTS, name) || ![.5, 1, 2].includes(factor))))

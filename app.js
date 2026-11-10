@@ -138,7 +138,8 @@
     for (const s of value.sections) {
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
-        || s.start + s.bars > st.bars || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
+        || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
+        || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
@@ -207,6 +208,8 @@
       part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
       if (sec.bpm) part.bpm = sec.bpm;
+      if (sec.transpose) part.transpose = sec.transpose;
+      if (sec.groove) part.groove = { ...s.settings.groove, ...sec.groove };
       if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
@@ -996,7 +999,7 @@
       block.setAttribute('aria-label', `${sectionLabel(sec)}, compassos ${sec.start + 1} a ${endOf(sec)}. Arrossega per moure-la o reordenar-la; fletxes per allargar-la, Maj+fletxes per moure-la.`);
       const name = document.createElement('strong'); name.textContent = sectionLabel(sec);
       const count = song.clips.filter(c => c.generated && overlaps(c, sec)).length;
-      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.${sec.bpm ? ` · ♩${sec.bpm}` : ''}`;
+      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.${sec.bpm ? ` · ♩${sec.bpm}` : ''}${sec.transpose ? ` · ${sec.transpose > 0 ? '↑' : '↓'}${Math.abs(sec.transpose)}` : ''}`;
       if (sec.bpm) block.classList.add('tempo-change');
       block.append(name, info); handles(block); bindDrag(block, 'section', sec);
       block.addEventListener('keydown', event => {
@@ -1058,6 +1061,13 @@
     $('section-start-time').textContent = time(secondsAt(sec.start));
     $('section-bars').value = sec.bars; $('section-bars').max = MAX_SECTION;
     $('section-time').textContent = time(sec.bars * barSeconds(sec.bpm));
+    const keyOf = shift => `${noteNames[(song.settings.tonic + shift + 12) % 12]} ${song.settings.mode === 'major' ? 'major' : 'menor'}`;
+    fillSelect($('section-transpose'), Array.from({ length: 13 }, (_, i) => i - 6).map(t => [String(t),
+      t === 0 ? `Igual que la cançó (${keyOf(0)})` : `${t > 0 ? '+' : '−'}${Math.abs(t)} semitò${Math.abs(t) > 1 ? 'ns' : ''} · ${keyOf(t)}`]), String(sec.transpose || 0));
+    $('section-key-name').textContent = sec.transpose ? '↑ modulació' : '';
+    const drums = engine.SONG_GROOVES[song.settings.style].drums;
+    fillSelect($('section-groove'), [['inherit', `Com la cançó (${drums[song.settings.groove.drums]})`], ...drums.map((name, i) => [String(i), name])],
+      sec.groove?.drums === undefined ? 'inherit' : String(sec.groove.drums));
     $('section-bpm').value = sec.bpm ?? ''; $('section-bpm').placeholder = String(song.settings.bpm);
     $('section-bpm-hint').textContent = sec.bpm ? (sec.bpm > song.settings.bpm ? 'més ràpida que la cançó' : sec.bpm < song.settings.bpm ? 'més lenta que la cançó' : 'igual que la cançó') : `buit = ${song.settings.bpm} (cançó)`;
     const energy = sec.energy ?? TYPES[sec.type].energy;
@@ -1260,7 +1270,9 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-groove']) $(key).disabled = busy;
+    $('add-variety').disabled = busy || !ready || song.sections.length < 3;
+    $('clear-variety').hidden = !song.sections.some(s => s.bpm || s.transpose || s.groove || s.feel?.drums);
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
     $('add-section').disabled = busy || !ready;
@@ -1326,6 +1338,68 @@
   });
   $('add-section').addEventListener('click', () => addSection(song.sections.length ? song.sections.at(-1).start + song.sections.at(-1).bars : 0));
   $('section-type').addEventListener('change', event => changeSection('type', event.target.value));
+  function changeSectionValue(apply) {
+    const sec = current(); if (!sec || busy) return;
+    apply(sec); const replay = playing?.kind; stop(); save(); render();
+    if (replay === 'song' || replay === 'section') play(replay);
+  }
+  $('section-transpose').addEventListener('change', event => changeSectionValue(sec => {
+    const t = Number(event.target.value); if (t) sec.transpose = t; else delete sec.transpose;
+  }));
+  $('section-groove').addEventListener('change', event => changeSectionValue(sec => {
+    if (event.target.value === 'inherit') delete sec.groove; else sec.groove = { drums: Number(event.target.value) };
+  }));
+  // ── Varietat: canvis de tempo, de to i de ritme ────────────────────
+  function addVariety() {
+    if (busy || !song.base.generated) return;
+    if (song.sections.length < 3) { notify('Marca com a mínim tres seccions a la línia per repartir-hi els canvis.'); return; }
+    stop();
+    const base = song.settings.bpm, secs = song.sections, done = [], used = new Set();
+    const of = type => secs.filter(s => s.type === type);
+    const tempo = (sec, factor, label) => {
+      if (!sec || used.has(sec)) return false;
+      const bpm = Math.max(40, Math.min(240, Math.round(base * factor)));
+      if (bpm === base || songSecondsWith({ section: sec, sectionBpm: bpm }) > MAX_SECONDS) return false;
+      sec.bpm = bpm; used.add(sec); done.push(`${sectionLabel(sec)} a ${bpm} BPM (${label})`); return true;
+    };
+    // Idees ordenades a l'atzar; se n'apliquen 2 o 3.
+    const ideas = [
+      () => secs[0].type === 'intro' && tempo(secs[0], .75 + pick(3) * .05, 'intro lenta'),
+      () => tempo(of('bridge')[0] || of('solo')[0], .78 + pick(3) * .04, 'pont més lent'),
+      () => of('chorus').length > 1 && tempo(of('chorus').at(-1), 1.06 + pick(3) * .02, 'última tornada més ràpida'),
+      () => tempo(of('outro').at(-1), .82 + pick(3) * .04, 'final que s’alenteix'),
+      () => tempo(of('prechorus')[0], 1.04 + pick(2) * .02, 'pretornada que empeny'),
+      () => tempo(of('verse')[1], .92, 'segona estrofa més tranquil·la')
+    ].sort(() => random32() / 4294967296 - .5);
+    const wanted = 2 + pick(2);
+    for (const idea of ideas) { if (done.length >= wanted) break; idea(); }
+    // Si l'estructura no té prou seccions típiques, s'alternen les del mig.
+    for (const sec of secs.slice(1)) { if (done.length >= 2) break; tempo(sec, used.size % 2 ? 1.08 : .88, 'contrast'); }
+    // Pont a mig temps: bateria i baix a la meitat (si no ha canviat de tempo).
+    const bridge = of('bridge')[0];
+    if (bridge && !used.has(bridge)) { bridge.feel = { ...(bridge.feel || {}), drums: .5 }; done.push(`${sectionLabel(bridge)} amb la bateria a mig temps`); }
+    // Pujada de to a l'última tornada (i al final que la segueix).
+    const choruses = of('chorus'), lastChorus = choruses.at(-1);
+    if (choruses.length > 1) {
+      const up = pick(3) ? 2 : 1;
+      for (const sec of secs.filter(s => s.start >= lastChorus.start)) sec.transpose = up;
+      done.push(`última tornada ${up === 2 ? 'un to' : 'mig to'} amunt`);
+    }
+    // Un altre patró de bateria en una estrofa o en el pont.
+    const drums = engine.SONG_GROOVES[song.settings.style].drums.length;
+    const target = of('verse')[1] || bridge || of('verse')[0];
+    if (target) { target.groove = { drums: (song.settings.groove.drums + 1 + pick(drums - 1)) % drums }; done.push(`${sectionLabel(target)} amb un altre ritme de bateria`); }
+    save(); render();
+    notify(`Varietat: ${done.join('; ')}.`);
+  }
+  function clearVariety() {
+    if (busy) return;
+    stop();
+    for (const sec of song.sections) { delete sec.bpm; delete sec.transpose; delete sec.groove; if (sec.feel) { delete sec.feel.drums; if (!Object.keys(sec.feel).length) delete sec.feel; } }
+    save(); render(); notify('S’han tret els canvis de tempo, de to i de ritme de bateria.');
+  }
+  $('add-variety').addEventListener('click', addVariety);
+  $('clear-variety').addEventListener('click', clearVariety);
   $('section-bpm').addEventListener('change', event => {
     const sec = current(); if (!sec || busy) return;
     const raw = event.target.value.trim(), value = Number(raw);
