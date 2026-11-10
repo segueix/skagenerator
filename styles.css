@@ -399,3 +399,6 @@ body.recording .transport-play { background: #ef4444; }
 }
 .lyrics-info { margin: 6px 2px 0; font-size: 13px; color: color-mix(in srgb, #f472b6 70%, var(--text)); font-weight: 600; }
 .lyrics-info:empty { display: none; }
+.variety-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; padding: 12px; border-radius: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--pink) 12%, var(--surface)), color-mix(in srgb, var(--primary) 12%, var(--surface))); }
+.variety-bar > span { flex: 1 1 220px; font-size: 13px; color: var(--muted); }
+.variety-bar .text-button { margin: 0; }

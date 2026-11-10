@@ -37,6 +37,16 @@ L’instrument **«Melodia de veu (guia)»** toca una melodia pensada per ser ca
 - **Tempo per secció** (40–240 BPM, també fora del rang de l’estil): al camp «Tempo de la secció»; buit vol dir el de la cançó. Les seccions amb tempo propi porten la marca ♩ a la línia. Durada, temps de cada compàs, capçal, gravació de veu i WAV segueixen el mapa de tempo; els trams de base sola van al tempo de la cançó.
 - **Ritme per instrument**: un tempo diferent per instrument desquadraria els compassos, així que cada instrument pot anar a **mig temps (½)** o a **doble temps (×2)** respecte de la secció. Per als instruments de la base es tria a «Volums d’aquesta secció»; per als altres, a cada clip («Ritme»). A doble temps, el patró de cada compàs es toca dues vegades; a mig temps, s’estira sobre dos compassos i les notes que canvien de compàs s’ajusten al nou acord.
 
+### Varietat: perquè cada cançó soni diferent
+
+Moltes cançons s’assemblaven perquè anaven a un sol tempo, en una sola tonalitat i amb el mateix ritme de bateria de principi a final. El botó **«✦ Dona-li varietat»** (pas 2, amb tres seccions o més) hi afegeix canvis amb sentit musical:
+
+- **2 o 3 canvis de tempo** triats entre: intro lenta, pont més lent, pretornada que empeny, última tornada més ràpida, segona estrofa més tranquil·la o final que s’alenteix. Si el pont no canvia de tempo, la bateria hi va a mig temps.
+- **Pujada de to** (mig to o un to) a l’última tornada i al que la segueix.
+- **Un altre patró de bateria** a la segona estrofa o al pont.
+
+Tot es pot ajustar a cada secció («Tempo de la secció», «To de la secció», «Patró de bateria») i «Treu la varietat» ho desfà.
+
 ## Volum per seccions, diverses guitarres i efectes
 
 - **Intensitat de cada secció** (10–100 %): controla la força amb què toquen tots els instruments de la secció. Abans els metalls sonaven uns 9 dB més fluix a les estrofes de manera automàtica; ara depenen només d’aquesta intensitat.

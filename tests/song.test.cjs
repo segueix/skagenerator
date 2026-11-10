@@ -302,3 +302,12 @@ test('la melodia de veu fa una nota per síl·laba, amb respiracions i en un reg
   for (const syllables of [[0], [25], 'abc', Array(33).fill(4)]) assert.throws(() => vocal({ syllables }), /Síl·labes/);
   assert.throws(() => vocal({ register: 2 }), /Registre/);
 });
+
+test('una secció pot canviar de to (modulació) i de patró de bateria', () => {
+  const base = { ...settings, instruments: ['drums', 'bass'] };
+  const same = engine.composeSongPart(base, part('chorus')), up = engine.composeSongPart(base, { ...part('chorus'), transpose: 2 });
+  assert.equal(up.tonic, (settings.tonic + 2) % 12);
+  assert.deepEqual(up.chords.map(c => c.pcs.map(p => (p + 10) % 12)), same.chords.map(c => c.pcs));
+  assert.notDeepEqual(engine.composeSongPart(base, { ...part('verse'), groove: { drums: 3 } }).drumLine, engine.composeSongPart(base, part('verse')).drumLine);
+  for (const transpose of [7, -7, 1.5]) assert.throws(() => engine.composeSongPart(base, { ...part('chorus'), transpose }), /to/);
+});
