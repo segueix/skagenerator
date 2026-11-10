@@ -128,3 +128,10 @@ test('tres guitarres poden sonar a la mateixa secció amb sons i efectes propis'
   for (const fx of [{ guitar: { type: 'wah', drive: 1, tone: 1 } }, { bass: { type: 'fuzz', drive: 1, tone: 1 } }, { guitar: { type: 'fuzz', drive: 101, tone: 1 } }, { guitar: null }])
     assert.throws(() => engine.composeSongPart({ ...config, fx }, part), /Efecte/);
 });
+
+test('el trombó toca la seva línia tal com està composta, una octava avall', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['trombone'] }, { ...part, type: 'chorus', layers: { trombone: 3 } });
+  const notes = createPerformance(spec).events.filter(e => e.type === 'on' && (e.channel === 4 || e.channel === 13)).map(e => e.note);
+  const line = spec.lines.trombone.map(([, , pitch]) => { let low = pitch - 12; while (low > 67) low -= 12; while (low < 45) low += 12; return low; });
+  assert.deepEqual(notes, line);
+});

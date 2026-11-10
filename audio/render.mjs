@@ -12,10 +12,10 @@ export const TAIL_SECONDS = 1.5;
 // per a una mescla de banda: baix rodó, guitarra prima i brillant, metalls
 // presents. L'equalitzador de l'usuari se suma a aquesta corba.
 export const EQ_PRESETS = {
-  vocal: [-4, 2, 1],
+  vocal: [-4, 3, 2],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
-  guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-2, 2, 0], sax: [-3, 2, 1], organ: [-5, 1, 1],
+  guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-3, 3, 1], sax: [-3, 2, 1], organ: [-5, 1, 1],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
 export const SONG_GAIN = 10 ** (5.5 / 20);
