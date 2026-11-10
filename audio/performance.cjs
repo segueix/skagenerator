@@ -228,7 +228,12 @@ function createPerformance(spec) {
       const length = Math.max(.07, duration * beat - .045), accent = t % 1 === 0 || duration >= 1;
       if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0);
       else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent);
-      else if (instrument === 'sax') horn(8, pitch - 12, at + .004, length, velocity - 3, accent);
+      else if (instrument === 'sax') {
+        // El saxo toca la seva línia en el registre agut del tenor (55–74), per sobre
+        // de la segona veu i de la guitarra, perquè no quedi tapat.
+        let high = pitch; while (high > 74) high -= 12; while (high < 55) high += 12;
+        horn(8, high, at + .004, length, velocity, accent);
+      }
       else {
         // Amb línia pròpia es toca tal com està composta (una octava avall, dins del
         // registre del trombó); sense, harmonitza la melodia amb notes de l'acord.
@@ -241,7 +246,9 @@ function createPerformance(spec) {
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
   const level = { '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
-  channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume; });
+  channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume;
+    // Saxo fent de segona veu: registre més greu, necessita més volum per sentir-se.
+    if (entry.channel === 4 && entry.bank === 2 && entry.program === 66) entry.volume = 110; });
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
 }
 module.exports = { createPerformance };

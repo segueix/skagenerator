@@ -15,7 +15,7 @@ export const EQ_PRESETS = {
   vocal: [-4, 3, 2],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
-  guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-3, 3, 1], sax: [-3, 2, 1], organ: [-5, 1, 1],
+  guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
 export const SONG_GAIN = 10 ** (5.5 / 20);
@@ -140,7 +140,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // reverberació: així l'equalitzador no deixa la sala sense efecte.
     const BLOCK = 128, eqs = new Map(), dummy = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
     for (const patch of score.channels) {
-      const eq = createEqualizer(patch.instrument, score.mix[patch.instrument], sampleRate);
+      // La segona veu de vent amb saxo fa servir la corba del saxo.
+      const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, score.mix[patch.instrument], sampleRate);
       const fx = createGuitarFx(score.fx?.[patch.instrument], sampleRate);
       if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);
     }

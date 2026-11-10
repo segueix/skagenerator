@@ -146,3 +146,14 @@ test('la segona veu de vent sona amb saxo tenor gravat i el trombó és opcional
   assert(trombone.events.some(e => e.type === 'on' && e.channel === 13), 'el trombó gravat conserva l’staccato');
   assert.equal(createPerformance(sp({ trombone: 'gm' })).channels.find(p => p.channel === 4).bank, 0);
 });
+
+test('els dos saxos toquen en registres separats i amb volum suficient', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['trombone', 'sax'] }, { ...part, type: 'chorus', layers: { trombone: 3, sax: 4 } });
+  const music = createPerformance(spec), notes = c => music.events.filter(e => e.type === 'on' && e.channel === c).map(e => e.note);
+  assert(notes(8).every(n => n >= 55 && n <= 74), 'saxo: registre agut del tenor');
+  assert(notes(4).every(n => n >= 45 && n <= 67), 'segona veu: per sota');
+  const mean = list => list.reduce((a, b) => a + b) / list.length;
+  assert(mean(notes(8)) > mean(notes(4)) + 3, 'el saxo queda per sobre de la segona veu');
+  const volume = c => music.channels.find(p => p.channel === c).volume;
+  assert(volume(4) >= 100 && volume(8) >= 90);
+});
