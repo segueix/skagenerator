@@ -15,6 +15,7 @@
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const GUITARS = ['guitar', 'guitar2', 'guitar3'];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
+  const FEELS = [['1', 'Normal'], ['0.5', 'Mig temps (½)'], ['2', 'Doble temps (×2)']];
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
@@ -115,7 +116,8 @@
     for (const s of value.sections) {
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
-        || s.start + s.bars > st.bars || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
+        || s.start + s.bars > st.bars || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
+        || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
     if (!Array.isArray(value.clips) || value.clips.length > MAX_CLIPS || value.clips.some(c => !c || typeof c !== 'object')) fail('Instruments no vàlids');
@@ -127,6 +129,7 @@
       if (value.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start + c.bars && c.start < o.start + o.bars)) fail('Instruments encavalcats');
       if (c.sound !== undefined && (!GUITARS.includes(c.instrument) || !timbreOptions.guitar.some(([key]) => key === c.sound))) fail('So de guitarra no vàlid');
       if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
+      if (c.feel !== undefined && ![.5, 2].includes(c.feel)) fail('Ritme no vàlid');
       ids.add(c.id);
     }
     if (value.voice !== undefined) {
@@ -154,9 +157,10 @@
     if (options.baseOnly) return null;
     const active = s.clips.filter(c => c.generated && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
-    const layers = {}, ranges = {}, timbres = {}, fx = {};
+    const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {};
     for (const c of active) {
       if (!(c.instrument in layers)) {
+        if (c.feel) feel[c.instrument] = c.feel;
         if (c.sound && c.sound !== 'auto') timbres[c.instrument] = c.sound;
         if (c.fx && c.fx.type !== 'none') fx[c.instrument] = c.fx;
       }
@@ -164,7 +168,7 @@
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
     }
     for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
-    return { layers, ranges, timbres, fx };
+    return { layers, ranges, timbres, fx, feel };
   }
   function partFor(s, seg, options = {}) {
     const base = s.base.instruments, extra = layersFor(s, seg, options);
@@ -177,6 +181,8 @@
       const sec = seg.section, harmony = s.harmony[sec.type] || 1;
       part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
+      if (sec.bpm) part.bpm = sec.bpm;
+      if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
     part.instruments = [...base, ...Object.keys(extra?.layers || {})];
@@ -184,6 +190,7 @@
       part.layers = extra.layers; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges;
       if (Object.keys(extra.timbres).length) part.timbres = extra.timbres;
       if (Object.keys(extra.fx).length) part.fx = extra.fx;
+      if (Object.keys(extra.feel).length) part.feel = { ...(part.feel || {}), ...extra.feel };
     }
     return part;
   }
@@ -206,8 +213,40 @@
   } catch { song = newSong(); storageAvailable = false; }
   let selected = song.sections[0]?.id || null, selectedClip = null, busy = false, noticeTimer;
   const current = () => song.sections.find(s => s.id === selected) || null;
-  const barSeconds = () => 4 * 60 / song.settings.bpm;
-  const frames = bars => Math.round(bars * barSeconds() * RATE);
+  // Mapa de tempo: cada secció pot tenir el seu BPM; els trams de base sola
+  // segueixen el de la cançó. secondsAt i barAt converteixen compassos i temps.
+  const barSeconds = (bpm = song.settings.bpm) => 240 / bpm;
+  const bpmAtBar = (bar, s = song) => s.sections.find(x => bar >= x.start && bar < x.start + x.bars)?.bpm ?? s.settings.bpm;
+  function tempoMap() {
+    const starts = [0];
+    for (let b = 0; b < song.settings.bars; b++) starts.push(starts[b] + barSeconds(bpmAtBar(b)));
+    return starts;
+  }
+  function secondsAt(bar) {
+    const map = tempoMap(), last = map.length - 1;
+    if (bar <= 0) return bar * barSeconds();
+    if (bar >= last) return map[last] + (bar - last) * barSeconds();
+    const b = Math.floor(bar); return map[b] + (bar - b) * (map[b + 1] - map[b]);
+  }
+  function barAt(seconds) {
+    const map = tempoMap(), last = map.length - 1;
+    if (seconds <= 0) return seconds / barSeconds();
+    if (seconds >= map[last]) return last + (seconds - map[last]) / barSeconds();
+    let b = 0; while (map[b + 1] <= seconds) b++;
+    return b + (seconds - map[b]) / (map[b + 1] - map[b]);
+  }
+  const songSeconds = () => secondsAt(song.settings.bars);
+  function songSecondsWith({ bpm = song.settings.bpm, section = null, sectionBpm } = {}) {
+    let total = 0;
+    for (let b = 0; b < song.settings.bars; b++) {
+      const sec = song.sections.find(x => b >= x.start && b < x.start + x.bars);
+      total += barSeconds(sec === section && section ? sectionBpm ?? bpm : sec?.bpm ?? bpm);
+    }
+    return total;
+  }
+  const segBpm = seg => seg.section?.bpm ?? song.settings.bpm;
+  const segFrames = seg => Math.round(seg.bars * barSeconds(segBpm(seg)) * RATE);
+  const frameAt = bar => Math.round(secondsAt(bar) * RATE);
   const time = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
   const sectionLabel = sec => {
     const peers = song.sections.filter(s => s.type === sec.type);
@@ -258,7 +297,7 @@
       }));
     }
     status('So enregistrat · Instruments a punt');
-    return audioUtils.mixSections(parts, segs.map(seg => frames(seg.bars)));
+    return audioUtils.mixSections(parts, segs.map(segFrames));
   }
   function status(text, state = '') {
     const element = $('audio-status'); element.textContent = text;
@@ -333,11 +372,11 @@
     try {
       await unlocked;
       let data, startBar = 0, bars = song.settings.bars;
-      if (kind === 'section') { data = withVoice(await renderSpec(specFor(segmentOf(sec))), frames(sec.start)); startBar = sec.start; bars = sec.bars; }
+      if (kind === 'section') { data = withVoice(await renderSpec(specFor(segmentOf(sec))), frameAt(sec.start)); startBar = sec.start; bars = sec.bars; }
       else data = kind === 'base' ? await songAudio({ baseOnly: true }) : withVoice(await songAudio(), 0);
       if (token !== playToken) return;
       const clock = await startBuffer(data, token);
-      playing = { kind, id: sec?.id, startBar, bars, seconds: data[0].length / RATE, clock };
+      playing = { kind, id: sec?.id, startBar, bars, startSeconds: secondsAt(startBar), seconds: data[0].length / RATE, clock };
       document.body.classList.add('playing');
       runTick(token);
     } catch (error) {
@@ -350,16 +389,17 @@
   function runTick(token) {
     const tick = () => {
       if (!playing || token !== playToken) return;
-      const elapsed = Math.min(playing.seconds, playing.clock()), bar = playing.startBar + elapsed / barSeconds();
+      const elapsed = Math.min(playing.seconds, playing.clock()), bar = barAt(playing.startSeconds + elapsed);
       $('song-progress').value = elapsed / playing.seconds; $('playback-time').textContent = time(elapsed);
       $('playhead').hidden = bar > playing.startBar + playing.bars || bar < 0;
+      $('tempo-badge').textContent = `♩ ${bpmAtBar(Math.max(0, Math.floor(bar)))} BPM`;
       $('playhead').style.setProperty('--pos', String(Math.max(0, Math.min(1, bar / song.settings.bars))));
       const active = song.sections.find(s => bar >= s.start && bar < s.start + s.bars);
       $('transport-subtitle').textContent = playing.kind === 'record' ? `● Gravant · ${active ? sectionLabel(active) : 'base'}`
         : playing.kind === 'base' ? 'Escoltant · base musical'
         : `Escoltant · ${active ? sectionLabel(active) : 'base'}${playing.kind === 'section' ? ' (secció)' : ''}`;
       if (playing.kind === 'record') {
-        $('voice-live-title').textContent = bar < playing.startBar ? 'Prepara’t…' : active ? sectionLabel(active) : 'Base';
+        $('voice-live-title').textContent = bar < (playing.startBar ?? 0) ? 'Prepara’t…' : active ? sectionLabel(active) : 'Base';
         $('voice-live-lyrics').textContent = active?.lyrics || (active ? 'Sense lletra en aquesta secció.' : '');
         $('voice-meter').style.width = `${Math.min(100, Math.round(Math.sqrt(recording?.level || 0) * 140))}%`;
         if (recording) recording.level *= .85;
@@ -440,7 +480,7 @@
       if (!context || context.state !== 'running') throw new Error('El navegador no ha activat l’àudio. Torna-ho a provar.');
       const data = await songAudio();
       if (token !== playToken) { stream.getTracks().forEach(t => t.stop()); return; }
-      const ctx = context, from = frames(fromBar), lead = .35, startAt = ctx.currentTime + lead;
+      const ctx = context, from = frameAt(fromBar), lead = .35, startAt = ctx.currentTime + lead;
       const input = ctx.createMediaStreamSource(stream), silent = ctx.createGain(); silent.gain.value = 0;
       const blocks = [];
       const rec = { stream, blocks, input, silent, ctx, from, startFrame: Math.round(startAt * ctx.sampleRate), fromBar, level: 0,
@@ -456,10 +496,9 @@
       source.onended = () => { if (token === playToken) { stop(); render(); } };
       source.start(startAt, from / RATE);
       recording = rec;
-      playing = { kind: 'record', startBar: fromBar, bars: song.settings.bars - fromBar, seconds: data[0].length / RATE - from / RATE + lead,
-        clock: () => ctx.currentTime - startAt + lead };
       // El capçal comença un instant abans perquè la primera nota no sorprengui.
-      playing.startBar = fromBar - lead / barSeconds();
+      playing = { kind: 'record', startBar: fromBar, bars: song.settings.bars - fromBar, startSeconds: secondsAt(fromBar) - lead,
+        seconds: data[0].length / RATE - from / RATE + lead, clock: () => ctx.currentTime - startAt + lead };
       document.body.classList.add('playing', 'recording');
       runTick(token);
       notify(fromBar ? `Gravant des del compàs ${fromBar + 1}. Prem ■ per acabar.` : 'Gravant. Canta mentre sona la cançó i prem ■ per acabar.');
@@ -783,7 +822,7 @@
     drag.delta = Math.round(dx / drag.perBar);
     const [start, bars] = preview(drag);
     drag.element.style.left = pct(start); drag.element.style.width = pct(bars);
-    drag.element.dataset.hint = drag.mode === 'move' ? `compàs ${start + 1}` : `${bars} c. · ${time(bars * barSeconds())}`;
+    drag.element.dataset.hint = drag.mode === 'move' ? `compàs ${start + 1}` : `${bars} c. · ${time(bars * barSeconds(drag.item.bpm))}`;
   }
   function dragEnd(event) {
     if (!drag || event.pointerId !== drag.pointer) return;
@@ -861,7 +900,7 @@
     } else if (id === 'song-bpm') {
       const bpm = Number($('song-bpm').value);
       if (!Number.isInteger(bpm) || bpm < profile.bpm.min || bpm > profile.bpm.max) notify(`Per a ${profile.name.toLowerCase()}, tria un tempo entre ${profile.bpm.min} i ${profile.bpm.max} BPM.`);
-      else if (st.bars * 240 / bpm > MAX_SECONDS) notify('Amb aquest tempo la cançó superaria els 6 minuts. Escurça-la primer.');
+      else if (songSecondsWith({ bpm }) > MAX_SECONDS) notify('Amb aquest tempo la cançó superaria els 6 minuts. Escurça-la primer.');
       else st.bpm = bpm;
     } else if (id === 'song-key') {
       const [tonic, mode] = $('song-key').value.split(':'); st.tonic = Number(tonic); st.mode = mode;
@@ -907,7 +946,7 @@
     $('line').style.setProperty('--bars', total);
     const ruler = $('line-ruler'); ruler.replaceChildren();
     const step = total > 64 ? 8 : 4;
-    for (let b = 0; b < total; b += step) { const tick = span(ruler, b, step, 'tick', String(b + 1)); tick.title = time(b * barSeconds()); }
+    for (let b = 0; b < total; b += step) { const tick = span(ruler, b, step, 'tick', String(b + 1)); tick.title = time(secondsAt(b)); }
     const track = $('section-track'); track.replaceChildren(); track.classList.toggle('locked', !song.base.generated || busy);
     for (const sec of song.sections) {
       const block = document.createElement('div'); block.tabIndex = 0; block.setAttribute('role', 'button');
@@ -916,7 +955,8 @@
       block.setAttribute('aria-label', `${sectionLabel(sec)}, compassos ${sec.start + 1} a ${endOf(sec)}. Arrossega per moure-la o reordenar-la; fletxes per allargar-la, Maj+fletxes per moure-la.`);
       const name = document.createElement('strong'); name.textContent = sectionLabel(sec);
       const count = song.clips.filter(c => c.generated && overlaps(c, sec)).length;
-      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.`;
+      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.${sec.bpm ? ` · ♩${sec.bpm}` : ''}`;
+      if (sec.bpm) block.classList.add('tempo-change');
       block.append(name, info); handles(block); bindDrag(block, 'section', sec);
       block.addEventListener('keydown', event => {
         if (busy) return;
@@ -974,9 +1014,11 @@
     $('section-title').textContent = `${sectionLabel(sec)} · compassos ${sec.start + 1}–${endOf(sec)}`;
     $('section-type').value = sec.type;
     $('section-start').value = sec.start + 1; $('section-start').min = 1; $('section-start').max = song.settings.bars - sec.bars + 1;
-    $('section-start-time').textContent = time(sec.start * barSeconds());
+    $('section-start-time').textContent = time(secondsAt(sec.start));
     $('section-bars').value = sec.bars; $('section-bars').max = MAX_SECTION;
-    $('section-time').textContent = time(sec.bars * barSeconds());
+    $('section-time').textContent = time(sec.bars * barSeconds(sec.bpm));
+    $('section-bpm').value = sec.bpm ?? ''; $('section-bpm').placeholder = String(song.settings.bpm);
+    $('section-bpm-hint').textContent = sec.bpm ? (sec.bpm > song.settings.bpm ? 'més ràpida que la cançó' : sec.bpm < song.settings.bpm ? 'més lenta que la cançó' : 'igual que la cançó') : `buit = ${song.settings.bpm} (cançó)`;
     const energy = sec.energy ?? TYPES[sec.type].energy;
     $('section-energy').value = energy; $('section-energy-value').textContent = `${energy} %${sec.energy === undefined ? ' · per defecte' : ''}`;
     renderVolumes(sec);
@@ -1006,7 +1048,7 @@
       remove.setAttribute('aria-label', `Eliminar ${clipLabel(clip)}`); remove.title = 'Elimina aquest clip'; remove.disabled = busy;
       remove.addEventListener('click', () => removeClip(clip));
       item.append(number, text, generate, remove);
-      if (GUITARS.includes(clip.instrument)) item.append(clipTone(clip));
+      item.append(clipTone(clip));
       list.append(item);
     });
     const available = Object.keys(INSTRUMENTS).filter(name => !song.base.instruments.includes(name) && !clips.some(c => c.instrument === name && c.start <= sec.start && endOf(c) >= endOf(sec)));
@@ -1040,7 +1082,9 @@
       const a = document.createElement('span'), b = document.createElement('span'); a.textContent = left; b.textContent = right; hint.append(a, b);
       wrap.append(caption, input, hint); return wrap;
     };
-    box.append(
+    const feelSelect = select('RITME', FEELS, String(clip.feel ?? 1), value => changeClipTone(clip, { feel: Number(value) }));
+    if (!GUITARS.includes(clip.instrument)) { box.classList.add('only-feel'); box.append(feelSelect); return box; }
+    box.append(feelSelect,
       select('SO', timbreOptions.guitar.map(([k, v]) => [k, k === 'auto' ? 'Com la guitarra de la cançó' : v]), clip.sound || 'auto', value => changeClipTone(clip, { sound: value })),
       select('EFECTE', Object.entries(engine.GUITAR_FX), fx.type, value => changeClipTone(clip, { fx: { ...fx, type: value } })),
       slider('GUANY', 'drive', 'Poc', 'Molt'), slider('TO', 'tone', 'Fosc', 'Brillant'));
@@ -1049,6 +1093,7 @@
   function changeClipTone(clip, change) {
     if (busy) return;
     if ('sound' in change) { if (change.sound === 'auto') delete clip.sound; else clip.sound = change.sound; }
+    if ('feel' in change) { if (change.feel === 1) delete clip.feel; else clip.feel = change.feel; }
     if ('fx' in change) { if (change.fx.type === 'none' && change.fx.drive === 50 && change.fx.tone === 50) delete clip.fx; else clip.fx = change.fx; }
     const replay = playing?.kind; stop(); save(); render();
     if (replay === 'song' || replay === 'section') play(replay);
@@ -1066,7 +1111,21 @@
       const output = document.createElement('output'); output.textContent = `${value > 0 ? '+' : ''}${value} dB`;
       input.addEventListener('input', () => { const v = Number(input.value); output.textContent = `${v > 0 ? '+' : ''}${v} dB`; });
       input.addEventListener('change', () => changeEq(sec, name, 'volume', Number(input.value)));
-      row.append(label, input, output); list.append(row);
+      row.append(label, input, output);
+      if (song.base.instruments.includes(name)) {
+        const feel = document.createElement('select'); feel.className = 'feel-select'; feel.disabled = busy;
+        feel.setAttribute('aria-label', `Ritme de ${label.textContent} en aquesta secció`);
+        fillSelect(feel, FEELS, String(sec.feel?.[name] ?? 1));
+        feel.addEventListener('change', () => {
+          const value = Number(feel.value), next = { ...(sec.feel || {}) };
+          if (value === 1) delete next[name]; else next[name] = value;
+          if (Object.keys(next).length) sec.feel = next; else delete sec.feel;
+          const replay = playing?.kind; stop(); save(); render();
+          if (replay === 'song' || replay === 'section') play(replay);
+        });
+        row.append(feel); row.classList.add('with-feel');
+      }
+      list.append(row);
     }
   }
   // ── Equalitzadors ──────────────────────────────────────────────────
@@ -1125,7 +1184,7 @@
     renderEq($('song-eq'), null);
     if (current()) renderEq($('section-eq'), current());
     const generatedLayers = song.clips.filter(c => c.generated).length;
-    const total = song.settings.bars * barSeconds();
+    const total = songSeconds();
     $('song-time').textContent = time(total);
     $('duration-total').textContent = `${song.settings.bars} compassos · ${time(total)} · ${song.sections.length} seccions`;
     $('base-state').textContent = busy ? 'Preparant el so…' : song.base.generated ? 'Generada ✓' : 'Pendent de generar';
@@ -1134,6 +1193,9 @@
     $('base-chords').textContent = song.base.generated ? `Acords de la base: ${chordsOf(segmentsOf({ ...song, sections: [] })[0])}` : '';
     $('play-base').textContent = playing?.kind === 'base' ? '■ Atura la base' : '▷ Escolta la base';
     $('transport-title').textContent = song.title || 'Nova cançó';
+    const changes = song.sections.some(x => x.bpm && x.bpm !== song.settings.bpm);
+    if (!playing) $('tempo-badge').textContent = `♩ ${song.settings.bpm} BPM${changes ? ' · amb canvis' : ''}`;
+    $('tempo-badge').title = changes ? 'La cançó té seccions amb un tempo propi' : 'Tempo de la cançó';
     $('ready-count').textContent = song.base.generated ? `Base ✓ · ${song.sections.length} seccions · ${generatedLayers} instruments generats` : 'Genera la base per començar';
     if (!playing) {
       $('transport-subtitle').textContent = !song.base.generated ? 'Comença generant la base' : generatedLayers ? 'Escolta com creix la cançó' : 'Marca seccions i afegeix-hi instruments';
@@ -1142,7 +1204,7 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm']) $(key).disabled = busy;
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
     $('add-section').disabled = busy || !ready;
@@ -1208,6 +1270,17 @@
   });
   $('add-section').addEventListener('click', () => addSection(song.sections.length ? song.sections.at(-1).start + song.sections.at(-1).bars : 0));
   $('section-type').addEventListener('change', event => changeSection('type', event.target.value));
+  $('section-bpm').addEventListener('change', event => {
+    const sec = current(); if (!sec || busy) return;
+    const raw = event.target.value.trim(), value = Number(raw);
+    if (raw === '' || value === song.settings.bpm) delete sec.bpm;
+    else if (!Number.isInteger(value) || value < 40 || value > 240) { notify('El tempo d’una secció pot anar de 40 a 240 BPM.'); render(); return; }
+    else if (songSecondsWith({ section: sec, sectionBpm: value }) > MAX_SECONDS) { notify('Amb aquest tempo la cançó superaria els 6 minuts.'); render(); return; }
+    else sec.bpm = value;
+    const replay = playing?.kind; stop(); save(); render();
+    notify(sec.bpm ? `${sectionLabel(sec)} a ${sec.bpm} BPM; la resta de la cançó continua a ${song.settings.bpm}.` : `${sectionLabel(sec)} torna al tempo de la cançó (${song.settings.bpm} BPM).`);
+    if (replay === 'song' || replay === 'section') play(replay);
+  });
   $('section-energy').addEventListener('input', event => { $('section-energy-value').textContent = `${event.target.value} %`; });
   $('section-energy').addEventListener('change', event => {
     const sec = current(); if (!sec || busy) return;

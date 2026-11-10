@@ -21,6 +21,12 @@ La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro
 
 Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
 
+## Canvis de tempo i ritme per instrument
+
+- **El tempo de la cançó es veu sempre** a l’etiqueta ♩ del reproductor (a escriptori i al mòbil). Mentre sona, mostra el tempo de la secció que s’està escoltant; si alguna secció en té un de propi, hi diu «amb canvis».
+- **Tempo per secció** (40–240 BPM, també fora del rang de l’estil): al camp «Tempo de la secció»; buit vol dir el de la cançó. Les seccions amb tempo propi porten la marca ♩ a la línia. Durada, temps de cada compàs, capçal, gravació de veu i WAV segueixen el mapa de tempo; els trams de base sola van al tempo de la cançó.
+- **Ritme per instrument**: un tempo diferent per instrument desquadraria els compassos, així que cada instrument pot anar a **mig temps (½)** o a **doble temps (×2)** respecte de la secció. Per als instruments de la base es tria a «Volums d’aquesta secció»; per als altres, a cada clip («Ritme»). A doble temps, el patró de cada compàs es toca dues vegades; a mig temps, s’estira sobre dos compassos i les notes que canvien de compàs s’ajusten al nou acord.
+
 ## Volum per seccions, diverses guitarres i efectes
 
 - **Intensitat de cada secció** (10–100 %): controla la força amb què toquen tots els instruments de la secció. Abans els metalls sonaven uns 9 dB més fluix a les estrofes de manera automàtica; ara depenen només d’aquesta intensitat.

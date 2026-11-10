@@ -1886,6 +1886,13 @@
         if (!Object.hasOwn(SONG_STYLES, settings.style) || !Number.isInteger(bars) || bars < 1 || bars > 64
             || !Number.isInteger(bpm) || bpm < style.bpm.min || bpm > style.bpm.max
             || !style.keys.some(([key, mode]) => key === tonic && mode === settings.mode)) throw new Error('Configuració musical no vàlida per a aquest estil');
+        // Tempo propi del tram (canvis de tempo dins la cançó): 40–240 BPM.
+        if (part.bpm !== undefined && (!Number.isInteger(part.bpm) || part.bpm < 40 || part.bpm > 240)) throw new Error('Tempo de la secció no vàlid');
+        const tempo = part.bpm ?? bpm;
+        // Ritme relatiu de cada instrument: mig temps (0,5), normal o doble temps (2).
+        if (part.feel !== undefined && (!part.feel || typeof part.feel !== 'object' || Array.isArray(part.feel)
+            || Object.entries(part.feel).some(([name, factor]) => !Object.hasOwn(SONG_INSTRUMENTS, name) || ![.5, 1, 2].includes(factor))))
+            throw new Error('Ritme d’instrument no vàlid');
         const instruments = part.instruments === undefined ? (settings.instruments === undefined ? style.instruments : settings.instruments) : part.instruments;
         if (!Array.isArray(instruments) || !instruments.length || new Set(instruments).size !== instruments.length
             || instruments.some(instrument => !Object.hasOwn(SONG_INSTRUMENTS, instrument))) throw new Error('Selecciona instruments vàlids');
@@ -2011,13 +2018,14 @@
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
         }
-        return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
-            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
+        return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo,
+            seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             ranges: JSON.parse(JSON.stringify(ranges)),
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: { ...(settings.mix || {}), ...(part.mix || {}) },
-            fx: { ...(settings.fx || {}), ...(part.fx || {}) } };
+            fx: { ...(settings.fx || {}), ...(part.fx || {}) },
+            feel: { ...(part.feel || {}) } };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;

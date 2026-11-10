@@ -6,7 +6,7 @@ function rng(seed) {
 }
 function createPerformance(spec) {
   if (!spec || !['ska', 'punk', 'urban'].includes(spec.style) || !Number.isFinite(spec.beat) || spec.beat <= 0
-    || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 180 || !Array.isArray(spec.chords)
+    || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 400 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
     || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ', 'guitar2', 'guitar3'].includes(i))) throw new Error('Partitura no vàlida');
   // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
@@ -56,8 +56,29 @@ function createPerformance(spec) {
     const at = start / bar + 1e-6;
     return list.some(([from, to]) => at >= from && at < to);
   }
+  // Ritme relatiu de cada instrument respecte del tempo de la secció.
+  //  ×2 (doble temps): el patró de cada compàs es toca dues vegades, el doble de ràpid.
+  //  ½ (mig temps): el patró de cada parell de compassos s'estira sobre tots dos; les
+  //  notes que cauen al compàs següent s'ajusten al seu acord.
+  if (spec.feel !== undefined && (!spec.feel || typeof spec.feel !== 'object' || Object.values(spec.feel).some(f => ![.5, 1, 2].includes(f))))
+    throw new Error('Ritme no vàlid');
+  function feel(channel, start, duration, pitch) {
+    const factor = spec.feel?.[instrumentOf[channel]] ?? 1;
+    if (factor === 1) return [[start, duration, pitch]];
+    const abs = start / beat + 1e-9, index = Math.floor(abs / 4), within = abs - index * 4;
+    if (factor === 2) return [0, 2].map(offset => [(index * 4 + within / 2 + offset) * beat, duration / 2, pitch]);
+    if (index % 2) return [];
+    const target = index * 4 + within * 2, destination = Math.floor(target / 4 + 1e-9);
+    let moved = pitch;
+    if (pitch !== undefined && channel !== 9 && channel !== 10 && destination !== index && spec.chords[destination])
+      moved = nearest(pitch, spec.chords[destination].pcs, pitch - 3, pitch + 3); // en una tríada sempre n'hi ha una a ±3
+    return [[target * beat, duration * 2, moved]];
+  }
   function note(channel, pitch, start, duration, velocity, jitter = .004, exact = false) {
-    if (!audible(channel, start)) return;
+    for (const [at, length, tone] of feel(channel, start, duration, pitch)) play(channel, tone, at, length, velocity, jitter, exact);
+  }
+  function play(channel, pitch, start, duration, velocity, jitter, exact) {
+    if (start >= spec.seconds || !audible(channel, start)) return;
     const at = Math.max(0, Math.min(spec.seconds - .02, start + (random() - .5) * jitter));
     const end = Math.min(spec.seconds - .005, at + Math.max(.025, duration));
     const midi = Math.max(0, Math.min(127, Math.round(pitch)));
@@ -65,10 +86,10 @@ function createPerformance(spec) {
     events.push({ time: at, type: 'on', channel, note: midi, velocity: vel });
     events.push({ time: end, type: 'off', channel, note: midi });
   }
-  const control = (channel, time, controller, value) =>
-    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, time)), type: 'cc', channel, controller, value: Math.round(Math.max(0, Math.min(127, value))) });
-  const bend = (channel, time, value) =>
-    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, time)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) });
+  const control = (channel, time, controller, value) => { for (const [at] of feel(channel, time, 0)) if (at < spec.seconds)
+    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'cc', channel, controller, value: Math.round(Math.max(0, Math.min(127, value))) }); };
+  const bend = (channel, time, value) => { for (const [at] of feel(channel, time, 0)) if (at < spec.seconds)
+    events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) }); };
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
   function horn(channel, pitch, start, duration, velocity, accent) {

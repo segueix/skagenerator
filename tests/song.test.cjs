@@ -242,3 +242,34 @@ test('un instrument pot sonar només en una part del tram (clips que travessen s
   for (const ranges of [{ trumpet: [[3, 3]] }, { trumpet: [[0, 9]] }, { trumpet: [] }, { piano: [[0, 1]] }, { trumpet: [[-1, 2]] }, { trumpet: [1, 2] }])
     assert.throws(() => engine.composeSongPart(base, part(ranges)), /Trams/);
 });
+
+test('una secció pot tenir el seu propi tempo', () => {
+  const base = { ...settings, instruments: ['drums', 'bass'] };
+  const normal = engine.composeSongPart(base, part('verse', 8)), slow = engine.composeSongPart(base, { ...part('verse', 8), bpm: 90 });
+  assert.equal(normal.beat, 60 / settings.bpm); assert.equal(slow.beat, 60 / 90);
+  assert.equal(slow.seconds, 8 * 4 * 60 / 90);
+  assert.deepEqual(slow.chords, normal.chords, 'el tempo no canvia la composició');
+  // Fora del rang de l'estil però dins de 40–240: un pont lent en ska.
+  assert.doesNotThrow(() => engine.composeSongPart(base, { ...part('bridge'), bpm: 60 }));
+  for (const bpm of [39, 241, 100.5, '120']) assert.throws(() => engine.composeSongPart(base, { ...part('verse'), bpm }), /Tempo/);
+});
+
+test('cada instrument pot anar a mig temps o a doble temps dins la secció', () => {
+  const performance = require('../audio/performance.cjs');
+  const cfg = { ...settings, instruments: ['drums', 'bass', 'trumpet'] };
+  const spec = feel => engine.composeSongPart(cfg, { ...part('verse', 4), layers: { trumpet: 2 }, ...(feel ? { feel } : {}) });
+  const notes = (s, channel) => performance.createPerformance(s).events.filter(e => e.type === 'on' && e.channel === channel);
+  const normal = spec(), double = spec({ drums: 2 }), half = spec({ drums: .5, bass: .5 });
+  const kicks = s => notes(s, 9).filter(e => e.note === 36).length;
+  assert(kicks(double) > kicks(normal) * 1.6, 'doble temps: el doble de cops');
+  assert(kicks(half) < kicks(normal) * .7, 'mig temps: la meitat de cops');
+  assert(notes(half, 9).every(e => e.time < half.seconds));
+  assert.deepEqual(notes(double, 3).map(e => e.note), notes(normal, 3).map(e => e.note), 'la trompeta no canvia');
+  // A mig temps, les notes del baix que cauen en un altre compàs s'ajusten al seu acord.
+  const bar = half.beat * 4;
+  const barOf = e => Math.floor(e.time / bar + .01); // tolera el petit desplaçament humà
+  const moved = notes(half, 2).filter(e => barOf(e) % 2 === 1);
+  assert(moved.length > 0);
+  for (const e of moved) assert(half.chords[barOf(e)].pcs.includes(e.note % 12), `nota ${e.note} fora de l’acord`);
+  for (const feel of [{ drums: 3 }, { drums: 0 }, { piano: 2 }, []]) assert.throws(() => spec(feel), /Ritme/);
+});
