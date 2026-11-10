@@ -178,3 +178,20 @@ test('els efectes de guitarra distorsionen sense canviar el volum', async () => 
   const dirty = rms(await renderSampledPart(bank, sp({ guitar: { type: 'metal', drive: 90, tone: 50 } }), 22050, { raw: true }));
   assert(Math.abs(20 * Math.log10(dirty / clean)) < 2, `${(20 * Math.log10(dirty / clean)).toFixed(1)} dB`);
 });
+
+test('el trombó i el clarinet gravats sonen de seguida (atac curt) per a les notes curtes', () => {
+  const env = data => { const w = 320, out = []; for (let s = 0; s + w < data.length; s += w) { let e = 0; for (let i = s; i < s + w; i++) e += data[i] * data[i]; out.push(Math.sqrt(e / w)); } return out; };
+  for (const [bankMSB, program] of [[2, 56], [2, 57], [2, 71]]) {
+    const preset = bank.presets.find(p => p.bankMSB === bankMSB && p.program === program), times = [];
+    for (const sample of new Set(preset.zones[0].instrument.zones.map(z => z.sample))) {
+      const e = env(sample.getAudioData()), max = Math.max(...e.slice(0, 150));
+      times.push(e.findIndex(v => v >= max * .7) * 10);
+    }
+    times.sort((a, b) => a - b);
+    assert(times[times.length >> 1] <= 60, `${bankMSB}:${program} atac mediana ${times[times.length >> 1]} ms`);
+  }
+  // L'staccato del trombó no té forats de més de 2 semitons.
+  const stac = bank.presets.find(p => p.bankMSB === 3 && p.program === 57);
+  const keys = [...new Set(stac.zones[0].instrument.zones.map(z => z.sample.originalKey))].sort((a, b) => a - b);
+  for (let k = 40; k <= 65; k++) assert(Math.min(...keys.map(n => Math.abs(n - k))) <= 2, `nota ${k}`);
+});

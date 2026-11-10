@@ -227,13 +227,18 @@ function createPerformance(spec) {
       if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0);
       else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent);
       else if (instrument === 'sax') horn(8, pitch - 12, at + .004, length, velocity - 3, accent);
-      else horn(4, nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length * .94, velocity - 5, accent);
+      else {
+        // Amb línia pròpia es toca tal com està composta (una octava avall, dins del
+        // registre del trombó); sense, harmonitza la melodia amb notes de l'acord.
+        let low = pitch - 12; while (low > 67) low -= 12; while (low < 45) low += 12;
+        horn(4, own ? low : nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length * .94, velocity - 5, accent);
+      }
     }
   }
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
-  const level = { '2:71': 112, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
+  const level = { '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume; });
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
 }

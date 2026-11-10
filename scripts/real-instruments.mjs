@@ -101,6 +101,18 @@ export function resample(input, from, to) {
   return output;
 }
 // Treu el silenci inicial i retalla la cua amb una baixada suau.
+// Atac immediat: algunes gravacions (clarinet, trombó) triguen fins a mig segon
+// a sonar plenes i les notes curtes quedaven apagades. La mostra comença just
+// abans del punt on arriba al 62 % del nivell màxim, amb una entrada de 8 ms.
+function tightenAttack(data, rate) {
+  const size = Math.round(rate * .005), limit = Math.min(data.length, Math.round(rate * .8)), levels = [];
+  for (let s = 0; s + size <= limit; s += size) { let e = 0; for (let i = s; i < s + size; i++) e += data[i] * data[i]; levels.push(Math.sqrt(e / size)); }
+  const max = Math.max(...levels); if (!max) return data;
+  const start = Math.max(0, levels.findIndex(v => v >= max * .62) * size - Math.round(rate * .006));
+  const out = data.slice(start), fade = Math.round(rate * .008);
+  for (let i = 0; i < Math.min(fade, out.length); i++) out[i] *= i / fade;
+  return out;
+}
 function trim(data, rate, maxSeconds, keepFrom = 0) {
   let peak = 0; for (const x of data) peak = Math.max(peak, Math.abs(x));
   let start = keepFrom;
@@ -158,7 +170,18 @@ function level(data, rate, targetDb) {
 const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
 async function buildVsco(bank, config, log) {
   for (const spec of config.instruments) {
-    const files = config.files.filter(file => file.startsWith(spec.match));
+    const parse = file => { const m = file.match(/_([A-G]#?)(-?\d)_v(\d)/); return m && { named: (Number(m[2]) + 2) * 12 + NOTE[m[1]], layer: Number(m[3]) }; };
+    let files = config.files.filter(file => file.startsWith(spec.match));
+    // Forats de l'staccato: les notes a més de 2 semitons d'una gravació
+    // staccato fan servir la sostinguda (retallada i amb atac immediat).
+    const fills = new Set();
+    if (spec.fill) {
+      const own = files.map(parse).filter(Boolean).map(x => x.named);
+      for (const file of config.files.filter(f => f.startsWith(spec.fill))) {
+        const info = parse(file);
+        if (info && Math.min(...own.map(n => Math.abs(n - info.named))) > 2) { files.push(file); fills.add(file); }
+      }
+    }
     const loaded = [];
     for (const file of files) {
       const match = file.match(/_([A-G]#?)(-?\d)_v(\d)/);
@@ -167,7 +190,8 @@ async function buildVsco(bank, config, log) {
       const named = (Number(match[2]) + 2) * 12 + NOTE[match[1]];
       const path = await download(config.base + file.split('/').map(encodeURIComponent).join('/'));
       const wav = readWav(await readFile(path));
-      const data = trim(resample(wav.data, wav.rate, RATE), RATE, spec.maxSeconds);
+      const sampled = resample(wav.data, wav.rate, RATE);
+      const data = trim(spec.tightAttack || fills.has(file) ? tightenAttack(sampled, RATE) : sampled, RATE, spec.maxSeconds);
       const measured = detectMidi(data, RATE);
       const cents = measured !== null && Math.abs(measured - named) < .5 ? -Math.round((measured - named) * 100) : 0;
       loaded.push({ named, layer: Number(match[3]), data, cents });
