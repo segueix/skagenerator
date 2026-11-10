@@ -23,21 +23,38 @@
     if (ready) return ready;
     ready = (async () => {
       progress?.({ stage: 'loading', value: 0 });
-      const response = await fetch(bankURL, { cache: 'force-cache', signal: typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(60000) : undefined });
-      if (!response.ok) throw new Error('No s’han pogut carregar els instruments. Comprova la connexió i torna-ho a provar.');
-      const bytes = Number(response.headers.get('content-length'));
+      // El banc fa uns 30 MB: el temps d'espera només salta si la descàrrega
+      // s'atura, no pel temps total (al mòbil pot passar d'un minut).
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      let idle;
+      const watchdog = () => { clearTimeout(idle); idle = setTimeout(() => controller?.abort(), 45000); };
+      const get = cache => { watchdog(); return fetch(bankURL, { cache, signal: controller?.signal }); };
       let buffer;
-      if (response.body?.getReader) {
-        const reader = response.body.getReader(), chunks = []; let total = 0;
-        while (true) {
-          const { done, value } = await reader.read(); if (done) break;
-          chunks.push(value); total += value.length;
-          progress?.({ stage: 'loading', value: bytes ? Math.min(.99, total / bytes) : null });
-        }
-        const joined = new Uint8Array(total); let offset = 0;
-        for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.length; }
-        buffer = joined.buffer;
-      } else buffer = await response.arrayBuffer();
+      try {
+        // Si el navegador havia desat un error (p. ex. durant una publicació),
+        // es torna a demanar el fitxer sense fer servir la memòria cau.
+        let response = await get('force-cache');
+        if (!response.ok) response = await get('reload');
+        if (!response.ok) throw new Error(response.status === 404
+          ? 'La web publicada no té el banc d’instruments (error 404). Si s’acaba de publicar, espera un parell de minuts i torna-ho a provar.'
+          : `No s’han pogut carregar els instruments (error ${response.status}). Torna-ho a provar.`);
+        const bytes = Number(response.headers.get('content-length'));
+        if (response.body?.getReader) {
+          const reader = response.body.getReader(), chunks = []; let total = 0;
+          while (true) {
+            const { done, value } = await reader.read(); if (done) break;
+            watchdog(); chunks.push(value); total += value.length;
+            progress?.({ stage: 'loading', value: bytes ? Math.min(.99, total / bytes) : null });
+          }
+          const joined = new Uint8Array(total); let offset = 0;
+          for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.length; }
+          buffer = joined.buffer;
+        } else buffer = await response.arrayBuffer();
+      } catch (error) {
+        if (error?.name === 'AbortError') throw new Error('La descàrrega dels instruments s’ha aturat. Comprova la connexió i torna-ho a provar.');
+        if (error instanceof TypeError) throw new Error('No s’han pogut carregar els instruments. Comprova la connexió i torna-ho a provar.');
+        throw error;
+      } finally { clearTimeout(idle); }
       worker = new Worker(workerURL);
       worker.onmessage = ({ data }) => {
         const request = requests.get(data.id); if (!request) return;
