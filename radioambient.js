@@ -1862,7 +1862,7 @@
         if (!Object.hasOwn(SONG_PARTS, part.type)) throw new Error('Tipus de secció desconegut');
         const bars = Number(part.bars), bpm = Number(settings.bpm), tonic = Number(settings.tonic);
         const style = SONG_STYLES[settings.style];
-        if (!Object.hasOwn(SONG_STYLES, settings.style) || ![4, 8, 12, 16].includes(bars)
+        if (!Object.hasOwn(SONG_STYLES, settings.style) || !Number.isInteger(bars) || bars < 1 || bars > 64
             || !Number.isInteger(bpm) || bpm < style.bpm.min || bpm > style.bpm.max
             || !style.keys.some(([key, mode]) => key === tonic && mode === settings.mode)) throw new Error('Configuració musical no vàlida per a aquest estil');
         const instruments = part.instruments === undefined ? (settings.instruments === undefined ? style.instruments : settings.instruments) : part.instruments;
@@ -1915,9 +1915,33 @@
             ];
             rhythms = patterns[variation];
         }
-        const phrase = composePhrase(r, ctx, [0, 1, 2, 3], rhythms).notes;
-        const melody = [];
-        for (let b = 0; b < bars; b += 4) phrase.forEach(n => melody.push([n[0] + b, n[1], n[2], n[3]]));
+        // Les seccions curtes (menys de quatre compassos) fan servir només una part de la frase.
+        const phraseBars = [0, 1, 2, 3].slice(0, Math.min(4, bars));
+        const repeat = notes => {
+            const out = [];
+            for (let b = 0; b < bars; b += 4) notes.forEach(n => { if (n[0] + b < bars) out.push([n[0] + b, n[1], n[2], n[3]]); });
+            return out;
+        };
+        const melody = repeat(composePhrase(r, ctx, phraseBars, rhythms).notes);
+        // Capes: cada instrument afegit a una secció té la seva pròpia versió.
+        // Els melòdics reben una frase pròpia sobre els mateixos acords; els
+        // rítmics i d'acompanyament, un patró propi.
+        const layers = part.layers === undefined ? {} : part.layers;
+        if (!layers || typeof layers !== 'object' || Array.isArray(layers)
+            || Object.entries(layers).some(([name, rev]) => !Object.hasOwn(SONG_INSTRUMENTS, name) || !Number.isInteger(rev) || rev < 1 || rev > 1000000))
+            throw new Error('Capes d’instruments no vàlides');
+        const lines = {}, layerIndex = {};
+        const rhythmPool = [RHYTHMS.r1, RHYTHMS.r2, RHYTHMS.r3, RHYTHMS.r4, RHYTHMS.r5, RHYTHMS.r6, RHYTHMS.r7, RHYTHMS.r9];
+        Object.keys(layers).forEach(name => {
+            const rev = layers[name], salt = name.split('').reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+            layerIndex[name] = (rev - 1) % 5;
+            if (!['trumpet', 'trombone', 'synthLead'].includes(name)) return;
+            const lr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
+            const lctx = { ...ctx, prev: nearestTone(name === 'trombone' ? 67 : 72, chords[0].pcs, 64, 79) };
+            const lrhythms = phraseBars.map(() => rhythmPool[Math.floor(lr() * rhythmPool.length)]);
+            if (name === 'synthLead' && lr() < .5) lrhythms[lrhythms.length - 1] = RHYTHMS.r7;
+            lines[name] = repeat(composePhrase(lr, lctx, phraseBars, lrhythms).notes);
+        });
         // El baix té un riff propi per a cada alternativa; una única partitura
         // alimenta tant el motor de mostres com el sintetitzador de reserva.
         const bassPatterns = settings.style === 'urban' ? [
@@ -1959,7 +1983,7 @@
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
         }
         return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
-            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation, groove,
+            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) } };
     }

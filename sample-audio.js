@@ -23,7 +23,7 @@
     if (ready) return ready;
     ready = (async () => {
       progress?.({ stage: 'loading', value: 0 });
-      const response = await fetch(bankURL, { cache: 'force-cache', signal: AbortSignal.timeout(60000) });
+      const response = await fetch(bankURL, { cache: 'force-cache', signal: typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(60000) : undefined });
       if (!response.ok) throw new Error('No s’han pogut carregar els instruments. Comprova la connexió i torna-ho a provar.');
       const bytes = Number(response.headers.get('content-length'));
       let buffer;
