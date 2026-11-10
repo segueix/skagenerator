@@ -78,12 +78,17 @@
           <label><span class="field-label">TIPUS DE SECCIÓ</span><select id="section-type"></select></label>
           <label><span class="field-label">COMENÇA AL COMPÀS <span id="section-start-time"></span></span><input id="section-start" type="number" min="1" step="1" aria-label="Compàs on comença la secció"></label>
           <label><span class="field-label">DURADA <span id="section-time"></span></span><div class="tempo-control"><input id="section-bars" type="number" min="1" max="32" step="1" aria-label="Durada de la secció en compassos"><span>COMPASSOS</span></div></label>
+          <label class="energy-field"><span class="field-label">INTENSITAT <output id="section-energy-value">55 %</output></span><input id="section-energy" type="range" min="10" max="100" step="5" aria-label="Intensitat de la secció"><small class="slider-hint"><span>Suau</span><span>Força de tots els instruments</span><span>Enèrgica</span></small></label>
         </div>
         <p class="chords-line"><span id="section-chords" class="chords"></span><button type="button" id="section-reharmonize" class="text-button">↻ Altres acords</button></p>
         <div class="layer-panel">
           <div class="layer-heading"><strong>INSTRUMENTS QUE SONEN EN AQUESTA SECCIÓ</strong><span>A més de la base · un a un</span></div>
           <ol id="layer-list" class="layer-list"></ol>
           <div class="add-layer"><select id="layer-instrument" aria-label="Instrument per afegir"></select><button type="button" id="add-layer" class="button">＋ Afegeix l’instrument</button><button type="button" id="copy-previous" class="text-button" hidden>⇢ Allarga fins aquí els instruments de la secció anterior</button></div>
+        </div>
+        <div class="section-volumes">
+          <div class="layer-heading"><strong>VOLUMS D’AQUESTA SECCIÓ</strong><span>dB respecte de la cançó · 0 = igual</span></div>
+          <div id="section-volumes" class="volume-list"></div>
         </div>
         <details class="eq-panel" id="section-eq-panel"><summary>Equalitzador d’aquesta secció <span>per instrument i per a la secció sencera</span></summary>
           <p class="eq-help">Per defecte cada fila segueix l’equalitzador de la cançó. En moure’n un control, aquella fila passa a ser pròpia d’aquesta secció.</p>

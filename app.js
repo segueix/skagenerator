@@ -10,9 +10,11 @@
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
   // Colors vius que funcionen en mode clar i fosc (la interfície els barreja amb el fons).
   const colors = { intro: '#14b8a6', verse: '#8b5cf6', prechorus: '#f97316', chorus: '#ec4899', bridge: '#3b82f6', solo: '#84cc16', outro: '#10b981' };
-  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e' };
+  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e', guitar2: '#84cc16', guitar3: '#10b981' };
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
+  const GUITARS = ['guitar', 'guitar2', 'guitar3'];
+  const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
@@ -113,7 +115,7 @@
     for (const s of value.sections) {
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
-        || s.start + s.bars > st.bars || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
+        || s.start + s.bars > st.bars || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
     if (!Array.isArray(value.clips) || value.clips.length > MAX_CLIPS || value.clips.some(c => !c || typeof c !== 'object')) fail('Instruments no vàlids');
@@ -123,6 +125,8 @@
         || base.instruments.includes(c.instrument) || !Number.isInteger(c.start) || !Number.isInteger(c.bars) || c.start < 0 || c.bars < 1
         || c.start + c.bars > st.bars || !Number.isInteger(c.revision) || c.revision < 1 || c.revision > MAX_REV || typeof c.generated !== 'boolean') fail('Instrument no vàlid');
       if (value.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start + c.bars && c.start < o.start + o.bars)) fail('Instruments encavalcats');
+      if (c.sound !== undefined && (!GUITARS.includes(c.instrument) || !timbreOptions.guitar.some(([key]) => key === c.sound))) fail('So de guitarra no vàlid');
+      if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
       ids.add(c.id);
     }
     if (value.voice !== undefined) {
@@ -150,13 +154,17 @@
     if (options.baseOnly) return null;
     const active = s.clips.filter(c => c.generated && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
-    const layers = {}, ranges = {};
+    const layers = {}, ranges = {}, timbres = {}, fx = {};
     for (const c of active) {
+      if (!(c.instrument in layers)) {
+        if (c.sound && c.sound !== 'auto') timbres[c.instrument] = c.sound;
+        if (c.fx && c.fx.type !== 'none') fx[c.instrument] = c.fx;
+      }
       layers[c.instrument] ??= c.revision;
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
     }
     for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
-    return { layers, ranges };
+    return { layers, ranges, timbres, fx };
   }
   function partFor(s, seg, options = {}) {
     const base = s.base.instruments, extra = layersFor(s, seg, options);
@@ -167,12 +175,16 @@
       part = { type: last ? 'outro' : 'verse', bars: seg.bars, energy: last ? 40 : 55, revision: s.base.revision, groove: s.settings.groove };
     } else {
       const sec = seg.section, harmony = s.harmony[sec.type] || 1;
-      part = { type: sec.type, bars: sec.bars, energy: TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
+      part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
     part.instruments = [...base, ...Object.keys(extra?.layers || {})];
-    if (extra) { part.layers = extra.layers; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges; }
+    if (extra) {
+      part.layers = extra.layers; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges;
+      if (Object.keys(extra.timbres).length) part.timbres = extra.timbres;
+      if (Object.keys(extra.fx).length) part.fx = extra.fx;
+    }
     return part;
   }
   const specFor = (seg, options) => engine.composeSongPart(song.settings, partFor(song, seg, options));
@@ -965,6 +977,9 @@
     $('section-start-time').textContent = time(sec.start * barSeconds());
     $('section-bars').value = sec.bars; $('section-bars').max = MAX_SECTION;
     $('section-time').textContent = time(sec.bars * barSeconds());
+    const energy = sec.energy ?? TYPES[sec.type].energy;
+    $('section-energy').value = energy; $('section-energy-value').textContent = `${energy} %${sec.energy === undefined ? ' · per defecte' : ''}`;
+    renderVolumes(sec);
     $('section-chords').textContent = `Acords: ${chordsOf(seg)}`;
     $('section-reharmonize').textContent = song.sections.filter(s => s.type === sec.type).length > 1 ? `↻ Altres acords per a totes ${plurals[sec.type]}` : '↻ Altres acords';
     $('section-lyrics').value = sec.lyrics;
@@ -990,7 +1005,9 @@
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-button'; remove.textContent = '×';
       remove.setAttribute('aria-label', `Eliminar ${clipLabel(clip)}`); remove.title = 'Elimina aquest clip'; remove.disabled = busy;
       remove.addEventListener('click', () => removeClip(clip));
-      item.append(number, text, generate, remove); list.append(item);
+      item.append(number, text, generate, remove);
+      if (GUITARS.includes(clip.instrument)) item.append(clipTone(clip));
+      list.append(item);
     });
     const available = Object.keys(INSTRUMENTS).filter(name => !song.base.instruments.includes(name) && !clips.some(c => c.instrument === name && c.start <= sec.start && endOf(c) >= endOf(sec)));
     const chosen = available.includes($('layer-instrument').value) ? $('layer-instrument').value : available[0];
@@ -1002,6 +1019,55 @@
     const pending = clips.some(c => !c.generated);
     $('play-section').textContent = playing?.kind === 'section' && playing.id === sec.id ? '■ Atura' : `▷ Escolta la secció${pending ? ' (sense els pendents)' : ''}`;
     $('play-song-inline').textContent = playing?.kind === 'song' ? '■ Atura la cançó' : '▷ Escolta tota la cançó';
+  }
+  // So i efecte de cada clip de guitarra.
+  function clipTone(clip) {
+    const box = document.createElement('div'); box.className = 'clip-tone';
+    const fx = clip.fx || defaultFx();
+    const select = (label, entries, value, onChange) => {
+      const wrap = document.createElement('label'), caption = document.createElement('span'), input = document.createElement('select');
+      caption.className = 'field-label'; caption.textContent = label; fillSelect(input, entries, value); input.disabled = busy;
+      input.addEventListener('change', () => onChange(input.value)); wrap.append(caption, input); return wrap;
+    };
+    const slider = (label, key, left, right) => {
+      const wrap = document.createElement('label'), caption = document.createElement('span'), output = document.createElement('output'), input = document.createElement('input');
+      caption.className = 'field-label'; caption.textContent = label; output.textContent = `${fx[key]}`; caption.append(output);
+      input.type = 'range'; input.min = 0; input.max = 100; input.step = 5; input.value = fx[key]; input.disabled = busy || fx.type === 'none';
+      input.setAttribute('aria-label', `${label} · ${INSTRUMENTS[clip.instrument]}`);
+      input.addEventListener('input', () => { output.textContent = input.value; });
+      input.addEventListener('change', () => changeClipTone(clip, { fx: { ...fx, [key]: Number(input.value) } }));
+      const hint = document.createElement('small'); hint.className = 'slider-hint'; hint.innerHTML = '';
+      const a = document.createElement('span'), b = document.createElement('span'); a.textContent = left; b.textContent = right; hint.append(a, b);
+      wrap.append(caption, input, hint); return wrap;
+    };
+    box.append(
+      select('SO', timbreOptions.guitar.map(([k, v]) => [k, k === 'auto' ? 'Com la guitarra de la cançó' : v]), clip.sound || 'auto', value => changeClipTone(clip, { sound: value })),
+      select('EFECTE', Object.entries(engine.GUITAR_FX), fx.type, value => changeClipTone(clip, { fx: { ...fx, type: value } })),
+      slider('GUANY', 'drive', 'Poc', 'Molt'), slider('TO', 'tone', 'Fosc', 'Brillant'));
+    return box;
+  }
+  function changeClipTone(clip, change) {
+    if (busy) return;
+    if ('sound' in change) { if (change.sound === 'auto') delete clip.sound; else clip.sound = change.sound; }
+    if ('fx' in change) { if (change.fx.type === 'none' && change.fx.drive === 50 && change.fx.tone === 50) delete clip.fx; else clip.fx = change.fx; }
+    const replay = playing?.kind; stop(); save(); render();
+    if (replay === 'song' || replay === 'section') play(replay);
+  }
+  // Volums ràpids de la secció (fan servir l'equalitzador de la secció).
+  function renderVolumes(sec) {
+    const list = $('section-volumes'); list.replaceChildren();
+    for (const name of eqNames(sec)) {
+      const own = sec.mix?.[name], value = (own || song.settings.mix?.[name] || flatEq()).volume;
+      const row = document.createElement('label'); row.className = `volume-row${own && own.volume !== (song.settings.mix?.[name] || flatEq()).volume ? ' own' : ''}`;
+      if (name !== 'master') row.style.setProperty('--color', instrumentColors[name]);
+      const label = document.createElement('span'); label.textContent = name === 'master' ? 'Secció sencera' : INSTRUMENTS[name];
+      const input = document.createElement('input'); input.type = 'range'; input.min = -24; input.max = 6; input.step = 1; input.value = value; input.disabled = busy;
+      input.setAttribute('aria-label', `Volum de ${label.textContent} en aquesta secció`);
+      const output = document.createElement('output'); output.textContent = `${value > 0 ? '+' : ''}${value} dB`;
+      input.addEventListener('input', () => { const v = Number(input.value); output.textContent = `${v > 0 ? '+' : ''}${v} dB`; });
+      input.addEventListener('change', () => changeEq(sec, name, 'volume', Number(input.value)));
+      row.append(label, input, output); list.append(row);
+    }
   }
   // ── Equalitzadors ──────────────────────────────────────────────────
   function eqNames(sec) {
@@ -1076,7 +1142,7 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy']) $(key).disabled = busy;
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
     $('add-section').disabled = busy || !ready;
@@ -1142,6 +1208,14 @@
   });
   $('add-section').addEventListener('click', () => addSection(song.sections.length ? song.sections.at(-1).start + song.sections.at(-1).bars : 0));
   $('section-type').addEventListener('change', event => changeSection('type', event.target.value));
+  $('section-energy').addEventListener('input', event => { $('section-energy-value').textContent = `${event.target.value} %`; });
+  $('section-energy').addEventListener('change', event => {
+    const sec = current(); if (!sec || busy) return;
+    const value = Number(event.target.value), replay = playing?.kind;
+    if (value === TYPES[sec.type].energy) delete sec.energy; else sec.energy = value;
+    stop(); save(); render();
+    if (replay === 'song' || replay === 'section') play(replay);
+  });
   $('section-start').addEventListener('change', event => changeSection('start', event.target.value));
   $('section-bars').addEventListener('change', event => changeSection('bars', event.target.value));
   $('section-reharmonize').addEventListener('click', () => {

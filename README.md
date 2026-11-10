@@ -21,6 +21,13 @@ La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro
 
 Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
 
+## Volum per seccions, diverses guitarres i efectes
+
+- **Intensitat de cada secció** (10–100 %): controla la força amb què toquen tots els instruments de la secció. Abans els metalls sonaven uns 9 dB més fluix a les estrofes de manera automàtica; ara depenen només d’aquesta intensitat.
+- **Volums d’aquesta secció**: un control de volum per instrument i per a la secció sencera, en dB respecte de la cançó (és el mateix volum que hi ha a l’equalitzador de la secció).
+- **Fins a tres guitarres a la mateixa secció**: Guitarra 1 (rítmica), Guitarra 2 (rítmica una octava amunt, amb un patró diferent) i Guitarra 3 (arpegis i punteig). Cadascuna té el seu canal, el seu clip, el seu so i el seu efecte.
+- **Efectes de guitarra** per a cada clip: boost net, saturació de cinta, crunch, overdrive, distorsió, metal, fuzz i lo-fi, amb **guany** i **to**. La cadena és la d’un pedal i un amplificador: filtre d’entrada, saturació amb sobremostreig ×2, pantalla d’altaveu i nivell compensat (la guitarra sona igual de forta amb efecte que sense). Amb efectes de guany alt, la reverberació es redueix.
+
 ## Grava la teva veu
 
 Al pas **4 · La teva veu** (pestanya «Veu» al mòbil) pots cantar mentre sona la cançó:

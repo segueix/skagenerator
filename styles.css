@@ -366,3 +366,19 @@ body.recording .transport-play { background: #ef4444; }
 @media (min-width: 900px) { .voice-sliders { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 899px) { body:not([data-tab="voice"]) [data-panel="voice"] { display: none !important; } }
 .field-label output { text-transform: none; letter-spacing: 0; color: var(--text); }
+
+/* Intensitat, volums de secció i so de les guitarres */
+.section-fields .energy-field { grid-column: 1 / -1; }
+.section-fields .slider-hint { display: flex; justify-content: space-between; }
+.section-fields .slider-hint span:nth-child(2) { display: none; }
+.section-volumes { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface-2); margin-bottom: 14px; }
+.volume-list { display: grid; gap: 6px; }
+.volume-row { display: grid; grid-template-columns: minmax(90px, 140px) 1fr 62px; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 9px; background: var(--surface); border-left: 5px solid var(--color, var(--primary)); font-size: 14px; font-weight: 600; }
+.volume-row.own { background: color-mix(in srgb, var(--color, var(--primary)) 12%, var(--surface)); }
+.volume-row output { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.clip-tone { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.clip-tone label { display: block; min-width: 0; }
+.clip-tone .field-label output { color: var(--text); }
+.clip-tone .slider-hint { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+@media (min-width: 900px) { .clip-tone { grid-template-columns: 1.2fr 1.2fr 1fr 1fr; } .section-fields .energy-field { grid-column: auto; } }
+@media (max-width: 899px) { .volume-row { grid-template-columns: 1fr 62px; } .volume-row input { grid-column: 1 / -1; grid-row: 2; } }

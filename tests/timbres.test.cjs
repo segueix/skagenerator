@@ -106,3 +106,25 @@ test('la força dels metalls s’allunya del canvi de dinàmica perquè no salti
     assert(Math.max(...velocities) - Math.min(...velocities) <= 25);
   }
 });
+
+test('la força dels metalls depèn de la intensitat, no del tipus de secció', () => {
+  const velocities = (type, energy) => createPerformance(engine.composeSongPart({ ...config, instruments: ['trumpet'] },
+    { type, bars: 4, energy, revision: 2, layers: { trumpet: 3 } })).events.filter(e => e.type === 'on').map(e => e.velocity);
+  const mean = list => list.reduce((a, b) => a + b) / list.length;
+  assert(Math.abs(mean(velocities('verse', 80)) - mean(velocities('chorus', 80))) < 3, 'estrofa i tornada iguals amb la mateixa intensitat');
+  assert(mean(velocities('verse', 90)) > mean(velocities('verse', 30)) + 10, 'la intensitat canvia la força');
+});
+
+test('tres guitarres poden sonar a la mateixa secció amb sons i efectes propis', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['guitar', 'guitar2', 'guitar3'],
+    fx: { guitar2: { type: 'distortion', drive: 70, tone: 40 } } },
+    { ...part, layers: { guitar: 1, guitar2: 2, guitar3: 3 }, timbres: { guitar3: 'muted' }, fx: { guitar: { type: 'fuzz', drive: 30, tone: 60 } } });
+  const music = createPerformance(spec), on = channel => music.events.filter(e => e.type === 'on' && e.channel === channel);
+  assert(on(0).length && on(14).length && on(15).length);
+  assert(Math.min(...on(14).map(e => e.note)) > Math.min(...on(0).map(e => e.note)), 'la guitarra 2 sona més aguda');
+  assert(new Set(on(15).map(e => e.time.toFixed(2))).size === on(15).length, 'la guitarra 3 fa notes soltes (arpegis)');
+  assert.equal(music.channels.find(c => c.channel === 15).program, 28);
+  assert.deepEqual(music.fx, { guitar: { type: 'fuzz', drive: 30, tone: 60 }, guitar2: { type: 'distortion', drive: 70, tone: 40 } });
+  for (const fx of [{ guitar: { type: 'wah', drive: 1, tone: 1 } }, { bass: { type: 'fuzz', drive: 1, tone: 1 } }, { guitar: { type: 'fuzz', drive: 101, tone: 1 } }, { guitar: null }])
+    assert.throws(() => engine.composeSongPart({ ...config, fx }, part), /Efecte/);
+});
