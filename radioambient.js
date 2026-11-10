@@ -1880,6 +1880,174 @@
         }
         return line;
     }
+    // ── Harmonia per símbols ────────────────────────────────────────────
+    // Graus romans amb alteracions: majúscula = major, minúscula = menor;
+    // «7» = setena (dominant si és major), «maj7», «°» = disminuït, «sus4», i
+    // dominants secundàries amb «/» (V7/vi). Permet acords prestats (bVII, iv,
+    // bVI...) i el llenguatge propi de cada subgènere.
+    const ROMAN = { I: 0, II: 2, III: 4, IV: 5, V: 7, VI: 9, VII: 11 };
+    const QUALITY = { maj: [0, 4, 7], min: [0, 3, 7], dim: [0, 3, 6], dom7: [0, 4, 7, 10], maj7: [0, 4, 7, 11], min7: [0, 3, 7, 10], sus4: [0, 5, 7] };
+    function parseChordSymbol(symbol) {
+        const m = /^([b#]?)(VII|VI|IV|V|III|II|I|vii|vi|iv|v|iii|ii|i)(°|maj7|7|sus4)?$/.exec(symbol);
+        if (!m) throw new Error(`Acord desconegut: ${symbol}`);
+        const upper = m[2] === m[2].toUpperCase();
+        const offset = ROMAN[m[2].toUpperCase()] + (m[1] === 'b' ? -1 : m[1] === '#' ? 1 : 0);
+        const quality = m[3] === '°' ? 'dim' : m[3] === 'maj7' ? 'maj7' : m[3] === '7' ? (upper ? 'dom7' : 'min7') : m[3] === 'sus4' ? 'sus4' : upper ? 'maj' : 'min';
+        return { offset, quality };
+    }
+    function chordFromSymbol(tonic, symbol) {
+        const [main, target] = symbol.split('/');
+        const base = target ? (tonic + parseChordSymbol(target).offset + 12) % 12 : tonic;
+        const { offset, quality } = parseChordSymbol(main), root = (base + offset + 12) % 12;
+        const pcs = QUALITY[quality].map(i => (root + i) % 12);
+        return { degree: -1, symbol, pcs, root: bassOf(pcs[0]), notes: voice(pcs, 55, false) };
+    }
+    // ── Subgèneres: cadascun té el seu llenguatge ───────────────────────
+    // Tempo, tonalitats, ritmes, balanceig, sons, efectes i progressions pròpies.
+    const SUBGENRES = {
+        jamaican: { name: 'Ska jamaicà (anys 60)', style: 'ska', bpm: [110, 128], swing: .45, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major']],
+            groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'jazz', bass: 'finger', trombone: 'vsco' },
+            description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de jazz, baix caminant, acords de setena i secció de vents fent el tema.',
+            harmony: { major: {
+                verse: [['I', 'vi', 'ii7', 'V7'], ['I', 'IV', 'I', 'V7'], ['Imaj7', 'vi7', 'ii7', 'V7'], ['I', 'I7', 'IV', 'iv']],
+                chorus: [['IV', 'V7', 'I', 'vi'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'IV', 'V7', 'IV']],
+                prechorus: [['ii7', 'V7', 'ii7', 'V7']], bridge: [['IV', 'iv', 'I', 'VI7'], ['ii7', 'V7', 'iii7', 'VI7']] } } },
+        rocksteady: { name: 'Rocksteady', style: 'ska', bpm: [100, 108], swing: .15, keys: [[9, 'minor'], [2, 'minor'], [7, 'minor'], [0, 'major']],
+            groove: { drums: [1, 3], bass: [1, 3], guitar: [2] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { trumpet: 'muted', bass: 'finger' },
+            description: 'Més lent i greu que l’ska: one drop, baix dub en primer pla, orgue de fons i vents amb sordina.',
+            harmony: { minor: {
+                verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'iv', 'bVII', 'bIII'], ['i7', 'iv7', 'i7', 'v7']],
+                chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'bVII', 'bIII', 'bVI'], ['i', 'bVI', 'bIII', 'bVII']],
+                bridge: [['iv', 'i', 'bVI', 'V7']] },
+              major: { verse: [['I', 'vi', 'IV', 'V'], ['I', 'iii', 'IV', 'V']], chorus: [['IV', 'I', 'V', 'vi']], bridge: [['vi', 'IV', 'ii', 'V7']] } } },
+        twotone: { name: 'Ska 2-tone', style: 'ska', bpm: [132, 156], swing: 0, keys: [[0, 'major'], [7, 'major'], [9, 'minor'], [2, 'minor']],
+            groove: { drums: [0, 4], bass: [0, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar'], timbres: {},
+            description: 'L’ska britànic de finals dels 70: més ràpid i nerviós, guitarra a contratemps, orgue i metalls amb riffs.',
+            harmony: { major: {
+                verse: [['I', 'vi', 'IV', 'V'], ['I', 'IV', 'I', 'V'], ['I', 'V7/vi', 'vi', 'IV']],
+                chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'V', 'iii', 'vi'], ['vi', 'IV', 'I', 'V']],
+                prechorus: [['ii', 'V', 'ii', 'V']], bridge: [['ii', 'V', 'I', 'vi'], ['IV', 'iv', 'I', 'I']] },
+              minor: { verse: [['i', 'bVII', 'bVI', 'V7'], ['i', 'iv', 'bVII', 'i']], chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'bIII', 'bVII', 'iv']], bridge: [['iv', 'V7', 'i', 'bVI']] } } },
+        skapunk: { name: 'Ska-punk', style: 'ska', bpm: [160, 180], swing: 0, keys: [[7, 'major'], [0, 'major'], [10, 'major'], [9, 'minor']],
+            groove: { drums: [4, 5], bass: [2, 4], guitar: [3, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rock', bass: 'pick' },
+            description: 'Estrofes a contratemps i tornades amb guitarres distorsionades i metalls a l’uníson, a tota velocitat.',
+            harmony: { major: {
+                verse: [['I', 'IV', 'V', 'IV'], ['I', 'bVII', 'IV', 'I'], ['I', 'V', 'IV', 'V']],
+                chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'I', 'V', 'vi'], ['I', 'IV', 'bVII', 'IV']], bridge: [['vi', 'IV', 'I', 'V']] },
+              minor: { verse: [['i', 'bVI', 'bVII', 'i']], chorus: [['bVI', 'bVII', 'i', 'bIII']], bridge: [['iv', 'bVI', 'bVII', 'V']] } } },
+        punk77: { name: 'Punk del 77', style: 'punk', bpm: [180, 205], swing: 0, keys: [[9, 'major'], [4, 'major'], [2, 'major'], [7, 'major']],
+            groove: { drums: [0], bass: [0], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rock', bass: 'pick', guitar: 'clean' },
+            fx: { type: 'distortion', drive: 60, tone: 60 },
+            description: 'Tres acords, corxeres a cops avall i tornades per cridar: directe, ràpid i sense floritures.',
+            harmony: { major: {
+                verse: [['I', 'IV', 'V', 'IV'], ['I', 'I', 'IV', 'V'], ['I', 'bVII', 'IV', 'I']],
+                chorus: [['I', 'IV', 'V', 'I'], ['IV', 'V', 'I', 'I'], ['I', 'V', 'IV', 'IV']], bridge: [['IV', 'IV', 'V', 'V']] } } },
+        hardcore: { name: 'Hardcore', style: 'punk', bpm: [200, 220], swing: 0, keys: [[11, 'minor'], [4, 'minor'], [9, 'minor'], [2, 'minor']],
+            groove: { drums: [2, 3], bass: [3, 4], guitar: [2, 0] }, base: ['drums', 'bass', 'guitar'], timbres: { bass: 'pick', guitar: 'clean' },
+            fx: { type: 'fuzz', drive: 75, tone: 55 },
+            description: 'Molt ràpid i agressiu: D-beat, fuzz, tornades en doble temps i un tros lent i pesant («breakdown»).',
+            harmony: { minor: {
+                verse: [['i', 'bVI', 'bVII', 'i'], ['i', 'i', 'bII', 'i'], ['i', 'iv', 'bVI', 'bVII']],
+                chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'bIII', 'bVII', 'bVI']], bridge: [['i', 'bII', 'i', 'bII']] } } },
+        poppunk: { name: 'Pop-punk', style: 'punk', bpm: [165, 185], swing: 0, keys: [[2, 'major'], [7, 'major'], [4, 'major'], [9, 'major']],
+            groove: { drums: [0, 3], bass: [1, 4], guitar: [1, 0] }, base: ['drums', 'bass', 'guitar'], timbres: { bass: 'finger', guitar: 'clean' },
+            fx: { type: 'overdrive', drive: 55, tone: 60 },
+            description: 'Melòdic i lluminós: tornades enganxoses, guitarres amb overdrive, arpegis i pujada de to final.',
+            harmony: { major: {
+                verse: [['I', 'V', 'vi', 'IV'], ['vi', 'IV', 'I', 'V'], ['I', 'iii', 'IV', 'V']],
+                chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'I', 'V', 'vi'], ['vi', 'IV', 'I', 'V']],
+                prechorus: [['IV', 'V', 'vi', 'V']], bridge: [['ii', 'IV', 'vi', 'V'], ['IV', 'V', 'iii', 'vi']] } } },
+        horrorpunk: { name: 'Horror punk', style: 'punk', bpm: [170, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [4, 'minor'], [9, 'minor']],
+            groove: { drums: [0], bass: [0], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { bass: 'pick', guitar: 'clean' },
+            fx: { type: 'horrorpunk', drive: 70, tone: 60 },
+            description: 'A l’estil dels Misfits: guitarres «serra mecànica» doblades, acords prestats foscos, veu greu i «whoa-oh».',
+            harmony: { major: {
+                verse: [['I', 'bVI', 'bVII', 'I'], ['I', 'bIII', 'IV', 'I']], chorus: [['I', 'bVI', 'bVII', 'I'], ['vi', 'IV', 'I', 'V']], bridge: [['bVI', 'bVII', 'I', 'I']] },
+              minor: { verse: [['i', 'bVI', 'bIII', 'bVII']], chorus: [['i', 'bVII', 'bVI', 'V7']], bridge: [['iv', 'i', 'V7', 'i']] } } }
+    };
+    function paletteFor(subgenre, mode, type) {
+        const pal = SUBGENRES[subgenre]?.harmony[mode] || Object.values(SUBGENRES[subgenre]?.harmony || {})[0];
+        if (!pal) return null;
+        const fallback = { intro: 'verse', solo: 'verse', outro: 'chorus', prechorus: 'chorus', bridge: 'verse' };
+        return pal[type] || pal[fallback[type]] || pal.verse;
+    }
+    // ── Riff de la cançó ────────────────────────────────────────────────
+    // Un motiu de dos compassos (ritme i contorn en graus de l'escala) que
+    // identifica la cançó: es toca a la intro, les tornades i el final, s'adapta
+    // als acords de cada compàs i varia el final de cada quarta repetició.
+    function composeRiff(seed, punk) {
+        const r = seededRng((seed ^ 0x2f7a1c3) >>> 0);
+        const rhythms = punk ? [
+            [[0, .5], [.5, .5], [1, .5], [1.5, .5], [2, 1], [3, .5], [3.5, .5], [4, .5], [4.5, .5], [5, 1], [6, 2]],
+            [[0, 1], [1, .5], [1.5, .5], [2, 1], [3, 1], [4, .5], [4.5, .5], [5, .5], [5.5, .5], [6, 1.5]],
+            [[0, .5], [.5, .5], [1, 1], [2.5, .5], [3, 1], [4, .5], [4.5, .5], [5, 1], [6.5, 1]]]
+          : [
+            [[.5, .5], [1, .5], [1.5, 1], [3, .5], [3.5, .5], [4.5, .5], [5, .5], [5.5, 1.5]],
+            [[0, .5], [.5, .5], [1, .5], [1.5, 1], [3.5, .5], [4, .5], [4.5, .5], [5, .5], [5.5, 1], [7, .5]],
+            [[0, 1.5], [1.5, .5], [2, .5], [2.5, 1], [4, .5], [4.5, .5], [5, 1], [6, 1]],
+            [[.5, .5], [1, 1], [2, .5], [2.5, .5], [3, 1], [4.5, .5], [5, 1.5], [6.5, .5]]];
+        const rhythm = rhythms[Math.floor(r() * rhythms.length)], steps = [0];
+        const peak = Math.floor(rhythm.length * (.35 + r() * .3));
+        for (let i = 1; i < rhythm.length; i++) {
+            const up = i <= peak ? 1 : -1, size = r() < .65 ? 1 : r() < .7 ? 2 : 0;
+            steps.push(r() < .15 ? -up * Math.max(1, size) : up * size);
+        }
+        return { rhythm, steps };
+    }
+    function moveByScale(pitch, steps, scalePcs, chord, lo, hi) {
+        let p = pitch;
+        for (let k = 0; k < Math.abs(steps); k++) p = stepScale(p, Math.sign(steps), scalePcs, chord, lo, hi);
+        return p;
+    }
+    function realizeRiff(riff, chords, bars, scalePcs, from = 0, to = bars * 4, only = null) {
+        const notes = [], lo = 64, hi = 81;
+        for (let start = 0, rep = 0; start < bars * 4; start += 8, rep++) {
+            let prev = null;
+            riff.rhythm.forEach(([t, d], i) => {
+                const at = start + t;
+                if (at < from || at >= to || (only && !only(t))) return;
+                const chord = chords[Math.min(chords.length - 1, Math.floor(at / 4))];
+                let step = riff.steps[i];
+                // Desenvolupament: la quarta repetició acaba al revés (pregunta-resposta).
+                if (rep % 4 === 3 && i >= riff.rhythm.length - 2) step = -step;
+                let p = prev === null ? nearestTone(72, chord.pcs, lo, hi) : moveByScale(prev, step, scalePcs, chord, lo, hi);
+                if (at % 1 === 0 || d >= 1) p = nearestTone(p, chord.pcs, lo, hi);
+                notes.push([Math.floor(at / 4), at % 4, p, Math.min(d, bars * 4 - at)]);
+                prev = p;
+            });
+        }
+        return notes;
+    }
+    // Segona veu: la mateixa línia una tercera diatònica per sota.
+    const harmonize = (notes, chords, scalePcs) => notes.map(([b, t, p, d]) => [b, t, moveByScale(p, -2, scalePcs, chords[b], 52, 84), d]);
+    // Respostes: fragments del riff als silencis de la veu (pregunta i resposta).
+    function answerLine(riff, chords, bars, scalePcs, vocal) {
+        const head = riff.rhythm.filter(([t]) => t < 3), span = Math.max(...head.map(([t, d]) => t + d)) - head[0][0];
+        // Forats de la veu [inici, final]: la resposta només hi posa les notes que hi caben.
+        const gaps = [];
+        if (vocal && vocal.length) {
+            const abs = vocal.map(([b, t, , d]) => [b * 4 + t, b * 4 + t + d]).sort((a, b) => a[0] - b[0]);
+            let cursor = 0;
+            for (const [s, e] of [...abs, [bars * 4, bars * 4]]) {
+                const from = Math.ceil((cursor + .25) * 2) / 2;
+                if (s - from >= 1) gaps.push([from, s]);
+                cursor = Math.max(cursor, e);
+            }
+        } else for (let b = 1; b < bars; b += 2) gaps.push([b * 4 + 1.5, b * 4 + 1.5 + span]);
+        const notes = [];
+        for (const [gap, end] of gaps) {
+            let prev = null;
+            head.forEach(([t, d], i) => {
+                const at = gap + t - head[0][0];
+                if (at >= end - .25 || at >= bars * 4) return;
+                const chord = chords[Math.floor(at / 4)];
+                let p = prev === null ? nearestTone(74, chord.pcs, 64, 81) : moveByScale(prev, riff.steps[i], scalePcs, chord, 64, 81);
+                if (at % 1 === 0) p = nearestTone(p, chord.pcs, 64, 81);
+                notes.push([Math.floor(at / 4), at % 4, p, Math.min(d, end - at, bars * 4 - at)]); prev = p;
+            });
+        }
+        return notes;
+    }
     // ── Melodia de veu (guia per cantar) ────────────────────────────────
     // Frases de dos compassos amb respiracions: cada línia de la lletra és una
     // frase i té tantes notes com síl·labes. Sense lletra, frases amb pauses i
@@ -1967,6 +2135,12 @@
         if (part.feel !== undefined && (!part.feel || typeof part.feel !== 'object' || Array.isArray(part.feel)
             || Object.entries(part.feel).some(([name, factor]) => !Object.hasOwn(SONG_INSTRUMENTS, name) || ![.5, 1, 2].includes(factor))))
             throw new Error('Ritme d’instrument no vàlid');
+        if (settings.subgenre !== undefined && (!Object.hasOwn(SUBGENRES, settings.subgenre) || SUBGENRES[settings.subgenre].style !== settings.style))
+            throw new Error('Subgènere no vàlid per a aquest estil');
+        if (settings.swing !== undefined && (!Number.isFinite(settings.swing) || settings.swing < 0 || settings.swing > .7)) throw new Error('Balanceig no vàlid');
+        if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
+            || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name) || !['riff', 'answer'].includes(mode))))
+            throw new Error('Mode de línia no vàlid');
         if (part.syllables !== undefined && (!Array.isArray(part.syllables) || part.syllables.length > 32
             || part.syllables.some(n => !Number.isInteger(n) || n < 1 || n > 24))) throw new Error('Síl·labes de la lletra no vàlides');
         if (part.register !== undefined && ![-1, 0, 1].includes(part.register)) throw new Error('Registre de la veu no vàlid');
@@ -2007,7 +2181,14 @@
         }
         degrees = Array.from({ length: bars }, (_, i) => degrees[i % degrees.length]);
         if (part.type === 'outro') degrees[bars - 1] = 0;
-        const chords = degrees.map(d => buildChord(tonic, mode, d, { chordBase: 55 }, false));
+        // Amb subgènere, les progressions surten del seu llenguatge harmònic.
+        const palette = settings.subgenre ? paletteFor(settings.subgenre, mode, part.type) : null;
+        let chords;
+        if (palette) {
+            const progression = palette[(variation >= 0 ? variation : (part.revision || 1) - 1) % palette.length];
+            chords = Array.from({ length: bars }, (_, i) => chordFromSymbol(tonic, progression[i % progression.length]));
+            if (part.type === 'outro') chords[bars - 1] = chordFromSymbol(tonic, mode === 'major' ? 'I' : 'i');
+        } else chords = degrees.map(d => buildChord(tonic, mode, d, { chordBase: 55 }, false));
         const ctx = { chords, scalePcs: SCALES[mode].map(n => (tonic + n) % 12), lo: 64, hi: part.type === 'chorus' ? 84 : 79, center: 72, maxJump: 3 };
         ctx.prev = nearestTone(72, chords[0].pcs, 64, 79);
         let rhythms = part.type === 'chorus' ? [RHYTHMS.r2, RHYTHMS.r5, RHYTHMS.r2, RHYTHMS.r7] : [RHYTHMS.r9, RHYTHMS.r3, RHYTHMS.r5, RHYTHMS.r7];
@@ -2100,7 +2281,17 @@
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
         }
-        return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo,
+        if (part.lineModes) {
+            const riff = composeRiff(settings.seed >>> 0, settings.style === 'punk');
+            const voiceLine = lines.vocal || null;
+            for (const [name, how] of Object.entries(part.lineModes)) {
+                if (!(name in layers)) continue;
+                const line = how === 'riff' ? realizeRiff(riff, chords, bars, ctx.scalePcs) : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine);
+                // Trombó/segona veu: el riff harmonitzat una tercera per sota.
+                lines[name] = name === 'trombone' && how === 'riff' ? harmonize(line, chords, ctx.scalePcs) : line;
+            }
+        }
+        return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             ranges: JSON.parse(JSON.stringify(ranges)),
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
@@ -2199,7 +2390,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, composeSongPart, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, composeSongPart, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

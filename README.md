@@ -21,6 +21,33 @@ A la primera pantalla hi ha **10 cançons fetes amb el taller** (5 de ska i 5 de
 
 Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques).
 
+## Cançó automàtica, biblioteca i puntuacions
+
+Al panell **Cançó automàtica** tries un subgènere, la durada (de 2 a 4 minuts) i si vols melodia de veu, i el taller compon una cançó sencera: introducció, estrofes, pretornades, tornades, pont o solo i final, amb els canvis de tempo propis del subgènere (introduccions lentes, ponts a mig temps, última tornada pujada de to…). Cada cançó es desa sola a **Les meves cançons**, al navegador, i s’hi pot posar de 1 a 5 estrelles. Quan d’un subgènere tens cançons de ★4 o més, les noves cançons d’aquest subgènere s’inspiren sovint en el seu tempo, tonalitat i groove. També pots desar-hi la cançó que estàs fent a mà.
+
+### Subgèneres amb personalitat
+
+| Subgènere | BPM | Trets |
+|---|---|---|
+| Ska jamaicà (anys 60) | 110–128 | Swing marcat, bateria jazz, baix de dits, acords amb setena i ii–V |
+| Rocksteady | 100–108 | Més lent i greu, trompeta amb sordina, tonalitats menors |
+| Ska 2-tone | 132–156 | Nerviós, orgue i metalls amb riffs |
+| Ska-punk | 160–180 | Guitarres distorsionades, ponts a mig temps |
+| Punk 77 | 180–205 | Tres acords amb bVII, distorsió clàssica |
+| Hardcore | 200–220 | Fuzz, acord bII i breakdown a mig temps |
+| Pop punk | 165–185 | Overdrive, vi–IV–I–V, pretornada que accelera |
+| Horror punk | 170–192 | Distorsió Misfits, acords prestats foscos (bVI, iv) |
+
+El subgènere també es pot triar al panell de la base, juntament amb el **balanceig** (swing), que endarrereix les corxeres a contratemps.
+
+### Harmonia i riffs
+
+- Cada subgènere té paletes d’acords per secció amb acords prestats (bVII, bVI, iv), dominants secundàries (V7/vi, V7/IV) i setenes.
+- Cada cançó té un **riff** propi (ritme de dos compassos i contorn melòdic) que es repeteix a la intro, les tornades i el final, adaptat als acords de cada secció.
+- El trombó toca el riff harmonitzat una tercera per sota de la trompeta.
+- Amb la línia **Respon a la veu**, els metalls o la guitarra solista toquen fragments del riff als silencis de la melodia de veu (pregunta i resposta).
+- A cada instrument melòdic (trompeta, trombó, saxo, sintetitzador i guitarra 3) l’opció **LÍNIA** tria entre línia pròpia, riff de la cançó o resposta a la veu.
+
 ## Flux de treball
 
 Hi ha una sola vista, que es treballa de baix cap amunt:

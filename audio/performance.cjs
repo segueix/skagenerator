@@ -83,8 +83,12 @@ function createPerformance(spec) {
       moved = nearest(pitch, spec.chords[destination].pcs, pitch - 3, pitch + 3); // en una tríada sempre n'hi ha una a ±3
     return [[target * beat, duration * 2, moved]];
   }
+  // Balanceig (shuffle): les corxeres a contratemps s'endarrereixen; amb 1
+  // quedarien en tresets. L'ska jamaicà el fa servir, el punk no.
+  const swing = Number.isFinite(spec.swing) ? Math.max(0, Math.min(.7, spec.swing)) : 0;
+  const swung = t => { if (!swing) return t; const pos = t / beat, frac = pos - Math.floor(pos); return Math.abs(frac - .5) < .04 ? t + swing * beat / 6 : t; };
   function note(channel, pitch, start, duration, velocity, jitter = .004, exact = false) {
-    for (const [at, length, tone] of feel(channel, start, duration, pitch)) play(channel, tone, at, length, velocity, jitter, exact);
+    for (const [at, length, tone] of feel(channel, swung(start), duration, pitch)) play(channel, tone, at, length, velocity, jitter, exact);
   }
   function play(channel, pitch, start, duration, velocity, jitter, exact) {
     if (start >= spec.seconds || !audible(channel, start)) return;
@@ -95,9 +99,9 @@ function createPerformance(spec) {
     events.push({ time: at, type: 'on', channel, note: midi, velocity: vel });
     events.push({ time: end, type: 'off', channel, note: midi });
   }
-  const control = (channel, time, controller, value) => { for (const [at] of feel(channel, time, 0)) if (at < spec.seconds)
+  const control = (channel, time, controller, value) => { for (const [at] of feel(channel, swung(time), 0)) if (at < spec.seconds)
     events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'cc', channel, controller, value: Math.round(Math.max(0, Math.min(127, value))) }); };
-  const bend = (channel, time, value) => { for (const [at] of feel(channel, time, 0)) if (at < spec.seconds)
+  const bend = (channel, time, value) => { for (const [at] of feel(channel, swung(time), 0)) if (at < spec.seconds)
     events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) }); };
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
@@ -158,8 +162,12 @@ function createPerformance(spec) {
         pitches.forEach((pitch, k) => note(14, pitch, t0 + t * beat + .009 + k * .006, ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? hit % 2 ? 70 : 88 : 80));
       });
     }
-    // Guitarra 3: arpegis i punteig sobre l'acord.
-    if (has('guitar3')) {
+    // Guitarra 3: amb línia pròpia (riff de la cançó o respostes) fa de guitarra
+    // solista; si no, arpegis i punteig sobre l'acord.
+    if (has('guitar3') && Array.isArray(spec.lines?.guitar3)) {
+      if (b === 0) for (const [nb, t, pitch, duration] of spec.lines.guitar3)
+        note(15, pitch, nb * bar + t * beat, Math.max(.06, duration * beat * .9), t % 1 === 0 ? 96 : 84, .004);
+    } else if (has('guitar3')) {
       const tones = [...chord.notes, chord.notes[0] + 12].map(n => n + 12), index = (spec.layers?.guitar3 ?? 0) % 5;
       const shapes = [
         [[0, 0], [.5, 1], [1, 2], [1.5, 3], [2, 0], [2.5, 1], [3, 2], [3.5, 3]],
