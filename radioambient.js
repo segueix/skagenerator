@@ -1940,6 +1940,13 @@
         if (!layers || typeof layers !== 'object' || Array.isArray(layers)
             || Object.entries(layers).some(([name, rev]) => !Object.hasOwn(SONG_INSTRUMENTS, name) || !Number.isInteger(rev) || rev < 1 || rev > 1000000))
             throw new Error('Capes d’instruments no vàlides');
+        // Trams dins de la secció on sona cada instrument afegit: un instrument
+        // pot començar o acabar a mitja secció (clips que travessen seccions).
+        const ranges = part.ranges === undefined ? {} : part.ranges;
+        if (!ranges || typeof ranges !== 'object' || Array.isArray(ranges) || Object.entries(ranges).some(([name, list]) =>
+            !Object.hasOwn(SONG_INSTRUMENTS, name) || !Array.isArray(list) || !list.length || list.some(range => !Array.isArray(range)
+                || range.length !== 2 || !Number.isInteger(range[0]) || !Number.isInteger(range[1]) || range[0] < 0 || range[1] > bars || range[0] >= range[1])))
+            throw new Error('Trams d’instruments no vàlids');
         const lines = {}, layerIndex = {};
         const rhythmPool = [RHYTHMS.r1, RHYTHMS.r2, RHYTHMS.r3, RHYTHMS.r4, RHYTHMS.r5, RHYTHMS.r6, RHYTHMS.r7, RHYTHMS.r9];
         Object.keys(layers).forEach(name => {
@@ -1994,6 +2001,7 @@
         }
         return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
             seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
+            ranges: JSON.parse(JSON.stringify(ranges)),
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: { ...(settings.mix || {}), ...(part.mix || {}) } };

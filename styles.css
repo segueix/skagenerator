@@ -162,3 +162,20 @@
 .eq-control input{width:100%;accent-color:#192d29;margin:0}
 .eq-reset{width:30px;height:30px;font-size:13px}
 @media(max-width:680px){.eq-row{grid-template-columns:1fr 1fr;gap:8px 12px}.eq-name{grid-column:1/-1}.eq-reset{grid-column:2;justify-self:end}}
+/* Edició amb el cursor */
+.line-section,.line-clip{touch-action:none;user-select:none;cursor:grab}
+.line-section.disabled{pointer-events:none;opacity:.6}
+.line-section:focus-visible,.line-clip:focus-visible{outline:3px solid #73a396;outline-offset:1px}
+.line-clip{position:absolute;top:3px;bottom:3px;border-radius:4px;background:repeating-linear-gradient(-55deg,#ffffff80 0,#ffffff80 3px,transparent 3px,transparent 7px),color-mix(in srgb,var(--color) 45%,white);border:1px dashed var(--color);min-width:6px}
+.line-clip.ready{background:var(--color);border-style:solid}
+.line-clip.selected{outline:2px solid var(--ink);outline-offset:1px;z-index:1}
+.line-track.lane{height:26px;cursor:copy;border-radius:5px}
+.line-track.lane:hover{background:color-mix(in srgb,var(--color) 10%,transparent)}
+.handle{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:2}
+.handle.left{left:-2px}.handle.right{right:-2px}
+.handle::after{content:'';position:absolute;top:25%;bottom:25%;left:3px;width:3px;border-radius:2px;background:#ffffffb0;opacity:0;transition:opacity .12s}
+.line-section:hover .handle::after,.line-clip:hover .handle::after,.dragging .handle::after{opacity:1}
+.line-section .handle::after{background:#2f4637}
+.dragging{cursor:grabbing;z-index:4;box-shadow:0 4px 14px #192d2930;opacity:.92}
+.dragging::after{content:attr(data-hint);position:absolute;right:6px;bottom:2px;font-size:9px;font-weight:700;color:#192d29;background:#ffffffd8;border-radius:3px;padding:0 4px;white-space:nowrap}
+.layer-row.selected{box-shadow:0 0 0 2px var(--ink) inset}

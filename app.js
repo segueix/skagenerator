@@ -1,12 +1,12 @@
 (() => {
   'use strict';
-  // Flux únic: 1) base musical per a tota la cançó, 2) seccions marcades a la
-  // línia, 3) instruments que entren un a un a cada secció, cadascun generat
-  // i escoltat per separat (la secció o la cançó sencera).
+  // Flux únic: 1) base musical per a tota la cançó, 2) seccions a la línia,
+  // que es poden estirar, moure i reordenar, 3) instruments com a clips propis
+  // a la seva pista: poden començar i acabar on calgui, fins i tot a mitja secció.
   const engine = window.ElTaulerRadioAmbient, sampleAudio = window.SkaSampleAudio, audioUtils = window.SkaAudioUtils;
   const $ = id => document.getElementById(id);
   const KEY = 'skagenerator.song.v2', OLD_KEY = 'skagenerator.song.v1', RATE = 44100;
-  const MIN_BARS = 8, MAX_BARS = 128, MAX_SECONDS = 360, MAX_SECTION = 32, MAX_SECTIONS = 32, GAP_CHUNK = 8, MAX_REV = 1000000;
+  const MIN_BARS = 8, MAX_BARS = 128, MAX_SECONDS = 360, MAX_SECTION = 32, MAX_SECTIONS = 32, MAX_CLIPS = 96, GAP_CHUNK = 8, MAX_REV = 1000000;
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
   const colors = { intro: '#90b8ad', verse: '#bab4d8', prechorus: '#d2b19a', chorus: '#e6b572', bridge: '#91b4cf', solo: '#c1bf8c', outro: '#aebc91' };
   const instrumentColors = { guitar: '#8aab6a', drums: '#7f9a8e', bass: '#9b8bc0', trumpet: '#d9a24e', trombone: '#c98a5e', synthLead: '#6fa3c7', synthPad: '#a9b6d9', synthBass: '#8676b3', electronicDrums: '#6d8f86', sax: '#b8873f', organ: '#7fae9c' };
@@ -39,7 +39,7 @@
   const newRev = () => random32() % MAX_REV + 1;
   const pick = n => random32() % n;
 
-  const newSong = () => ({ version: 2, title: 'Nova cançó',
+  const newSong = () => ({ version: 3, title: 'Nova cançó', clips: [],
     settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: newSeed(), bars: 64, timbres: defaultTimbres(), groove: defaultGroove() },
     base: { instruments: baseDefaults('ska'), revision: 1, generated: false }, harmony: {}, sections: [] });
 
@@ -71,11 +71,27 @@
         timbres: validTimbres(old.settings.timbres) ? { ...defaultTimbres(), ...(old.settings.timbres || {}) } : defaultTimbres(), groove: defaultGroove() },
       base: { instruments: base, revision: 1, generated: old.parts.some(p => p?.generated) }, harmony, sections };
   }
+  // Versió 2: els instruments eren capes de cada secció. Ara són clips de la
+  // línia; les capes iguals de seccions contigües s'uneixen en un sol clip.
+  function upgrade(value) {
+    if (value?.version !== 2 || !Array.isArray(value.sections)) return value;
+    const clips = [];
+    for (const s of [...value.sections].filter(Boolean).sort((a, b) => a.start - b.start)) {
+      for (const layer of Array.isArray(s.layers) ? s.layers : []) {
+        const last = [...clips].reverse().find(c => c.instrument === layer?.instrument);
+        if (last && last.start + last.bars === s.start && last.revision === layer.revision && last.generated === layer.generated) last.bars += s.bars;
+        else clips.push({ id: uid(), instrument: layer?.instrument, start: s.start, bars: s.bars, revision: layer?.revision, generated: layer?.generated });
+      }
+      delete s.layers;
+    }
+    return { ...value, version: 3, clips };
+  }
   let migrated = false;
   function validateSong(value) {
     if (value?.version === 1) { value = migrate(value); migrated = true; }
+    if (value?.version === 2) { value = upgrade(value); migrated = true; }
     const fail = message => { throw new Error(message); };
-    if (!value || value.version !== 2 || typeof value.title !== 'string' || value.title.length > 100) fail('Projecte no vàlid');
+    if (!value || value.version !== 3 || typeof value.title !== 'string' || value.title.length > 100) fail('Projecte no vàlid');
     const st = value.settings, profile = STYLES[st?.style];
     if (!st || !Object.hasOwn(STYLES, st.style) || !Number.isInteger(st.bpm) || st.bpm < profile.bpm.min || st.bpm > profile.bpm.max
       || !profile.keys.some(([k, m]) => k === st.tonic && m === st.mode) || !Number.isInteger(st.seed) || st.seed < 1 || st.seed > 4294967295
@@ -95,14 +111,17 @@
     for (const s of value.sections) {
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
-        || s.start + s.bars > st.bars || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000 || !Array.isArray(s.layers) || s.layers.length > 9) fail('Secció no vàlida');
-      const names = new Set();
-      for (const layer of s.layers) {
-        if (!layer || !Object.hasOwn(INSTRUMENTS, layer.instrument) || names.has(layer.instrument) || base.instruments.includes(layer.instrument)
-          || !Number.isInteger(layer.revision) || layer.revision < 1 || layer.revision > MAX_REV || typeof layer.generated !== 'boolean') fail('Instrument de secció no vàlid');
-        names.add(layer.instrument);
-      }
+        || s.start + s.bars > st.bars || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
+    }
+    if (!Array.isArray(value.clips) || value.clips.length > MAX_CLIPS || value.clips.some(c => !c || typeof c !== 'object')) fail('Instruments no vàlids');
+    value.clips.sort((a, b) => a.start - b.start);
+    for (const c of value.clips) {
+      if (typeof c.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(c.id) || ids.has(c.id) || !Object.hasOwn(INSTRUMENTS, c.instrument)
+        || base.instruments.includes(c.instrument) || !Number.isInteger(c.start) || !Number.isInteger(c.bars) || c.start < 0 || c.bars < 1
+        || c.start + c.bars > st.bars || !Number.isInteger(c.revision) || c.revision < 1 || c.revision > MAX_REV || typeof c.generated !== 'boolean') fail('Instrument no vàlid');
+      if (value.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start + c.bars && c.start < o.start + o.bars)) fail('Instruments encavalcats');
+      ids.add(c.id);
     }
     for (const seg of segmentsOf(value)) engine.composeSongPart(value.settings, partFor(value, seg));
     return value;
@@ -119,19 +138,34 @@
     gap(at, s.settings.bars);
     return list;
   }
+  // Clips que sonen dins d'un tram, amb els compassos on sonen.
+  function layersFor(s, seg, options) {
+    if (options.baseOnly) return null;
+    const active = s.clips.filter(c => c.generated && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
+    if (!active.length) return null;
+    const layers = {}, ranges = {};
+    for (const c of active) {
+      layers[c.instrument] ??= c.revision;
+      (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
+    }
+    for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
+    return { layers, ranges };
+  }
   function partFor(s, seg, options = {}) {
-    const base = s.base.instruments;
+    const base = s.base.instruments, extra = layersFor(s, seg, options);
+    let part;
     if (!seg.section) {
       // Si la cançó acaba amb base sola, l'últim tram fa de final.
       const last = seg.start + seg.bars === s.settings.bars && seg.bars >= 2;
-      return { type: last ? 'outro' : 'verse', bars: seg.bars, energy: last ? 40 : 55, revision: s.base.revision, instruments: base.slice(), groove: s.settings.groove };
+      part = { type: last ? 'outro' : 'verse', bars: seg.bars, energy: last ? 40 : 55, revision: s.base.revision, groove: s.settings.groove };
+    } else {
+      const sec = seg.section, harmony = s.harmony[sec.type] || 1;
+      part = { type: sec.type, bars: sec.bars, energy: TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
+      if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
+      if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
-    const sec = seg.section, harmony = s.harmony[sec.type] || 1;
-    const layers = options.baseOnly ? [] : sec.layers.filter(layer => layer.generated);
-    const part = { type: sec.type, bars: sec.bars, energy: TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove,
-      instruments: [...base, ...layers.map(layer => layer.instrument)], layers: Object.fromEntries(layers.map(layer => [layer.instrument, layer.revision])) };
-    if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
-    if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
+    part.instruments = [...base, ...Object.keys(extra?.layers || {})];
+    if (extra) { part.layers = extra.layers; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges; }
     return part;
   }
   const specFor = (seg, options) => engine.composeSongPart(song.settings, partFor(song, seg, options));
@@ -151,7 +185,7 @@
     const saved = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
     song = saved ? validateSong(JSON.parse(saved)) : newSong();
   } catch { song = newSong(); storageAvailable = false; }
-  let selected = song.sections[0]?.id || null, busy = false, noticeTimer;
+  let selected = song.sections[0]?.id || null, selectedClip = null, busy = false, noticeTimer;
   const current = () => song.sections.find(s => s.id === selected) || null;
   const barSeconds = () => 4 * 60 / song.settings.bpm;
   const frames = bars => Math.round(bars * barSeconds() * RATE);
@@ -322,25 +356,30 @@
       audioError(error); notify(`No s’ha pogut generar la base: ${reasonOf(error)}`);
     } finally { setBusy(false); updateSettingsUI(); render(); }
   }
-  async function generateLayer(sec, layer) {
+  const endOf = item => item.start + item.bars;
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
+  const sectionAt = bar => song.sections.find(s => bar >= s.start && bar < endOf(s));
+  const clipLabel = clip => `${INSTRUMENTS[clip.instrument]} · compassos ${clip.start + 1}–${endOf(clip)}`;
+  const overlaps = (a, b) => a.start < endOf(b) && b.start < endOf(a);
+  async function generateClip(clip) {
     if (busy || !song.base.generated) return;
     stop();
-    const before = { revision: layer.revision, generated: layer.generated };
+    const before = { revision: clip.revision, generated: clip.generated }, home = sectionAt(clip.start);
     let reused = null;
-    if (!layer.generated) {
-      // Les seccions del mateix tipus repeteixen la mateixa idea, com una tornada.
-      const peer = song.sections.find(s => s !== sec && s.type === sec.type && s.layers.some(l => l.instrument === layer.instrument && l.generated));
-      if (peer) { layer.revision = peer.layers.find(l => l.instrument === layer.instrument).revision; reused = peer; }
-    } else { const previous = layer.revision; do layer.revision = newRev(); while (layer.revision === previous); }
-    layer.generated = true;
+    if (!clip.generated) {
+      // Un instrument que entra en una secció del mateix tipus repeteix la idea, com una tornada.
+      reused = home && song.clips.find(c => c !== clip && c.generated && c.instrument === clip.instrument && sectionAt(c.start)?.type === home.type);
+      if (reused) clip.revision = reused.revision;
+    } else { const previous = clip.revision; do clip.revision = newRev(); while (clip.revision === previous); }
+    clip.generated = true;
     setBusy(true);
     try {
-      await renderSpec(specFor(segmentOf(sec)));
+      for (const seg of segmentsOf(song)) if (overlaps(seg, clip)) await renderSpec(specFor(seg));
       save();
-      notify(reused ? `${INSTRUMENTS[layer.instrument]} a ${sectionLabel(sec)}: repeteix la idea de ${sectionLabel(reused)}. Prem «Genera’n una altra» per variar-la.`
-        : `${INSTRUMENTS[layer.instrument]} generat a ${sectionLabel(sec)}. Escolta la secció o tota la cançó.`);
+      notify(reused ? `${INSTRUMENTS[clip.instrument]}: repeteix la idea de ${sectionLabel(sectionAt(reused.start))}. Prem «Genera’n una altra» per variar-la.`
+        : `${clipLabel(clip)} generat. Escolta la secció o tota la cançó.`);
     } catch (error) {
-      Object.assign(layer, before); audioError(error); notify(`No s’ha pogut generar l’instrument: ${reasonOf(error)}`);
+      Object.assign(clip, before); audioError(error); notify(`No s’ha pogut generar l’instrument: ${reasonOf(error)}`);
     } finally { setBusy(false); }
   }
 
@@ -371,7 +410,7 @@
     if (range[1] - start < 1) start = range[0];
     const bars = Math.min(8, MAX_SECTION, range[1] - start), type = nextType(start, start + bars);
     song.harmony[type] ??= newRev();
-    const sec = { id: uid(), type, start, bars, lyrics: '', layers: [] };
+    const sec = { id: uid(), type, start, bars, lyrics: '' };
     song.sections.push(sec); song.sections.sort((a, b) => a.start - b.start);
     selected = sec.id; stop(); save(); render();
     notify(`${sectionLabel(sec)} marcada als compassos ${start + 1}–${start + bars}. Ara afegeix-hi un instrument.`);
@@ -379,42 +418,214 @@
   function previousSection(sec) { return song.sections.filter(s => s.start < sec.start).at(-1); }
   function changeSection(field, raw) {
     const sec = current(); if (!sec || busy) return;
-    const value = Number(raw);
-    if (field === 'type') {
-      sec.type = raw; song.harmony[raw] ??= newRev();
-    } else if (field === 'start') {
-      const start = Math.round(value) - 1, range = freeRange(sec.start, sec);
-      if (!Number.isFinite(value) || start < range[0] || start + sec.bars > range[1]) {
-        notify(`Aquesta secció pot començar entre el compàs ${range[0] + 1} i el ${range[1] - sec.bars + 1}.`);
-      } else sec.start = start;
-    } else if (field === 'bars') {
-      const range = freeRange(sec.start, sec), max = Math.min(MAX_SECTION, range[1] - sec.start);
-      const bars = Math.round(value);
-      if (!Number.isFinite(value) || bars < 1 || bars > max) notify(`Aquesta secció pot durar entre 1 i ${max} compassos.`);
-      else sec.bars = bars;
-    }
+    const value = Math.round(Number(raw));
+    if (field === 'type') { sec.type = raw; song.harmony[raw] ??= newRev(); }
+    else if (!Number.isFinite(value)) notify('Escriu un nombre de compassos.');
+    else if (field === 'start') moveSection(sec, value - 1, null);
+    else if (field === 'bars') resizeSectionRight(sec, value);
     stop(); save(); render();
   }
   async function removeSection() {
     const sec = current(); if (!sec || busy) return;
-    if ((sec.layers.length || sec.lyrics) && !await ask(`Eliminar ${sectionLabel(sec).toLowerCase()}?`,
-      'S’eliminaran la secció i els seus instruments. En aquest tram només sonarà la base.')) return;
+    const inside = song.clips.filter(c => c.start >= sec.start && endOf(c) <= endOf(sec));
+    if ((inside.length || sec.lyrics) && !await ask(`Eliminar ${sectionLabel(sec).toLowerCase()}?`,
+      'S’eliminaran la secció i els instruments que només sonen dins seu. En aquest tram sonarà la base.')) return;
     stop(); const index = song.sections.indexOf(sec); song.sections.splice(index, 1);
+    song.clips = song.clips.filter(c => !inside.includes(c));
     selected = song.sections[Math.min(index, song.sections.length - 1)]?.id || null; save(); render();
+  }
+
+  // ── Edició de la línia: seccions ───────────────────────────────────
+  const maxSongBars = () => Math.min(MAX_BARS, Math.floor(MAX_SECONDS / barSeconds()));
+  const contentEnd = () => Math.max(0, ...song.sections.map(endOf), ...song.clips.map(endOf));
+  // Afegeix (delta > 0) o treu (delta < 0) compassos a la posició «edge»: tot el
+  // que ve després es desplaça, i els instruments que hi passen per sobre o hi
+  // acaben s'allarguen o s'escurcen amb la secció.
+  function ripple(edge, delta) {
+    const map = x => x >= edge ? x + delta : delta < 0 ? Math.min(x, edge + delta) : x;
+    for (const s of song.sections) if (s.start >= edge) s.start += delta;
+    for (const c of song.clips) { const start = c.start >= edge ? c.start + delta : map(c.start), end = map(endOf(c)); c.start = start; c.bars = end - start; }
+    song.clips = song.clips.filter(c => c.bars >= 1);
+  }
+  // Si la cançó acabava amb l'última secció, la durada la segueix.
+  function fitSong(tight, delta) {
+    const st = song.settings;
+    if (tight) st.bars += delta;
+    st.bars = clamp(Math.max(st.bars, contentEnd()), MIN_BARS, MAX_BARS);
+  }
+  function resizeSectionRight(sec, bars) {
+    const newBars = clamp(bars, 1, MAX_SECTION), delta = newBars - sec.bars;
+    if (!delta) return true;
+    const edge0 = endOf(sec), newEnd = Math.max(0, ...[...song.sections, ...song.clips].map(item => endOf(item) >= edge0 ? endOf(item) + delta : endOf(item)));
+    if (delta > 0 && newEnd > maxSongBars()) {
+      notify(`La cançó no pot passar de ${maxSongBars()} compassos (${time(maxSongBars() * barSeconds())}).`); return false;
+    }
+    const tight = Math.max(0, ...song.sections.map(endOf)) === song.settings.bars, edge = endOf(sec);
+    sec.bars = newBars; ripple(edge, delta);
+    fitSong(tight, delta);
+    return true;
+  }
+  function resizeSectionLeft(sec, start) {
+    const previous = song.sections.filter(s => s !== sec && s.start < sec.start).at(-1);
+    const end = endOf(sec), newStart = clamp(start, Math.max(previous ? endOf(previous) : 0, end - MAX_SECTION), end - 1);
+    // Els instruments que entraven amb la secció hi continuen entrant.
+    for (const c of song.clips) if (c.start === sec.start && endOf(c) > newStart && !song.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start && endOf(o) > newStart)) {
+      c.bars = endOf(c) - newStart; c.start = newStart;
+    }
+    sec.start = newStart; sec.bars = end - newStart;
+    return true;
+  }
+  function freeFor(sec, start) {
+    return start >= 0 && start + sec.bars <= song.settings.bars
+      && !song.sections.some(s => s !== sec && s.start < start + sec.bars && start < endOf(s));
+  }
+  // Moure una secció: si cap en un espai lliure, s'hi col·loca (amb els
+  // instruments que sonen només dins seu); si cau sobre una altra secció,
+  // les seccions es reordenen i la resta es desplaça.
+  function moveSection(sec, start, pointerBar) {
+    if (start === sec.start) return true;
+    if (freeFor(sec, start)) {
+      const delta = start - sec.start, inside = song.clips.filter(c => c.start >= sec.start && endOf(c) <= endOf(sec));
+      for (const c of inside) {
+        const moved = { ...c, start: c.start + delta };
+        if (!song.clips.some(o => o !== c && !inside.includes(o) && o.instrument === c.instrument && overlaps(o, moved))) c.start = moved.start;
+      }
+      sec.start = start; song.sections.sort((a, b) => a.start - b.start);
+      return true;
+    }
+    if (pointerBar === null) { notify('En aquest punt hi ha una altra secció. Arrossega-la a la línia per reordenar-les.'); return false; }
+    const target = sectionAt(clamp(pointerBar, 0, song.settings.bars - 1));
+    if (!target || target === sec) { notify('Deixa-la anar sobre una altra secció per canviar l’ordre, o en un espai lliure.'); return false; }
+    const after = pointerBar >= target.start + target.bars / 2;
+    reorder(sec, after ? song.sections[song.sections.indexOf(target) + 1] || null : target);
+    return true;
+  }
+  function reorder(sec, before) {
+    const items = []; let at = 0;
+    for (const s of song.sections) { if (s.start > at) items.push({ start: at, bars: s.start - at }); items.push({ start: s.start, bars: s.bars, section: s }); at = endOf(s); }
+    if (at < song.settings.bars) items.push({ start: at, bars: song.settings.bars - at });
+    const moving = items.find(item => item.section === sec);
+    items.splice(items.indexOf(moving), 1);
+    let index = before ? items.findIndex(item => item.section === before) : -1;
+    if (index < 0) { const sectionsOnly = items.filter(item => item.section); index = sectionsOnly.length ? items.indexOf(sectionsOnly.at(-1)) + 1 : 0; }
+    items.splice(index, 0, moving);
+    let position = 0;
+    for (const item of items) { item.to = position; position += item.bars; }
+    const map = x => { const item = items.find(i => x >= i.start && x < i.start + i.bars); return item ? item.to + x - item.start : x; };
+    for (const c of song.clips) c.start = map(c.start);
+    for (const item of items) if (item.section) item.section.start = item.to;
+    song.sections.sort((a, b) => a.start - b.start);
+    resolveClips();
+  }
+  // Dos clips del mateix instrument no es poden trepitjar: l'anterior s'escurça.
+  function resolveClips() {
+    song.clips.sort((a, b) => a.start - b.start);
+    for (const c of song.clips) c.bars = Math.min(c.bars, song.settings.bars - c.start);
+    for (const name of Object.keys(INSTRUMENTS)) {
+      const list = song.clips.filter(c => c.instrument === name);
+      for (let i = 1; i < list.length; i++) if (list[i].start < endOf(list[i - 1])) list[i - 1].bars = list[i].start - list[i - 1].start;
+    }
+    song.clips = song.clips.filter(c => c.bars >= 1);
+  }
+
+  // ── Edició de la línia: instruments ────────────────────────────────
+  function clipBounds(clip, instrument = clip.instrument) {
+    const others = song.clips.filter(c => c !== clip && c.instrument === instrument);
+    const before = others.filter(c => endOf(c) <= clip.start).map(endOf), after = others.filter(c => c.start >= endOf(clip)).map(c => c.start);
+    return [Math.max(0, ...before), Math.min(song.settings.bars, ...after)];
+  }
+  function addClip(instrument, from, to) {
+    if (song.clips.length >= MAX_CLIPS) { notify(`Com a màxim hi pot haver ${MAX_CLIPS} clips d’instrument.`); return null; }
+    const others = song.clips.filter(c => c.instrument === instrument);
+    let start = from;
+    for (const c of others.sort((a, b) => a.start - b.start)) if (c.start <= start && endOf(c) > start) start = endOf(c);
+    const next = Math.min(to, ...others.filter(c => c.start >= start).map(c => c.start));
+    if (next - start < 1) { notify(`${INSTRUMENTS[instrument]} ja sona en aquest tram. Estira el seu clip a la línia si el vols allargar.`); return null; }
+    const clip = { id: uid(), instrument, start, bars: next - start, revision: newRev(), generated: false };
+    song.clips.push(clip); song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id;
+    return clip;
   }
   function addLayer() {
     const sec = current(), instrument = $('layer-instrument').value;
-    if (!sec || busy || !Object.hasOwn(INSTRUMENTS, instrument) || sec.layers.some(l => l.instrument === instrument)) return;
-    sec.layers.push({ instrument, revision: newRev(), generated: false });
+    if (!sec || busy || !Object.hasOwn(INSTRUMENTS, instrument)) return;
+    const clip = addClip(instrument, sec.start, endOf(sec));
+    if (!clip) return;
     save(); render();
-    notify(`${INSTRUMENTS[instrument]} afegit a ${sectionLabel(sec)}. Prem «Genera» per crear-ne la part.`);
+    notify(`${clipLabel(clip)} afegit. Prem «Genera» per crear-ne la part; després pots estirar-lo a la línia.`);
   }
-  function removeLayer(sec, layer) { if (busy) return; stop(); sec.layers.splice(sec.layers.indexOf(layer), 1); save(); render(); }
-  function copyPrevious() {
+  function removeClip(clip) { if (busy) return; stop(); song.clips = song.clips.filter(c => c !== clip); save(); render(); }
+  // Allarga fins al final d'aquesta secció els instruments que acabaven a l'anterior.
+  function extendPrevious() {
     const sec = current(), previous = sec && previousSection(sec);
-    if (!sec || busy || !previous?.layers.length) return;
-    sec.layers = previous.layers.map(layer => ({ ...layer })); stop(); save(); render();
-    notify(`${sectionLabel(sec)} continua amb els instruments de ${sectionLabel(previous)}. Afegeix-ne un de nou per fer créixer la cançó.`);
+    if (!sec || busy || !previous) return;
+    let count = 0;
+    for (const c of song.clips.filter(c => endOf(c) === endOf(previous))) {
+      const [, limit] = clipBounds(c);
+      if (limit >= endOf(sec)) { c.bars = endOf(sec) - c.start; count++; }
+    }
+    stop(); save(); render();
+    notify(count ? `${count} instrument${count > 1 ? 's' : ''} de ${sectionLabel(previous)} continuen fins al final de ${sectionLabel(sec)}.` : 'No hi ha instruments que es puguin allargar fins aquí.');
+  }
+
+  // ── Arrossegar amb el cursor ───────────────────────────────────────
+  let drag = null;
+  const pct = bars => `${bars / song.settings.bars * 100}%`;
+  function bindDrag(element, kind, item) {
+    element.addEventListener('pointerdown', event => beginDrag(event, kind, item, event.target.dataset.edge || 'move'));
+    element.addEventListener('pointermove', dragMove);
+    element.addEventListener('pointerup', dragEnd);
+    element.addEventListener('pointercancel', () => { if (drag) { drag = null; render(); } });
+  }
+  function beginDrag(event, kind, item, mode) {
+    if (busy || event.button > 0) return;
+    event.preventDefault(); event.stopPropagation();
+    const element = event.currentTarget, rect = element.parentElement.getBoundingClientRect();
+    drag = { kind, item, mode, element, x0: event.clientX, left: rect.left, perBar: rect.width / song.settings.bars, delta: 0, moved: false, pointer: event.pointerId };
+    try { element.setPointerCapture(event.pointerId); } catch {}
+  }
+  function preview(d) {
+    const { item, mode, delta, kind } = d, total = song.settings.bars;
+    const [lo, hi] = kind === 'clip' ? clipBounds(item) : [0, total];
+    if (mode === 'move') return [clamp(item.start + delta, 0, total - item.bars), item.bars];
+    if (mode === 'right') return [item.start, clamp(item.bars + delta, 1, kind === 'section' ? MAX_SECTION : hi - item.start)];
+    const start = clamp(item.start + delta, kind === 'clip' ? lo : 0, endOf(item) - 1);
+    return [start, endOf(item) - start];
+  }
+  function dragMove(event) {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    const dx = event.clientX - drag.x0;
+    if (Math.abs(dx) > 4 && !drag.moved) { drag.moved = true; drag.element.classList.add('dragging'); }
+    if (!drag.moved) return;
+    drag.delta = Math.round(dx / drag.perBar);
+    const [start, bars] = preview(drag);
+    drag.element.style.left = pct(start); drag.element.style.width = pct(bars);
+    drag.element.dataset.hint = drag.mode === 'move' ? `compàs ${start + 1}` : `${bars} c. · ${time(bars * barSeconds())}`;
+  }
+  function dragEnd(event) {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    const d = drag; drag = null;
+    if (!d.moved) {
+      if (d.kind === 'section') { selected = d.item.id; selectedClip = null; }
+      else { selectedClip = d.item.id; selected = sectionAt(d.item.start)?.id ?? selected; }
+      render(); return;
+    }
+    stop();
+    const [start, bars] = preview(d), pointerBar = Math.floor((event.clientX - d.left) / d.perBar);
+    let done;
+    if (d.kind === 'section') {
+      done = d.mode === 'move' ? moveSection(d.item, start, pointerBar) : d.mode === 'right' ? resizeSectionRight(d.item, bars) : resizeSectionLeft(d.item, start);
+      selected = d.item.id;
+    } else {
+      const clip = d.item;
+      if (d.mode === 'move') {
+        const moved = { ...clip, start };
+        done = !song.clips.some(o => o !== clip && o.instrument === clip.instrument && overlaps(o, moved));
+        if (done) clip.start = start; else notify(`Aquí ja sona un altre clip de ${INSTRUMENTS[clip.instrument].toLowerCase()}.`);
+      } else { clip.start = start; clip.bars = bars; done = true; }
+      song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id;
+    }
+    if (done) save();
+    render();
   }
 
   // ── Configuració ────────────────────────────────────────────────────
@@ -436,11 +647,8 @@
   }
   function applyBase(instruments) {
     song.base.instruments = instruments;
-    let removed = 0;
-    for (const sec of song.sections) {
-      const kept = sec.layers.filter(layer => !instruments.includes(layer.instrument));
-      removed += sec.layers.length - kept.length; sec.layers = kept;
-    }
+    const kept = song.clips.filter(c => !instruments.includes(c.instrument)), removed = song.clips.length - kept.length;
+    song.clips = kept;
     if (removed) notify('Els instruments que ara formen part de la base ja sonen a totes les seccions.');
   }
   function updateSettingsUI() {
@@ -477,8 +685,8 @@
       const bars = Number($('song-bars').value), max = Math.min(MAX_BARS, Math.floor(MAX_SECONDS / barSeconds()));
       if (!Number.isInteger(bars) || bars < MIN_BARS || bars > max) notify(`La cançó pot durar entre ${MIN_BARS} i ${max} compassos (${time(max * barSeconds())}).`);
       else {
-        const lost = song.sections.filter(s => s.start + s.bars > bars);
-        if (lost.length && !await ask('Escurçar la cançó?', `${lost.map(sectionLabel).join(', ')} queda${lost.length > 1 ? 'en' : ''} fora o s’escurçarà. La resta es conserva.`)) { updateSettingsUI(); return; }
+        const lost = song.sections.filter(s => s.start + s.bars > bars), lostClips = song.clips.some(c => endOf(c) > bars);
+        if ((lost.length || lostClips) && !await ask('Escurçar la cançó?', `${lost.length ? lost.map(sectionLabel).join(', ') : 'Alguns instruments'} queda${lost.length > 1 ? 'en' : ''} fora o s’escurçarà. La resta es conserva.`)) { updateSettingsUI(); return; }
         st.bars = bars; trimSections();
       }
     } else if (id.startsWith('groove-')) st.groove = { ...st.groove, [id.slice(7)]: Number(event.target.value) };
@@ -491,6 +699,7 @@
     const bars = song.settings.bars;
     song.sections = song.sections.filter(s => s.start < bars);
     for (const s of song.sections) s.bars = Math.min(s.bars, bars - s.start);
+    song.clips = song.clips.filter(c => c.start < bars); resolveClips();
     if (!current()) selected = song.sections.at(-1)?.id || null;
   }
 
@@ -503,6 +712,12 @@
     if (text) element.textContent = text;
     track.append(element); return element;
   }
+  function handles(element) {
+    for (const edge of ['left', 'right']) {
+      const handle = document.createElement('i'); handle.className = `handle ${edge}`; handle.dataset.edge = edge;
+      handle.title = edge === 'left' ? 'Arrossega per moure l’inici' : 'Arrossega per allargar o escurçar'; element.append(handle);
+    }
+  }
   function renderLine() {
     const total = song.settings.bars;
     $('line').style.setProperty('--bars', total);
@@ -511,15 +726,24 @@
     for (let b = 0; b < total; b += step) { const tick = span(ruler, b, step, 'tick', String(b + 1)); tick.title = time(b * barSeconds()); }
     const track = $('section-track'); track.replaceChildren(); track.classList.toggle('locked', !song.base.generated || busy);
     for (const sec of song.sections) {
-      const block = document.createElement('button'); block.type = 'button';
-      block.className = `line-section${sec.id === selected ? ' selected' : ''}`;
-      block.style.left = `${sec.start / total * 100}%`; block.style.width = `${sec.bars / total * 100}%`; block.style.setProperty('--color', colors[sec.type]);
-      block.disabled = busy;
-      block.setAttribute('aria-label', `${sectionLabel(sec)}, compassos ${sec.start + 1} a ${sec.start + sec.bars}`);
+      const block = document.createElement('div'); block.tabIndex = 0; block.setAttribute('role', 'button');
+      block.className = `line-section${sec.id === selected ? ' selected' : ''}${busy ? ' disabled' : ''}`;
+      block.style.left = pct(sec.start); block.style.width = pct(sec.bars); block.style.setProperty('--color', colors[sec.type]);
+      block.setAttribute('aria-label', `${sectionLabel(sec)}, compassos ${sec.start + 1} a ${endOf(sec)}. Arrossega per moure-la o reordenar-la; fletxes per allargar-la, Maj+fletxes per moure-la.`);
       const name = document.createElement('strong'); name.textContent = sectionLabel(sec);
-      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${sec.layers.filter(l => l.generated).length} instr.`;
-      block.append(name, info);
-      block.addEventListener('click', event => { event.stopPropagation(); if (!busy) { selected = sec.id; render(); } });
+      const count = song.clips.filter(c => c.generated && overlaps(c, sec)).length;
+      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.`;
+      block.append(name, info); handles(block); bindDrag(block, 'section', sec);
+      block.addEventListener('keydown', event => {
+        if (busy) return;
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selected = sec.id; selectedClip = null; render(); return; }
+        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+        if (!step) return;
+        event.preventDefault(); stop();
+        if (event.shiftKey ? moveSection(sec, sec.start + step, null) : resizeSectionRight(sec, sec.bars + step)) save();
+        selected = sec.id; render();
+        document.querySelector('.line-section.selected')?.focus();
+      });
       track.append(block);
     }
     const baseTrack = $('base-track'); baseTrack.replaceChildren();
@@ -527,19 +751,34 @@
       `${song.base.instruments.map(name => INSTRUMENTS[name]).join(' + ')}${song.base.generated ? '' : ' · pendent de generar'}`);
     const rows = $('layer-rows'); rows.replaceChildren();
     const used = [];
-    for (const sec of song.sections) for (const layer of sec.layers) if (!used.includes(layer.instrument)) used.push(layer.instrument);
+    for (const c of song.clips) if (!used.includes(c.instrument)) used.push(c.instrument);
     for (const name of used) {
       const row = document.createElement('div'); row.className = 'line-row';
       const label = document.createElement('span'); label.className = 'line-label'; label.textContent = INSTRUMENTS[name];
-      const lane = document.createElement('div'); lane.className = 'line-track';
-      for (const sec of song.sections) {
-        const layer = sec.layers.find(l => l.instrument === name);
-        if (layer) span(lane, sec.start, sec.bars, `line-layer${layer.generated ? ' ready' : ''}`, '', instrumentColors[name]).title = `${INSTRUMENTS[name]} · ${sectionLabel(sec)}${layer.generated ? '' : ' · pendent'}`;
+      const lane = document.createElement('div'); lane.className = 'line-track lane'; lane.title = `Fes clic en un espai buit per afegir ${INSTRUMENTS[name].toLowerCase()}`;
+      lane.style.setProperty('--color', instrumentColors[name]);
+      for (const clip of song.clips.filter(c => c.instrument === name)) {
+        const element = document.createElement('div'); element.tabIndex = 0; element.setAttribute('role', 'button');
+        element.className = `line-clip${clip.generated ? ' ready' : ''}${clip.id === selectedClip ? ' selected' : ''}`;
+        element.style.left = pct(clip.start); element.style.width = pct(clip.bars);
+        element.title = `${clipLabel(clip)}${clip.generated ? '' : ' · pendent de generar'}`;
+        element.setAttribute('aria-label', `${element.title}. Arrossega per moure’l o estira’l per les vores.`);
+        handles(element); bindDrag(element, 'clip', clip);
+        lane.append(element);
       }
+      lane.addEventListener('click', event => {
+        if (busy || event.target !== lane) return;
+        const rect = lane.getBoundingClientRect(), bar = clamp(Math.floor((event.clientX - rect.left) / rect.width * total), 0, total - 1);
+        const home = sectionAt(bar), clip = addClip(name, home ? home.start : Math.floor(bar / 4) * 4, home ? endOf(home) : Math.min(total, Math.floor(bar / 4) * 4 + 4));
+        if (!clip) return;
+        selected = sectionAt(clip.start)?.id ?? selected; save(); render();
+        notify(`${clipLabel(clip)} afegit. Prem «Genera» al panell de la secció.`);
+      });
       row.append(label, lane); rows.append(row);
     }
     $('line-hint').textContent = !song.base.generated ? 'Primer genera la base (pas 1).'
-      : song.sections.length ? 'Fes clic en un espai buit de la fila «Seccions» per marcar-ne una altra.' : 'Fes clic a la fila «Seccions» on vulguis que entri el primer instrument.';
+      : song.sections.length ? 'Arrossega una secció per moure-la o reordenar-la, i estira-la per les vores. Els instruments també es poden moure i estirar.'
+      : 'Fes clic a la fila «Seccions» on vulguis que comenci la primera secció.';
   }
   function renderSection() {
     const sec = current(), editor = $('section-editor');
@@ -547,52 +786,55 @@
     $('section-empty').textContent = !song.base.generated ? '3 · Quan tinguis la base, marca una secció a la línia per afegir-hi instruments.'
       : '3 · Marca una secció a la línia (o prem «Afegeix una secció al final») per començar a afegir instruments.';
     if (!sec) return;
-    const seg = segmentOf(sec), range = freeRange(sec.start, sec);
-    $('section-title').textContent = `${sectionLabel(sec)} · compassos ${sec.start + 1}–${sec.start + sec.bars}`;
+    const seg = segmentOf(sec);
+    $('section-title').textContent = `${sectionLabel(sec)} · compassos ${sec.start + 1}–${endOf(sec)}`;
     $('section-type').value = sec.type;
-    $('section-start').value = sec.start + 1; $('section-start').min = range[0] + 1; $('section-start').max = range[1] - sec.bars + 1;
+    $('section-start').value = sec.start + 1; $('section-start').min = 1; $('section-start').max = song.settings.bars - sec.bars + 1;
     $('section-start-time').textContent = time(sec.start * barSeconds());
-    $('section-bars').value = sec.bars; $('section-bars').max = Math.min(MAX_SECTION, range[1] - sec.start);
+    $('section-bars').value = sec.bars; $('section-bars').max = MAX_SECTION;
     $('section-time').textContent = time(sec.bars * barSeconds());
     $('section-chords').textContent = `Acords: ${chordsOf(seg)}`;
     $('section-reharmonize').textContent = song.sections.filter(s => s.type === sec.type).length > 1 ? `↻ Altres acords per a totes ${plurals[sec.type]}` : '↻ Altres acords';
     $('section-lyrics').value = sec.lyrics;
     const list = $('layer-list'); list.replaceChildren();
-    if (!sec.layers.length) {
+    const clips = song.clips.filter(c => overlaps(c, sec));
+    if (!clips.length) {
       const empty = document.createElement('li'); empty.className = 'layer-empty';
       empty.textContent = 'Encara només sona la base. Tria un instrument a sota i afegeix-lo.'; list.append(empty);
     }
-    sec.layers.forEach((layer, index) => {
-      const item = document.createElement('li'); item.className = `layer-row${layer.generated ? ' ready' : ''}`;
-      item.style.setProperty('--color', instrumentColors[layer.instrument]);
+    clips.forEach((clip, index) => {
+      const item = document.createElement('li'); item.className = `layer-row${clip.generated ? ' ready' : ''}${clip.id === selectedClip ? ' selected' : ''}`;
+      item.style.setProperty('--color', instrumentColors[clip.instrument]);
       const number = document.createElement('span'); number.className = 'layer-number'; number.textContent = String(index + 1);
       const text = document.createElement('div'); text.className = 'layer-title';
-      const name = document.createElement('strong'); name.textContent = INSTRUMENTS[layer.instrument];
-      const state = document.createElement('small'); state.textContent = layer.generated ? 'Generat ✓' : 'Pendent de generar';
+      const name = document.createElement('strong'); name.textContent = INSTRUMENTS[clip.instrument];
+      const outside = clip.start < sec.start || endOf(clip) > endOf(sec);
+      const state = document.createElement('small');
+      state.textContent = `${clip.generated ? 'Generat ✓' : 'Pendent de generar'} · compassos ${clip.start + 1}–${endOf(clip)}${outside ? ' (passa a altres seccions)' : ''}`;
       text.append(name, state);
       const generate = document.createElement('button'); generate.type = 'button';
-      generate.className = `button ${layer.generated ? '' : 'primary'}`; generate.textContent = layer.generated ? '↻ Genera’n una altra' : '✦ Genera';
-      generate.disabled = busy || !song.base.generated; generate.addEventListener('click', () => generateLayer(sec, layer));
+      generate.className = `button ${clip.generated ? '' : 'primary'}`; generate.textContent = clip.generated ? '↻ Genera’n una altra' : '✦ Genera';
+      generate.disabled = busy || !song.base.generated; generate.addEventListener('click', () => generateClip(clip));
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-button'; remove.textContent = '×';
-      remove.setAttribute('aria-label', `Treure ${INSTRUMENTS[layer.instrument]} d’aquesta secció`); remove.disabled = busy;
-      remove.addEventListener('click', () => removeLayer(sec, layer));
+      remove.setAttribute('aria-label', `Eliminar ${clipLabel(clip)}`); remove.title = 'Elimina aquest clip'; remove.disabled = busy;
+      remove.addEventListener('click', () => removeClip(clip));
       item.append(number, text, generate, remove); list.append(item);
     });
-    const available = Object.keys(INSTRUMENTS).filter(name => !song.base.instruments.includes(name) && !sec.layers.some(l => l.instrument === name));
+    const available = Object.keys(INSTRUMENTS).filter(name => !song.base.instruments.includes(name) && !clips.some(c => c.instrument === name && c.start <= sec.start && endOf(c) >= endOf(sec)));
     const chosen = available.includes($('layer-instrument').value) ? $('layer-instrument').value : available[0];
     fillSelect($('layer-instrument'), available.map(name => [name, INSTRUMENTS[name]]), chosen);
     $('layer-instrument').disabled = busy || !available.length; $('add-layer').disabled = busy || !available.length;
-    const previous = previousSection(sec);
-    $('copy-previous').hidden = sec.layers.length > 0 || !previous?.layers.length;
-    if (previous) $('copy-previous').textContent = `⇢ Continua amb els instruments de ${sectionLabel(previous)}`;
-    const pending = sec.layers.some(l => !l.generated);
+    const previous = previousSection(sec), extendable = previous && song.clips.some(c => endOf(c) === endOf(previous) && clipBounds(c)[1] >= endOf(sec));
+    $('copy-previous').hidden = !extendable;
+    if (previous) $('copy-previous').textContent = `⇢ Allarga fins aquí els instruments de ${sectionLabel(previous)}`;
+    const pending = clips.some(c => !c.generated);
     $('play-section').textContent = playing?.kind === 'section' && playing.id === sec.id ? '■ Atura' : `▷ Escolta la secció${pending ? ' (sense els pendents)' : ''}`;
     $('play-song-inline').textContent = playing?.kind === 'song' ? '■ Atura la cançó' : '▷ Escolta tota la cançó';
   }
   // ── Equalitzadors ──────────────────────────────────────────────────
   function eqNames(sec) {
     const names = song.base.instruments.slice();
-    for (const s of sec ? [sec] : song.sections) for (const layer of s.layers) if (!names.includes(layer.instrument)) names.push(layer.instrument);
+    for (const c of song.clips) if ((!sec || overlaps(c, sec)) && !names.includes(c.instrument)) names.push(c.instrument);
     return [...names, 'master'];
   }
   function renderEq(container, sec) {
@@ -644,7 +886,7 @@
     renderLine(); renderSection();
     renderEq($('song-eq'), null);
     if (current()) renderEq($('section-eq'), current());
-    const generatedLayers = song.sections.reduce((n, s) => n + s.layers.filter(l => l.generated).length, 0);
+    const generatedLayers = song.clips.filter(c => c.generated).length;
     const total = song.settings.bars * barSeconds();
     $('song-time').textContent = time(total);
     $('duration-total').textContent = `${song.settings.bars} compassos · ${time(total)} · ${song.sections.length} seccions`;
@@ -696,7 +938,7 @@
   });
   $('remove-section').addEventListener('click', removeSection);
   $('add-layer').addEventListener('click', addLayer);
-  $('copy-previous').addEventListener('click', copyPrevious);
+  $('copy-previous').addEventListener('click', extendPrevious);
   $('section-lyrics').addEventListener('input', event => { const sec = current(); if (sec) { sec.lyrics = event.target.value; save(); } });
   function download(blob, filename) {
     const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);

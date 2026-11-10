@@ -40,7 +40,15 @@ function createPerformance(spec) {
     { channel: 10, program: 24, pan: 64, volume: 106, drums: true },
     { channel: 9, program: chosen('drums') ?? (punk ? 16 : 32), pan: 64, volume: 106, drums: true }
   ];
+  // Un instrument amb trams només sona dins d'aquests compassos.
+  function audible(channel, start) {
+    const list = spec.ranges?.[instrumentOf[channel]];
+    if (!list) return true;
+    const at = start / bar + 1e-6;
+    return list.some(([from, to]) => at >= from && at < to);
+  }
   function note(channel, pitch, start, duration, velocity, jitter = .004) {
+    if (!audible(channel, start)) return;
     const at = Math.max(0, Math.min(spec.seconds - .02, start + (random() - .5) * jitter));
     const end = Math.min(spec.seconds - .005, at + Math.max(.025, duration));
     const midi = Math.max(0, Math.min(127, Math.round(pitch)));
