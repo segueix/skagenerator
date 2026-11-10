@@ -9,13 +9,15 @@ function createPerformance(spec) {
     || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 180 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
     || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ'].includes(i))) throw new Error('Partitura no vàlida');
+  // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
+  // FreePats); banc 3: staccato de VSCO; banc 1: variacions GS; banc 0: GM.
+  // Kit 64: Muldjord (gravat). La resta són sons de GeneralUser GS.
   const presets = {
-    guitar: { auto: null, clean: 27, muted: 28, overdrive: 29, distortion: 30 },
-    bass: { auto: null, finger: 33, pick: 34 },
-    drums: { auto: null, standard: 0, rock: 16, electronic: 24, jazz: 32, room: 8, brush: 40 },
-    // [banc, programa]: el banc 1 conté les variacions GS de trompeta i trombó.
-    trumpet: { auto: null, bright: [1, 56], muted: [0, 59] },
-    trombone: { auto: null, warm: [1, 57] }
+    guitar: { auto: null, clean: [2, 27], cleanGm: [0, 27], muted: [0, 28], overdrive: [0, 29], distortion: [0, 30] },
+    bass: { auto: null, finger: [2, 33], pick: [2, 34], fingerGm: [0, 33], pickGm: [0, 34] },
+    drums: { auto: null, real: [0, 64], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
+    trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
+    trombone: { auto: null, gm: [0, 57], warm: [1, 57] }
   };
   if (spec.timbres !== undefined && (!spec.timbres || typeof spec.timbres !== 'object' || Array.isArray(spec.timbres)
     || Object.entries(spec.timbres).some(([family, preset]) => !Object.hasOwn(presets, family) || !Object.hasOwn(presets[family], preset))))
@@ -25,20 +27,24 @@ function createPerformance(spec) {
   const has = name => spec.instruments.includes(name), energy = .55 + spec.energy / 200;
   const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
   const events = [];
-  const instrumentOf = { 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
+  const patch = (channel, [bank, program], pan, volume) => ({ channel, bank, program, pan, volume });
+  const realBrass = { 3: !chosen('trumpet'), 4: !chosen('trombone') };
+  const instrumentOf = { 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
-    { channel: 0, program: chosen('guitar') ?? (punk ? 30 : 27), pan: 42, volume: 94 },
-    { channel: 1, program: chosen('guitar') ?? (punk && spec.type === 'chorus' ? 29 : 28), pan: 84, volume: 66 },
-    { channel: 2, program: chosen('bass') ?? (punk ? 34 : 33), pan: 64, volume: 115 },
-    { channel: 3, bank: chosen('trumpet')?.[0] ?? 0, program: chosen('trumpet')?.[1] ?? 56, pan: 50, volume: 116 },
-    { channel: 4, bank: chosen('trombone')?.[0] ?? 0, program: chosen('trombone')?.[1] ?? 57, pan: 79, volume: 112 },
-    { channel: 8, program: 66, pan: 30, volume: 108 },
+    patch(0, chosen('guitar') ?? (punk ? [0, 30] : [2, 27]), 42, 94),
+    patch(1, chosen('guitar') ?? (punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
+    patch(2, chosen('bass') ?? (punk ? [2, 34] : [2, 33]), 64, 115),
+    patch(3, chosen('trumpet') ?? [2, 56], 50, 116),
+    patch(4, chosen('trombone') ?? [2, 57], 79, 112),
+    // Staccato gravat per a les notes curtes de trompeta i trombó.
+    patch(12, [3, 56], 50, 116), patch(13, [3, 57], 79, 127),
+    patch(8, [2, 66], 30, 86),
     { channel: 11, program: 16, pan: 92, volume: 84 },
     { channel: 5, program: 81, pan: 58, volume: 106 },
     { channel: 6, program: 89, pan: 76, volume: 90 },
     { channel: 7, program: 38, pan: 64, volume: 110 },
     { channel: 10, program: 24, pan: 64, volume: 106, drums: true },
-    { channel: 9, program: chosen('drums') ?? (punk ? 16 : 32), pan: 64, volume: 106, drums: true }
+    { ...patch(9, chosen('drums') ?? [0, 64], 64, 106), drums: true }
   ];
   // Un instrument amb trams només sona dins d'aquests compassos.
   function audible(channel, start) {
@@ -63,6 +69,8 @@ function createPerformance(spec) {
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
   function horn(channel, pitch, start, duration, velocity, accent) {
+    // Les notes curtes dels metalls gravats fan servir les mostres d'staccato.
+    if (realBrass[channel] && duration < .3) channel += 9;
     const at = Math.max(0, start), long = duration > beat * .9;
     bend(channel, at - .002, accent && random() < .55 ? 8192 - 700 - random() * 500 : 8192);
     if (accent) for (let k = 1; k <= 4; k++) bend(channel, at + k * .016, 8192 - (4 - k) * 260 * (1 - k / 5));
@@ -164,7 +172,9 @@ function createPerformance(spec) {
   }
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
-  channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; });
+  // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
+  const level = { '2:27': 77, '2:33': 99, '2:34': 99, '2:57': 127 };
+  channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume; });
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {} };
 }
 module.exports = { createPerformance };

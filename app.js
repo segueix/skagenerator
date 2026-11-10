@@ -15,11 +15,12 @@
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
-    guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta'], ['muted', 'Guitarra apagada'], ['overdrive', 'Guitarra saturada'], ['distortion', 'Guitarra distorsionada']],
-    bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits'], ['pick', 'Baix amb pua']],
-    drums: [['auto', 'Segons l’estil'], ['jazz', 'Kit de jazz (ska clàssic)'], ['room', 'Kit de sala'], ['standard', 'Bateria acústica'], ['brush', 'Escombretes'], ['rock', 'Bateria rock'], ['electronic', 'Kit electrònic']],
-    trumpet: [['auto', 'Segons l’estil'], ['bright', 'Trompeta brillant'], ['muted', 'Trompeta amb sordina']],
-    trombone: [['auto', 'Segons l’estil'], ['warm', 'Trombó càlid']]
+    // «gravat»: mostres nota a nota de VSCO 2 CE, FreePats o el kit Muldjord.
+    guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta · gravada'], ['cleanGm', 'Guitarra neta GM'], ['muted', 'Guitarra apagada GM'], ['overdrive', 'Guitarra saturada GM'], ['distortion', 'Guitarra distorsionada GM']],
+    bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
+    drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
+    trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
+    trombone: [['auto', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']]
   };
   const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto' });
   // Equalitzador: valors en dB respecte de la corba de cada instrument.
@@ -657,7 +658,7 @@
     $('song-bpm').min = profile.bpm.min; $('song-bpm').max = profile.bpm.max; $('song-bpm').value = st.bpm;
     fillSelect($('song-key'), profile.keys.map(([tonic, mode]) => [`${tonic}:${mode}`, `${noteNames[tonic]} ${mode === 'major' ? 'major' : 'menor'}`]), `${st.tonic}:${st.mode}`);
     $('song-bars').max = Math.min(MAX_BARS, Math.floor(MAX_SECONDS / barSeconds())); $('song-bars').value = st.bars;
-    $('style-description').textContent = `${profile.name} · ${profile.description} La base (bateria i baix) sona durant tota la cançó: genera-la i escolta-la abans d’afegir res més.`;
+    $('style-description').textContent = `${profile.name} · ${profile.description} La base (bateria i baix) sona durant tota la cançó: genera-la i escolta-la abans d’afegir res més. Per defecte sonen instruments gravats nota a nota.`;
     for (const name of BASE_CHOICES) $(`base-${name}`).checked = song.base.instruments.includes(name);
     for (const family of ['drums', 'bass', 'guitar'])
       fillSelect($(`groove-${family}`), engine.SONG_GROOVES[st.style][family].map((name, index) => [String(index), name]), String(st.groove[family]));

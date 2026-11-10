@@ -26,6 +26,12 @@ jobs:
           cache: npm
       - name: Instal·lar les dependències
         run: npm ci
+      - name: Recuperar els bancs de mostres descarregats
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs') }}
+          restore-keys: soundbanks-
       - name: Passar els tests
         run: npm test
       - name: Construir la web

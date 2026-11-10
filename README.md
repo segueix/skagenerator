@@ -21,6 +21,25 @@ La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro
 
 Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
 
+## Instruments gravats nota a nota
+
+Per defecte sonen instruments gravats per músics, nota a nota i amb diverses dinàmiques, que el build converteix i afegeix al banc:
+
+| Instrument | Font | Llicència |
+|---|---|---|
+| Trompeta i trombó (sostinguts i staccato) | VSCO 2 Community Edition | CC0 |
+| Saxo tenor | FreePats (amb mostres de VSCO) | CC0 |
+| Baix amb dits i amb pua | FreePats, Yamaha RBX d’Andrea Biasior | CC0 |
+| Guitarra neta | FreePats FSBS (pont) | CC0 |
+| Bateria | Muldjord Kit, de Lars Muldjord (via FreePats) | CC BY 4.0 |
+
+- VSCO només publica els WAV: el build llegeix el nom de cada fitxer (nota i dinàmica), en mesura l’afinació, el remostreja i en crea les zones de tecla i de força. Les notes curtes de trompeta i trombó fan servir les mostres d’staccato, que donen els cops secs típics de l’ska.
+- FreePats ja publica aquests instruments en SF2: no cal convertir l’SFZ. El build els remostreja a 32 kHz (baixos a 22 kHz), treu els bucles i escurça les cues.
+- El kit Muldjord original ocupa 209 MB i té un mapa de tecles propi: se’n construeix un kit GM nou (bombo, caixa, cop de vora, charleston, plats, ride i timbals) amb tres capes de força.
+- El banc final ocupa uns 30 MB i es carrega una sola vegada. Les descàrregues i el banc convertit es guarden a `.cache/` i a la memòria cau de GitHub Actions.
+- Els sons de GeneralUser GS continuen disponibles com a alternatives («… GM») als selectors de so. L’orgue continua sent el de GeneralUser: l’orgue de FreePats és una emulació sintetitzada, no una gravació.
+- No s’han fet servir les biblioteques de Karoryfer: només es distribueixen en SFZ amb FLAC/OGG i caldria un descodificador més; FreePats ja cobreix baix, guitarra i bateria amb mostres reals i llicències lliures.
+
 ## So més autèntic i equalitzadors
 
 - **Més sons del banc.** Saxo tenor i orgue (contratemps, «bubble», sostingut…) com a instruments nous; l’orgue també pot formar part de la base. Trompeta brillant o amb sordina, trombó càlid i kits de jazz, sala i escombretes. En ska, «Segons l’estil» fa servir el kit de jazz, com els bateries jamaicans.
@@ -65,7 +84,7 @@ El motor original `radioambient.js` conserva la seva API. L’editor fa servir `
 
 ## Banc de mostres i interpretació
 
-El build descarrega la versió oficial fixada a `soundbank-source.json`, comprova el SHA-256 i n’extreu els presets de guitarra, baix, metalls, saxo, orgue i sintetitzadors (amb les variacions GS de trompeta i trombó) i sis kits de bateria. La selecció ocupa aproximadament 9,2 MB i es publica a la mateixa web; no hi ha peticions a proveïdors d’àudio durant la reproducció. `.cache/` conserva la font per als builds següents.
+El build descarrega la versió oficial fixada a `soundbank-source.json`, comprova el SHA-256 i n’extreu els presets de guitarra, baix, metalls, saxo, orgue i sintetitzadors (amb les variacions GS de trompeta i trombó) i sis kits de bateria. La selecció de GeneralUser ocupa aproximadament 9,2 MB i, amb els instruments gravats, el banc publicat en fa uns 30 i es publica a la mateixa web; no hi ha peticions a proveïdors d’àudio durant la reproducció. `.cache/` conserva la font per als builds següents.
 
 El banc conserva les mostres i els moduladors dels presets seleccionats. Els sons de guitarra neta/apagada serveixen per a l’ska, i els de guitarra distorsionada/saturada per al punk. La interpretació introdueix petits canvis de força, temps i ordre de les cordes, sempre a partir de la llavor del projecte. El baix i els dos metalls tenen canals i panoràmiques pròpies.
 

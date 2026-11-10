@@ -13,6 +13,7 @@
     "spessasynth_core": "4.4.9"
   },
   "devDependencies": {
+    "7zip-bin": "5.2.0",
     "esbuild": "0.25.12"
   }
 }

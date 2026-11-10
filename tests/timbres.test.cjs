@@ -11,11 +11,11 @@ const patch = (performance, channel) => performance.channels.find(p => p.channel
 test('per defecte els presets mantenen l’estil original', () => {
   assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 0), 27);
   assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 2), 33);
-  assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 9), 32);
+  assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 9), 64);
   const punk = engine.composeSongPart({ ...config, style: 'punk', bpm: 180 }, part);
   assert.equal(patch(createPerformance(punk), 0), 30);
   assert.equal(patch(createPerformance(punk), 2), 34);
-  assert.equal(patch(createPerformance(punk), 9), 16);
+  assert.equal(patch(createPerformance(punk), 9), 64);
 });
 
 test('els presets triats canvien els tres instruments i la guitarra secundària', () => {
@@ -76,4 +76,23 @@ test('l’equalitzador es valida i arriba a la interpretació', () => {
   assert.deepEqual(createPerformance(spec).mix, spec.mix);
   for (const mix of [{ piano: flat }, { bass: { ...flat, low: 13 } }, { bass: { ...flat, volume: -25 } }, { bass: { low: 0 } }, { bass: { ...flat, mid: NaN } }, [], null])
     assert.throws(() => engine.composeSongPart({ ...config, mix }, part), /Equalitzador/);
+});
+
+test('per defecte sonen els instruments gravats i les notes curtes dels metalls van a l’staccato', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'sax'] },
+    { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3, sax: 4 } });
+  const music = createPerformance(spec), entry = channel => music.channels.find(p => p.channel === channel);
+  assert.deepEqual([0, 2, 3, 4, 8, 12, 13].map(c => `${entry(c).bank}:${entry(c).program}`), ['2:27', '2:33', '2:56', '2:57', '2:66', '3:56', '3:57']);
+  assert.equal(entry(9).program, 64);
+  const notes = channel => music.events.filter(e => e.type === 'on' && e.channel === channel);
+  const off = e => music.events.find(o => o.type === 'off' && o.channel === e.channel && o.note === e.note && o.time >= e.time);
+  assert(notes(12).length + notes(13).length > 0, 'hi ha notes en staccato');
+  assert(notes(12).every(e => off(e).time - e.time < .31));
+  assert(notes(3).every(e => off(e).time - e.time >= .29));
+  // Les inflexions van al mateix canal que la nota.
+  assert(music.events.filter(e => e.type === 'pitch').every(e => [3, 4, 8, 12, 13].includes(e.channel)));
+  // Amb el so GM no hi ha staccato separat.
+  const gm = createPerformance(engine.composeSongPart({ ...config, instruments: ['trumpet'], timbres: { trumpet: 'gm' } }, { ...part, layers: { trumpet: 2 } }));
+  assert(gm.events.every(e => e.channel === 3));
+  assert.equal(gm.channels.find(p => p.channel === 3).bank, 0);
 });

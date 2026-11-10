@@ -1,0 +1,263 @@
+{
+  "about": "Instruments gravats nota a nota (CC0 i CC-BY 4.0) que el build converteix i afegeix al banc. Els projectes i commits estan fixats.",
+  "vsco": {
+    "name": "Versilian Community Sample Library 2 (VSCO 2 CE)",
+    "license": "CC0 1.0",
+    "commit": "440300901dfe9275fd84e0b7763af1f8443ae62e",
+    "base": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/440300901dfe9275fd84e0b7763af1f8443ae62e/",
+    "instruments": [
+      {
+        "name": "Trompeta (VSCO 2 CE)",
+        "bank": 2,
+        "program": 56,
+        "match": "Brass/Trumpet/sus/",
+        "maxSeconds": 2.6,
+        "release": 0.14
+      },
+      {
+        "name": "Trompeta staccato (VSCO 2 CE)",
+        "bank": 3,
+        "program": 56,
+        "match": "Brass/Trumpet/stac/",
+        "maxSeconds": 0.9,
+        "release": 0.08
+      },
+      {
+        "name": "Trombó (VSCO 2 CE)",
+        "bank": 2,
+        "program": 57,
+        "match": "Brass/Tenor Trombone/sus/",
+        "maxSeconds": 2.6,
+        "release": 0.16
+      },
+      {
+        "name": "Trombó staccato (VSCO 2 CE)",
+        "bank": 3,
+        "program": 57,
+        "match": "Brass/Tenor Trombone/stac/",
+        "maxSeconds": 0.9,
+        "release": 0.08
+      }
+    ],
+    "files": [
+      "Brass/Tenor Trombone/stac/tenortbn_stac_A#0_v1_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_A#0_v3_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_A#1_v1_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_A#1_v3_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_A#2_v1_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_A#2_v3_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_D3_v1_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_D3_v3_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_F1_v1_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_F1_v3_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_F2_v1_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_F2_v3_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_F3_v1_rr1.wav",
+      "Brass/Tenor Trombone/stac/tenortbn_stac_F3_v3_rr1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_A#0_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_A#1_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_A#1_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_C#1_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_C#3_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_C#3_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_C3_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_C3_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_D#1_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_D#1_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_D#3_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_D#3_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_D2_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_D2_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_F1_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_F1_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_F2_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_F2_v3_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_F3_v1_1.wav",
+      "Brass/Tenor Trombone/sus/tenortbn_sus_F3_v3_1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_A#3_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_A#3_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_A2_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_A2_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_A4_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_A4_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_C3_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_C3_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_C5_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_C5_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_D#3_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_D#3_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_D4_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_D4_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_F2_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_F2_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_F3_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_F3_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_F4_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_F4_v3_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_G3_v1_rr1.wav",
+      "Brass/Trumpet/stac/Sum_SHTrumpet_stac_G3_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_A#3_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_A#3_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_A2_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_A2_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_A4_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_A4_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_C3_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_C3_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_C5_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_C5_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_D#3_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_D#3_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_D4_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_D4_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_F2_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_F2_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_F4_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_F4_v3_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_G3_v1_rr1.wav",
+      "Brass/Trumpet/sus/Sum_SHTrumpet_sus_G3_v3_rr1.wav"
+    ]
+  },
+  "freepats": [
+    {
+      "name": "Finger Bass YR",
+      "author": "Andrea Biasior",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 33,
+      "maxSeconds": 3,
+      "url": "https://github.com/freepats/electric-bass-YR/releases/download/2019-09-30/FingerBassYR-SF2-20190930.7z",
+      "sha256": "f5b5cfe04435a9e9037d1f97d515dc596535acf26637db9579d724cd757f179e",
+      "rate": 22050
+    },
+    {
+      "name": "Picked Bass YR",
+      "author": "Andrea Biasior",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 34,
+      "maxSeconds": 3,
+      "url": "https://github.com/freepats/electric-bass-YR/releases/download/2019-09-30/PickedBassYR-SF2-20190930.7z",
+      "sha256": "e6bff767c352cd27de2de8cfff326d0849a76bb38d876075eecd5ffd2dc5afd0",
+      "rate": 22050
+    },
+    {
+      "name": "Electric Guitar FSBS clean bridge (small)",
+      "author": "FreePats",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 27,
+      "maxSeconds": 2.5,
+      "url": "https://github.com/freepats/electric-guitar-FSBS-clean/releases/download/2026-08-07/EGuitarFSBS-clean-bridge-small-SF2-20260807.7z",
+      "sha256": "bcea7d4c92a1cc6a26e545a218b34e59037d4bab6cf0fce24396428e6934d69c"
+    },
+    {
+      "name": "Tenor Saxophone (small)",
+      "author": "roberto@zenvoid.org, amb mostres de VSCO",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 66,
+      "maxSeconds": 2.6,
+      "url": "https://freepats.zenvoid.org/Reed/TenorSaxophone/TenorSaxophone-small-SF2-20200717.tar.bz2",
+      "sha256": "fd45d0234b455f54300a5286594da5753b5619a86ebc34ebf574b21044b18db4"
+    }
+  ],
+  "drums": {
+    "name": "Muldjord Kit",
+    "author": "Lars Muldjord",
+    "license": "CC-BY 4.0",
+    "program": 64,
+    "url": "https://github.com/freepats/muldjordkit/releases/download/2020-10-18/MuldjordKit-SF2-20201018.7z",
+    "sha256": "aef4c9e0a96f9a899a7838f65ff07565f6af247bbb4ff31e24dba3331a671a96",
+    "velocities": [
+      40,
+      84,
+      124
+    ],
+    "map": {
+      "35": [
+        48,
+        1.0
+      ],
+      "36": [
+        48,
+        1.0
+      ],
+      "37": [
+        65,
+        0.6
+      ],
+      "38": [
+        50,
+        1.0
+      ],
+      "40": [
+        51,
+        1.0
+      ],
+      "42": [
+        52,
+        0.5,
+        1
+      ],
+      "44": [
+        52,
+        0.45,
+        1
+      ],
+      "46": [
+        53,
+        1.6,
+        1
+      ],
+      "49": [
+        58,
+        2.4
+      ],
+      "57": [
+        59,
+        2.4
+      ],
+      "52": [
+        60,
+        2.4
+      ],
+      "51": [
+        54,
+        2.4
+      ],
+      "53": [
+        55,
+        2.0
+      ],
+      "59": [
+        56,
+        2.4
+      ],
+      "50": [
+        61,
+        1.4
+      ],
+      "48": [
+        62,
+        1.4
+      ],
+      "47": [
+        63,
+        1.4
+      ],
+      "45": [
+        63,
+        1.4
+      ],
+      "43": [
+        64,
+        1.6
+      ],
+      "41": [
+        64,
+        1.6
+      ]
+    }
+  }
+}
