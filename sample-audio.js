@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const base = document.currentScript.src;
-  const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.3-1', base).href;
+  const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.3-urban', base).href;
   const workerURL = new URL('sample-worker.js?v=20261110-samples', base).href;
   let worker, ready, serial = 0;
   const requests = new Map();

@@ -47,8 +47,8 @@ test('rebutja configuracions impossibles i conserva el compositor original', () 
   assert.equal(original.style, 'rumba'); assert(original.chords.length > 0); assert(original.melody.length > 0);
 });
 
-test('els perfils només admeten ska i punk, amb els seus tempos i tonalitats', () => {
-  assert.deepEqual(Object.keys(engine.SONG_STYLES), ['ska', 'punk']);
+test('els perfils admeten ska, punk i urban, amb els seus tempos i tonalitats', () => {
+  assert.deepEqual(Object.keys(engine.SONG_STYLES), ['ska', 'punk', 'urban']);
   assert.throws(() => engine.composeSongPart({ ...settings, style: 'pop' }, part('intro')));
   assert.throws(() => engine.composeSongPart({ ...settings, bpm: 99 }, part('intro')));
   assert.throws(() => engine.composeSongPart({ ...settings, bpm: 181 }, part('intro')));
@@ -59,7 +59,7 @@ test('els perfils només admeten ska i punk, amb els seus tempos i tonalitats', 
   }
   assert.throws(() => engine.composeSongPart({ ...settings, tonic: 11, mode: 'major' }, part('intro')));
 });
-test('els cinc instruments generen àudio propi i trompeta i trombó són diferents', async () => {
+test('els nou instruments generen àudio propi i trompeta i trombó són diferents', async () => {
   const samples = [];
   for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) {
     const spec = engine.composeSongPart({ ...settings, instruments: [instrument] }, part('chorus'));

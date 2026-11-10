@@ -8,11 +8,13 @@ Intro (4 compassos) → estrofa (8) → tornada (8) → estrofa (8) → tornada 
 
 ## Estils i instruments
 
-Només hi ha ska i punk. L’ska té una selecció de 100–180 BPM (128 per defecte) i el punk de 140–220 BPM (180 per defecte). Cada estil ofereix una preselecció de tonalitats majors i menors adequada per treballar amb guitarra i metalls. Són decisions de configuració del taller, no restriccions teòriques dels gèneres.
+Hi ha ska, punk i urban. L’ska té una selecció de 100–180 BPM (128 per defecte) i el punk de 140–220 BPM (180 per defecte). Urban ofereix 70–160 BPM (95 per defecte), sintetitzador melòdic, sintetitzador d’acords, baix sintetitzat i bateria electrònica. Les cinc propostes inclouen urban sincopat, trap a mig temps, dembow electrònic, urban melòdic i urban amb síncopes. Canviar d’estil selecciona la seva formació inicial; després es poden combinar lliurement els nou instruments, també per secció.
+
+Cada estil ofereix una preselecció de tonalitats majors i menors adequada per treballar amb guitarra i metalls. Són decisions de configuració del taller, no restriccions teòriques dels gèneres.
 
 Guitarres, bateria, baix, trompeta i trombó es poden activar independentment. Els instruments base serveixen de formació inicial per a la cançó. Cada intro, estrofa, tornada, pont, pretornada, instrumental o final pot activar diversos instruments propis; la selecció es desa per secció i no afecta les altres. L’opció «Recupera la formació base» restableix l’herència dels instruments generals. Canviar la formació base només invalida l’àudio de les seccions que la segueixen; canviar l’estil, el tempo o la tonalitat continua afectant-les totes. L’ska utilitza guitarra curta a contratemps i baix caminant; el punk utilitza quintes en corxeres i bateria més directa. Trompeta i trombó tenen mostres i registres diferenciats. No intervenen piano, vibràfon ni coixins de cordes en les noves cançons.
 
-En recuperar un projecte anterior, es conserva l’estructura i la lletra, s’adapta la configuració als dos estils i es deixen les parts pendents de regenerar.
+En recuperar un projecte anterior, es conserva l’estructura i la lletra, s’adapta la configuració als estils disponibles i es deixen les parts pendents de regenerar.
 
 Cada part es genera i s’escolta individualment, amb durada i intensitat pròpies. Tota la cançó comparteix estil, tempo i tonalitat. Per a cada intro, estrofa o tornada, el botó «Genera 5 versions diferents» crea cinc propostes amb progressions d’acords, melodies, patrons de bateria i línies de baix alternatius. El baix té una partitura pròpia en cada proposta (caminant, dub, octaves, melòdic o sincopat en ska; corxeres, mig temps, galop, riff o síncopes en punk). El motor de mostres interpreta aquesta mateixa línia de baix i els patrons diferenciats de guitarra i bombo. El canal del baix enregistrat té més presència. Es poden escoltar per separat i escollir la versió definitiva, que és la que es reprodueix a la cançó completa i s’exporta al WAV. Les altres alternatives continuen disponibles. Les seccions repetides (estrofes i tornades) poden tenir una elecció independent. Les cinc composicions es calculen al moment, mentre que l’àudio de les alternatives no seleccionades només es prepara quan s’escolten. La tria i les llavors queden desades al JSON i al navegador. També es poden afegir pretornades i parts instrumentals, reordenar seccions i eliminar-les.
 
@@ -41,7 +43,7 @@ El motor original `radioambient.js` conserva la seva API. L’editor fa servir `
 
 ## Banc de mostres i interpretació
 
-El build descarrega la versió oficial fixada a `soundbank-source.json`, comprova el SHA-256 i n’extreu vuit presets de guitarra, baix i metalls i dos kits de bateria. La selecció ocupa aproximadament 5,8 MB i es publica a la mateixa web; no hi ha peticions a proveïdors d’àudio durant la reproducció. `.cache/` conserva la font per als builds següents.
+El build descarrega la versió oficial fixada a `soundbank-source.json`, comprova el SHA-256 i n’extreu onze presets de guitarra, baix, metalls i sintetitzadors i tres kits de bateria. La selecció ocupa aproximadament 8,5 MB i es publica a la mateixa web; no hi ha peticions a proveïdors d’àudio durant la reproducció. `.cache/` conserva la font per als builds següents.
 
 El banc conserva les mostres i els moduladors dels presets seleccionats. Els sons de guitarra neta/apagada serveixen per a l’ska, i els de guitarra distorsionada/saturada per al punk. La interpretació introdueix petits canvis de força, temps i ordre de les cordes, sempre a partir de la llavor del projecte. El baix i els dos metalls tenen canals i panoràmiques pròpies.
 
