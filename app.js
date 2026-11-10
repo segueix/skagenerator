@@ -187,7 +187,7 @@
         if (c.feel) feel[c.instrument] = c.feel;
         if (c.instrument === 'vocal' && c.register) register = c.register;
         if (c.sound && c.sound !== 'auto') timbres[c.instrument] = c.sound;
-        if (c.fx && c.fx.type !== 'none') fx[c.instrument] = c.fx;
+        if (c.fx) fx[c.instrument] = c.fx;
       }
       layers[c.instrument] ??= c.revision;
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
@@ -887,6 +887,7 @@
   const timbreFamilies = Object.keys(timbreOptions);
   for (const family of timbreFamilies) fillSelect($(`timbre-${family}`), timbreOptions[family]);
   fillSelect($('section-type'), Object.entries(TYPES).map(([type, info]) => [type, info.name]));
+  fillSelect($('song-guitar-fx'), Object.entries(engine.GUITAR_FX));
   for (const name of BASE_CHOICES) {
     const label = document.createElement('label'); label.className = 'instrument-toggle';
     const input = document.createElement('input'); input.type = 'checkbox'; input.id = `base-${name}`; input.value = name;
@@ -918,6 +919,7 @@
       fillSelect($(`groove-${family}`), engine.SONG_GROOVES[st.style][family].map((name, index) => [String(index), name]), String(st.groove[family]));
     $('groove-guitar-field').hidden = !song.base.instruments.includes('guitar');
     for (const family of timbreFamilies) $(`timbre-${family}`).value = st.timbres[family];
+    $('song-guitar-fx').value = st.fx?.guitar?.type || 'none';
   }
   async function changeSettings(event) {
     if (busy) return;
@@ -946,7 +948,14 @@
       }
     } else if (id.startsWith('groove-')) st.groove = { ...st.groove, [id.slice(7)]: Number(event.target.value) };
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
-    const replay = id.startsWith('groove-') || id.startsWith('timbre-') ? playing?.kind : null;
+    else if (id === 'song-guitar-fx') {
+      const type = event.target.value;
+      if (type === 'none') delete st.fx;
+      else { const setting = { type, drive: type === 'horrorpunk' ? 70 : 60, tone: type === 'horrorpunk' ? 60 : 50 }; st.fx = { guitar: setting, guitar2: { ...setting }, guitar3: { ...setting } }; }
+      if (type === 'horrorpunk') notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
+        : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
+    }
+    const replay = id.startsWith('groove-') || id.startsWith('timbre-') || id === 'song-guitar-fx' ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   }
@@ -1113,7 +1122,7 @@
     const slider = (label, key, left, right) => {
       const wrap = document.createElement('label'), caption = document.createElement('span'), output = document.createElement('output'), input = document.createElement('input');
       caption.className = 'field-label'; caption.textContent = label; output.textContent = `${fx[key]}`; caption.append(output);
-      input.type = 'range'; input.min = 0; input.max = 100; input.step = 5; input.value = fx[key]; input.disabled = busy || fx.type === 'none';
+      input.type = 'range'; input.min = 0; input.max = 100; input.step = 5; input.value = fx[key]; input.disabled = busy || !clip.fx || fx.type === 'none';
       input.setAttribute('aria-label', `${label} · ${INSTRUMENTS[clip.instrument]}`);
       input.addEventListener('input', () => { output.textContent = input.value; });
       input.addEventListener('change', () => changeClipTone(clip, { fx: { ...fx, [key]: Number(input.value) } }));
@@ -1131,7 +1140,8 @@
     if (!GUITARS.includes(clip.instrument)) { box.classList.add('only-feel'); box.append(feelSelect); return box; }
     box.append(feelSelect,
       select('SO', timbreOptions.guitar.map(([k, v]) => [k, k === 'auto' ? 'Com la guitarra de la cançó' : v]), clip.sound || 'auto', value => changeClipTone(clip, { sound: value })),
-      select('EFECTE', Object.entries(engine.GUITAR_FX), fx.type, value => changeClipTone(clip, { fx: { ...fx, type: value } })),
+      select('EFECTE', [['inherit', `Com la cançó (${engine.GUITAR_FX[song.settings.fx?.guitar?.type || 'none']})`], ...Object.entries(engine.GUITAR_FX)], clip.fx?.type ?? 'inherit',
+        value => changeClipTone(clip, { fx: value === 'inherit' ? null : { ...fx, type: value } })),
       slider('GUANY', 'drive', 'Poc', 'Molt'), slider('TO', 'tone', 'Fosc', 'Brillant'));
     return box;
   }
@@ -1140,7 +1150,7 @@
     if ('sound' in change) { if (change.sound === 'auto') delete clip.sound; else clip.sound = change.sound; }
     if ('register' in change) { if (change.register === 0) delete clip.register; else clip.register = change.register; }
     if ('feel' in change) { if (change.feel === 1) delete clip.feel; else clip.feel = change.feel; }
-    if ('fx' in change) { if (change.fx.type === 'none' && change.fx.drive === 50 && change.fx.tone === 50) delete clip.fx; else clip.fx = change.fx; }
+    if ('fx' in change) { if (change.fx === null) delete clip.fx; else clip.fx = change.fx; }
     const replay = playing?.kind; stop(); save(); render();
     if (replay === 'song' || replay === 'section') play(replay);
   }
@@ -1249,7 +1259,7 @@
     } else { $('playback-duration').textContent = time(playing.seconds); $('play-song').textContent = playing.kind === 'song' ? '■' : '▶'; }
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
-      'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'section-type', 'section-start', 'section-bars',
+      'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
       'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm']) $(key).disabled = busy;
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
@@ -1300,7 +1310,7 @@
   paintTheme();
 
   // ── Esdeveniments ───────────────────────────────────────────────────
-  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal']
+  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx']
     .forEach(key => $(key).addEventListener('change', changeSettings));
   $('song-title').addEventListener('input', event => { song.title = event.target.value; $('transport-title').textContent = song.title || 'Nova cançó'; save(); });
   $('generate-base').addEventListener('click', generateBase);

@@ -15,7 +15,7 @@ export const EQ_PRESETS = {
   vocal: [-4, 3, 2],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
-  guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-3, 3, 1], sax: [-3, 2, 1], organ: [-5, 1, 1],
+  guitar: [-6, 1, 3], trumpet: [-4, 1, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
 export const SONG_GAIN = 10 ** (5.5 / 20);
@@ -73,7 +73,12 @@ const FX = {
   distortion: { gain: [38, 58], curve: x => 2 / Math.PI * Math.atan(x * 1.6), tight: 150, mid: 4, scoop: 0, cab: 5000 },
   metal: { gain: [46, 66], curve: x => Math.tanh(x * 1.4), tight: 220, mid: 2, scoop: -7, cab: 6000 },
   fuzz: { gain: [48, 68], curve: x => { const h = Math.max(-.62, Math.min(.62, x)); return h * .8 + Math.abs(Math.tanh(x)) * .25; }, tight: 90, mid: 0, scoop: 0, cab: 4200 },
-  lofi: { gain: [10, 24], curve: x => Math.tanh(x), tight: 120, mid: 0, scoop: 0, cab: 4500, bits: true }
+  lofi: { gain: [10, 24], curve: x => Math.tanh(x), tight: 120, mid: 0, scoop: 0, cab: 4500, bits: true },
+  // Horror punk a l'estil dels Misfits: distorsió «serra mecànica» molt saturada,
+  // amb un punt de fuzz (part rectificada que fa brunzir), mitjos plens (sense el
+  // buit del metal), greus ajustats i presència a 2,5 kHz per tallar la mescla.
+  horrorpunk: { gain: [40, 58], curve: x => { const soft = Math.tanh(x * 1.2), hard = Math.max(-.8, Math.min(.8, x)); return .6 * soft + .4 * hard + .08 * Math.abs(soft); },
+    tight: 140, mid: 5, scoop: 0, presence: 4, cab: 5200 }
 };
 export const GUITAR_FX_TYPES = Object.keys(FX);
 export function createGuitarFx(fx, sampleRate) {
@@ -85,6 +90,7 @@ export function createGuitarFx(fx, sampleRate) {
   const side = () => ({
     tight: biquad('highpass', def.tight, 0, sampleRate, .7), mid: biquad('peak', 720, def.mid, sampleRate, .9),
     scoop: biquad('peak', 500, def.scoop, sampleRate, .7), low: biquad('highpass', 90, 0, sampleRate, .7),
+    presence: biquad('peak', 2500, def.presence || 0, sampleRate, .9),
     cab1: biquad('lowpass', cutoff, 0, sampleRate, .7), cab2: biquad('lowpass', cutoff * 1.15, 0, sampleRate, .6),
     last: 0, hold: 0, count: 0, inLevel: 1e-6, outLevel: 1e-6
   });
@@ -102,7 +108,7 @@ export function createGuitarFx(fx, sampleRate) {
         if (s.count++ % crushEvery === 0) s.hold = Math.round(y / bitStep) * bitStep;
         y = s.hold;
       }
-      y = run(s.cab2, run(s.cab1, run(s.low, run(s.scoop, y))));
+      y = run(s.cab2, run(s.cab1, run(s.low, run(s.presence, run(s.scoop, y)))));
       // Nivell compensat: segueix la sonoritat de la guitarra sense efecte.
       s.inLevel = smooth * s.inLevel + (1 - smooth) * x * x;
       s.outLevel = smooth * s.outLevel + (1 - smooth) * y * y;
@@ -140,7 +146,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // reverberació: així l'equalitzador no deixa la sala sense efecte.
     const BLOCK = 128, eqs = new Map(), dummy = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
     for (const patch of score.channels) {
-      const eq = createEqualizer(patch.instrument, score.mix[patch.instrument], sampleRate);
+      // La segona veu de vent amb saxo fa servir la corba del saxo.
+      const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, score.mix[patch.instrument], sampleRate);
       const fx = createGuitarFx(score.fx?.[patch.instrument], sampleRate);
       if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);
     }

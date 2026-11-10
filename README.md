@@ -44,6 +44,12 @@ L’instrument **«Melodia de veu (guia)»** toca una melodia pensada per ser ca
 - **Fins a tres guitarres a la mateixa secció**: Guitarra 1 (rítmica), Guitarra 2 (rítmica una octava amunt, amb un patró diferent) i Guitarra 3 (arpegis i punteig). Cadascuna té el seu canal, el seu clip, el seu so i el seu efecte.
 - **Efectes de guitarra** per a cada clip: boost net, saturació de cinta, crunch, overdrive, distorsió, metal, fuzz i lo-fi, amb **guany** i **to**. La cadena és la d’un pedal i un amplificador: filtre d’entrada, saturació amb sobremostreig ×2, pantalla d’altaveu i nivell compensat (la guitarra sona igual de forta amb efecte que sense). Amb efectes de guany alt, la reverberació es redueix.
 
+### Horror punk (estil Misfits)
+
+L’efecte **«Horror punk (estil Misfits)»** imita el so de guitarra dels primers discos dels Misfits: distorsió tipus «serra mecànica» molt saturada amb un punt de fuzz, mitjos plens (no buidats com en el metal), greus ajustats i presència a 2,5 kHz. Es pot triar per a tota la cançó a «Efecte de guitarra» (s’aplica a les tres guitarres; cada clip el pot canviar) o només en un clip.
+
+Amb aquest efecte, la guitarra principal també toca a la manera del grup: acords de quinta (fonamental, quinta i octava) **tot a cops avall en corxeres**, **apagats amb el palmell a les estrofes** i **oberts a les tornades**, amb **dues guitarres iguals a esquerra i dreta**. La guitarra entra neta a l’«amplificador» perquè no es distorsioni dues vegades. Per sonar com ells: estil Punk, 160–200 BPM.
+
 ## Grava la teva veu
 
 Al pas **4 · La teva veu** (pestanya «Veu» al mòbil) pots cantar mentre sona la cançó:
@@ -78,6 +84,7 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 - Les gravacions de VSCO tenen nivells molt desiguals (més de 20 dB entre notes). El build iguala la sonoritat de cada mostra: totes les notes d’una dinàmica sonen igual, la dinàmica suau queda 4 dB per sota de la forta i l’staccato 5 dB per sota del sostingut. La força dels metalls s’allunya del canvi de dinàmica perquè no saltin de mostra nota a nota.
 - El trombó i el clarinet tenien un atac lent (el clarinet trigava fins a mig segon a sonar ple) i les notes curtes quedaven apagades: el build fa començar aquestes mostres just quan la nota ja sona (atac de ~20 ms, més ràpid que la trompeta). Les notes del trombó on no hi ha staccato gravat a menys de 2 semitons fan servir la gravació sostinguda retallada, i la línia pròpia del trombó es toca tal com està composta, una octava avall.
 - **Segona veu de vent**: per defecte sona amb **saxo tenor gravat** en lloc de trombó. És un instrument de claus, amb una articulació més clara que la vara del trombó i l’atac més ràpid dels vents gravats; és la parella clàssica de la trompeta a l’ska jamaicà. Toca la mateixa línia (una octava sota la trompeta) uns 2 dB per sota d’aquesta. El trombó gravat (VSCO) i els GM continuen disponibles a «So de la segona veu de vent». Les mostres del saxo també s’igualen nota a nota.
+- **Saxos audibles dins la banda**: el saxo i la segona veu quedaven 2,5–5 dB per sota de la trompeta i tapats per la guitarra i el baix, en el mateix registre. Ara el saxo toca en el registre agut del tenor (per sobre de la segona veu), tots dos tenen menys greus i més presència, i el volum està calibrat perquè els tres vents pesin el mateix dins la mescla.
 - Totes les seccions reben el mateix guany (abans cada secció es normalitzava per separat i un instrument que passava d’una secció a l’altra pujava o baixava de volum). Un compressor suau i un limitador controlen els pics.
 - FreePats ja publica aquests instruments en SF2: no cal convertir l’SFZ. El build els remostreja a 32 kHz (baixos a 22 kHz), treu els bucles i escurça les cues.
 - El kit Muldjord original ocupa 209 MB i té un mapa de tecles propi: se’n construeix un kit GM nou (bombo, caixa, cop de vora, charleston, plats, ride i timbals) amb tres capes de força.
