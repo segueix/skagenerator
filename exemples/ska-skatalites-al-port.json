@@ -1,0 +1,211 @@
+{
+  "version": 3,
+  "title": "Skatalites al Port",
+  "settings": {
+    "style": "ska",
+    "bpm": 116,
+    "tonic": 5,
+    "mode": "major",
+    "seed": 2207,
+    "bars": 64,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "auto",
+      "drums": "jazz",
+      "trumpet": "auto",
+      "trombone": "vsco",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 0,
+      "bass": 0,
+      "guitar": 1
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar",
+      "organ"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 2,
+    "verse": 4,
+    "chorus": 3,
+    "solo": 8,
+    "bridge": 5,
+    "outro": 3
+  },
+  "sections": [
+    {
+      "id": "ska-skatalites-al-port-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "bpm": 100,
+      "energy": 45
+    },
+    {
+      "id": "ska-skatalites-al-port-s2",
+      "start": 4,
+      "lyrics": "",
+      "type": "verse",
+      "bars": 8,
+      "energy": 65
+    },
+    {
+      "id": "ska-skatalites-al-port-s3",
+      "start": 12,
+      "lyrics": "",
+      "type": "verse",
+      "bars": 8,
+      "energy": 70
+    },
+    {
+      "id": "ska-skatalites-al-port-s4",
+      "start": 20,
+      "lyrics": "",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 85
+    },
+    {
+      "id": "ska-skatalites-al-port-s5",
+      "start": 28,
+      "lyrics": "",
+      "type": "solo",
+      "bars": 16,
+      "energy": 80
+    },
+    {
+      "id": "ska-skatalites-al-port-s6",
+      "start": 44,
+      "lyrics": "",
+      "type": "bridge",
+      "bars": 8,
+      "energy": 55,
+      "feel": {
+        "drums": 0.5
+      }
+    },
+    {
+      "id": "ska-skatalites-al-port-s7",
+      "start": 52,
+      "lyrics": "",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95
+    },
+    {
+      "id": "ska-skatalites-al-port-s8",
+      "start": 60,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "bpm": 104
+    }
+  ],
+  "clips": [
+    {
+      "id": "ska-skatalites-al-port-c1",
+      "instrument": "trumpet",
+      "start": 0,
+      "bars": 4,
+      "revision": 10,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c2",
+      "instrument": "trumpet",
+      "start": 4,
+      "bars": 16,
+      "revision": 35,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c3",
+      "instrument": "sax",
+      "start": 4,
+      "bars": 16,
+      "revision": 25,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c4",
+      "instrument": "trumpet",
+      "start": 20,
+      "bars": 8,
+      "revision": 8,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c5",
+      "instrument": "trombone",
+      "start": 20,
+      "bars": 8,
+      "revision": 36,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c6",
+      "instrument": "sax",
+      "start": 20,
+      "bars": 8,
+      "revision": 49,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c7",
+      "instrument": "sax",
+      "start": 28,
+      "bars": 16,
+      "revision": 47,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c8",
+      "instrument": "guitar3",
+      "start": 28,
+      "bars": 16,
+      "revision": 3,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c9",
+      "instrument": "trombone",
+      "start": 44,
+      "bars": 8,
+      "revision": 33,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c10",
+      "instrument": "trumpet",
+      "start": 52,
+      "bars": 12,
+      "revision": 55,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c11",
+      "instrument": "trombone",
+      "start": 52,
+      "bars": 12,
+      "revision": 48,
+      "generated": true
+    },
+    {
+      "id": "ska-skatalites-al-port-c12",
+      "instrument": "sax",
+      "start": 52,
+      "bars": 12,
+      "revision": 49,
+      "generated": true
+    }
+  ]
+}

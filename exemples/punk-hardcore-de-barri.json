@@ -1,0 +1,243 @@
+{
+  "version": 3,
+  "title": "Hardcore de Barri",
+  "settings": {
+    "style": "punk",
+    "bpm": 216,
+    "tonic": 11,
+    "mode": "minor",
+    "seed": 8821,
+    "bars": 72,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "pick",
+      "drums": "auto",
+      "trumpet": "auto",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 2,
+      "bass": 3,
+      "guitar": 2
+    },
+    "fx": {
+      "guitar": {
+        "type": "fuzz",
+        "drive": 75,
+        "tone": 55
+      },
+      "guitar2": {
+        "type": "fuzz",
+        "drive": 75,
+        "tone": 55
+      },
+      "guitar3": {
+        "type": "fuzz",
+        "drive": 75,
+        "tone": 55
+      }
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 2,
+    "verse": 5,
+    "chorus": 4,
+    "bridge": 6,
+    "outro": 2
+  },
+  "sections": [
+    {
+      "id": "punk-hardcore-de-barri-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "energy": 90
+    },
+    {
+      "id": "punk-hardcore-de-barri-s2",
+      "start": 4,
+      "lyrics": "Ens volen quiets\nens volen callats\nperò el barri és nostre\ni no ens han guanyat",
+      "type": "verse",
+      "bars": 8,
+      "energy": 85
+    },
+    {
+      "id": "punk-hardcore-de-barri-s3",
+      "start": 12,
+      "lyrics": "Mai no ens rendirem\nmai no callarem\nmai no ens rendirem\nsom molts i som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100,
+      "groove": {
+        "drums": 3
+      }
+    },
+    {
+      "id": "punk-hardcore-de-barri-s4",
+      "start": 20,
+      "lyrics": "Tanquen les places\nens treuen el bar\nperò a cada cantonada\nhi ha algú per cridar",
+      "type": "verse",
+      "bars": 8,
+      "energy": 85
+    },
+    {
+      "id": "punk-hardcore-de-barri-s5",
+      "start": 28,
+      "lyrics": "Mai no ens rendirem\nmai no callarem\nmai no ens rendirem\nsom molts i som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100,
+      "groove": {
+        "drums": 3
+      }
+    },
+    {
+      "id": "punk-hardcore-de-barri-s6",
+      "start": 36,
+      "lyrics": "Pugem el volum\nque tremolin els vidres\ncap porta tancada\nens farà callar",
+      "type": "verse",
+      "bars": 8,
+      "energy": 90
+    },
+    {
+      "id": "punk-hardcore-de-barri-s7",
+      "start": 44,
+      "lyrics": "Mai no ens rendirem\nmai no callarem\nmai no ens rendirem\nsom molts i som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100,
+      "groove": {
+        "drums": 3
+      }
+    },
+    {
+      "id": "punk-hardcore-de-barri-s8",
+      "start": 52,
+      "lyrics": "",
+      "type": "bridge",
+      "bars": 8,
+      "bpm": 108,
+      "energy": 100,
+      "groove": {
+        "drums": 1
+      }
+    },
+    {
+      "id": "punk-hardcore-de-barri-s9",
+      "start": 60,
+      "lyrics": "Mai no ens rendirem\nmai no callarem\nmai no ens rendirem\nsom molts i som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100,
+      "groove": {
+        "drums": 3
+      }
+    },
+    {
+      "id": "punk-hardcore-de-barri-s10",
+      "start": 68,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "energy": 100
+    }
+  ],
+  "clips": [
+    {
+      "id": "punk-hardcore-de-barri-c1",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 8,
+      "revision": 8,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c2",
+      "instrument": "vocal",
+      "start": 12,
+      "bars": 8,
+      "revision": 30,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c3",
+      "instrument": "vocal",
+      "start": 20,
+      "bars": 8,
+      "revision": 8,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c4",
+      "instrument": "vocal",
+      "start": 28,
+      "bars": 8,
+      "revision": 30,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c5",
+      "instrument": "vocal",
+      "start": 36,
+      "bars": 8,
+      "revision": 8,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c6",
+      "instrument": "vocal",
+      "start": 44,
+      "bars": 8,
+      "revision": 30,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c7",
+      "instrument": "guitar2",
+      "start": 44,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c8",
+      "instrument": "guitar2",
+      "start": 52,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "metal",
+        "drive": 80,
+        "tone": 50
+      }
+    },
+    {
+      "id": "punk-hardcore-de-barri-c9",
+      "instrument": "vocal",
+      "start": 60,
+      "bars": 8,
+      "revision": 30,
+      "generated": true
+    },
+    {
+      "id": "punk-hardcore-de-barri-c10",
+      "instrument": "guitar2",
+      "start": 60,
+      "bars": 12,
+      "revision": 1,
+      "generated": true
+    }
+  ]
+}

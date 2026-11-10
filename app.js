@@ -1447,6 +1447,41 @@
     if (oldVoice) voiceDb.remove(oldVoice).catch(() => {});
   });
   $('export-project').addEventListener('click', () => { download(new Blob([JSON.stringify(song, null, 2)], { type: 'application/json' }), `${fileName()}.json`); notify(song.voice ? 'Projecte desat. La veu es queda en aquest navegador: descarrega-la a part si la vols portar a un altre lloc.' : 'Projecte desat amb la base, les seccions i els instruments.'); });
+  function openSong(imported, message) {
+    stop(); song = imported; selected = song.sections[0]?.id || null; selectedClip = null; voiceData = null; cache.clear(); cachedFrames = 0;
+    updateSettingsUI(); save(); render(); loadVoice(); notify(message);
+  }
+  // Cançons d'exemple (exemples/*.json, publicades amb la web).
+  async function loadExamples() {
+    try {
+      const response = await fetch(new URL('exemples/index.json', document.baseURI), { cache: 'no-cache' });
+      if (!response.ok) throw new Error(response.status);
+      const list = $('example-list'); list.replaceChildren();
+      for (const example of await response.json()) {
+        const card = document.createElement('button'); card.type = 'button'; card.className = `example-card ${example.style}`;
+        const head = document.createElement('span'); head.className = 'example-head';
+        const tag = document.createElement('span'); tag.className = 'example-tag'; tag.textContent = example.style === 'punk' ? 'Punk' : 'Ska';
+        const meta = document.createElement('small'); meta.textContent = `♩ ${example.bpm} · ${time(example.seconds)}`;
+        head.append(tag, meta);
+        const title = document.createElement('strong'); title.textContent = example.title;
+        const text = document.createElement('span'); text.className = 'example-text'; text.textContent = example.description;
+        card.append(head, title, text);
+        card.addEventListener('click', () => openExample(example));
+        list.append(card);
+      }
+    } catch (error) { console.warn('No s’han pogut carregar els exemples', error); $('example-list').closest('.examples').hidden = true; }
+  }
+  async function openExample(example) {
+    if (busy) return;
+    if ((song.base.generated || song.sections.length) && !await ask(`Obrir «${example.title}»?`, 'L’exemple reemplaçarà l’esborrany actual. Desa primer el projecte si el vols conservar.')) return;
+    try {
+      const response = await fetch(new URL(`exemples/${example.file}`, document.baseURI), { cache: 'no-cache' });
+      if (!response.ok) throw new Error(response.status);
+      migrated = false;
+      openSong(validateSong(await response.json()), `«${example.title}» oberta. Prem ▶ per escoltar-la; la primera vegada es preparen els instruments.`);
+      if (mobile.matches) setTab('line');
+    } catch (error) { console.error(error); notify('No s’ha pogut obrir aquest exemple.'); }
+  }
   $('import-project').addEventListener('change', async event => {
     const file = event.target.files[0]; event.target.value = ''; if (!file) return;
     try {
@@ -1454,8 +1489,7 @@
       migrated = false;
       const imported = validateSong(JSON.parse(await file.text()));
       if (!await ask('Obrir aquest projecte?', 'El projecte importat reemplaçarà l’esborrany actual.')) return;
-      stop(); song = imported; selected = song.sections[0]?.id || null; cache.clear(); cachedFrames = 0; updateSettingsUI(); save(); render(); loadVoice();
-      notify(migrated ? 'Projecte antic convertit: cada part és ara una secció de la línia.' : 'Projecte obert.');
+      openSong(imported, migrated ? 'Projecte antic convertit: cada part és ara una secció de la línia.' : 'Projecte obert.');
     } catch { notify('Aquest fitxer no és un projecte vàlid de Ska Generator.'); }
   });
   $('record-song').addEventListener('click', () => startRecording(0));
@@ -1480,7 +1514,7 @@
   let firstTab = song.base.generated ? (song.sections.length ? 'line' : 'line') : 'song';
   try { firstTab = sessionStorage.getItem('skagenerator.tab') || firstTab; } catch {}
   setTab(firstTab, false);
-  updateSettingsUI(); render(); loadVoice();
+  updateSettingsUI(); render(); loadVoice(); loadExamples();
   if (migrated && storageAvailable) { save(); notify('Projecte anterior convertit al nou flux: cada part és ara una secció de la línia.'); }
   if (!storageAvailable) notify('No s’ha pogut recuperar l’esborrany. Obre un projecte desat o comença una cançó nova.');
 })();

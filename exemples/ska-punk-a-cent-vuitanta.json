@@ -1,0 +1,287 @@
+{
+  "version": 3,
+  "title": "Ska-punk a Cent Vuitanta",
+  "settings": {
+    "style": "ska",
+    "bpm": 168,
+    "tonic": 7,
+    "mode": "major",
+    "seed": 4421,
+    "bars": 56,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "pick",
+      "drums": "rock",
+      "trumpet": "auto",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 4,
+      "bass": 4,
+      "guitar": 4
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 5,
+    "verse": 1,
+    "chorus": 2,
+    "bridge": 3,
+    "outro": 5
+  },
+  "sections": [
+    {
+      "id": "ska-punk-a-cent-vuitanta-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "energy": 80
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-s2",
+      "start": 4,
+      "lyrics": "Corrent pel passeig amb el monopatí\nla policia xiula i no ens pot seguir\ntenim tres acords i una trompeta vella\ni tota la nit per fer-la sonar",
+      "type": "verse",
+      "bars": 8,
+      "energy": 70
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-s3",
+      "start": 12,
+      "lyrics": "Més ràpid, més fort\nsalta amb nosaltres\nmés ràpid, més fort\nfins que caigui el sostre",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-s4",
+      "start": 20,
+      "lyrics": "La sala és petita i suem com mai\nel cantant ha perdut la veu fa estona\nperò ningú no vol tornar a casa\nmentre el bombo segueixi picant",
+      "type": "verse",
+      "bars": 8,
+      "energy": 70
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-s5",
+      "start": 28,
+      "lyrics": "Més ràpid, més fort\nsalta amb nosaltres\nmés ràpid, més fort\nfins que caigui el sostre",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-s6",
+      "start": 36,
+      "lyrics": "",
+      "type": "bridge",
+      "bars": 8,
+      "energy": 60,
+      "feel": {
+        "drums": 0.5
+      }
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-s7",
+      "start": 44,
+      "lyrics": "Més ràpid, més fort\nsalta amb nosaltres\nmés ràpid, més fort\nfins que caigui el sostre",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100,
+      "bpm": 176,
+      "transpose": 1
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-s8",
+      "start": 52,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "bpm": 176,
+      "transpose": 1
+    }
+  ],
+  "clips": [
+    {
+      "id": "ska-punk-a-cent-vuitanta-c1",
+      "instrument": "trumpet",
+      "start": 0,
+      "bars": 4,
+      "revision": 20,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c2",
+      "instrument": "sax",
+      "start": 0,
+      "bars": 4,
+      "revision": 17,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c3",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 8,
+      "revision": 57,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c4",
+      "instrument": "vocal",
+      "start": 12,
+      "bars": 8,
+      "revision": 42,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c5",
+      "instrument": "guitar2",
+      "start": 12,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "distortion",
+        "drive": 65,
+        "tone": 55
+      }
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c6",
+      "instrument": "trumpet",
+      "start": 12,
+      "bars": 8,
+      "revision": 40,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c7",
+      "instrument": "sax",
+      "start": 12,
+      "bars": 8,
+      "revision": 18,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c8",
+      "instrument": "vocal",
+      "start": 20,
+      "bars": 8,
+      "revision": 57,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c9",
+      "instrument": "vocal",
+      "start": 28,
+      "bars": 8,
+      "revision": 42,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c10",
+      "instrument": "guitar2",
+      "start": 28,
+      "bars": 8,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "distortion",
+        "drive": 65,
+        "tone": 55
+      }
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c11",
+      "instrument": "trumpet",
+      "start": 28,
+      "bars": 8,
+      "revision": 40,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c12",
+      "instrument": "sax",
+      "start": 28,
+      "bars": 8,
+      "revision": 18,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c13",
+      "instrument": "trombone",
+      "start": 36,
+      "bars": 8,
+      "revision": 18,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c14",
+      "instrument": "guitar3",
+      "start": 36,
+      "bars": 8,
+      "revision": 4,
+      "generated": true,
+      "fx": {
+        "type": "crunch",
+        "drive": 40,
+        "tone": 50
+      }
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c15",
+      "instrument": "vocal",
+      "start": 44,
+      "bars": 8,
+      "revision": 42,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c16",
+      "instrument": "guitar2",
+      "start": 44,
+      "bars": 12,
+      "revision": 1,
+      "generated": true,
+      "fx": {
+        "type": "distortion",
+        "drive": 75,
+        "tone": 60
+      }
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c17",
+      "instrument": "trumpet",
+      "start": 44,
+      "bars": 12,
+      "revision": 8,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c18",
+      "instrument": "sax",
+      "start": 44,
+      "bars": 12,
+      "revision": 32,
+      "generated": true
+    },
+    {
+      "id": "ska-punk-a-cent-vuitanta-c19",
+      "instrument": "trombone",
+      "start": 44,
+      "bars": 12,
+      "revision": 6,
+      "generated": true
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+{
+  "version": 3,
+  "title": "Tres Acords i la Veritat",
+  "settings": {
+    "style": "punk",
+    "bpm": 200,
+    "tonic": 9,
+    "mode": "major",
+    "seed": 7717,
+    "bars": 68,
+    "timbres": {
+      "guitar": "clean",
+      "bass": "pick",
+      "drums": "rock",
+      "trumpet": "auto",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 0,
+      "bass": 0,
+      "guitar": 0
+    },
+    "fx": {
+      "guitar": {
+        "type": "distortion",
+        "drive": 60,
+        "tone": 60
+      },
+      "guitar2": {
+        "type": "distortion",
+        "drive": 60,
+        "tone": 60
+      },
+      "guitar3": {
+        "type": "distortion",
+        "drive": 60,
+        "tone": 60
+      }
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 1,
+    "verse": 1,
+    "chorus": 3,
+    "bridge": 1,
+    "outro": 1
+  },
+  "sections": [
+    {
+      "id": "punk-tres-acords-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "energy": 90
+    },
+    {
+      "id": "punk-tres-acords-s2",
+      "start": 4,
+      "lyrics": "Tinc tres acords i res a perdre\nun amplificador que fa soroll\nla sala és petita i plena de gent\ni el bateria compta fins a quatre",
+      "type": "verse",
+      "bars": 8,
+      "energy": 80
+    },
+    {
+      "id": "punk-tres-acords-s3",
+      "start": 12,
+      "lyrics": "Un, dos, tres, quatre\ncrida amb mi\nun, dos, tres, quatre\navui som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100
+    },
+    {
+      "id": "punk-tres-acords-s4",
+      "start": 20,
+      "lyrics": "No sé tocar però tinc ganes\nles cordes trencades i el cor encès\nsi no t’agrada tanca la porta\nque nosaltres no callarem mai més",
+      "type": "verse",
+      "bars": 8,
+      "energy": 80
+    },
+    {
+      "id": "punk-tres-acords-s5",
+      "start": 28,
+      "lyrics": "Un, dos, tres, quatre\ncrida amb mi\nun, dos, tres, quatre\navui som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100
+    },
+    {
+      "id": "punk-tres-acords-s6",
+      "start": 36,
+      "lyrics": "Demà tindré mal de cap\ni la veu feta miques\nperò aquesta nit és nostra\ni la cantarem fins al final",
+      "type": "verse",
+      "bars": 8,
+      "energy": 85
+    },
+    {
+      "id": "punk-tres-acords-s7",
+      "start": 44,
+      "lyrics": "Un, dos, tres, quatre\ncrida amb mi\nun, dos, tres, quatre\navui som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100
+    },
+    {
+      "id": "punk-tres-acords-s8",
+      "start": 52,
+      "lyrics": "",
+      "type": "bridge",
+      "bars": 4,
+      "energy": 60,
+      "groove": {
+        "drums": 1
+      }
+    },
+    {
+      "id": "punk-tres-acords-s9",
+      "start": 56,
+      "lyrics": "Un, dos, tres, quatre\ncrida amb mi\nun, dos, tres, quatre\navui som aquí",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100,
+      "transpose": 2
+    },
+    {
+      "id": "punk-tres-acords-s10",
+      "start": 64,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "energy": 100,
+      "transpose": 2
+    }
+  ],
+  "clips": [
+    {
+      "id": "punk-tres-acords-c1",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 8,
+      "revision": 14,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c2",
+      "instrument": "vocal",
+      "start": 12,
+      "bars": 8,
+      "revision": 60,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c3",
+      "instrument": "guitar2",
+      "start": 12,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c4",
+      "instrument": "vocal",
+      "start": 20,
+      "bars": 8,
+      "revision": 14,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c5",
+      "instrument": "vocal",
+      "start": 28,
+      "bars": 8,
+      "revision": 60,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c6",
+      "instrument": "guitar2",
+      "start": 28,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c7",
+      "instrument": "vocal",
+      "start": 36,
+      "bars": 8,
+      "revision": 14,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c8",
+      "instrument": "guitar3",
+      "start": 36,
+      "bars": 8,
+      "revision": 5,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c9",
+      "instrument": "vocal",
+      "start": 44,
+      "bars": 8,
+      "revision": 60,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c10",
+      "instrument": "guitar2",
+      "start": 44,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c11",
+      "instrument": "vocal",
+      "start": 56,
+      "bars": 8,
+      "revision": 60,
+      "generated": true
+    },
+    {
+      "id": "punk-tres-acords-c12",
+      "instrument": "guitar2",
+      "start": 56,
+      "bars": 12,
+      "revision": 1,
+      "generated": true
+    }
+  ]
+}

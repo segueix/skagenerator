@@ -1,0 +1,225 @@
+{
+  "version": 3,
+  "title": "Nit de Difunts",
+  "settings": {
+    "style": "punk",
+    "bpm": 184,
+    "tonic": 4,
+    "mode": "major",
+    "seed": 6607,
+    "bars": 56,
+    "timbres": {
+      "guitar": "auto",
+      "bass": "pick",
+      "drums": "auto",
+      "trumpet": "auto",
+      "trombone": "auto",
+      "vocal": "auto"
+    },
+    "groove": {
+      "drums": 0,
+      "bass": 0,
+      "guitar": 0
+    },
+    "fx": {
+      "guitar": {
+        "type": "horrorpunk",
+        "drive": 70,
+        "tone": 60
+      },
+      "guitar2": {
+        "type": "horrorpunk",
+        "drive": 70,
+        "tone": 60
+      },
+      "guitar3": {
+        "type": "horrorpunk",
+        "drive": 70,
+        "tone": 60
+      }
+    }
+  },
+  "base": {
+    "instruments": [
+      "drums",
+      "bass",
+      "guitar"
+    ],
+    "revision": 1,
+    "generated": true
+  },
+  "harmony": {
+    "intro": 4,
+    "verse": 3,
+    "chorus": 1,
+    "bridge": 2,
+    "outro": 4
+  },
+  "sections": [
+    {
+      "id": "punk-nit-de-difunts-s1",
+      "start": 0,
+      "lyrics": "",
+      "type": "intro",
+      "bars": 4,
+      "bpm": 120,
+      "energy": 50
+    },
+    {
+      "id": "punk-nit-de-difunts-s2",
+      "start": 4,
+      "lyrics": "Surto quan la lluna treu el cap\nentre les tombes del cementiri vell\nporto la jaqueta i els ulls pintats\ni un cor que batega sota la pell",
+      "type": "verse",
+      "bars": 8,
+      "energy": 75
+    },
+    {
+      "id": "punk-nit-de-difunts-s3",
+      "start": 12,
+      "lyrics": "Nit de difunts\nwhoa oh whoa oh\nnit de difunts\nningú no dorm avui",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95
+    },
+    {
+      "id": "punk-nit-de-difunts-s4",
+      "start": 20,
+      "lyrics": "Les campanes toquen a mitjanit\nels gats negres corren pel teulat\nvine amb mi que la festa comença\non els vius i els morts ballen plegats",
+      "type": "verse",
+      "bars": 8,
+      "energy": 75
+    },
+    {
+      "id": "punk-nit-de-difunts-s5",
+      "start": 28,
+      "lyrics": "Nit de difunts\nwhoa oh whoa oh\nnit de difunts\nningú no dorm avui",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 95
+    },
+    {
+      "id": "punk-nit-de-difunts-s6",
+      "start": 36,
+      "lyrics": "Whoa oh oh oh\nwhoa oh oh oh\nwhoa oh oh oh\nningú no dorm",
+      "type": "bridge",
+      "bars": 8,
+      "bpm": 160,
+      "energy": 70,
+      "feel": {
+        "drums": 0.5
+      }
+    },
+    {
+      "id": "punk-nit-de-difunts-s7",
+      "start": 44,
+      "lyrics": "Nit de difunts\nwhoa oh whoa oh\nnit de difunts\nningú no dorm avui",
+      "type": "chorus",
+      "bars": 8,
+      "energy": 100
+    },
+    {
+      "id": "punk-nit-de-difunts-s8",
+      "start": 52,
+      "lyrics": "",
+      "type": "outro",
+      "bars": 4,
+      "energy": 90
+    }
+  ],
+  "clips": [
+    {
+      "id": "punk-nit-de-difunts-c1",
+      "instrument": "organ",
+      "start": 0,
+      "bars": 4,
+      "revision": 3,
+      "generated": true
+    },
+    {
+      "id": "punk-nit-de-difunts-c2",
+      "instrument": "vocal",
+      "start": 4,
+      "bars": 8,
+      "revision": 30,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "punk-nit-de-difunts-c3",
+      "instrument": "vocal",
+      "start": 12,
+      "bars": 8,
+      "revision": 21,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "punk-nit-de-difunts-c4",
+      "instrument": "guitar2",
+      "start": 12,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-nit-de-difunts-c5",
+      "instrument": "vocal",
+      "start": 20,
+      "bars": 8,
+      "revision": 30,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "punk-nit-de-difunts-c6",
+      "instrument": "vocal",
+      "start": 28,
+      "bars": 8,
+      "revision": 21,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "punk-nit-de-difunts-c7",
+      "instrument": "guitar2",
+      "start": 28,
+      "bars": 8,
+      "revision": 1,
+      "generated": true
+    },
+    {
+      "id": "punk-nit-de-difunts-c8",
+      "instrument": "vocal",
+      "start": 36,
+      "bars": 8,
+      "revision": 53,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "punk-nit-de-difunts-c9",
+      "instrument": "organ",
+      "start": 36,
+      "bars": 8,
+      "revision": 3,
+      "generated": true
+    },
+    {
+      "id": "punk-nit-de-difunts-c10",
+      "instrument": "vocal",
+      "start": 44,
+      "bars": 8,
+      "revision": 21,
+      "generated": true,
+      "register": -1
+    },
+    {
+      "id": "punk-nit-de-difunts-c11",
+      "instrument": "guitar2",
+      "start": 44,
+      "bars": 12,
+      "revision": 1,
+      "generated": true
+    }
+  ]
+}

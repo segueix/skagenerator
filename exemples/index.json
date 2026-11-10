@@ -1,0 +1,82 @@
+[
+  {
+    "file": "ska-rude-boys-del-raval.json",
+    "title": "Rude Boys del Raval",
+    "style": "ska",
+    "bpm": 132,
+    "seconds": 109,
+    "description": "Ska 2-tone clàssic: guitarra a contratemps, orgue «bubble», trompeta i saxo a les tornades, veu guia amb lletra i pujada de to a l’última tornada."
+  },
+  {
+    "file": "ska-skatalites-al-port.json",
+    "title": "Skatalites al Port",
+    "style": "ska",
+    "bpm": 116,
+    "seconds": 135,
+    "description": "Ska jamaicà instrumental: kit de jazz, baix caminant, trompeta, trombó gravat i saxo fent el tema, solo de saxo i pont amb la bateria a mig temps."
+  },
+  {
+    "file": "ska-rocksteady-de-matinada.json",
+    "title": "Rocksteady de Matinada",
+    "style": "ska",
+    "bpm": 100,
+    "seconds": 139,
+    "description": "Rocksteady lent en La menor: one drop, baix dub, orgue de fons, trompeta amb sordina, veu guia greu i pont més lent amb coixí de sintetitzador."
+  },
+  {
+    "file": "ska-punk-a-cent-vuitanta.json",
+    "title": "Ska-punk a Cent Vuitanta",
+    "style": "ska",
+    "bpm": 168,
+    "seconds": 79,
+    "description": "Ska-punk: estrofes a contratemps i tornades amb guitarra distorsionada, metalls a l’uníson, pont a mig temps i última tornada més ràpida i mig to amunt."
+  },
+  {
+    "file": "ska-dub-de-sant-joan.json",
+    "title": "Dub de Sant Joan",
+    "style": "ska",
+    "bpm": 112,
+    "seconds": 115,
+    "description": "Ska amb aire dub: steppers, baix dub, guitarres amb cinta i lo-fi, bateria electrònica i sintetitzadors al pont, i un final que s’alenteix."
+  },
+  {
+    "file": "punk-nit-de-difunts.json",
+    "title": "Nit de Difunts",
+    "style": "punk",
+    "bpm": 184,
+    "seconds": 77,
+    "description": "Horror punk a l’estil dels Misfits: guitarres «serra mecànica» doblades a banda i banda, quintes a cops avall, veu greu, orgue de terror a la intro i «whoa-oh» al pont."
+  },
+  {
+    "file": "punk-tres-acords.json",
+    "title": "Tres Acords i la Veritat",
+    "style": "punk",
+    "bpm": 200,
+    "seconds": 82,
+    "description": "Punk del 77, ràpid i directe: corxeres a tota velocitat, distorsió de pedal, kit de rock i tornades per cridar a cor."
+  },
+  {
+    "file": "punk-hardcore-de-barri.json",
+    "title": "Hardcore de Barri",
+    "style": "punk",
+    "bpm": 216,
+    "seconds": 89,
+    "description": "Hardcore en Si menor: D-beat a 216 BPM, fuzz, tornades en doble temps tipus skate punk i un «breakdown» a la meitat de tempo amb guitarra metal."
+  },
+  {
+    "file": "punk-estiu-pop-punk.json",
+    "title": "Estiu, no te’n vagis",
+    "style": "punk",
+    "bpm": 172,
+    "seconds": 89,
+    "description": "Pop-punk d’estiu: guitarra aguda amb overdrive a les tornades, arpegis a les estrofes, veu aguda, pretornada que empeny i última tornada un to amunt."
+  },
+  {
+    "file": "punk-mig-temps.json",
+    "title": "Mig Temps",
+    "style": "punk",
+    "bpm": 150,
+    "seconds": 93,
+    "description": "Punk fosc i melòdic en Mi menor: patró a mig temps, baix amb riff molt present, arpegis amb crunch, guitarra metal a les tornades i un pont que baixa de to."
+  }
+]
