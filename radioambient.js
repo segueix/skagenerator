@@ -1749,7 +1749,7 @@
         outro: { name: 'Final', bars: 4, energy: 30, description: 'Recupera el motiu i tanca la cançó.' }
     };
     // Preseleccions de treball: no són límits teòrics dels gèneres.
-    const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue',
+    const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Segona veu de vent (saxo / trombó)', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue',
         guitar2: 'Guitarra 2 (aguda)', guitar3: 'Guitarra 3 (arpegis)', vocal: 'Melodia de veu (guia)' };
     // Efectes de guitarra que aplica el motor de mostres (vegeu audio/render.mjs).
     const GUITAR_FX = { none: 'Net, sense efecte', boost: 'Boost net', tape: 'Saturació de cinta', crunch: 'Crunch',

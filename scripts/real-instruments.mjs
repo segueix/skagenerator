@@ -248,6 +248,8 @@ async function importFreePats(entry, log) {
   const rate = entry.rate || RATE;
   for (const sample of bank.samples) {
     const data = trim(resample(sample.getAudioData(), sample.sampleRate, rate), rate, entry.maxSeconds, 1);
+    // Igualació de nivell entre notes (com amb VSCO), si la font la necessita.
+    if (entry.levelDb !== undefined) level(data, rate, entry.levelDb);
     sample.setAudioData(data, rate);
     sample.loopStart = 0; sample.loopEnd = data.length - 1;
   }

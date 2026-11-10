@@ -212,7 +212,8 @@
       "program": 66,
       "maxSeconds": 2.6,
       "url": "https://freepats.zenvoid.org/Reed/TenorSaxophone/TenorSaxophone-small-SF2-20200717.tar.bz2",
-      "sha256": "fd45d0234b455f54300a5286594da5753b5619a86ebc34ebf574b21044b18db4"
+      "sha256": "fd45d0234b455f54300a5286594da5753b5619a86ebc34ebf574b21044b18db4",
+      "levelDb": -14
     }
   ],
   "drums": {
