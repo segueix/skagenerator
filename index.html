@@ -93,6 +93,26 @@
         <div class="lyrics-heading"><label class="field-label" for="section-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="section-lyrics" rows="2" maxlength="5000" placeholder="Escriu la lletra o les idees per a aquesta secció…"></textarea>
       </div>
     </section>
+    <section class="step-panel step-voice" data-panel="voice" aria-labelledby="voice-title">
+      <div class="section-heading"><h2 id="voice-title"><span class="step" aria-hidden="true">4</span>La teva veu</h2><span id="voice-state" class="state-pill">Sense gravar</span></div>
+      <p class="step-copy">Grava’t cantant mentre sona la cançó: la veu queda alineada amb la música i s’inclou quan l’escoltes i al WAV. Pots tornar a gravar només un tros des de la secció seleccionada.</p>
+      <label class="check-row"><input type="checkbox" id="voice-headphones" checked> <span><strong>Porto auriculars</strong> · so més net. Sense auriculars, desmarca-ho perquè el micròfon no torni a gravar la música.</span></label>
+      <div class="step-actions"><button type="button" id="record-song" class="button record">● Grava des del principi</button><button type="button" id="record-section" class="button record" hidden>● Grava des de la secció</button></div>
+      <div class="voice-live" id="voice-live" hidden>
+        <div class="voice-live-head"><span class="rec-dot" aria-hidden="true"></span><strong id="voice-live-title">Prepara’t…</strong></div>
+        <p id="voice-live-lyrics" class="voice-lyrics"></p>
+        <div class="meter" aria-hidden="true"><i id="voice-meter"></i></div>
+        <button type="button" id="record-stop" class="button primary">■ Atura la gravació</button>
+      </div>
+      <div class="voice-controls" id="voice-controls" hidden>
+        <label class="check-row"><input type="checkbox" id="voice-enabled" checked> <span>Inclou la veu a la cançó i al WAV</span></label>
+        <div class="voice-sliders">
+          <label><span class="field-label">VOLUM DE LA VEU <output id="voice-volume-value">0 dB</output></span><input type="range" id="voice-volume" min="-24" max="12" step="1" value="0" aria-label="Volum de la veu"></label>
+          <label><span class="field-label">SINCRONIA <output id="voice-offset-value">0 ms</output></span><input type="range" id="voice-offset" min="-300" max="300" step="5" value="0" aria-label="Ajust de sincronia de la veu"><small class="slider-hint"><span>← avança la veu</span><span>la retarda →</span></small></label>
+        </div>
+        <div class="step-actions"><button type="button" id="play-voice" class="button listen">▷ Escolta amb la veu</button><button type="button" id="download-voice" class="button">↓ Només la veu (WAV)</button><button type="button" id="delete-voice" class="button danger">Esborra la veu</button></div>
+      </div>
+    </section>
     <div class="bottom-notes" data-panel="song"><span><span class="live-dot"></span> Es desa automàticament en aquest navegador</span><button class="text-button" id="export-project">↓ Desa el projecte</button><label class="text-button import-label" for="import-project">↑ Obre un projecte<input type="file" id="import-project" accept=".json,application/json" hidden></label></div>
   </main>
   <footer class="transport" aria-label="Reproductor de la cançó"><div class="transport-content"><button id="play-song" class="transport-play" aria-label="Escoltar la cançó completa" disabled>▶</button><div class="transport-title"><strong id="transport-title">Nova cançó</strong><span id="transport-subtitle">Comença generant la base</span></div><div class="transport-progress"><div class="progress-label"><span id="playback-time">00:00</span><span id="ready-count">Genera la base per començar</span><span id="playback-duration">01:51</span></div><progress id="song-progress" value="0" max="1" aria-label="Progrés de reproducció"></progress></div><button id="stop-playback" class="icon-button" aria-label="Aturar reproducció" disabled>■</button><button id="download-song" class="button download" disabled aria-label="Exporta la cançó en WAV">↓ <span class="download-label">Exporta WAV</span></button></div></footer>
@@ -101,6 +121,7 @@
     <button type="button" class="tab" data-tab="base"><span class="tab-icon" aria-hidden="true">◉</span><span>Base</span><i class="tab-badge" id="tab-base"></i></button>
     <button type="button" class="tab" data-tab="line"><span class="tab-icon" aria-hidden="true">▤</span><span>Línia</span><i class="tab-badge" id="tab-line"></i></button>
     <button type="button" class="tab" data-tab="section"><span class="tab-icon" aria-hidden="true">✎</span><span>Secció</span><i class="tab-badge" id="tab-section"></i></button>
+    <button type="button" class="tab" data-tab="voice"><span class="tab-icon" aria-hidden="true">🎤</span><span>Veu</span><i class="tab-badge" id="tab-voice"></i></button>
   </nav>
   <p id="notice" class="notice" role="status" aria-live="polite"></p>
   <dialog id="confirm-dialog"><form method="dialog"><h2 id="confirm-title">Començar una cançó nova?</h2><p id="confirm-message">Desa el projecte si el vols recuperar després.</p><div class="dialog-actions"><button class="button" value="cancel">Cancel·la</button><button class="button primary" value="confirm">Continua</button></div></form></dialog>

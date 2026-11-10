@@ -340,3 +340,29 @@ main > *, .step-panel, .line-scroll { min-width: 0; max-width: 100%; }
   .notice.visible { transform: translate(-50%, 0); }
 }
 .theme-switching *, .theme-switching *::before, .theme-switching *::after { transition: none !important; }
+
+/* ── La teva veu ─────────────────────────────────────────────────── */
+.step-voice { --step: #ef4444; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14px; cursor: pointer; }
+.check-row input { width: 20px; height: 20px; margin: 1px 0 0; flex-shrink: 0; accent-color: #ef4444; }
+.check-row span { color: var(--muted); } .check-row strong { color: var(--text); }
+.button.record { border-color: #ef4444; color: #ef4444; }
+.button.record:hover:not(:disabled) { background: color-mix(in srgb, #ef4444 12%, var(--surface)); border-color: #ef4444; }
+.button.danger { color: var(--bad); }
+.button.danger:hover:not(:disabled) { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.state-pill.live { background: #ef4444; color: #fff; animation: pulse .8s infinite alternate; }
+.voice-live { margin-top: 14px; padding: 16px; border-radius: 14px; border: 2px solid #ef4444; background: color-mix(in srgb, #ef4444 8%, var(--surface)); display: grid; gap: 10px; }
+.voice-live-head { display: flex; align-items: center; gap: 10px; font-size: 18px; font-family: 'Manrope', sans-serif; }
+.rec-dot { width: 14px; height: 14px; border-radius: 50%; background: #ef4444; animation: pulse .7s infinite alternate; }
+.voice-lyrics { margin: 0; white-space: pre-wrap; font-size: 20px; line-height: 1.45; font-weight: 600; min-height: 1.5em; }
+.meter { height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; border-radius: 5px; background: linear-gradient(90deg, var(--good), var(--amber) 75%, var(--bad)); transition: width .06s linear; }
+.voice-controls { margin-top: 14px; display: grid; gap: 12px; }
+.voice-sliders { display: grid; gap: 14px; }
+.slider-hint { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+body.recording .transport-play { background: #ef4444; }
+.tabbar { grid-template-columns: repeat(5, 1fr); }
+.tab[data-tab="voice"] { --tab: #ef4444; }
+@media (min-width: 900px) { .voice-sliders { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 899px) { body:not([data-tab="voice"]) [data-panel="voice"] { display: none !important; } }
+.field-label output { text-transform: none; letter-spacing: 0; color: var(--text); }

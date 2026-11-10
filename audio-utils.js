@@ -34,6 +34,55 @@
     }
     return result;
   }
+  // ── Veu gravada (mono, a la mateixa freqüència que la cançó) ──────────
+  // Suma la veu, centrada i amb un filtre passaaltes de 80 Hz, a un tros de
+  // la cançó que comença a la mostra «from». «offset» desplaça la veu
+  // (positiu: més tard) per afinar la sincronia.
+  function mixVoice(mix, voice, options = {}) {
+    check(mix);
+    const { from = 0, gainDb = 0, offset = 0, rate = 44100 } = options;
+    const out = [mix[0].slice(), mix[1].slice()];
+    if (!(voice instanceof Float32Array) || !voice.length) return out;
+    const gain = 10 ** (gainDb / 20) * Math.SQRT1_2, a = Math.exp(-2 * Math.PI * 80 / rate);
+    let x1 = 0, y1 = 0;
+    for (let i = 0; i < out[0].length; i++) {
+      const at = from + i - offset, x = at >= 0 && at < voice.length ? voice[at] : 0;
+      const y = a * (y1 + x - x1); x1 = x; y1 = y;
+      for (const channel of out) {
+        let v = channel[i] + y * gain;
+        const level = Math.abs(v);
+        if (level > .94) v = Math.sign(v) * (.94 + .06 * Math.tanh((level - .94) / .06));
+        channel[i] = v;
+      }
+    }
+    return out;
+  }
+  // Regravació d'un tros: la presa substitueix la veu des de «from» fins on
+  // acaba; el que hi ha abans i després es conserva.
+  function placeTake(voice, take, at, from = at) {
+    const end = at + take.length, length = Math.max(voice ? voice.length : 0, end), out = new Float32Array(length);
+    if (voice) out.set(voice);
+    for (let i = Math.max(0, from, at); i < end; i++) out[i] = take[i - at];
+    return out;
+  }
+  // Anivella una presa perquè soni amb un volum semblant a la música.
+  function levelTake(take, targetDb = -18) {
+    let sum = 0, count = 0, peak = 0;
+    for (const x of take) { const a = Math.abs(x); peak = Math.max(peak, a); if (a > .002) { sum += x * x; count++; } }
+    if (!count || !peak) return take;
+    const gain = Math.min(10 ** (targetDb / 20) / Math.sqrt(sum / count), .9 / peak, 16);
+    for (let i = 0; i < take.length; i++) take[i] *= gain;
+    return take;
+  }
+  function resampleLinear(data, from, to) {
+    if (from === to) return data;
+    const ratio = from / to, out = new Float32Array(Math.round(data.length * to / from));
+    for (let i = 0; i < out.length; i++) {
+      const x = i * ratio, k = Math.floor(x), f = x - k;
+      out[i] = (data[k] || 0) * (1 - f) + (data[k + 1] || 0) * f;
+    }
+    return out;
+  }
   function encodeWav(channels, sampleRate = 44100) {
     check(channels);
     if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
@@ -49,5 +98,5 @@
     }
     return wav;
   }
-  return { joinStereo, mixSections, encodeWav };
+  return { joinStereo, mixSections, mixVoice, placeTake, levelTake, resampleLinear, encodeWav };
 });
