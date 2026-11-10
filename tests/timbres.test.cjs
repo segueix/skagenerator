@@ -157,3 +157,24 @@ test('els dos saxos toquen en registres separats i amb volum suficient', () => {
   const volume = c => music.channels.find(p => p.channel === c).volume;
   assert(volume(4) >= 100 && volume(8) >= 90);
 });
+
+test('guitarra horror punk (estil Misfits): quintes a cops avall, apagades a l’estrofa i dues guitarres', () => {
+  const fx = { guitar: { type: 'horrorpunk', drive: 70, tone: 60 } };
+  const sp = type => engine.composeSongPart({ ...config, style: 'punk', bpm: 180, tonic: 4, instruments: ['guitar'], fx }, { ...part, type });
+  const verse = createPerformance(sp('verse')), chorus = createPerformance(sp('chorus'));
+  const on = (m, c) => m.events.filter(e => e.type === 'on' && e.channel === c);
+  const length = (m, e) => m.events.find(o => o.type === 'off' && o.channel === e.channel && o.note === e.note && o.time >= e.time).time - e.time;
+  // Corxeres seguides: 8 cops per compàs, cadascun un acord de quinta (fonamental, quinta, octava).
+  const bar = verse.events.length && sp('verse').beat * 4;
+  assert.equal(on(verse, 0).filter(e => e.time < bar - .01).length, 24);
+  const chord = on(verse, 0).slice(0, 3).map(e => e.note).sort((a, b) => a - b);
+  assert.deepEqual([chord[1] - chord[0], chord[2] - chord[0]], [7, 12]);
+  // Apagades a l'estrofa, obertes a la tornada.
+  assert(length(verse, on(verse, 0)[0]) < length(chorus, on(chorus, 0)[0]) * .6);
+  // Dues guitarres iguals, obertes a banda i banda, i sense distorsionar dues vegades.
+  assert.equal(on(verse, 1).length, on(verse, 0).length);
+  const ch = c => verse.channels.find(p => p.channel === c);
+  assert(ch(0).pan < 30 && ch(1).pan > 100 && ch(0).volume === ch(1).volume);
+  assert.deepEqual([ch(0).bank, ch(0).program], [2, 27], 'entra el so net a l’amplificador');
+  assert.equal(verse.fx.guitar.type, 'horrorpunk');
+});

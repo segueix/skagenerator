@@ -34,18 +34,22 @@ function createPerformance(spec) {
   const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
   const events = [];
   const patch = (channel, [bank, program], pan, volume) => ({ channel, bank, program, pan, volume });
+  // Amb un efecte de guany alt, la guitarra entra neta a l'«amplificador» (com una
+  // guitarra real a un pedal): no es distorsiona dues vegades.
+  const amped = name => ['crunch', 'overdrive', 'distortion', 'metal', 'fuzz', 'horrorpunk'].includes(spec.fx?.[name]?.type);
+  const misfits = spec.fx?.guitar?.type === 'horrorpunk';
   const realBrass = { 3: !chosen('trumpet'), 4: spec.timbres?.trombone === 'vsco' };
   const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
-    patch(0, chosen('guitar') ?? (punk ? [0, 30] : [2, 27]), 42, 94),
-    patch(1, chosen('guitar') ?? (punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
+    patch(0, chosen('guitar') ?? (punk && !amped('guitar') ? [0, 30] : [2, 27]), 42, 94),
+    patch(1, chosen('guitar') ?? (amped('guitar') ? [2, 27] : punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
     patch(2, chosen('bass') ?? (punk ? [2, 34] : [2, 33]), 64, 115),
     patch(3, chosen('trumpet') ?? [2, 56], 50, 116),
     patch(4, chosen('trombone') ?? [2, 66], 79, 112),
     // Staccato gravat per a les notes curtes de trompeta i trombó.
     patch(12, [3, 56], 50, 116), patch(13, [3, 57], 79, 127),
     patch(16, chosen('vocal') ?? [2, 71], 64, 112),
-    patch(14, chosen('guitar2') ?? (punk ? [0, 30] : [2, 27]), 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
+    patch(14, chosen('guitar2') ?? (punk && !amped('guitar2') ? [0, 30] : [2, 27]), 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
     patch(8, [2, 66], 30, 94),
     { channel: 11, program: 16, pan: 92, volume: 84 },
     { channel: 5, program: 81, pan: 58, volume: 106 },
@@ -127,7 +131,17 @@ function createPerformance(spec) {
       : [[.5, 1.5, 2.5, 3.5], [.5, 1.5, 2.5, 3.5, 3.75], [.5, 1.5, 3.5], [.5, 1.75, 2.5, 3.5], [.5, 1.5, 2.75, 3.5]];
     const guitarIndex = spec.layers?.guitar ?? spec.groove?.guitar ?? Math.max(0, variation);
     const hits = ending ? [0] : guitarPatterns[guitarIndex % guitarPatterns.length];
-    if (has('guitar')) hits.forEach((t, hit) => {
+    // Horror punk (estil Misfits): acords de quinta tot a cops avall en corxeres,
+    // apagats amb el palmell a les estrofes i oberts a les tornades, amb dues
+    // guitarres iguals a esquerra i dreta (paret de guitarres).
+    if (has('guitar') && misfits) {
+      const open = ['chorus', 'prechorus', 'solo', 'outro'].includes(spec.type);
+      (ending ? [0] : [0, .5, 1, 1.5, 2, 2.5, 3, 3.5]).forEach(t => [chord.root + 12, chord.root + 19, chord.root + 24].forEach((pitch, k) => {
+        const length = ending ? bar * .75 : beat * (open ? .46 : .2), force = open ? 104 : 86;
+        note(0, pitch, t0 + t * beat + k * .004, length, force, .002);
+        note(1, pitch, t0 + t * beat + .009 + k * .004, length, force - 4, .002);
+      }));
+    } else if (has('guitar')) hits.forEach((t, hit) => {
       const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
       const duration = ending ? bar * .75 : beat * (punk ? .4 : .22);
       pitches.forEach((pitch, k) => {
@@ -249,6 +263,8 @@ function createPerformance(spec) {
   channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume;
     // Saxo fent de segona veu: registre més greu, necessita més volum per sentir-se.
     if (entry.channel === 4 && entry.bank === 2 && entry.program === 66) entry.volume = 110; });
+  // Estil Misfits: les dues guitarres igual de fortes i obertes a banda i banda.
+  if (misfits) for (const [channel, pan] of [[0, 22], [1, 106]]) Object.assign(channels.find(c => c.channel === channel), { pan, volume: 62 });
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
 }
 module.exports = { createPerformance };

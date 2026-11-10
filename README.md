@@ -44,6 +44,12 @@ L’instrument **«Melodia de veu (guia)»** toca una melodia pensada per ser ca
 - **Fins a tres guitarres a la mateixa secció**: Guitarra 1 (rítmica), Guitarra 2 (rítmica una octava amunt, amb un patró diferent) i Guitarra 3 (arpegis i punteig). Cadascuna té el seu canal, el seu clip, el seu so i el seu efecte.
 - **Efectes de guitarra** per a cada clip: boost net, saturació de cinta, crunch, overdrive, distorsió, metal, fuzz i lo-fi, amb **guany** i **to**. La cadena és la d’un pedal i un amplificador: filtre d’entrada, saturació amb sobremostreig ×2, pantalla d’altaveu i nivell compensat (la guitarra sona igual de forta amb efecte que sense). Amb efectes de guany alt, la reverberació es redueix.
 
+### Horror punk (estil Misfits)
+
+L’efecte **«Horror punk (estil Misfits)»** imita el so de guitarra dels primers discos dels Misfits: distorsió tipus «serra mecànica» molt saturada amb un punt de fuzz, mitjos plens (no buidats com en el metal), greus ajustats i presència a 2,5 kHz. Es pot triar per a tota la cançó a «Efecte de guitarra» (s’aplica a les tres guitarres; cada clip el pot canviar) o només en un clip.
+
+Amb aquest efecte, la guitarra principal també toca a la manera del grup: acords de quinta (fonamental, quinta i octava) **tot a cops avall en corxeres**, **apagats amb el palmell a les estrofes** i **oberts a les tornades**, amb **dues guitarres iguals a esquerra i dreta**. La guitarra entra neta a l’«amplificador» perquè no es distorsioni dues vegades. Per sonar com ells: estil Punk, 160–200 BPM.
+
 ## Grava la teva veu
 
 Al pas **4 · La teva veu** (pestanya «Veu» al mòbil) pots cantar mentre sona la cançó:
