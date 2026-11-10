@@ -141,3 +141,24 @@
 @media(max-width:680px){.step-panel{padding:16px}.base-grid .timbre-picker,.section-fields{grid-template-columns:1fr}.line{--label:84px}.add-layer select{flex:1;min-width:0}.layer-row{flex-wrap:wrap}.layer-row .button{flex:1}}
 .song-settings .field-label{gap:8px}
 @media(max-width:680px){.song-settings label{border-left:0!important;padding-left:0!important}.song-settings{grid-template-columns:1fr 1fr}}
+/* Equalitzadors */
+.eq-panel{margin-top:14px;border:1px solid #dce5d4;border-radius:9px;background:#fbfcf8}
+.eq-panel summary{cursor:pointer;padding:12px 14px;font-size:11px;font-weight:700;color:#3f5545;list-style:none;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.eq-panel summary::-webkit-details-marker{display:none}
+.eq-panel summary::before{content:'▸';color:#7d8b78}
+.eq-panel[open] summary::before{content:'▾'}
+.eq-panel summary span{font-weight:400;font-size:10px;color:#899785}
+.eq-help{margin:0 14px 10px;font-size:10px;line-height:1.5;color:#7b8778}
+.eq-list{display:grid;gap:6px;padding:0 10px 12px}
+.eq-row{display:grid;grid-template-columns:130px repeat(4,minmax(0,1fr)) 34px;gap:12px;align-items:center;background:white;border:1px solid #e3e8dc;border-left:4px solid var(--color,#9aa894);border-radius:7px;padding:8px 10px}
+.eq-row.own{background:#f4f8ee;border-color:#c9d8b9}
+.eq-name{display:flex;flex-direction:column;gap:2px;min-width:0}
+.eq-name strong{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eq-name small{font-size:9px;color:#86937f}
+.eq-row.own .eq-name small{color:#3f6140}
+.eq-control{display:flex;flex-direction:column;gap:3px;min-width:0}
+.eq-control span{display:flex;justify-content:space-between;font-size:9px;color:#6f7d6c;letter-spacing:.3px}
+.eq-control output{font-variant-numeric:tabular-nums;color:#2f4637;font-weight:600}
+.eq-control input{width:100%;accent-color:#192d29;margin:0}
+.eq-reset{width:30px;height:30px;font-size:13px}
+@media(max-width:680px){.eq-row{grid-template-columns:1fr 1fr;gap:8px 12px}.eq-name{grid-column:1/-1}.eq-reset{grid-column:2;justify-self:end}}

@@ -15,9 +15,10 @@ const spec = engine.composeSongPart(settings, part);
 
 test('el banc conté les mostres enregistrades dels instruments i els tres kits requerits', () => {
   assert(raw.byteLength > 1000000 && raw.byteLength < 24 * 1024 * 1024);
-  assert.equal(bank.presets.length, 14);
-  for (const program of [27, 28, 29, 30, 33, 34, 38, 56, 57, 81, 89]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));
-  for (const program of [0, 16, 24]) assert(bank.presets.some(p => p.program === program && p.isGMGSDrum));
+  assert.equal(bank.presets.length, 22);
+  for (const program of [16, 27, 28, 29, 30, 33, 34, 38, 56, 57, 59, 66, 81, 89]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));
+  for (const [bankMSB, program] of [[1, 56], [1, 57]]) assert(bank.presets.some(p => p.bankMSB === bankMSB && p.program === program));
+  for (const program of [0, 8, 16, 24, 32, 40]) assert(bank.presets.some(p => p.program === program && p.isGMGSDrum));
   assert(bank.samples.length > 10);
 });
 test('la interpretació és reproduïble, només activa els instruments seleccionats i respecta contratemps/quintes', () => {
@@ -112,4 +113,19 @@ test('urban activa els sintetitzadors i el kit electrònic amb cinc grooves dife
   assert.equal(grooves.size, 5); assert.equal(basses.size, 5);
   const sp = engine.composeSongPart({ ...cfg, instruments: undefined }, part);
   assert.deepEqual(sp.instruments, profile.instruments);
+});
+
+test('l’equalitzador canvia el volum i el timbre de cada instrument per separat', async () => {
+  const flat = { low: 0, mid: 0, high: 0, volume: 0 };
+  const rms = data => Math.sqrt(data[0].reduce((s, x) => s + x * x, 0) / data[0].length);
+  const solo = { ...settings, instruments: ['trumpet', 'bass'] }, sp = mix => engine.composeSongPart({ ...solo, mix }, { ...part, layers: { trumpet: 2 } });
+  const base = rms(await renderSampledPart(bank, sp(undefined), 16000, { raw: true }));
+  const quiet = rms(await renderSampledPart(bank, sp({ trumpet: { ...flat, volume: -24 }, bass: { ...flat, volume: -24 } }), 16000, { raw: true }));
+  assert(Math.abs(20 * Math.log10(quiet / base) + 24) < 2.5, 'el volum ha de baixar uns 24 dB');
+  const high = (data, sign) => { let prev = 0, e = 0; for (const x of data[0]) { e += (x - prev) ** 2; prev = x; } return e; };
+  const bright = await renderSampledPart(bank, sp({ master: { ...flat, high: 12 } }), 44100, { raw: true });
+  const dark = await renderSampledPart(bank, sp({ master: { ...flat, high: -12 } }), 44100, { raw: true });
+  assert(high(bright) > high(dark) * 2, 'els aguts de la mescla han de canviar');
+  const normal = await renderSampledPart(bank, sp(undefined), 16000);
+  assert(normal.every(ch => ch.every(x => Number.isFinite(x) && Math.abs(x) <= .931)));
 });

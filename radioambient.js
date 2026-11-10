@@ -1749,7 +1749,16 @@
         outro: { name: 'Final', bars: 4, energy: 30, description: 'Recupera el motiu i tanca la cançó.' }
     };
     // Preseleccions de treball: no són límits teòrics dels gèneres.
-    const SONG_INSTRUMENTS = { guitar: 'Guitarres', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica' };
+    const SONG_INSTRUMENTS = { guitar: 'Guitarres', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue' };
+    // Equalitzador: greus, mitjos i aguts en dB respecte del so de l'estil, i volum.
+    const MIX_LIMITS = { low: [-12, 12], mid: [-12, 12], high: [-12, 12], volume: [-24, 6] };
+    function checkMix(mix) {
+        if (mix === undefined) return;
+        if (!mix || typeof mix !== 'object' || Array.isArray(mix) || Object.entries(mix).some(([name, band]) =>
+            (name !== 'master' && !Object.hasOwn(SONG_INSTRUMENTS, name)) || !band || typeof band !== 'object' || Array.isArray(band)
+            || Object.keys(band).length !== 4 || Object.entries(MIX_LIMITS).some(([key, [lo, hi]]) => !Number.isFinite(band[key]) || band[key] < lo || band[key] > hi)))
+            throw new Error('Equalitzador no vàlid');
+    }
     const SONG_STYLES = {
         ska: { instruments: ['guitar', 'drums', 'bass', 'trumpet', 'trombone'], name: 'Ska', bpm: { min: 100, max: 180, default: 128 },
             keys: [[0, 'major'], [5, 'major'], [10, 'major'], [3, 'major'], [7, 'major'], [9, 'minor'], [2, 'minor'], [7, 'minor'], [0, 'minor']],
@@ -1877,6 +1886,7 @@
         if (!Number.isInteger(variation) || variation < -1 || variation > 4 || (variation !== -1 && !eligible))
             throw new Error('Versió musical no vàlida');
         checkGroove(settings.groove, settings.style); checkGroove(part.groove, settings.style);
+        checkMix(settings.mix); checkMix(part.mix);
         // Sense base rítmica (projectes antics), cada versió porta el seu patró.
         const groove = {};
         for (const name of GROOVE_FAMILIES) groove[name] = part.groove?.[name] ?? settings.groove?.[name]
@@ -1935,7 +1945,7 @@
         Object.keys(layers).forEach(name => {
             const rev = layers[name], salt = name.split('').reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
             layerIndex[name] = (rev - 1) % 5;
-            if (!['trumpet', 'trombone', 'synthLead'].includes(name)) return;
+            if (!['trumpet', 'trombone', 'synthLead', 'sax'].includes(name)) return;
             const lr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
             const lctx = { ...ctx, prev: nearestTone(name === 'trombone' ? 67 : 72, chords[0].pcs, 64, 79) };
             const lrhythms = phraseBars.map(() => rhythmPool[Math.floor(lr() * rhythmPool.length)]);
@@ -1985,7 +1995,8 @@
         return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
             seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
-            timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) } };
+            timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
+            mix: { ...(settings.mix || {}), ...(part.mix || {}) } };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;
@@ -1998,6 +2009,7 @@
             const t0 = b * bar, ending = spec.type === 'outro' && b === spec.bars - 1;
             const soft = spec.type === 'intro' || spec.type === 'bridge';
             if (has('synthPad')) chord.notes.forEach(n => syn.pad(t0, n, bar * .95, .018 * intensity, .35));
+            if (has('organ')) (ending ? [0] : [.5, 1.5, 2.5, 3.5]).forEach(t => chord.notes.forEach(n => syn.pad(t0 + t * beat, n + 12, beat * .4, .02 * intensity, .01)));
             const guitarPatterns = punk
                 ? [[0,.5,1,1.5,2,2.5,3,3.5],[0,1,1.5,2,3,3.5],
                    [0,.5,1.5,2,2.5,3.5],[0,.5,1,1.5,2.5,3],[0,1,2,2.5,3,3.5]]
@@ -2047,6 +2059,7 @@
             const level = intensity * (spec.type === 'verse' ? 0.42 : 0.72);
             if (has('synthLead')) syn.pluck(start, n, level, { decay: duration, partials: [1,.5,.3,.2], damp: .4, gain: .07, attack: .008 });
             if (has('trumpet')) syn.brass(start, n, duration, level, 'trumpet');
+            if (has('sax')) syn.brass(start, n - 12, duration, level * .75, 'trombone');
             const chord = spec.chords[b];
             const harmony = nearestTone(n - 12, chord.pcs, 45, 67);
             if (has('trombone')) syn.brass(start, harmony, duration * 0.92, level * 0.8, 'trombone');
@@ -2069,7 +2082,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, composeSongPart, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, composeSongPart, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

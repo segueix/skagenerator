@@ -22,7 +22,10 @@ export async function prepareSoundBank() {
   SpessaLog.setLogLevel(false, false, false);
   const bank = SoundBankLoader.fromArrayBuffer(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
   for (const preset of [...bank.presets]) {
-    const keep = preset.bankMSB === 0 && preset.bankLSB === 0
+    // Variacions GS (banc 1): trompeta i trombó alternatius.
+    const variation = !preset.isGMGSDrum && preset.bankLSB === 0
+      && (source.variations || []).some(([msb, program]) => msb === preset.bankMSB && program === preset.program);
+    const keep = variation || preset.bankMSB === 0 && preset.bankLSB === 0
       && (preset.isGMGSDrum ? source.drumPrograms : source.programs).includes(preset.program);
     if (!keep) bank.deletePreset(preset);
   }

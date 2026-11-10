@@ -30,7 +30,7 @@
     // Limitador suau: només actua quan una cua i una entrada forta coincideixen.
     for (const out of result) for (let k = 0; k < out.length; k++) {
       const a = Math.abs(out[k]);
-      if (a > .9) out[k] = Math.sign(out[k]) * (.9 + .1 * Math.tanh((a - .9) / .1));
+      if (a > .94) out[k] = Math.sign(out[k]) * (.94 + .06 * Math.tanh((a - .94) / .06));
     }
     return result;
   }

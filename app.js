@@ -9,17 +9,23 @@
   const MIN_BARS = 8, MAX_BARS = 128, MAX_SECONDS = 360, MAX_SECTION = 32, MAX_SECTIONS = 32, GAP_CHUNK = 8, MAX_REV = 1000000;
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
   const colors = { intro: '#90b8ad', verse: '#bab4d8', prechorus: '#d2b19a', chorus: '#e6b572', bridge: '#91b4cf', solo: '#c1bf8c', outro: '#aebc91' };
-  const instrumentColors = { guitar: '#8aab6a', drums: '#7f9a8e', bass: '#9b8bc0', trumpet: '#d9a24e', trombone: '#c98a5e', synthLead: '#6fa3c7', synthPad: '#a9b6d9', synthBass: '#8676b3', electronicDrums: '#6d8f86' };
+  const instrumentColors = { guitar: '#8aab6a', drums: '#7f9a8e', bass: '#9b8bc0', trumpet: '#d9a24e', trombone: '#c98a5e', synthLead: '#6fa3c7', synthPad: '#a9b6d9', synthBass: '#8676b3', electronicDrums: '#6d8f86', sax: '#b8873f', organ: '#7fae9c' };
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
-  const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'synthPad'];
+  const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
     guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta'], ['muted', 'Guitarra apagada'], ['overdrive', 'Guitarra saturada'], ['distortion', 'Guitarra distorsionada']],
     bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits'], ['pick', 'Baix amb pua']],
-    drums: [['auto', 'Segons l’estil'], ['standard', 'Bateria acústica'], ['rock', 'Bateria rock'], ['electronic', 'Kit electrònic']]
+    drums: [['auto', 'Segons l’estil'], ['jazz', 'Kit de jazz (ska clàssic)'], ['room', 'Kit de sala'], ['standard', 'Bateria acústica'], ['brush', 'Escombretes'], ['rock', 'Bateria rock'], ['electronic', 'Kit electrònic']],
+    trumpet: [['auto', 'Segons l’estil'], ['bright', 'Trompeta brillant'], ['muted', 'Trompeta amb sordina']],
+    trombone: [['auto', 'Segons l’estil'], ['warm', 'Trombó càlid']]
   };
-  const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto' });
+  const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto' });
+  // Equalitzador: valors en dB respecte de la corba de cada instrument.
+  const EQ_KEYS = [['low', 'Greus'], ['mid', 'Mitjos'], ['high', 'Aguts'], ['volume', 'Volum']];
+  const flatEq = () => ({ low: 0, mid: 0, high: 0, volume: 0 });
+  const isFlat = band => EQ_KEYS.every(([key]) => band[key] === 0);
   const defaultGroove = () => ({ drums: 0, bass: 0, guitar: 0 });
   const validTimbres = input => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
     && Object.entries(input).every(([name, value]) => timbreOptions[name]?.some(([preset]) => preset === value));
@@ -76,6 +82,7 @@
       || !Number.isInteger(st.bars) || st.bars < MIN_BARS || st.bars > MAX_BARS) fail('Configuració no vàlida');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     st.timbres = { ...defaultTimbres(), ...(st.timbres || {}) }; st.groove = { ...defaultGroove(), ...(st.groove || {}) };
+    if (st.mix !== undefined) engine.composeSongPart({ ...st }, { type: 'verse', bars: 1, energy: 50, revision: 1 });
     const base = value.base;
     if (!base || !Array.isArray(base.instruments) || !base.instruments.length || new Set(base.instruments).size !== base.instruments.length
       || base.instruments.some(name => !BASE_CHOICES.includes(name)) || !Number.isInteger(base.revision) || base.revision < 1
@@ -88,7 +95,7 @@
     for (const s of value.sections) {
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
-        || s.start + s.bars > st.bars || typeof s.lyrics !== 'string' || s.lyrics.length > 5000 || !Array.isArray(s.layers) || s.layers.length > 9) fail('Secció no vàlida');
+        || s.start + s.bars > st.bars || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000 || !Array.isArray(s.layers) || s.layers.length > 9) fail('Secció no vàlida');
       const names = new Set();
       for (const layer of s.layers) {
         if (!layer || !Object.hasOwn(INSTRUMENTS, layer.instrument) || names.has(layer.instrument) || base.instruments.includes(layer.instrument)
@@ -123,6 +130,7 @@
     const layers = options.baseOnly ? [] : sec.layers.filter(layer => layer.generated);
     const part = { type: sec.type, bars: sec.bars, energy: TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove,
       instruments: [...base, ...layers.map(layer => layer.instrument)], layers: Object.fromEntries(layers.map(layer => [layer.instrument, layer.revision])) };
+    if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
     if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     return part;
   }
@@ -475,9 +483,9 @@
       }
     } else if (id.startsWith('groove-')) st.groove = { ...st.groove, [id.slice(7)]: Number(event.target.value) };
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
-    const replay = playing?.kind === 'base' && (id.startsWith('groove-') || id.startsWith('timbre-'));
+    const replay = id.startsWith('groove-') || id.startsWith('timbre-') ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
-    if (replay) play('base');
+    if (replay) play(replay);
   }
   function trimSections() {
     const bars = song.settings.bars;
@@ -581,8 +589,61 @@
     $('play-section').textContent = playing?.kind === 'section' && playing.id === sec.id ? '■ Atura' : `▷ Escolta la secció${pending ? ' (sense els pendents)' : ''}`;
     $('play-song-inline').textContent = playing?.kind === 'song' ? '■ Atura la cançó' : '▷ Escolta tota la cançó';
   }
+  // ── Equalitzadors ──────────────────────────────────────────────────
+  function eqNames(sec) {
+    const names = song.base.instruments.slice();
+    for (const s of sec ? [sec] : song.sections) for (const layer of s.layers) if (!names.includes(layer.instrument)) names.push(layer.instrument);
+    return [...names, 'master'];
+  }
+  function renderEq(container, sec) {
+    container.replaceChildren();
+    for (const name of eqNames(sec)) {
+      const own = sec ? sec.mix?.[name] : song.settings.mix?.[name], inherited = sec ? song.settings.mix?.[name] : undefined;
+      const values = own || inherited || flatEq();
+      const row = document.createElement('div'); row.className = `eq-row${own ? ' own' : ''}`;
+      if (name !== 'master') row.style.setProperty('--color', instrumentColors[name]);
+      const title = document.createElement('div'); title.className = 'eq-name';
+      const label = document.createElement('strong'); label.textContent = name === 'master' ? (sec ? 'Secció sencera' : 'Mescla total') : INSTRUMENTS[name];
+      const state = document.createElement('small');
+      state.textContent = sec ? (own ? 'Propi d’aquesta secció' : 'Com a la cançó') : (own ? 'Ajustat' : 'So de l’estil');
+      title.append(label, state); row.append(title);
+      for (const [key, text] of EQ_KEYS) {
+        const [min, max] = engine.MIX_LIMITS[key];
+        const control = document.createElement('label'); control.className = 'eq-control';
+        const caption = document.createElement('span'), output = document.createElement('output');
+        const show = value => { output.textContent = `${value > 0 ? '+' : ''}${value} dB`; };
+        caption.textContent = text; show(values[key]); caption.append(output);
+        const input = document.createElement('input'); input.type = 'range'; input.min = min; input.max = max; input.step = 1; input.value = values[key];
+        input.disabled = busy; input.setAttribute('aria-label', `${text} · ${label.textContent}`);
+        input.addEventListener('input', () => show(Number(input.value)));
+        input.addEventListener('change', () => changeEq(sec, name, key, Number(input.value)));
+        control.append(caption, input); row.append(control);
+      }
+      const reset = document.createElement('button'); reset.type = 'button'; reset.className = 'icon-button eq-reset'; reset.textContent = '↶';
+      reset.title = sec ? 'Torna a l’equalitzador de la cançó' : 'Torna al so de l’estil'; reset.setAttribute('aria-label', reset.title);
+      reset.disabled = busy || !own; reset.addEventListener('click', () => changeEq(sec, name, null));
+      row.append(reset); container.append(row);
+    }
+  }
+  function changeEq(sec, name, key, value) {
+    if (busy) return;
+    const holder = sec || song.settings, inherited = sec ? song.settings.mix?.[name] || flatEq() : flatEq();
+    const mix = { ...(holder.mix || {}) };
+    if (key === null) delete mix[name];
+    else {
+      mix[name] = { ...(mix[name] || inherited), [key]: value };
+      if (sec ? EQ_KEYS.every(([k]) => mix[name][k] === inherited[k]) : isFlat(mix[name])) delete mix[name];
+    }
+    if (Object.keys(mix).length) holder.mix = mix; else delete holder.mix;
+    // Si sonava, es torna a escoltar amb el canvi aplicat.
+    const replay = playing?.kind;
+    stop(); save(); render();
+    if (replay) play(replay);
+  }
   function render() {
     renderLine(); renderSection();
+    renderEq($('song-eq'), null);
+    if (current()) renderEq($('section-eq'), current());
     const generatedLayers = song.sections.reduce((n, s) => n + s.layers.filter(l => l.generated).length, 0);
     const total = song.settings.bars * barSeconds();
     $('song-time').textContent = time(total);
@@ -600,7 +661,7 @@
     } else { $('playback-duration').textContent = time(playing.seconds); $('play-song').textContent = playing.kind === 'song' ? '■' : '▶'; }
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
-      'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'section-type', 'section-start', 'section-bars',
+      'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'section-type', 'section-start', 'section-bars',
       'section-reharmonize', 'remove-section', 'copy-previous']) $(key).disabled = busy;
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
@@ -610,7 +671,7 @@
   }
 
   // ── Esdeveniments ───────────────────────────────────────────────────
-  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums']
+  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone']
     .forEach(key => $(key).addEventListener('change', changeSettings));
   $('song-title').addEventListener('input', event => { song.title = event.target.value; $('transport-title').textContent = song.title || 'Nova cançó'; save(); });
   $('generate-base').addEventListener('click', generateBase);
