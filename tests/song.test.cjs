@@ -224,3 +224,21 @@ test('les seccions admeten qualsevol durada i cada instrument afegit té la seva
   for (const layers of [{ piano: 1 }, { trumpet: 0 }, { trumpet: 1.5 }, [], null])
     assert.throws(() => engine.composeSongPart(base, { ...part('verse'), layers }), /Capes/);
 });
+
+test('un instrument pot sonar només en una part del tram (clips que travessen seccions)', () => {
+  const performance = require('../audio/performance.cjs');
+  const base = { ...settings, instruments: ['drums', 'bass'] };
+  const part = (ranges) => ({ type: 'verse', bars: 8, energy: 60, revision: 3, instruments: ['drums', 'bass', 'trumpet', 'organ'],
+    layers: { trumpet: 4, organ: 2 }, ...(ranges ? { ranges } : {}) });
+  const bars = spec => events => events.filter(e => e.type === 'on').map(e => Math.floor(e.time / (spec.beat * 4)));
+  const full = engine.composeSongPart(base, part()), cut = engine.composeSongPart(base, part({ trumpet: [[2, 5]], organ: [[0, 1], [6, 8]] }));
+  const on = (spec, channel) => bars(spec)(performance.createPerformance(spec).events.filter(e => e.channel === channel));
+  assert(on(full, 3).some(b => b < 2) && on(full, 3).some(b => b >= 5));
+  assert(on(cut, 3).length > 0 && on(cut, 3).every(b => b >= 2 && b < 5));
+  assert(on(cut, 11).every(b => b === 0 || b >= 6) && on(cut, 11).some(b => b >= 6));
+  // La base no es veu afectada pels trams dels instruments afegits.
+  assert.deepEqual(on(cut, 9), on(full, 9).length ? on(cut, 9) : []);
+  assert.equal(on(cut, 2).length, on(full, 2).length);
+  for (const ranges of [{ trumpet: [[3, 3]] }, { trumpet: [[0, 9]] }, { trumpet: [] }, { piano: [[0, 1]] }, { trumpet: [[-1, 2]] }, { trumpet: [1, 2] }])
+    assert.throws(() => engine.composeSongPart(base, part(ranges)), /Trams/);
+});

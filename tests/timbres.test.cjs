@@ -11,11 +11,11 @@ const patch = (performance, channel) => performance.channels.find(p => p.channel
 test('per defecte els presets mantenen l’estil original', () => {
   assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 0), 27);
   assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 2), 33);
-  assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 9), 0);
+  assert.equal(patch(createPerformance(engine.composeSongPart(config, part)), 9), 64);
   const punk = engine.composeSongPart({ ...config, style: 'punk', bpm: 180 }, part);
   assert.equal(patch(createPerformance(punk), 0), 30);
   assert.equal(patch(createPerformance(punk), 2), 34);
-  assert.equal(patch(createPerformance(punk), 9), 16);
+  assert.equal(patch(createPerformance(punk), 9), 64);
 });
 
 test('els presets triats canvien els tres instruments i la guitarra secundària', () => {
@@ -42,7 +42,57 @@ test('els sons de la part substitueixen només els sons base indicats', () => {
 
 test('es rebutgen els sons desconeguts', () => {
   const spec = engine.composeSongPart(config, part);
-  for (const timbres of [{ guitar: 'piano' }, { bass: 'slap' }, { drums: 'jazz' }, { cello: 'auto' }]) {
+  for (const timbres of [{ guitar: 'piano' }, { bass: 'slap' }, { drums: 'disco' }, { cello: 'auto' }]) {
     assert.throws(() => createPerformance({ ...spec, timbres }), /Timbres no vàlids/);
   }
+});
+
+test('metalls amb variacions de banc, saxo, orgue i articulació', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['trumpet', 'trombone', 'sax', 'organ'],
+    timbres: { trumpet: 'bright', trombone: 'warm' } }, { ...part, layers: { trumpet: 2, trombone: 3, sax: 4, organ: 2 } });
+  const music = createPerformance(spec), entry = channel => music.channels.find(p => p.channel === channel);
+  assert.deepEqual([entry(3).bank, entry(3).program, entry(4).bank, entry(4).program], [1, 56, 1, 57]);
+  assert.deepEqual([entry(8).program, entry(8).instrument, entry(11).program, entry(11).instrument], [66, 'sax', 16, 'organ']);
+  assert.equal(createPerformance(engine.composeSongPart({ ...config, timbres: { trumpet: 'muted' } }, part)).channels.find(p => p.channel === 3).program, 59);
+  const on = channel => music.events.filter(e => e.type === 'on' && e.channel === channel);
+  assert(on(8).length > 0 && on(11).length > 0);
+  // Cada nota de metall porta expressió i inflexió (pujada d'afinació o centre).
+  assert(music.events.some(e => e.type === 'pitch' && e.channel === 3 && e.value < 8192));
+  assert(music.events.some(e => e.type === 'cc' && e.controller === 11 && e.channel === 8));
+  assert(music.events.every((e, i, all) => !i || all[i - 1].time <= e.time));
+  assert(music.events.filter(e => e.type === 'pitch').every(e => e.value >= 0 && e.value <= 16383));
+  // L'orgue té cinc patrons i el saxo una línia pròpia, una octava sota.
+  const organs = [1, 2, 3].map(rev => createPerformance(engine.composeSongPart({ ...config, instruments: ['organ'] }, { ...part, layers: { organ: rev } }))
+    .events.filter(e => e.type === 'on').length);
+  assert(new Set(organs).size > 1);
+  assert(Math.max(...on(8).map(e => e.note)) < Math.max(...on(3).map(e => e.note)));
+});
+
+test('l’equalitzador es valida i arriba a la interpretació', () => {
+  const flat = { low: 0, mid: 0, high: 0, volume: 0 };
+  const spec = engine.composeSongPart({ ...config, mix: { bass: { ...flat, low: 4 }, master: { ...flat, high: -3 } } },
+    { ...part, mix: { bass: { ...flat, volume: -6 } } });
+  assert.deepEqual(spec.mix, { bass: { ...flat, volume: -6 }, master: { ...flat, high: -3 } });
+  assert.deepEqual(createPerformance(spec).mix, spec.mix);
+  for (const mix of [{ piano: flat }, { bass: { ...flat, low: 13 } }, { bass: { ...flat, volume: -25 } }, { bass: { low: 0 } }, { bass: { ...flat, mid: NaN } }, [], null])
+    assert.throws(() => engine.composeSongPart({ ...config, mix }, part), /Equalitzador/);
+});
+
+test('per defecte sonen els instruments gravats i les notes curtes dels metalls van a l’staccato', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'sax'] },
+    { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3, sax: 4 } });
+  const music = createPerformance(spec), entry = channel => music.channels.find(p => p.channel === channel);
+  assert.deepEqual([0, 2, 3, 4, 8, 12, 13].map(c => `${entry(c).bank}:${entry(c).program}`), ['2:27', '2:33', '2:56', '2:57', '2:66', '3:56', '3:57']);
+  assert.equal(entry(9).program, 64);
+  const notes = channel => music.events.filter(e => e.type === 'on' && e.channel === channel);
+  const off = e => music.events.find(o => o.type === 'off' && o.channel === e.channel && o.note === e.note && o.time >= e.time);
+  assert(notes(12).length + notes(13).length > 0, 'hi ha notes en staccato');
+  assert(notes(12).every(e => off(e).time - e.time < .31));
+  assert(notes(3).every(e => off(e).time - e.time >= .29));
+  // Les inflexions van al mateix canal que la nota.
+  assert(music.events.filter(e => e.type === 'pitch').every(e => [3, 4, 8, 12, 13].includes(e.channel)));
+  // Amb el so GM no hi ha staccato separat.
+  const gm = createPerformance(engine.composeSongPart({ ...config, instruments: ['trumpet'], timbres: { trumpet: 'gm' } }, { ...part, layers: { trumpet: 2 } }));
+  assert(gm.events.every(e => e.channel === 3));
+  assert.equal(gm.channels.find(p => p.channel === 3).bank, 0);
 });

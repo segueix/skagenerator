@@ -7,14 +7,45 @@ Taller web en català per compondre cançons instrumentals, secció per secció.
 Hi ha una sola vista, que es treballa de baix cap amunt:
 
 1. **Durada i base musical.** Es marca la durada de la cançó en compassos (amb el temps equivalent, fins a 6 minuts) i es genera la base: bateria i baix (en urban, bateria electrònica i baix sintetitzat) que sonen durant tota la cançó. Es poden triar els instruments de la base, el patró de bateria, la línia de baix i els sons, i escoltar-la. «Genera una altra base» proposa una progressió i uns patrons nous.
-2. **La línia de la cançó.** Un clic a la fila «Seccions» marca una secció en aquell punt (alineada a grups de quatre compassos). Cada secció té tipus (intro, estrofa, tornada…), compàs d’inici i durada pròpia (1–32 compassos). Sota la base, cada instrument té una fila que mostra en quines seccions sona. On no hi ha cap secció només sona la base; si la cançó acaba amb base sola, l’últim tram fa de final.
-3. **Instruments un a un.** A la secció seleccionada s’afegeix un instrument i es prem «Genera»: es compon la seva part (una melodia pròpia per a trompeta, trombó i sintetitzador melòdic; un patró propi per a guitarra i coixí). Després es pot escoltar la secció o tota la cançó, i «Genera’n una altra» en dona una versió nova sense tocar la resta. Les seccions del mateix tipus comparteixen acords i, per defecte, repeteixen la mateixa idea de cada instrument, com una tornada. «Continua amb els instruments de la secció anterior» facilita fer créixer la cançó.
+2. **La línia de la cançó.** Un clic a la fila «Seccions» afegeix una secció en aquell punt. Cada secció té tipus (intro, estrofa, tornada…), inici i durada (1–32 compassos), i es treballa amb el cursor:
+   - **Estirar per la vora dreta** l’allarga o l’escurça i totes les seccions i instruments que venen després es desplacen. Si la cançó acabava amb l’última secció, la durada total la segueix (fins a 6 minuts).
+   - **Estirar per la vora esquerra** n’avança o n’endarrereix l’inici dins de l’espai lliure.
+   - **Arrossegar-la** a un espai lliure la mou (amb els instruments que sonen només dins seu); deixar-la anar **sobre una altra secció** canvia l’ordre i la resta es reorganitza.
+   - Amb el teclat: fletxes per allargar o escurçar, Maj + fletxes per moure.
+   On no hi ha cap secció només sona la base; si la cançó acaba amb base sola, l’últim tram fa de final.
+3. **Instruments un a un.** Cada instrument és un **clip** a la seva pista: comença amb la secció on l’afegeixes, però es pot moure i estirar per les dues vores, de manera que pot començar o acabar a mitja secció i travessar-ne diverses. Un clic en un espai buit d’una pista n’afegeix un altre clip. Cada clip es genera per separat («Genera», «Genera’n una altra») i després es pot escoltar la secció o tota la cançó. Estirar o moure un clip no el torna a generar. Els clips que entren en seccions del mateix tipus repeteixen per defecte la mateixa idea, com una tornada. «Allarga fins aquí els instruments de…» estén fins a la secció actual els clips que acabaven a l’anterior.
 
-Canviar tempo, tonalitat, estil, patrons o sons no esborra res: tot es torna a calcular a partir de les llavors desades. Els projectes de la versió anterior (per parts) es converteixen automàticament: cada part passa a ser una secció de la línia.
+Canviar tempo, tonalitat, estil, patrons o sons no esborra res: tot es torna a calcular a partir de les llavors desades. Els projectes anteriors es converteixen automàticament: cada part passa a ser una secció i els instruments de seccions contigües s’uneixen en un sol clip.
 
 La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro que es construeix, pont més buit i crescendo abans de la tornada). Cada tram es renderitza amb una cua d’1,5 s que sona sobre l’inici del següent.
 
 Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
+
+## Instruments gravats nota a nota
+
+Per defecte sonen instruments gravats per músics, nota a nota i amb diverses dinàmiques, que el build converteix i afegeix al banc:
+
+| Instrument | Font | Llicència |
+|---|---|---|
+| Trompeta i trombó (sostinguts i staccato) | VSCO 2 Community Edition | CC0 |
+| Saxo tenor | FreePats (amb mostres de VSCO) | CC0 |
+| Baix amb dits i amb pua | FreePats, Yamaha RBX d’Andrea Biasior | CC0 |
+| Guitarra neta | FreePats FSBS (pont) | CC0 |
+| Bateria | Muldjord Kit, de Lars Muldjord (via FreePats) | CC BY 4.0 |
+
+- VSCO només publica els WAV: el build llegeix el nom de cada fitxer (nota i dinàmica), en mesura l’afinació, el remostreja i en crea les zones de tecla i de força. Les notes curtes de trompeta i trombó fan servir les mostres d’staccato, que donen els cops secs típics de l’ska.
+- FreePats ja publica aquests instruments en SF2: no cal convertir l’SFZ. El build els remostreja a 32 kHz (baixos a 22 kHz), treu els bucles i escurça les cues.
+- El kit Muldjord original ocupa 209 MB i té un mapa de tecles propi: se’n construeix un kit GM nou (bombo, caixa, cop de vora, charleston, plats, ride i timbals) amb tres capes de força.
+- El banc final ocupa uns 30 MB i es carrega una sola vegada. Les descàrregues i el banc convertit es guarden a `.cache/` i a la memòria cau de GitHub Actions.
+- Els sons de GeneralUser GS continuen disponibles com a alternatives («… GM») als selectors de so. L’orgue continua sent el de GeneralUser: l’orgue de FreePats és una emulació sintetitzada, no una gravació.
+- No s’han fet servir les biblioteques de Karoryfer: només es distribueixen en SFZ amb FLAC/OGG i caldria un descodificador més; FreePats ja cobreix baix, guitarra i bateria amb mostres reals i llicències lliures.
+
+## So més autèntic i equalitzadors
+
+- **Més sons del banc.** Saxo tenor i orgue (contratemps, «bubble», sostingut…) com a instruments nous; l’orgue també pot formar part de la base. Trompeta brillant o amb sordina, trombó càlid i kits de jazz, sala i escombretes. En ska, «Segons l’estil» fa servir el kit de jazz, com els bateries jamaicans.
+- **Interpretació.** Els metalls entren amb una lleugera pujada d’afinació, fan crescendo a les notes llargues i hi afegeixen vibrato. La bateria té notes fantasma a la caixa, que en ska va lleugerament endarrerida i en punk, una mica avançada.
+- **Mescla.** Cada instrument porta una corba d’equalització de partida (baix rodó, guitarra prima i brillant, metalls presents) i una reverberació pròpia (baix sec, metalls amb sala). La banda passa per un compressor de bus suau i un limitador.
+- **Equalitzadors.** A «Equalitzador de la cançó» cada instrument té greus (120 Hz), mitjos (900 Hz), aguts (6 kHz) i volum, més una fila per a la mescla total. A cada secció hi ha un equalitzador propi: per defecte segueix el de la cançó i, en moure un control, aquella fila passa a ser de la secció. Si està sonant, el canvi s’escolta de seguida. L’equalitzador s’aplica a la sortida de cada instrument dins del worker, i la reverberació segueix el volum de l’instrument.
 
 ## Estils i instruments
 
@@ -53,7 +84,7 @@ El motor original `radioambient.js` conserva la seva API. L’editor fa servir `
 
 ## Banc de mostres i interpretació
 
-El build descarrega la versió oficial fixada a `soundbank-source.json`, comprova el SHA-256 i n’extreu onze presets de guitarra, baix, metalls i sintetitzadors i tres kits de bateria. La selecció ocupa aproximadament 8,5 MB i es publica a la mateixa web; no hi ha peticions a proveïdors d’àudio durant la reproducció. `.cache/` conserva la font per als builds següents.
+El build descarrega la versió oficial fixada a `soundbank-source.json`, comprova el SHA-256 i n’extreu els presets de guitarra, baix, metalls, saxo, orgue i sintetitzadors (amb les variacions GS de trompeta i trombó) i sis kits de bateria. La selecció de GeneralUser ocupa aproximadament 9,2 MB i, amb els instruments gravats, el banc publicat en fa uns 30 i es publica a la mateixa web; no hi ha peticions a proveïdors d’àudio durant la reproducció. `.cache/` conserva la font per als builds següents.
 
 El banc conserva les mostres i els moduladors dels presets seleccionats. Els sons de guitarra neta/apagada serveixen per a l’ska, i els de guitarra distorsionada/saturada per al punk. La interpretació introdueix petits canvis de força, temps i ordre de les cordes, sempre a partir de la llavor del projecte. El baix i els dos metalls tenen canals i panoràmiques pròpies.
 
