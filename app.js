@@ -8,8 +8,9 @@
   const KEY = 'skagenerator.song.v2', OLD_KEY = 'skagenerator.song.v1', RATE = 44100;
   const MIN_BARS = 8, MAX_BARS = 128, MAX_SECONDS = 360, MAX_SECTION = 32, MAX_SECTIONS = 32, MAX_CLIPS = 96, GAP_CHUNK = 8, MAX_REV = 1000000;
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
-  const colors = { intro: '#90b8ad', verse: '#bab4d8', prechorus: '#d2b19a', chorus: '#e6b572', bridge: '#91b4cf', solo: '#c1bf8c', outro: '#aebc91' };
-  const instrumentColors = { guitar: '#8aab6a', drums: '#7f9a8e', bass: '#9b8bc0', trumpet: '#d9a24e', trombone: '#c98a5e', synthLead: '#6fa3c7', synthPad: '#a9b6d9', synthBass: '#8676b3', electronicDrums: '#6d8f86', sax: '#b8873f', organ: '#7fae9c' };
+  // Colors vius que funcionen en mode clar i fosc (la interfície els barreja amb el fons).
+  const colors = { intro: '#14b8a6', verse: '#8b5cf6', prechorus: '#f97316', chorus: '#ec4899', bridge: '#3b82f6', solo: '#84cc16', outro: '#10b981' };
+  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e' };
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
@@ -606,7 +607,7 @@
     if (!drag || event.pointerId !== drag.pointer) return;
     const d = drag; drag = null;
     if (!d.moved) {
-      if (d.kind === 'section') { selected = d.item.id; selectedClip = null; }
+      if (d.kind === 'section') { selected = d.item.id; selectedClip = null; if (mobile.matches) { render(); setTab('section'); return; } }
       else { selectedClip = d.item.id; selected = sectionAt(d.item.start)?.id ?? selected; }
       render(); return;
     }
@@ -911,7 +912,47 @@
     $('add-section').disabled = busy || !ready;
     $('stop-playback').disabled = !playing;
     document.body.classList.toggle('busy', busy);
+    renderTabs();
   }
+
+  // ── Mòbil: un pas per pantalla, amb pestanyes ──────────────────────
+  const mobile = window.matchMedia('(max-width: 899px)');
+  function setTab(name, scroll = true) {
+    document.body.dataset.tab = name;
+    for (const tab of document.querySelectorAll('.tab')) tab.setAttribute('aria-selected', String(tab.dataset.tab === name));
+    try { sessionStorage.setItem('skagenerator.tab', name); } catch {}
+    if (scroll && mobile.matches) window.scrollTo(0, 0);
+  }
+  for (const tab of document.querySelectorAll('.tab')) tab.addEventListener('click', () => setTab(tab.dataset.tab));
+  for (const button of document.querySelectorAll('[data-go]')) button.addEventListener('click', () => setTab(button.dataset.go));
+  function renderTabs() {
+    $('tab-base').textContent = song.base.generated ? '✓' : '';
+    $('tab-line').textContent = song.sections.length ? String(song.sections.length) : '';
+    const pending = song.clips.filter(c => !c.generated).length;
+    $('tab-section').textContent = pending ? String(pending) : '';
+    $('next-line').disabled = !song.base.generated;
+    $('next-section').disabled = !current();
+    $('next-section').textContent = current() ? `Edita ${sectionLabel(current()).toLowerCase()} →` : 'Edita la secció →';
+  }
+  // ── Mode clar i fosc ───────────────────────────────────────────────
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : darkQuery.matches;
+  function paintTheme() {
+    $('theme-toggle').firstElementChild.textContent = isDark() ? '☀' : '☾';
+    $('theme-toggle').setAttribute('aria-label', isDark() ? 'Canvia a mode clar' : 'Canvia a mode fosc');
+    $('theme-color').content = isDark() ? '#0b0a12' : '#151325';
+  }
+  $('theme-toggle').addEventListener('click', () => {
+    const next = isDark() ? 'light' : 'dark', root = document.documentElement;
+    // Sense transicions durant el canvi: tot canvia de cop.
+    root.classList.add('theme-switching');
+    root.dataset.theme = next;
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
+    try { localStorage.setItem('skagenerator.theme', next); } catch {}
+    paintTheme();
+  });
+  darkQuery.addEventListener?.('change', paintTheme);
+  paintTheme();
 
   // ── Esdeveniments ───────────────────────────────────────────────────
   ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone']
@@ -969,6 +1010,9 @@
     } catch { notify('Aquest fitxer no és un projecte vàlid de Ska Generator.'); }
   });
   window.addEventListener('pagehide', stop);
+  let firstTab = song.base.generated ? (song.sections.length ? 'line' : 'line') : 'song';
+  try { firstTab = sessionStorage.getItem('skagenerator.tab') || firstTab; } catch {}
+  setTab(firstTab, false);
   updateSettingsUI(); render();
   if (migrated && storageAvailable) { save(); notify('Projecte anterior convertit al nou flux: cada part és ara una secció de la línia.'); }
   if (!storageAvailable) notify('No s’ha pogut recuperar l’esborrany. Obre un projecte desat o comença una cançó nova.');
