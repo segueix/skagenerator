@@ -21,6 +21,16 @@ La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro
 
 Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
 
+## Melodia de veu (guia per cantar)
+
+L’instrument **«Melodia de veu (guia)»** toca una melodia pensada per ser cantada, independent de les de la trompeta, el saxo o les guitarres, per saber com s’ha de cantar la cançó:
+
+- **Segueix la lletra**: cada línia de la lletra de la secció és una frase, amb tantes notes com síl·labes (el recompte segueix les regles bàsiques del català: diftongs com *ai*, *eu* o *ou* compten una síl·laba i la dièresi marca hiat). Si hi ha menys versos que frases, la resta són pauses.
+- **Sense lletra**, fa frases de dos compassos amb respiracions; al pont, la intro i el final canta frase sí, frase no, i a la tornada repeteix el motiu perquè sigui fàcil de recordar.
+- **Cantable**: registre d’una desena i mitja de notes, salts de com a molt una quarta dins de la frase, notes de l’acord als temps forts i final de frase en una nota estable. «Registre» del clip: greu (veu d’home), mitjà o agut (veu de dona).
+- **So**: per defecte, **clarinet gravat (VSCO 2 CE)**, l’instrument recomanat per imitar la veu: té una tessitura com la d’un cantant, pot lligar les notes i fer crescendos, i l’atac és prou clar per sentir on comença cada síl·laba. Alternatives a «So de la melodia de veu»: veu «uh», flauta, ocarina i clarinet GM. La veu «uh» té el timbre més semblant a la veu, però és més difusa.
+- Es toca lligada, amb vibrato a les notes llargues, i fa servir un canal MIDI propi (el 17è).
+
 ## Canvis de tempo i ritme per instrument
 
 - **El tempo de la cançó es veu sempre** a l’etiqueta ♩ del reproductor (a escriptori i al mòbil). Mentre sona, mostra el tempo de la secció que s’està escoltant; si alguna secció en té un de propi, hi diu «amb canvis».

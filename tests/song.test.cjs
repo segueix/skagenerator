@@ -273,3 +273,32 @@ test('cada instrument pot anar a mig temps o a doble temps dins la secció', () 
   for (const e of moved) assert(half.chords[barOf(e)].pcs.includes(e.note % 12), `nota ${e.note} fora de l’acord`);
   for (const feel of [{ drums: 3 }, { drums: 0 }, { piano: 2 }, []]) assert.throws(() => spec(feel), /Ritme/);
 });
+
+test('la melodia de veu fa una nota per síl·laba, amb respiracions i en un registre cantable', () => {
+  const base = { ...settings, instruments: ['vocal'] };
+  const vocal = extra => engine.composeSongPart(base, { ...part('verse', 8), layers: { vocal: 3 }, ...extra }).lines.vocal;
+  const perPhrase = notes => { const out = [0, 0, 0, 0]; for (const n of notes) out[Math.floor(n[0] / 2)]++; return out; };
+  assert.deepEqual(perPhrase(vocal({ syllables: [7, 9, 6, 8] })), [7, 9, 6, 8]);
+  // Menys versos que frases: la resta són pauses.
+  assert.deepEqual(perPhrase(vocal({ syllables: [5, 6] })), [5, 6, 0, 0]);
+  for (const register of [-1, 0, 1]) {
+    const notes = vocal({ register });
+    assert(notes.every(n => n[2] >= 52 + register * 5 && n[2] <= 74 + register * 5), `registre ${register}`);
+    // Cada frase acaba amb una respiració (silenci) abans de la següent.
+    for (let p = 0; p < 4; p++) {
+      const phrase = notes.filter(n => Math.floor(n[0] / 2) === p), last = phrase.at(-1);
+      if (last) assert(last[0] * 4 + last[1] + last[3] <= (p + 1) * 8 - .99);
+    }
+    for (let i = 1; i < notes.length; i++) {
+      const gap = notes[i][0] * 4 + notes[i][1] - (notes[i - 1][0] * 4 + notes[i - 1][1] + notes[i - 1][3]);
+      if (gap < .01) assert(Math.abs(notes[i][2] - notes[i - 1][2]) <= 7, 'salts curts dins de la frase');
+    }
+  }
+  // Sense lletra, la tornada repeteix el motiu i és diferent de la de les trompetes.
+  const chorus = engine.composeSongPart(base, { ...part('chorus', 8), layers: { vocal: 4 } });
+  const phrase = p => chorus.lines.vocal.filter(n => Math.floor(n[0] / 2) === p).map(n => [n[0] % 2, n[1], n[2], n[3]]);
+  assert.deepEqual(phrase(0), phrase(2));
+  assert.notDeepEqual(chorus.lines.vocal.map(n => n[2]), chorus.melody.map(n => n[2]));
+  for (const syllables of [[0], [25], 'abc', Array(33).fill(4)]) assert.throws(() => vocal({ syllables }), /Síl·labes/);
+  assert.throws(() => vocal({ register: 2 }), /Registre/);
+});

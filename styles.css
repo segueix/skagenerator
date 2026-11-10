@@ -392,8 +392,10 @@ body.recording .transport-play { background: #ef4444; }
 .bpm-field input::placeholder { color: var(--faint); }
 .volume-row.with-feel { grid-template-columns: minmax(90px, 140px) 1fr 62px 150px; }
 .feel-select { min-height: 36px !important; padding: 4px 8px !important; font-size: 13px !important; }
-.clip-tone.only-feel { grid-template-columns: minmax(0, 260px); }
+.clip-tone.only-feel { grid-template-columns: repeat(2, minmax(0, 260px)); }
 @media (max-width: 899px) {
   .volume-row.with-feel { grid-template-columns: 1fr 62px; }
   .volume-row.with-feel .feel-select { grid-column: 1 / -1; grid-row: 3; }
 }
+.lyrics-info { margin: 6px 2px 0; font-size: 13px; color: color-mix(in srgb, #f472b6 70%, var(--text)); font-weight: 600; }
+.lyrics-info:empty { display: none; }

@@ -15,7 +15,9 @@ const spec = engine.composeSongPart(settings, part);
 
 test('el banc conté les mostres enregistrades dels instruments i els tres kits requerits', () => {
   assert(raw.byteLength > 1000000 && raw.byteLength < 40 * 1024 * 1024);
-  assert.equal(bank.presets.length, 31);
+  assert.equal(bank.presets.length, 35);
+  for (const program of [53, 73, 79]) assert(bank.presets.some(p => p.bankMSB === 0 && p.program === program), `veu GM ${program}`);
+  assert(bank.presets.some(p => p.bankMSB === 2 && p.program === 71), 'clarinet gravat');
   // Instruments gravats: VSCO 2 CE (banc 2 i staccato al 3), FreePats (banc 2) i el kit Muldjord (64).
   for (const [bankMSB, program] of [[2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57]])
     assert(bank.presets.some(p => p.bankMSB === bankMSB && p.program === program && !p.isGMGSDrum), `${bankMSB}:${program}`);

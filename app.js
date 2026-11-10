@@ -10,7 +10,7 @@
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
   // Colors vius que funcionen en mode clar i fosc (la interfície els barreja amb el fons).
   const colors = { intro: '#14b8a6', verse: '#8b5cf6', prechorus: '#f97316', chorus: '#ec4899', bridge: '#3b82f6', solo: '#84cc16', outro: '#10b981' };
-  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e', guitar2: '#84cc16', guitar3: '#10b981' };
+  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e', guitar2: '#84cc16', guitar3: '#10b981', vocal: '#f472b6' };
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const GUITARS = ['guitar', 'guitar2', 'guitar3'];
@@ -24,9 +24,31 @@
     bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
     drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
     trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
-    trombone: [['auto', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']]
+    trombone: [['auto', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
+    vocal: [['auto', 'Clarinet · gravat (recomanat)'], ['oohs', 'Veu «uh» GM'], ['flute', 'Flauta GM'], ['ocarina', 'Ocarina GM'], ['clarinetGm', 'Clarinet GM']]
   };
-  const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto' });
+  const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto' });
+  // Síl·labes d'un vers en català (aproximat): grups vocàlics, amb els diftongs
+  // decreixents (ai, ei, oi, ui, au, eu, iu, ou) com una sola síl·laba i la
+  // dièresi (ï, ü) com a hiat. La melodia de veu fa una nota per síl·laba.
+  function syllableCount(line) {
+    let total = 0;
+    for (const word of line.toLowerCase().match(/[a-zàèéíïòóúüç·'’-]+/g) || []) {
+      const clean = word.replace(/(q|g)u(?=[eiéèí])/g, '$1');
+      for (const group of clean.match(/[aeiouàèéíïòóúü]+/g) || []) {
+        let count = 0;
+        for (let i = 0; i < group.length; i++) {
+          const next = group[i + 1];
+          count++;
+          if (next && 'iu'.includes(next) && !'iu'.includes(group[i])) i++;
+        }
+        total += count;
+      }
+    }
+    return total;
+  }
+  const lyricLines = text => (text || '').split(/\n/).map(l => l.trim()).filter(l => l && /[a-zàèéíòóúïü]/i.test(l)).slice(0, 32);
+  const lyricSyllables = text => lyricLines(text).map(line => Math.max(1, Math.min(24, syllableCount(line))));
   // Equalitzador: valors en dB respecte de la corba de cada instrument.
   const EQ_KEYS = [['low', 'Greus'], ['mid', 'Mitjos'], ['high', 'Aguts'], ['volume', 'Volum']];
   const flatEq = () => ({ low: 0, mid: 0, high: 0, volume: 0 });
@@ -130,6 +152,7 @@
       if (c.sound !== undefined && (!GUITARS.includes(c.instrument) || !timbreOptions.guitar.some(([key]) => key === c.sound))) fail('So de guitarra no vàlid');
       if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
       if (c.feel !== undefined && ![.5, 2].includes(c.feel)) fail('Ritme no vàlid');
+      if (c.register !== undefined && (c.instrument !== 'vocal' || ![-1, 1].includes(c.register))) fail('Registre no vàlid');
       ids.add(c.id);
     }
     if (value.voice !== undefined) {
@@ -158,9 +181,11 @@
     const active = s.clips.filter(c => c.generated && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
     const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {};
+    let register;
     for (const c of active) {
       if (!(c.instrument in layers)) {
         if (c.feel) feel[c.instrument] = c.feel;
+        if (c.instrument === 'vocal' && c.register) register = c.register;
         if (c.sound && c.sound !== 'auto') timbres[c.instrument] = c.sound;
         if (c.fx && c.fx.type !== 'none') fx[c.instrument] = c.fx;
       }
@@ -168,7 +193,7 @@
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
     }
     for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
-    return { layers, ranges, timbres, fx, feel };
+    return { layers, ranges, timbres, fx, feel, register };
   }
   function partFor(s, seg, options = {}) {
     const base = s.base.instruments, extra = layersFor(s, seg, options);
@@ -191,6 +216,12 @@
       if (Object.keys(extra.timbres).length) part.timbres = extra.timbres;
       if (Object.keys(extra.fx).length) part.fx = extra.fx;
       if (Object.keys(extra.feel).length) part.feel = { ...(part.feel || {}), ...extra.feel };
+      // La melodia de veu segueix la lletra de la secció: una frase per vers.
+      if ('vocal' in extra.layers) {
+        if (extra.register) part.register = extra.register;
+        const syllables = seg.section ? lyricSyllables(seg.section.lyrics) : [];
+        if (syllables.length) part.syllables = syllables;
+      }
     }
     return part;
   }
@@ -600,6 +631,7 @@
       for (const seg of segmentsOf(song)) if (overlaps(seg, clip)) await renderSpec(specFor(seg));
       save();
       notify(reused ? `${INSTRUMENTS[clip.instrument]}: repeteix la idea de ${sectionLabel(sectionAt(reused.start))}. Prem «Genera’n una altra» per variar-la.`
+        : clip.instrument === 'vocal' ? `Melodia de veu creada${lyricSyllables(home?.lyrics).length ? ' a partir de la lletra (una nota per síl·laba)' : ' amb frases i respiracions'}. Escolta-la per saber com cantar.`
         : `${clipLabel(clip)} generat. Escolta la secció o tota la cançó.`);
     } catch (error) {
       Object.assign(clip, before); audioError(error); notify(`No s’ha pogut generar l’instrument: ${reasonOf(error)}`);
@@ -1025,6 +1057,7 @@
     $('section-chords').textContent = `Acords: ${chordsOf(seg)}`;
     $('section-reharmonize').textContent = song.sections.filter(s => s.type === sec.type).length > 1 ? `↻ Altres acords per a totes ${plurals[sec.type]}` : '↻ Altres acords';
     $('section-lyrics').value = sec.lyrics;
+    renderLyricsInfo(sec);
     const list = $('layer-list'); list.replaceChildren();
     const clips = song.clips.filter(c => overlaps(c, sec));
     if (!clips.length) {
@@ -1062,6 +1095,12 @@
     $('play-section').textContent = playing?.kind === 'section' && playing.id === sec.id ? '■ Atura' : `▷ Escolta la secció${pending ? ' (sense els pendents)' : ''}`;
     $('play-song-inline').textContent = playing?.kind === 'song' ? '■ Atura la cançó' : '▷ Escolta tota la cançó';
   }
+  function renderLyricsInfo(sec) {
+    const counts = lyricSyllables(sec.lyrics), voice = song.clips.some(c => c.instrument === 'vocal' && overlaps(c, sec));
+    $('lyrics-info').textContent = counts.length
+      ? `${voice ? 'La melodia de veu fa' : 'Si hi afegeixes la «Melodia de veu», farà'} ${counts.length} frase${counts.length > 1 ? 's' : ''}, una per vers: ${counts.join(' · ')} síl·labes.`
+      : voice ? 'Sense lletra, la melodia de veu fa frases amb respiracions. Escriu un vers per línia perquè s’hi ajusti.' : '';
+  }
   // So i efecte de cada clip de guitarra.
   function clipTone(clip) {
     const box = document.createElement('div'); box.className = 'clip-tone';
@@ -1083,6 +1122,12 @@
       wrap.append(caption, input, hint); return wrap;
     };
     const feelSelect = select('RITME', FEELS, String(clip.feel ?? 1), value => changeClipTone(clip, { feel: Number(value) }));
+    if (clip.instrument === 'vocal') {
+      box.classList.add('only-feel');
+      box.append(feelSelect, select('REGISTRE', [['-1', 'Greu (veu d’home)'], ['0', 'Mitjà'], ['1', 'Agut (veu de dona)']], String(clip.register ?? 0),
+        value => changeClipTone(clip, { register: Number(value) })));
+      return box;
+    }
     if (!GUITARS.includes(clip.instrument)) { box.classList.add('only-feel'); box.append(feelSelect); return box; }
     box.append(feelSelect,
       select('SO', timbreOptions.guitar.map(([k, v]) => [k, k === 'auto' ? 'Com la guitarra de la cançó' : v]), clip.sound || 'auto', value => changeClipTone(clip, { sound: value })),
@@ -1093,6 +1138,7 @@
   function changeClipTone(clip, change) {
     if (busy) return;
     if ('sound' in change) { if (change.sound === 'auto') delete clip.sound; else clip.sound = change.sound; }
+    if ('register' in change) { if (change.register === 0) delete clip.register; else clip.register = change.register; }
     if ('feel' in change) { if (change.feel === 1) delete clip.feel; else clip.feel = change.feel; }
     if ('fx' in change) { if (change.fx.type === 'none' && change.fx.drive === 50 && change.fx.tone === 50) delete clip.fx; else clip.fx = change.fx; }
     const replay = playing?.kind; stop(); save(); render();
@@ -1203,7 +1249,7 @@
     } else { $('playback-duration').textContent = time(playing.seconds); $('play-song').textContent = playing.kind === 'song' ? '■' : '▶'; }
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
-      'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'section-type', 'section-start', 'section-bars',
+      'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'section-type', 'section-start', 'section-bars',
       'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm']) $(key).disabled = busy;
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
@@ -1254,7 +1300,7 @@
   paintTheme();
 
   // ── Esdeveniments ───────────────────────────────────────────────────
-  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone']
+  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal']
     .forEach(key => $(key).addEventListener('change', changeSettings));
   $('song-title').addEventListener('input', event => { song.title = event.target.value; $('transport-title').textContent = song.title || 'Nova cançó'; save(); });
   $('generate-base').addEventListener('click', generateBase);
@@ -1299,7 +1345,7 @@
   $('remove-section').addEventListener('click', removeSection);
   $('add-layer').addEventListener('click', addLayer);
   $('copy-previous').addEventListener('click', extendPrevious);
-  $('section-lyrics').addEventListener('input', event => { const sec = current(); if (sec) { sec.lyrics = event.target.value; save(); } });
+  $('section-lyrics').addEventListener('input', event => { const sec = current(); if (sec) { sec.lyrics = event.target.value; save(); renderLyricsInfo(sec); } });
   function download(blob, filename) {
     const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
