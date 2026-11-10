@@ -5,6 +5,22 @@
   "commit": "684543d5e5efaef08d02be50dcda8d552478fa60",
   "url": "https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/684543d5e5efaef08d02be50dcda8d552478fa60/GeneralUser-GS.sf2",
   "sha256": "9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe",
-  "programs": [27, 28, 29, 30, 33, 34, 56, 57],
-  "drumPrograms": [0, 16]
+  "programs": [
+    27,
+    28,
+    29,
+    30,
+    33,
+    34,
+    56,
+    57,
+    38,
+    81,
+    89
+  ],
+  "drumPrograms": [
+    0,
+    16,
+    24
+  ]
 }

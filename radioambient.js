@@ -1749,14 +1749,18 @@
         outro: { name: 'Final', bars: 4, energy: 30, description: 'Recupera el motiu i tanca la cançó.' }
     };
     // Preseleccions de treball: no són límits teòrics dels gèneres.
-    const SONG_INSTRUMENTS = { guitar: 'Guitarres', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó' };
+    const SONG_INSTRUMENTS = { guitar: 'Guitarres', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Trombó', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica' };
     const SONG_STYLES = {
-        ska: { name: 'Ska', bpm: { min: 100, max: 180, default: 128 },
+        ska: { instruments: ['guitar', 'drums', 'bass', 'trumpet', 'trombone'], name: 'Ska', bpm: { min: 100, max: 180, default: 128 },
             keys: [[0, 'major'], [5, 'major'], [10, 'major'], [3, 'major'], [7, 'major'], [9, 'minor'], [2, 'minor'], [7, 'minor'], [0, 'minor']],
             description: 'Guitarra a contratemps, baix caminant i metalls.' },
-        punk: { name: 'Punk', bpm: { min: 140, max: 220, default: 180 },
+        punk: { instruments: ['guitar', 'drums', 'bass', 'trumpet', 'trombone'], name: 'Punk', bpm: { min: 140, max: 220, default: 180 },
             keys: [[4, 'major'], [9, 'major'], [2, 'major'], [7, 'major'], [0, 'major'], [4, 'minor'], [9, 'minor'], [11, 'minor'], [2, 'minor']],
-            description: 'Guitarres amb quintes, corxeres i bateria directa.' }
+            description: 'Guitarres amb quintes, corxeres i bateria directa.' },
+        urban: { name: 'Urban', instruments: ['synthLead', 'synthPad', 'synthBass', 'electronicDrums'],
+            bpm: { min: 70, max: 160, default: 95 },
+            keys: [[9, 'minor'], [0, 'minor'], [2, 'minor'], [4, 'minor'], [7, 'minor'], [0, 'major'], [5, 'major'], [7, 'major']],
+            description: 'Sintetitzadors melòdics i d’acords, baix profund i bateria electrònica amb ritmes urbans.' }
     };
     function composeSongPart(settings, part) {
         if (!Object.hasOwn(SONG_PARTS, part.type)) throw new Error('Tipus de secció desconegut');
@@ -1765,7 +1769,7 @@
         if (!Object.hasOwn(SONG_STYLES, settings.style) || ![4, 8, 12, 16].includes(bars)
             || !Number.isInteger(bpm) || bpm < style.bpm.min || bpm > style.bpm.max
             || !style.keys.some(([key, mode]) => key === tonic && mode === settings.mode)) throw new Error('Configuració musical no vàlida per a aquest estil');
-        const instruments = part.instruments === undefined ? (settings.instruments === undefined ? Object.keys(SONG_INSTRUMENTS) : settings.instruments) : part.instruments;
+        const instruments = part.instruments === undefined ? (settings.instruments === undefined ? style.instruments : settings.instruments) : part.instruments;
         if (!Array.isArray(instruments) || !instruments.length || new Set(instruments).size !== instruments.length
             || instruments.some(instrument => !Object.hasOwn(SONG_INSTRUMENTS, instrument))) throw new Error('Selecciona instruments vàlids');
         const energy = Number(part.energy);
@@ -1815,7 +1819,13 @@
         for (let b = 0; b < bars; b += 4) phrase.forEach(n => melody.push([n[0] + b, n[1], n[2], n[3]]));
         // El baix té un riff propi per a cada alternativa; una única partitura
         // alimenta tant el motor de mostres com el sintetitzador de reserva.
-        const bassPatterns = settings.style === 'ska' ? [
+        const bassPatterns = settings.style === 'urban' ? [
+            [[0,'root',1.4,1.1],[1.75,'root',.65,.9],[3,'fifth',.8,1]],
+            [[0,'root',1.8,1.1],[2.5,'octave',.55,.85],[3.25,'root',.65,1]],
+            [[0,'root',.7,1.1],[1.5,'fifth',.7,1],[2.75,'root',1,1]],
+            [[0,'root',1.1,1.1],[1.5,'third',.4,.85],[2,'fifth',.65,1],[3.5,'root',.4,1]],
+            [[0,'root',.9,1.1],[1.25,'octave',.45,.9],[2.5,'fifth',.65,1],[3.5,'root',.4,1]]
+        ] : settings.style === 'ska' ? [
             [[0,'root',.85,1.13],[1,'third',.8,1],[2,'fifth',.8,1.08],[3,'approach',.72,1.08]],
             [[0,'root',1.3,1.2],[1.5,'fifth',.8,.92],[2.5,'octave',1,1.04]],
             [[0,'root',.42,1.18],[.5,'octave',.42,.88],[1.5,'fifth',.43,1.04],[2,'root',.75,1.13],[3,'third',.85,1.02]],
@@ -1832,7 +1842,7 @@
             [[0,'root',.65,1.19],[.75,'root',.48,.93],[1.5,'fifth',.42,1.01],
              [2,'root',.66,1.13],[2.75,'octave',.4,1.02],[3.25,'approach',.5,1.12]]
         ];
-        const classic = settings.style === 'punk'
+        const classic = settings.style === 'urban' ? bassPatterns[0] : settings.style === 'punk'
             ? [[0,'root',.42,1.1],[.5,'root',.42,.9],[1,'root',.42,1.05],[1.5,'root',.42,.9],
                [2,'root',.42,1.08],[2.5,'root',.42,.9],[3,'root',.42,1.08],[3.5,'root',.42,.9]]
             : [[0,'root',.8,1.1],[1,'third',.78,.98],[2,'fifth',.78,1.04],[3,'approach',.75,1.02]];
@@ -1860,6 +1870,15 @@
         spec.chords.forEach((chord, b) => {
             const t0 = b * bar, ending = spec.type === 'outro' && b === spec.bars - 1;
             const soft = spec.type === 'intro' || spec.type === 'bridge';
+            if (has('synthPad')) chord.notes.forEach(n => syn.pad(t0, n, bar * .95, .018 * intensity, .35));
+            if (has('electronicDrums')) {
+                const kicks = [[0,1.75,2.5],[0,2.5,3.25],[0,1.5,2.75],[0,.75,2.5],[0,1.25,3]];
+                (ending ? [0] : kicks[Math.max(0,variation)]).forEach(t => syn.kick(t0+t*beat,intensity*.8,42));
+                if (!ending) {
+                    [1,3].forEach(t => syn.brush(t0+t*beat,intensity*.7,.08,false));
+                    for (let k=0;k<16;k++) syn.brush(t0+k*beat/4,intensity*(k%2?.09:.18),.012,true);
+                }
+            }
             const guitarPatterns = punk
                 ? [[0,.5,1,1.5,2,2.5,3,3.5],[0,1,1.5,2,3,3.5],
                    [0,.5,1.5,2,2.5,3.5],[0,.5,1,1.5,2.5,3],[0,1,2,2.5,3,3.5]]
@@ -1895,9 +1914,11 @@
                 if (has('trombone')) syn.brass(t0, chord.root + 24, bar * 0.7, intensity * 0.65, 'trombone');
             }
         });
-        if (has('bass') && Array.isArray(spec.bassLine)) {
-            for (const [b,t,pitch,length,strength] of spec.bassLine)
-                syn.bass((b*4+t)*beat, pitch, intensity*strength*1.13, length*beat);
+        if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {
+            for (const [b,t,pitch,length,strength] of spec.bassLine) {
+                if (has('bass')) syn.bass((b*4+t)*beat, pitch, intensity*strength*1.13, length*beat);
+                if (has('synthBass')) syn.bass((b*4+t)*beat, Math.max(24,pitch-12), intensity*strength, length*beat);
+            }
         }
         spec.melody.forEach(([b, t, n, d]) => {
             if (spec.type === 'outro' && b === spec.bars - 1) return;
@@ -1905,6 +1926,7 @@
             if (spec.type === 'intro' && b < 2) return;
             const start = b * bar + t * beat, duration = Math.max(0.06, d * beat - 0.05);
             const level = intensity * (spec.type === 'verse' ? 0.42 : 0.72);
+            if (has('synthLead')) syn.pluck(start, n, level, { decay: duration, partials: [1,.5,.3,.2], damp: .4, gain: .07, attack: .008 });
             if (has('trumpet')) syn.brass(start, n, duration, level, 'trumpet');
             const chord = spec.chords[b];
             const harmony = nearestTone(n - 12, chord.pcs, 45, 67);

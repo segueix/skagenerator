@@ -16,7 +16,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       synth.programChange(patch.channel, patch.program);
       synth.controllerChange(patch.channel, 7, patch.volume);
       synth.controllerChange(patch.channel, 10, patch.pan);
-      synth.controllerChange(patch.channel, 91, patch.channel === 9 ? 12 : 27);
+      synth.controllerChange(patch.channel, 91, patch.drums ? 12 : 27);
       synth.controllerChange(patch.channel, 93, 0);
     }
     const length = Math.round(score.seconds * sampleRate), left = new Float32Array(length), right = new Float32Array(length);

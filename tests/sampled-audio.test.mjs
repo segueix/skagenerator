@@ -13,11 +13,11 @@ const settings = { seed: 71931, bpm: 128, style: 'ska', tonic: 0, mode: 'major',
 const part = { type: 'chorus', bars: 4, energy: 75, revision: 1 };
 const spec = engine.composeSongPart(settings, part);
 
-test('el banc conté les mostres enregistrades dels instruments i els dos kits requerits', () => {
+test('el banc conté les mostres enregistrades dels instruments i els tres kits requerits', () => {
   assert(raw.byteLength > 1000000 && raw.byteLength < 24 * 1024 * 1024);
-  assert.equal(bank.presets.length, 10);
-  for (const program of [27, 28, 29, 30, 33, 34, 56, 57]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));
-  for (const program of [0, 16]) assert(bank.presets.some(p => p.program === program && p.isGMGSDrum));
+  assert.equal(bank.presets.length, 14);
+  for (const program of [27, 28, 29, 30, 33, 34, 38, 56, 57, 81, 89]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));
+  for (const program of [0, 16, 24]) assert(bank.presets.some(p => p.program === program && p.isGMGSDrum));
   assert(bank.samples.length > 10);
 });
 test('la interpretació és reproduïble, només activa els instruments seleccionats i respecta contratemps/quintes', () => {
@@ -36,7 +36,7 @@ test('la interpretació és reproduïble, només activa els instruments seleccio
   assert(ska.events.every(e => e.time >= 0 && e.time < spec.seconds));
   assert(ska.events.every((e,i,a) => !i || a[i-1].time <= e.time));
 });
-test('els cinc instruments produeixen àudio estèreo finit a partir del banc real', async () => {
+test('els nou instruments produeixen àudio estèreo finit a partir del banc real', async () => {
   const renders = [];
   for (const instrument of Object.keys(engine.SONG_INSTRUMENTS)) {
     const solo = { ...spec, instruments: [instrument] };
@@ -81,4 +81,26 @@ test('un error de renderització es comunica i el banc es pot reutilitzar despr�
   await assert.rejects(renderSampledPart(bank, spec, 16000, { cancelled: () => true }));
   const channels = await renderSampledPart(bank, spec, 16000);
   assert(channels[0].some(n => Math.abs(n) > .01));
+});
+
+test('urban activa els sintetitzadors i el kit electrònic amb cinc grooves diferents', async () => {
+  const profile = engine.SONG_STYLES.urban;
+  const cfg = { ...settings, style: 'urban', bpm: profile.bpm.default, tonic: 9, mode: 'minor', instruments: profile.instruments };
+  const grooves = new Set(), basses = new Set();
+  for (let i = 0; i < 5; i++) {
+    const sp = engine.composeSongPart(cfg, { ...part, revision: i + 1, variantIndex: i });
+    const performance = createPerformance(sp);
+    assert.deepEqual(new Set(performance.events.map(e => e.channel)), new Set([5, 6, 7, 10]));
+    assert.equal(performance.channels.find(c => c.channel === 10).program, 24);
+    assert.equal(performance.channels.find(c => c.channel === 10).drums, true);
+    grooves.add(JSON.stringify(performance.events.filter(e => e.channel === 10 && e.type === 'on').map(e => [e.time, e.note])));
+    basses.add(JSON.stringify(sp.bassLine));
+    for (const instrument of profile.instruments) {
+      const channels = await renderSampledPart(bank, { ...sp, instruments: [instrument] }, 16000);
+      assert(channels[0].some(n => Math.abs(n) > .01), `${instrument}, variant ${i}`);
+    }
+  }
+  assert.equal(grooves.size, 5); assert.equal(basses.size, 5);
+  const sp = engine.composeSongPart({ ...cfg, instruments: undefined }, part);
+  assert.deepEqual(sp.instruments, profile.instruments);
 });

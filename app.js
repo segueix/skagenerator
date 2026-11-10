@@ -11,7 +11,7 @@
   const makePart = type => ({ id: id(), type, bars: engine.SONG_PARTS[type].bars, energy: engine.SONG_PARTS[type].energy, lyrics: '', generated: false, revision: 1 });
   const fiveVersions = part => ['intro', 'verse', 'chorus'].includes(part.type);
   let recoveredMigration = false;
-  const newSong = () => ({ version: 1, title: 'Nova cançó', settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: seed(), instruments: Object.keys(engine.SONG_INSTRUMENTS) }, parts: ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'].map(makePart), chorusRevision: 1 });
+  const newSong = () => ({ version: 1, title: 'Nova cançó', settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: seed(), instruments: engine.SONG_STYLES.ska.instruments.slice() }, parts: ['intro', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'outro'].map(makePart), chorusRevision: 1 });
   function validateSong(value) {
     if (!value || value.version !== 1 || typeof value.title !== 'string' || value.title.length > 100 || !value.settings
       || !Number.isInteger(value.settings.seed) || value.settings.seed < 1 || value.settings.seed > 4294967295
@@ -26,7 +26,7 @@
       if (!Object.hasOwn(engine.SONG_STYLES, value.settings.style)) throw new Error('Estil no vàlid');
       if (Number.isInteger(value.settings.bpm)) value.settings.bpm = Math.max(profile.bpm.min, Math.min(profile.bpm.max, value.settings.bpm));
       if (!profile.keys.some(([tonic, mode]) => tonic === value.settings.tonic && mode === value.settings.mode)) [value.settings.tonic, value.settings.mode] = profile.keys[0];
-      value.settings.instruments ||= Object.keys(engine.SONG_INSTRUMENTS);
+      value.settings.instruments ||= profile.instruments.slice();
       value.parts.forEach(part => { part.generated = false; });
       recoveredMigration = true;
     }
@@ -200,6 +200,7 @@
       const name = document.createElement('strong'); name.textContent = `Versió ${index + 1}`;
       const grooves = song.settings.style === 'ska'
         ? ['Baix caminant', 'Baix dub espaiat', 'Octaves i contratemps', 'Baix melòdic', 'Baix sincopat']
+        : song.settings.style === 'urban' ? ['Urban sincopat', 'Trap a mig temps', 'Dembow electrònic', 'Urban melòdic', 'Urban amb síncopes']
         : ['Punk de corxeres', 'Punk a mig temps', 'Punk galopant', 'Baix amb riff', 'Punk sincopat'];
       const note = document.createElement('span');
       note.textContent = `${grooves[index]}${chosen ? ' · ✓ Escollida' : ''}`;
@@ -238,7 +239,6 @@
     status.parentElement.classList.toggle('loading', progress.stage === 'loading');
     if (progress.stage === 'loading') status.textContent = `Carregant instruments${progress.value === null ? '…' : ` · ${Math.round(progress.value * 100)} %`}`;
     else if (progress.stage === 'rendering') status.textContent = progress.value === 1 ? 'So enregistrat · Instruments a punt' : `Preparant la part · ${Math.round(progress.value * 100)} %`;
-    else if (progress.stage === 'fallback') status.textContent = progress.value === 1 ? 'Mode compatible · àudio sintetitzat' : 'Preparant so alternatiu (sense banc de mostres)…';
     else status.textContent = 'So enregistrat · Instruments a punt';
   }
   function audioError(error) {
@@ -351,7 +351,7 @@
     let [tonic, mode] = $('song-key').value.split(':'); tonic = Number(tonic);
     if (!profile.keys.some(([key, keyMode]) => key === tonic && keyMode === mode)) [tonic, mode] = profile.keys[0];
     const bpm = changingStyle ? profile.bpm.default : Number($('song-bpm').value);
-    const instruments = Object.keys(engine.SONG_INSTRUMENTS).filter(name => $(`instrument-${name}`).checked);
+    const instruments = changingStyle ? profile.instruments.slice() : Object.keys(engine.SONG_INSTRUMENTS).filter(name => $(`instrument-${name}`).checked);
     if (!instruments.length) { notify('Mantén com a mínim un instrument activat.'); updateSettingsUI(); return; }
     if (!Number.isInteger(bpm) || bpm < profile.bpm.min || bpm > profile.bpm.max) {
       notify(`Per a ${profile.name.toLowerCase()}, tria un tempo entre ${profile.bpm.min} i ${profile.bpm.max} BPM.`); updateSettingsUI(); return;

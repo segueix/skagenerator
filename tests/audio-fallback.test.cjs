@@ -21,32 +21,26 @@ function loadClient({ Worker, fetch, songPartSamples }) {
   return window.SkaSampleAudio;
 }
 
-test('si falta el banc de mostres, la generació funciona amb el sintetitzador local', async () => {
-  let workers = 0, fetches = 0, renders = 0;
-  class BrokenWorker {
-    constructor() { workers++; }
+test('un banc absent informa de l’error i permet recuperar les mostres en el següent intent', async () => {
+  let available = false, fetches = 0, fallbackCalls = 0;
+  class Worker {
     terminate() {}
-    postMessage() { throw new Error('No hauria d’inicialitzar-se'); }
-  }
-  const client = loadClient({
-    Worker: BrokenWorker,
-    async fetch() { fetches++; return { ok: false, status: 404 }; },
-    async songPartSamples(spec, sampleRate) {
-      renders++;
-      assert.equal(sampleRate, 44100);
-      return Float32Array.from([0, 0.4, -0.3, 0]);
+    postMessage(data) {
+      queueMicrotask(() => this.onmessage({ data: { id: data.id,
+        type: data.type === 'init' ? 'ready' : 'rendered',
+        channels: [Float32Array.from([0, .4, 0]), Float32Array.from([0, .3, 0])] } }));
     }
+  }
+  const client = loadClient({ Worker,
+    async fetch() { fetches++; return { ok: available, headers: { get() { return null; } },
+      arrayBuffer: async () => new ArrayBuffer(8) }; },
+    async songPartSamples() { fallbackCalls++; }
   });
-  const stages = [];
-  const first = await client.render({ type: 'intro' }, 44100, { onProgress: p => stages.push(p.stage) });
-  const second = await client.render({ type: 'verse' }, 44100);
-  assert.equal(first.length, 2);
-  assert.deepEqual(Array.from(first[0]), Array.from(first[1]));
-  assert.notStrictEqual(first[0], first[1]);
-  assert.equal(first[0].length, 4);
-  assert.equal(second.length, 2);
-  assert.deepEqual(stages, ['loading', 'fallback', 'fallback']);
-  assert.equal(workers, 1); assert.equal(fetches, 1); assert.equal(renders, 2);
+  await assert.rejects(client.render({ type: 'intro' }), /carregar els instruments/);
+  available = true;
+  const audio = await client.render({ type: 'verse' });
+  assert(audio[0][1] > .3);
+  assert.equal(fetches, 3); assert.equal(fallbackCalls, 0);
   client.dispose();
 });
 
@@ -77,13 +71,34 @@ test('si el banc i el worker funcionen, es manté el so enregistrat', async () =
   client.dispose();
 });
 
-test('si el navegador no admet workers, la generació també és recuperable', async () => {
+test('un worker que falla durant el render es reinicia amb les mateixes mostres', async () => {
+  let workers = 0;
+  class Worker {
+    constructor() { this.number = ++workers; }
+    terminate() {}
+    postMessage(data) {
+      queueMicrotask(() => {
+        if (data.type === 'render' && this.number === 1) { this.onerror(); return; }
+        this.onmessage({ data: { id: data.id, type: data.type === 'init' ? 'ready' : 'rendered',
+          channels: [Float32Array.from([0, .5, 0]), Float32Array.from([0, .4, 0])] } });
+      });
+    }
+  }
+  const client = loadClient({ Worker,
+    async fetch() { return { ok: true, headers: { get() { return null; } }, arrayBuffer: async () => new ArrayBuffer(8) }; },
+    async songPartSamples() { throw new Error('No s’ha de substituir el so'); }
+  });
+  assert.equal((await client.render({ type: 'intro' }))[0][1], .5);
+  assert.equal(workers, 2);
+  client.dispose();
+});
+
+test('si el navegador no admet workers, es comunica l’error sense substituir el so', async () => {
   const client = loadClient({
     Worker: class { constructor() { throw new Error('Worker unavailable'); } },
-    async fetch() { throw new Error('No s’hauria de consultar el banc'); },
-    async songPartSamples() { return Float32Array.from([0, .5, 0]); }
+    async fetch() { return { ok: true, headers: { get() { return null; } }, arrayBuffer: async () => new ArrayBuffer(8) }; },
+    async songPartSamples() { throw new Error('No s’ha de substituir el so'); }
   });
-  const audio = await client.render({ type: 'intro' });
-  assert.equal(audio.length, 2);
-  assert.equal(audio[0][1], .5);
+  await assert.rejects(client.render({ type: 'intro' }), /Worker unavailable/);
+  await assert.rejects(client.render({ type: 'verse' }), /Worker unavailable/);
 });
