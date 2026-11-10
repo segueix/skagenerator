@@ -14,6 +14,26 @@
     for (const part of parts) { result[0].set(part[0], offset); result[1].set(part[1], offset); offset += part[0].length; }
     return result;
   }
+  // Uneix seccions que porten cua: cada una comença on acaba la durada
+  // nominal de l'anterior i les cues se sumen a la secció següent.
+  function mixSections(parts, lengths) {
+    parts.forEach(check);
+    if (!Array.isArray(lengths) || lengths.length !== parts.length
+      || lengths.some((n, i) => !Number.isInteger(n) || n < 1 || n > parts[i][0].length)) throw new Error('Durades de secció no vàlides');
+    let offset = 0, total = 0;
+    parts.forEach((part, i) => { total = Math.max(total, offset + part[0].length); offset += lengths[i]; });
+    const result = [new Float32Array(total), new Float32Array(total)]; offset = 0;
+    parts.forEach((part, i) => {
+      for (let ch = 0; ch < 2; ch++) { const out = result[ch], data = part[ch]; for (let k = 0; k < data.length; k++) out[offset + k] += data[k]; }
+      offset += lengths[i];
+    });
+    // Limitador suau: només actua quan una cua i una entrada forta coincideixen.
+    for (const out of result) for (let k = 0; k < out.length; k++) {
+      const a = Math.abs(out[k]);
+      if (a > .9) out[k] = Math.sign(out[k]) * (.9 + .1 * Math.tanh((a - .9) / .1));
+    }
+    return result;
+  }
   function encodeWav(channels, sampleRate = 44100) {
     check(channels);
     if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
@@ -29,5 +49,5 @@
     }
     return wav;
   }
-  return { joinStereo, encodeWav };
+  return { joinStereo, mixSections, encodeWav };
 });

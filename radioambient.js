@@ -1762,6 +1762,102 @@
             keys: [[9, 'minor'], [0, 'minor'], [2, 'minor'], [4, 'minor'], [7, 'minor'], [0, 'major'], [5, 'major'], [7, 'major']],
             description: 'Sintetitzadors melòdics i d’acords, baix profund i bateria electrònica amb ritmes urbans.' }
     };
+    // ── Base rítmica ────────────────────────────────────────────────────
+    // La bateria, el baix i la guitarra rítmica es trien una vegada per a tota
+    // la cançó (i, si cal, per secció). Les cinc versions d'una secció canvien
+    // els acords i la melodia, però no la base: així la cançó manté el caràcter.
+    const GROOVE_FAMILIES = ['drums', 'bass', 'guitar'];
+    const DRUM_GROOVES = {
+        ska: [
+            { name: 'Ska clàssic', kick: [0, 2], snare: [1, 3], hat: 'offbeat' },
+            { name: 'One drop', kick: [2], snare: [2], rim: true, hat: 'eighths' },
+            { name: 'Steppers · bombo a negres', kick: [0, 1, 2, 3], snare: [2], rim: true, hat: 'offbeat' },
+            { name: 'Rocksteady', kick: [0, 2.5], snare: [1, 3], rim: true, hat: 'eighths' },
+            { name: 'Ska-punk', kick: [0, 1.5, 2, 3.5], snare: [1, 3], hat: 'eighths' },
+            { name: 'Doble temps', kick: [0, 1, 2, 3], snare: [.5, 1.5, 2.5, 3.5], hat: 'quarters' }
+        ],
+        punk: [
+            { name: 'Punk directe', kick: [0, 2, 2.5], snare: [1, 3], hat: 'eighths' },
+            { name: 'Mig temps', kick: [0, 1.5, 3.5], snare: [2], hat: 'quarters' },
+            { name: 'D-beat', kick: [0, 1.5, 2, 3.5], snare: [1, 3], hat: 'eighths' },
+            { name: 'Skate punk · doble temps', kick: [0, 1, 2, 3], snare: [.5, 1.5, 2.5, 3.5], hat: 'quarters' },
+            { name: 'Timbals', kick: [0, 2], snare: [1, 3], hat: 'toms' },
+            { name: 'Sincopat', kick: [0, .75, 2, 2.5], snare: [1, 3], hat: 'eighths' }
+        ],
+        urban: [
+            { name: 'Boom bap', kick: [0, 1.75, 2.5], snare: [1, 3], hat: 'eighths', roll: true },
+            { name: 'Trap a mig temps', kick: [0, 2.5, 3.25], snare: [2], hat: 'sixteenths', roll: true },
+            { name: 'Dembow', kick: [0, 1, 2, 3], snare: [.75, 1.5, 2.75, 3.5], hat: 'eighths', roll: true },
+            { name: 'Urban melòdic', kick: [0, .75, 2.5], snare: [1, 3], hat: 'eighths', roll: true },
+            { name: 'Sincopat', kick: [0, 1.25, 3], snare: [1, 3], hat: 'sixteenths', roll: true },
+            { name: 'Two-step', kick: [0, 2.5], snare: [1, 3], hat: 'offbeat', roll: true }
+        ]
+    };
+    const skaGuitar = ['Contratemps', 'Contratemps amb doble cop', 'Contratemps espaiat', 'Contratemps desplaçat', 'Contratemps sincopat'];
+    const SONG_GROOVES = {
+        ska: { drums: DRUM_GROOVES.ska.map(g => g.name), guitar: skaGuitar,
+            bass: ['Caminant', 'Dub espaiat', 'Octaves', 'Melòdic', 'Sincopat'] },
+        punk: { drums: DRUM_GROOVES.punk.map(g => g.name),
+            guitar: ['Corxeres', 'Cops i corxeres', 'Sincopat', 'Galop', 'Obert'],
+            bass: ['Corxeres', 'Mig temps', 'Galop', 'Riff', 'Sincopat'] },
+        urban: { drums: DRUM_GROOVES.urban.map(g => g.name), guitar: skaGuitar,
+            bass: ['Sincopat', 'Greu i llarg', 'Dembow', 'Melòdic', 'Amb rebot'] }
+    };
+    function checkGroove(input, styleName) {
+        if (input === undefined) return;
+        if (!input || typeof input !== 'object' || Array.isArray(input)
+            || Object.entries(input).some(([family, index]) => !GROOVE_FAMILIES.includes(family)
+                || !Number.isInteger(index) || index < 0 || index >= SONG_GROOVES[styleName][family].length))
+            throw new Error('Base rítmica no vàlida');
+    }
+    // Partitura de bateria: [compàs, temps, nota General MIDI, força].
+    // Segueix la forma de la secció: plat a l'entrada, redoble al final,
+    // construcció a la intro, buit al pont i crescendo abans de la tornada.
+    function composeDrumLine(styleName, index, type, bars, energy) {
+        const g = DRUM_GROOVES[styleName][index], line = [];
+        const hit = (b, t, note, force) => line.push([b, t, note, force]);
+        const big = energy >= 70, quiet = energy < 45, half = Math.max(1, Math.floor(bars / 2));
+        const buildBars = type === 'intro' ? Math.min(2, half) : 0;
+        for (let b = 0; b < bars; b++) {
+            const last = b === bars - 1;
+            if (type === 'outro' && last) { hit(b, 0, 36, 116); hit(b, 0, 38, 100); hit(b, 0, 49, 106); continue; }
+            const build = b < buildBars, drop = type === 'bridge' && b < half;
+            const crescendo = last && (type === 'prechorus' || type === 'bridge');
+            const fillFrom = crescendo ? 0 : !last ? 4 : big ? 2.5 : quiet ? 3.5 : 3;
+            if (!build && !drop && ((b === buildBars && !quiet) || (b > 0 && b % 4 === 0 && big))) hit(b, 0, 49, b ? 92 : big ? 108 : 96);
+            (build ? [0] : g.kick).forEach((t, k) => { if (t < fillFrom) hit(b, t, 36, build ? 92 : k ? 106 : 112); });
+            if (!build) g.snare.forEach(t => {
+                if (t < fillFrom) (drop || quiet || g.rim) ? hit(b, t, 37, drop || quiet ? 80 : 94) : hit(b, t, 38, 106);
+            });
+            const hat = build ? 'eighths' : drop ? 'quarters' : g.hat;
+            const steps = hat === 'sixteenths' ? 16 : hat === 'quarters' ? 4 : 8;
+            for (let k = 0; k < steps; k++) {
+                const t = k * 4 / steps; if (t >= fillFrom) break;
+                if (hat === 'sixteenths') hit(b, t, 42, [78, 42, 60, 42][k % 4]);
+                else if (hat === 'quarters') hit(b, t, big && !drop ? 51 : 42, drop ? 58 : 84);
+                else if (hat === 'toms') hit(b, t, k % 4 === 3 ? 45 : 43, k % 2 ? 68 : 88);
+                else if (hat === 'offbeat') hit(b, t, k % 2 && big ? 46 : 42, k % 2 ? 84 : 48);
+                else hit(b, t, k === 7 && !quiet && !build ? 46 : 42, k % 2 ? 56 : 76);
+            }
+            if (crescendo) {
+                // Caixa en corxeres i després semicorxeres, cada cop més forta.
+                [0, 1, 2, 3].forEach(t => hit(b, t, 36, 104));
+                [0, .5, 1, 1.5, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75].forEach((t, k) => hit(b, t, 38, 62 + k * 5));
+            } else if (last && g.roll) {
+                for (let t = fillFrom; t < 4; t += .125) hit(b, t, 42, 50 + Math.round((t - fillFrom) * 28));
+                hit(b, 3.5, 38, 98); if (big) hit(b, 3.75, 38, 104);
+            } else if (last) {
+                const fill = big ? [[2.5, 38, 98], [2.75, 38, 86], [3, 48, 102], [3.25, 48, 94], [3.5, 45, 104], [3.75, 43, 108]]
+                    : quiet ? [[3.5, 38, 70], [3.75, 38, 82]] : [[3, 38, 96], [3.25, 38, 82], [3.5, 45, 98], [3.75, 43, 104]];
+                fill.forEach(([t, note, force]) => hit(b, t, note, force));
+                if (big) hit(b, 3, 36, 104);
+            } else if (b % 4 === 3 && !build && !drop && !quiet) {
+                // Petit avís al final de cada frase de quatre compassos.
+                hit(b, 3.75, 38, 64); if (!g.kick.includes(3.5)) hit(b, 3.5, 36, 92);
+            }
+        }
+        return line;
+    }
     function composeSongPart(settings, part) {
         if (!Object.hasOwn(SONG_PARTS, part.type)) throw new Error('Tipus de secció desconegut');
         const bars = Number(part.bars), bpm = Number(settings.bpm), tonic = Number(settings.tonic);
@@ -1780,6 +1876,11 @@
             : part.variantIndex;
         if (!Number.isInteger(variation) || variation < -1 || variation > 4 || (variation !== -1 && !eligible))
             throw new Error('Versió musical no vàlida');
+        checkGroove(settings.groove, settings.style); checkGroove(part.groove, settings.style);
+        // Sense base rítmica (projectes antics), cada versió porta el seu patró.
+        const groove = {};
+        for (const name of GROOVE_FAMILIES) groove[name] = part.groove?.[name] ?? settings.groove?.[name]
+            ?? (variation >= 0 ? variation : name === 'bass' ? -1 : 0);
         const family = part.type === 'chorus' ? 31 : part.type === 'verse' ? 17 : Object.keys(SONG_PARTS).indexOf(part.type) * 47 + 3;
         const seed = ((settings.seed >>> 0) + Math.imul(family, 7919) + Math.imul(part.revision || 1, 104729)) >>> 0;
         const r = seededRng(seed), mode = settings.mode;
@@ -1853,12 +1954,13 @@
                 fifth: nearestTone(root+7,chord.pcs,root,root+12), octave: root+12,
                 approach: next===root ? root+7 : next+(next>root ? -1 : 1) };
             const pattern = part.type==='outro' && b===bars-1
-                ? [[0,'root',3.3,1.18]] : variation>=0 ? bassPatterns[variation] : classic;
+                ? [[0,'root',3.3,1.18]] : groove.bass>=0 ? bassPatterns[groove.bass] : classic;
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
         }
         return { style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / bpm,
-            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation,
+            seconds: bars * 4 * 60 / bpm, chords, melody, bassLine, instruments: instruments.slice(), variation, groove,
+            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) } };
     }
     function songPartScore(syn, spec) {
@@ -1872,20 +1974,12 @@
             const t0 = b * bar, ending = spec.type === 'outro' && b === spec.bars - 1;
             const soft = spec.type === 'intro' || spec.type === 'bridge';
             if (has('synthPad')) chord.notes.forEach(n => syn.pad(t0, n, bar * .95, .018 * intensity, .35));
-            if (has('electronicDrums')) {
-                const kicks = [[0,1.75,2.5],[0,2.5,3.25],[0,1.5,2.75],[0,.75,2.5],[0,1.25,3]];
-                (ending ? [0] : kicks[Math.max(0,variation)]).forEach(t => syn.kick(t0+t*beat,intensity*.8,42));
-                if (!ending) {
-                    [1,3].forEach(t => syn.brush(t0+t*beat,intensity*.7,.08,false));
-                    for (let k=0;k<16;k++) syn.brush(t0+k*beat/4,intensity*(k%2?.09:.18),.012,true);
-                }
-            }
             const guitarPatterns = punk
                 ? [[0,.5,1,1.5,2,2.5,3,3.5],[0,1,1.5,2,3,3.5],
                    [0,.5,1.5,2,2.5,3.5],[0,.5,1,1.5,2.5,3],[0,1,2,2.5,3,3.5]]
                 : [[.5,1.5,2.5,3.5],[.5,1.5,2.5,3.5,3.75],
                    [.5,1.5,3.5],[.5,1.75,2.5,3.5],[.5,1.5,2.75,3.5]];
-            const stabs = ending ? [0] : guitarPatterns[Math.max(0,variation)];
+            const stabs = ending ? [0] : guitarPatterns[spec.groove?.guitar ?? Math.max(0,variation)];
             const voicing = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes;
             if (has('guitar')) stabs.forEach((t, hit) => voicing.forEach((n, k) => {
                 syn.pluck(t0 + t * beat + k * 0.004, n, intensity * (punk && hit % 2 ? 0.5 : 0.75), guitar);
@@ -1896,25 +1990,25 @@
                     punk ? chord.root : k === 3 ? chord.root + 7 : k === 1 ? bassOf(chord.pcs[1]) : chord.root,
                     intensity * (k % 2 ? 0.65 : 0.85), ending ? 0.8 : 0.21));
             }
-            if (has('drums')) {
-                const kicks = punk
-                    ? [[0,1.5,2,2.5],[0,1,2,3],[0,.5,2,3],[0,1.5,2.5,3],[0,1,2,2.5]]
-                    : [[0,2],[0,2,3.5],[0,2.5],[0,1.5,2],[0,2,3]];
-                (ending ? [0] : kicks[Math.max(0,variation)]).forEach(t => syn.kick(t0 + t * beat, intensity * (punk ? .85 : .65)));
-                if (!ending) {
-                    [1, 3].forEach(t => {
-                        syn.brush(t0 + t * beat, intensity * (soft ? 0.3 : punk ? 0.95 : 0.65), punk ? 0.11 : 0.07, false);
-                        if (punk) syn.block(t0 + t * beat, intensity * 0.24, 180, 0.05, 0.3);
-                    });
-                    for (let k = 0; k < 8; k++) syn.brush(t0 + k * beat / 2, intensity * (k % 2 ? 0.16 : 0.24), 0.018, true);
-                }
-            }
             // Acord final dels dos metalls, només si estan activats.
             if (ending) {
                 if (has('trumpet')) syn.brass(t0, chord.notes.at(-1) + 12, bar * 0.7, intensity * 0.7, 'trumpet');
                 if (has('trombone')) syn.brass(t0, chord.root + 24, bar * 0.7, intensity * 0.65, 'trombone');
             }
         });
+        for (const [b, t, note, force] of spec.drumLine || []) {
+            const at = (b * 4 + t) * beat, level = intensity * force / 108;
+            for (const electronic of [false, true]) {
+                if (!has(electronic ? 'electronicDrums' : 'drums')) continue;
+                if (note === 36) electronic ? syn.kick(at, level * .8, 42) : syn.kick(at, level * (punk ? .85 : .65));
+                else if (note === 38 || note === 37) {
+                    syn.brush(at, level * (note === 37 ? .35 : punk ? .95 : .65), punk ? .11 : electronic ? .08 : .07, false);
+                    if (punk && note === 38) syn.block(at, level * .24, 180, .05, .3);
+                } else if (note === 42 || note === 46 || note === 51) syn.brush(at, level * .26, note === 42 ? .018 : .05, true);
+                else if (note === 49) syn.brush(at, level * .3, .22, true);
+                else syn.block(at, level * .3, note === 48 ? 165 : note === 45 ? 130 : 105, .09, .15);
+            }
+        }
         if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {
             for (const [b,t,pitch,length,strength] of spec.bassLine) {
                 if (has('bass')) syn.bass((b*4+t)*beat, pitch, intensity*strength*1.13, length*beat);
@@ -1951,7 +2045,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, composeSongPart, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, composeSongPart, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

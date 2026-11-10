@@ -4,6 +4,9 @@ import performance from './performance.cjs';
 SpessaLog.setLogLevel(false, false, false);
 export function parseSoundBank(buffer) { return SoundBankLoader.fromArrayBuffer(buffer); }
 
+// Cada secció es lliura amb una cua: la reverberació i els plats continuen
+// sonant sobre l'inici de la secció següent en lloc de tallar-se en sec.
+export const TAIL_SECONDS = 1.5;
 export async function renderSampledPart(bank, spec, sampleRate = 44100, options = {}) {
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
   const score = performance.createPerformance(spec);
@@ -19,7 +22,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       synth.controllerChange(patch.channel, 91, patch.drums ? 12 : 27);
       synth.controllerChange(patch.channel, 93, 0);
     }
-    const length = Math.round(score.seconds * sampleRate), left = new Float32Array(length), right = new Float32Array(length);
+    const body = Math.round(score.seconds * sampleRate), tail = Math.round(TAIL_SECONDS * sampleRate);
+    const length = body + tail, left = new Float32Array(length), right = new Float32Array(length);
     let event = 0, offset = 0, lastProgress = 0;
     const scheduled = score.events.map(e => ({ ...e, frame: Math.round(e.time * sampleRate) }));
     while (offset < length) {
@@ -38,8 +42,10 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       if (!Number.isFinite(left[i]) || !Number.isFinite(right[i])) throw new Error('El motor ha produït àudio no vàlid');
       peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
     }
-    const gain = peak > 0 ? Math.min(1.6, .93 / peak) : 1;
-    const fade = Math.min(length, Math.round((score.type === 'outro' ? .65 : .012) * sampleRate));
+    // Nivell: una secció plena queda prop del màxim i una de buida, més avall,
+    // però només a mig camí. Així la tornada creix sense que la intro es perdi.
+    const gain = peak > 0 ? Math.min(.93, .9 * Math.sqrt(peak / .42)) / peak : 1;
+    const fade = Math.round(.4 * sampleRate);
     for (let i = 0; i < length; i++) {
       const envelope = Math.min(1, i / 64, (length - 1 - i) / fade);
       left[i] *= gain * envelope; right[i] *= gain * envelope;

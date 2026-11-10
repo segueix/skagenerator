@@ -25,7 +25,7 @@
     </section>
     <section class="band-settings" aria-label="Estil i instruments">
       <div class="style-guide"><strong id="style-summary"></strong><span id="style-description"></span><small>Tempos i tonalitats preseleccionats per a aquest taller; no són límits del gènere.</small></div>
-      <fieldset class="instrument-picker"><legend>INSTRUMENTS BASE DE LA CANÇÓ</legend><div id="song-instruments"></div><small>Configuració inicial per a les parts. Després pots escollir una combinació diferent a cada secció.</small><div class="timbre-picker" id="song-timbres" role="group" aria-label="Tria els sons de la formació base">
+      <fieldset class="instrument-picker"><legend>LA BANDA · INSTRUMENTS BASE DE LA CANÇÓ</legend><div id="song-instruments"></div><small>Tria la formació. A l’arranjament decidiràs en quines seccions toca cada instrument.</small><div class="timbre-picker" id="song-timbres" role="group" aria-label="Tria els sons de la formació base">
   <label><span class="field-label">SO DE GUITARRA</span><select id="song-timbre-guitar" aria-label="So de guitarra de la cançó"></select></label>
   <label><span class="field-label">SO DE BAIX</span><select id="song-timbre-bass" aria-label="So de baix de la cançó"></select></label>
   <label><span class="field-label">KIT DE BATERIA</span><select id="song-timbre-drums" aria-label="Kit de bateria de la cançó"></select></label>
@@ -33,13 +33,25 @@
 <small>Tria el timbre de cada instrument. «Segons l’estil» utilitza el so apropiat per a ska, punk o urban.</small>
 <div class="audio-bank-status"><span class="live-dot"></span><span id="audio-status" role="status">So enregistrat · GeneralUser GS</span><a href="licenses/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Crèdits</a></div><small id="tone-status">Reproductor preparat</small></fieldset>
     </section>
+    <section class="groove-panel" aria-labelledby="groove-title">
+      <div class="section-heading"><h2 id="groove-title"><span class="step" aria-hidden="true">1</span>La base rítmica</h2><span>Comença per la bateria i el baix: donen el caràcter a tota la cançó</span></div>
+      <div class="timbre-picker groove-picker" role="group" aria-label="Base rítmica de la cançó">
+        <label><span class="field-label">PATRÓ DE BATERIA</span><select id="song-groove-drums" aria-label="Patró de bateria de la cançó"></select></label>
+        <label><span class="field-label">LÍNIA DE BAIX</span><select id="song-groove-bass" aria-label="Línia de baix de la cançó"></select></label>
+        <label><span class="field-label">RITME DE GUITARRA</span><select id="song-groove-guitar" aria-label="Ritme de guitarra de la cançó"></select></label>
+        <button type="button" id="play-groove" class="button listen">▷ Escolta la base</button>
+      </div>
+      <small>Prova patrons mentre sona: la base es torna a reproduir amb cada canvi. Les idees de cada secció es componen a sobre i la bateria hi afegeix entrades, redobles i finals.</small>
+    </section>
     <section class="arrangement" aria-labelledby="arrangement-title">
-      <div class="section-heading"><h2 id="arrangement-title">El mapa de la cançó</h2><span id="duration-total">4/4 · Estructura estàndard</span></div>
+      <div class="section-heading"><h2 id="arrangement-title"><span class="step" aria-hidden="true">2</span>L’arranjament: qui toca a cada secció</h2><span id="duration-total">4/4 · Estructura estàndard</span></div>
       <div id="timeline" class="timeline" aria-label="Seccions de la cançó"></div>
       <div class="timeline-caption"><span><i class="legend-dot"></i> Generada <i class="legend-dot pending"></i> Pendent de generar</span><span>Selecciona una part per treballar-hi <span aria-hidden="true">↗</span></span></div>
+      <div class="matrix-scroll"><table id="matrix" class="matrix" aria-label="Instruments de cada secció"></table></div>
+      <div class="matrix-actions"><span>Marca les caselles per fer entrar o callar un instrument. Els acords i la melodia de la secció no canvien.</span><button type="button" id="toggle-rows" class="text-button"></button><button type="button" id="suggest-arrangement" class="button">✦ Proposa un arranjament</button><button type="button" id="generate-all" class="button primary">✦ Genera les parts pendents</button></div>
     </section>
     <div class="studio-grid">
-      <aside class="structure-panel" aria-labelledby="structure-title"><div class="section-heading"><h2 id="structure-title">Estructura</h2><span class="count-pill" id="part-count">8 parts</span></div><ol id="section-list" class="section-list"></ol><div class="add-section"><select id="add-type" aria-label="Tipus de part per afegir"><option value="prechorus">Pretornada</option><option value="intro">Intro</option><option value="verse">Estrofa</option><option value="chorus">Tornada</option><option value="bridge">Pont</option><option value="solo">Instrumental</option><option value="outro">Final</option></select><button id="add-part" class="button" aria-label="Afegir una part després de la seleccionada">＋ Afegir</button></div><p class="aside-tip">Una estructura per començar.<br>Adapta-la al que et demani la cançó.</p></aside>
+      <aside class="structure-panel" aria-labelledby="structure-title"><div class="section-heading"><h2 id="structure-title"><span class="step" aria-hidden="true">3</span>Les seccions</h2><span class="count-pill" id="part-count">8 parts</span></div><ol id="section-list" class="section-list"></ol><div class="add-section"><select id="add-type" aria-label="Tipus de part per afegir"><option value="prechorus">Pretornada</option><option value="intro">Intro</option><option value="verse">Estrofa</option><option value="chorus">Tornada</option><option value="bridge">Pont</option><option value="solo">Instrumental</option><option value="outro">Final</option></select><button id="add-part" class="button" aria-label="Afegir una part després de la seleccionada">＋ Afegir</button></div><p class="aside-tip">Una estructura per començar.<br>Adapta-la al que et demani la cançó.</p></aside>
       <section class="editor-panel" aria-labelledby="part-title">
         <div class="editor-topline"><p class="eyebrow" id="part-position">PART 01 / 08</p><div class="part-tools"><button class="icon-button" id="move-up" aria-label="Moure la part amunt" title="Moure amunt">↑</button><button class="icon-button" id="move-down" aria-label="Moure la part avall" title="Moure avall">↓</button><button class="icon-button" id="remove-part" aria-label="Eliminar la part" title="Eliminar part">×</button></div></div>
         <div class="editor-title-line"><h2 id="part-title">Intro</h2><span class="part-badge" id="part-status">Per començar</span></div>
@@ -53,14 +65,21 @@
             <label><span class="field-label">BAIX</span><select id="part-timbre-bass" aria-label="So de baix d’aquesta part"></select></label>
             <label><span class="field-label">BATERIA</span><select id="part-timbre-drums" aria-label="Kit de bateria d’aquesta part"></select></label>
           </div>
-          <div class="part-instrument-footer"><span id="part-instrument-mode">Segueix els instruments base de la cançó</span><button type="button" id="reset-part-instruments" class="text-button" hidden>↶ Recupera els instruments i sons base</button></div>
+          <div class="timbre-picker per-part" id="part-grooves" role="group" aria-label="Base rítmica d’aquesta part">
+            <label><span class="field-label">PATRÓ DE BATERIA</span><select id="part-groove-drums" aria-label="Patró de bateria d’aquesta part"></select></label>
+            <label><span class="field-label">LÍNIA DE BAIX</span><select id="part-groove-bass" aria-label="Línia de baix d’aquesta part"></select></label>
+            <label><span class="field-label">RITME DE GUITARRA</span><select id="part-groove-guitar" aria-label="Ritme de guitarra d’aquesta part"></select></label>
+          </div>
+          <div class="part-instrument-footer"><span id="part-instrument-mode">Segueix els instruments base de la cançó</span><button type="button" id="reset-part-instruments" class="text-button" hidden>↶ Recupera els instruments, sons i base de la cançó</button></div>
         </fieldset>
         <div class="sound-preview" id="sound-preview"><div class="waveform" id="waveform" aria-hidden="true"></div><span id="preview-label">El primer compàs comença aquí.</span><span class="preview-duration" id="part-duration">00:09</span></div>
+        <p id="part-chords" class="part-chords" hidden></p>
         <section class="variant-panel" id="variant-panel" aria-label="Cinc versions de la secció" hidden>
-          <div class="variant-header"><strong>5 VERSIONS PER ESCOLLIR</strong><span>Només intro, estrofes i tornades</span></div>
+          <div class="variant-header"><strong>5 IDEES PER ESCOLLIR</strong><span>Canvien acords i melodia · la base rítmica es manté</span></div>
           <p id="variant-intro"></p>
           <div id="variant-list" class="variant-list"></div>
         </section>
+        <button type="button" id="apply-peers" class="text-button apply-peers" hidden></button>
         <div class="lyrics-heading"><label class="field-label" for="part-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="part-lyrics" rows="3" maxlength="5000" placeholder="Escriu la lletra o les idees per a aquesta part…"></textarea>
         <p class="instrumental-note"><span aria-hidden="true">♫</span> Generació instrumental. La lletra queda desada com a anotació; encara no es canta.</p>
         <div class="editor-actions"><button id="generate-part" class="button primary"><span aria-hidden="true">✦</span> <span id="generate-label">Genera la intro</span></button><button id="play-part" class="button listen" disabled><span aria-hidden="true">▷</span> Escolta la part</button><button id="next-part" class="text-button">Següent part <span aria-hidden="true">→</span></button></div>

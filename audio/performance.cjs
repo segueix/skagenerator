@@ -23,13 +23,13 @@ function createPerformance(spec) {
   const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
   const events = [];
   const channels = [
-    { channel: 0, program: chosen('guitar') ?? (punk ? 30 : 27), pan: 42, volume: 85 },
-    { channel: 1, program: chosen('guitar') ?? (punk && spec.type === 'chorus' ? 29 : 28), pan: 84, volume: 60 },
+    { channel: 0, program: chosen('guitar') ?? (punk ? 30 : 27), pan: 42, volume: 94 },
+    { channel: 1, program: chosen('guitar') ?? (punk && spec.type === 'chorus' ? 29 : 28), pan: 84, volume: 66 },
     { channel: 2, program: chosen('bass') ?? (punk ? 34 : 33), pan: 64, volume: 115 },
-    { channel: 3, program: 56, pan: 50, volume: 85 },
-    { channel: 4, program: 57, pan: 79, volume: 87 },
-    { channel: 5, program: 81, pan: 58, volume: 80 },
-    { channel: 6, program: 89, pan: 76, volume: 65 },
+    { channel: 3, program: 56, pan: 50, volume: 116 },
+    { channel: 4, program: 57, pan: 79, volume: 112 },
+    { channel: 5, program: 81, pan: 58, volume: 106 },
+    { channel: 6, program: 89, pan: 76, volume: 90 },
     { channel: 7, program: 38, pan: 64, volume: 110 },
     { channel: 10, program: 24, pan: 64, volume: 106, drums: true },
     { channel: 9, program: chosen('drums') ?? (punk ? 16 : 0), pan: 64, volume: 106, drums: true }
@@ -53,7 +53,7 @@ function createPerformance(spec) {
     const guitarPatterns = punk
       ? [[0, .5, 1, 1.5, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 3, 3.5], [0, .5, 1.5, 2, 2.5, 3.5], [0, .5, 1, 1.5, 2.5, 3], [0, 1, 2, 2.5, 3, 3.5]]
       : [[.5, 1.5, 2.5, 3.5], [.5, 1.5, 2.5, 3.5, 3.75], [.5, 1.5, 3.5], [.5, 1.75, 2.5, 3.5], [.5, 1.5, 2.75, 3.5]];
-    const hits = ending ? [0] : variation >= 0 ? guitarPatterns[variation] : punk ? guitarPatterns[0] : guitarPatterns[0];
+    const hits = ending ? [0] : guitarPatterns[spec.groove?.guitar ?? Math.max(0, variation)];
     if (has('guitar')) hits.forEach((t, hit) => {
       const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
       const duration = ending ? bar * .75 : beat * (punk ? .4 : .22);
@@ -67,34 +67,22 @@ function createPerformance(spec) {
       const pitch = punk || k % 4 === 0 ? chord.root : k % 4 === 1 ? nearest(chord.root + 4, chord.pcs, chord.root, chord.root + 12) : k % 4 === 2 ? chord.root + 7 : chord.root + 12;
       note(2, pitch, t0 + t * beat, ending ? bar * .8 : beat * (punk ? .43 : .8), k % 2 ? 88 : 103, .003);
     });
-    if (has('drums')) {
-      if (b === 0 || ending) note(9, 49, t0, .35, ending ? 90 : 73);
-      const kicks = punk
-        ? [[0, 1.5, 2, 2.5], [0, 1, 2, 3], [0, .5, 2, 3], [0, 1.5, 2.5, 3], [0, 1, 2, 2.5]]
-        : [[0, 2], [0, 2, 3.5], [0, 2.5], [0, 1.5, 2], [0, 2, 3]];
-      (ending ? [0] : kicks[Math.max(0, variation)]).forEach(t => note(9, 36, t0 + t * beat, .08, 105, .002));
-      if (!ending) {
-        [1, 3].forEach(t => note(9, 38, t0 + t * beat, .08, soft ? 76 : 109, .003));
-        for (let k = 0; k < 8; k++) note(9, k === 7 && !soft ? 46 : 42, t0 + k * beat / 2, beat * .3, k % 2 ? 53 : 72, .003);
-        if (b === spec.chords.length - 1 && !soft) [2.75, 3.25, 3.5].forEach((t, k) => note(9, [48, 45, 43][k], t0 + t * beat, .1, 76 + k * 5));
-      }
-    }
     if (has('synthPad')) chord.notes.forEach(pitch => note(6, pitch, t0, bar * (ending ? .8 : .94), soft ? 58 : 70, 0));
-    if (has('electronicDrums')) {
-      const patterns = [[0,1.75,2.5],[0,2.5,3.25],[0,1.5,2.75],[0,.75,2.5],[0,1.25,3]];
-      (ending ? [0] : patterns[Math.max(0,variation)]).forEach(t => note(10,36,t0+t*beat,.12,112,0));
-      if (!ending) {
-        const snares = variation === 1 ? [2] : variation === 2 ? [.75,2.75] : [1,3];
-        snares.forEach(t => { note(10,38,t0+t*beat,.1,92,0); note(10,39,t0+t*beat+.008,.1,70,0); });
-        const steps = variation === 1 || variation === 4 ? 16 : 8;
-        for (let k=0;k<steps;k++) note(10,42,t0+k*4/steps*beat,.045,k%2?45:66,0);
-        if (variation === 1) [3.5,3.625,3.75,3.875].forEach(t=>note(10,42,t0+t*beat,.025,55,0));
-      }
-    }
     if (ending && has('synthLead')) note(5,chord.notes.at(-1)+12,t0,bar*.7,82,0);
     if (ending) {
       if (has('trumpet')) note(3, chord.notes.at(-1) + 12, t0 + .006, bar * .68, 84);
       if (has('trombone')) note(4, chord.root + 24, t0 + .012, bar * .7, 83);
+    }
+  }
+  // La bateria ve escrita a la partitura; el kit acústic i l'electrònic la comparteixen.
+  if (spec.drumLine !== undefined && (!Array.isArray(spec.drumLine) || spec.drumLine.some(hit => !Array.isArray(hit)
+    || hit.length !== 4 || !hit.every(Number.isFinite) || hit[2] < 27 || hit[2] > 87))) throw new Error('Partitura de bateria no vàlida');
+  for (const [b, t, drum, force] of spec.drumLine || []) {
+    const at = (b * 4 + t) * beat, length = drum === 49 ? 1.4 : drum === 46 || drum === 51 ? beat * .45 : .09;
+    if (has('drums')) note(9, drum, at, length, force, .003);
+    if (has('electronicDrums')) {
+      note(10, drum, at, length, force, 0);
+      if (drum === 38) note(10, 39, at + .008, .1, force * .72, 0);
     }
   }
   if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {
