@@ -199,3 +199,28 @@ test('la bateria segueix la forma de cada secció', () => {
   assert.deepEqual(outro.filter(hit => hit[0] === 3).map(hit => hit[1]), [0, 0, 0]);
   assert.notDeepEqual(drums('verse', 4, 30), drums('verse', 4, 90));
 });
+
+test('les seccions admeten qualsevol durada i cada instrument afegit té la seva part', () => {
+  const performance = require('../audio/performance.cjs');
+  for (const bars of [1, 2, 3, 5, 7, 13, 32]) {
+    const spec = engine.composeSongPart(settings, { ...part('verse'), bars });
+    assert.equal(spec.chords.length, bars); assert.equal(spec.drumLine.at(-1)[0], bars - 1);
+    assert(spec.melody.every(n => n[0] < bars));
+    assert(performance.createPerformance(spec).events.every(e => e.time < spec.seconds));
+  }
+  assert.throws(() => engine.composeSongPart(settings, { ...part('verse'), bars: 0 }));
+  assert.throws(() => engine.composeSongPart(settings, { ...part('verse'), bars: 65 }));
+  const base = { ...settings, instruments: ['drums', 'bass'] };
+  const layered = layers => engine.composeSongPart(base, { ...part('chorus', 8), instruments: ['drums', 'bass', ...Object.keys(layers)], layers });
+  const a = layered({ trumpet: 11, trombone: 12 }), b = layered({ trumpet: 13, trombone: 12 });
+  // Una nova versió d'un instrument no toca els acords ni els altres instruments.
+  assert.deepEqual(a.chords, b.chords); assert.deepEqual(a.lines.trombone, b.lines.trombone);
+  assert.notDeepEqual(a.lines.trumpet, b.lines.trumpet); assert.notDeepEqual(a.lines.trumpet, a.lines.trombone);
+  assert.deepEqual(layered({ trumpet: 11, trombone: 12 }), a);
+  const trumpet = spec => performance.createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 3).map(e => e.note);
+  assert.notDeepEqual(trumpet(a), trumpet(b));
+  const guitars = [1, 2, 3].map(rev => performance.createPerformance(layered({ guitar: rev })).events.filter(e => e.type === 'on' && e.channel === 0).length);
+  assert(new Set(guitars).size > 1);
+  for (const layers of [{ piano: 1 }, { trumpet: 0 }, { trumpet: 1.5 }, [], null])
+    assert.throws(() => engine.composeSongPart(base, { ...part('verse'), layers }), /Capes/);
+});

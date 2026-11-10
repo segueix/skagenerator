@@ -2,21 +2,19 @@
 
 Taller web en català per compondre cançons instrumentals, secció per secció.
 
-## Flux de treball: de la base cap amunt
+## Flux de treball
 
-1. **La base rítmica.** Es trien el patró de bateria, la línia de baix i el ritme de guitarra per a tota la cançó, i s’escolten en bucle amb «Escolta la base». Cada estil té sis patrons de bateria (per exemple one drop, steppers o doble temps en ska; D-beat o mig temps en punk; boom bap, trap o dembow en urban) i cinc de baix i de guitarra.
-2. **L’arranjament.** Una graella d’instruments × seccions indica qui toca a cada part. Marcar una casella fa entrar o callar un instrument. «Proposa un arranjament» crea un punt de partida que creix cap a les tornades.
-3. **Les seccions.** Cada intro, estrofa i tornada ofereix cinc idees d’acords i melodia compostes sobre la base comuna; es mostren amb els seus acords. «Genera les parts pendents» en prepara una per a totes les seccions de cop.
+Hi ha una sola vista, que es treballa de baix cap amunt:
 
-Canviar instruments, sons, base rítmica, intensitat, durada o tempo no descarta la idea escollida: només es torna a preparar l’àudio. Només un canvi d’estil o de tonalitat demana idees noves. Una secció pot tenir una base rítmica pròpia, i una idea es pot copiar a totes les seccions del mateix tipus.
+1. **Durada i base musical.** Es marca la durada de la cançó en compassos (amb el temps equivalent, fins a 6 minuts) i es genera la base: bateria i baix (en urban, bateria electrònica i baix sintetitzat) que sonen durant tota la cançó. Es poden triar els instruments de la base, el patró de bateria, la línia de baix i els sons, i escoltar-la. «Genera una altra base» proposa una progressió i uns patrons nous.
+2. **La línia de la cançó.** Un clic a la fila «Seccions» marca una secció en aquell punt (alineada a grups de quatre compassos). Cada secció té tipus (intro, estrofa, tornada…), compàs d’inici i durada pròpia (1–32 compassos). Sota la base, cada instrument té una fila que mostra en quines seccions sona. On no hi ha cap secció només sona la base; si la cançó acaba amb base sola, l’últim tram fa de final.
+3. **Instruments un a un.** A la secció seleccionada s’afegeix un instrument i es prem «Genera»: es compon la seva part (una melodia pròpia per a trompeta, trombó i sintetitzador melòdic; un patró propi per a guitarra i coixí). Després es pot escoltar la secció o tota la cançó, i «Genera’n una altra» en dona una versió nova sense tocar la resta. Les seccions del mateix tipus comparteixen acords i, per defecte, repeteixen la mateixa idea de cada instrument, com una tornada. «Continua amb els instruments de la secció anterior» facilita fer créixer la cançó.
 
-La bateria segueix la forma de la cançó: plat a l’entrada, avís cada quatre compassos, redoble al final de la secció, construcció a la intro, buit a la primera meitat del pont i crescendo de caixa abans de la tornada. Cada secció es renderitza amb una cua d’1,5 s que sona sobre l’inici de la següent, i el nivell reflecteix l’arranjament (una intro buida sona més baixa que una tornada plena).
+Canviar tempo, tonalitat, estil, patrons o sons no esborra res: tot es torna a calcular a partir de les llavors desades. Els projectes de la versió anterior (per parts) es converteixen automàticament: cada part passa a ser una secció de la línia.
 
-Els projectes desats abans d’aquesta versió s’obren igual: conserven acords, melodies i la línia de baix de la versió escollida, però la bateria fa servir els patrons nous i pot sonar diferent.
+La bateria segueix la forma de cada secció (plat a l’entrada, redobles, intro que es construeix, pont més buit i crescendo abans de la tornada). Cada tram es renderitza amb una cua d’1,5 s que sona sobre l’inici del següent.
 
-## Estructura inicial
-
-Intro (4 compassos) → estrofa (8) → tornada (8) → estrofa (8) → tornada (8) → pont (4) → tornada (8) → final (4).
+Si la reproducció falla, l’avís mostra el motiu concret. Si Tone.js no pot reproduir, s’utilitza directament Web Audio.
 
 ## Estils i instruments
 
@@ -24,25 +22,17 @@ Hi ha ska, punk i urban. L’ska té una selecció de 100–180 BPM (128 per def
 
 Cada estil ofereix una preselecció de tonalitats majors i menors adequada per treballar amb guitarra i metalls. Són decisions de configuració del taller, no restriccions teòriques dels gèneres.
 
-Guitarres, bateria, baix, trompeta i trombó es poden activar independentment. Els instruments base serveixen de formació inicial per a la cançó. Cada intro, estrofa, tornada, pont, pretornada, instrumental o final pot activar diversos instruments propis; la selecció es desa per secció i no afecta les altres. L’opció «Recupera la formació base» restableix l’herència dels instruments generals. Canviar la formació base només obliga a preparar de nou l’àudio de les seccions que la segueixen. L’ska utilitza guitarra curta a contratemps i baix caminant; el punk utilitza quintes en corxeres i bateria més directa. Trompeta i trombó tenen mostres i registres diferenciats. No intervenen piano, vibràfon ni coixins de cordes en les noves cançons.
-
-En recuperar un projecte anterior, es conserva l’estructura i la lletra, s’adapta la configuració als estils disponibles i es deixen les parts pendents de regenerar.
-
-Cada part es genera i s’escolta individualment, amb durada i intensitat pròpies. Tota la cançó comparteix estil, tempo i tonalitat. Per a cada intro, estrofa o tornada, el botó «Genera 5 versions diferents» crea cinc propostes amb progressions d’acords i melodies alternatives sobre la base rítmica de la cançó. El motor de mostres interpreta les partitures de baix i de bateria escrites pel compositor. El canal del baix enregistrat té més presència. Es poden escoltar per separat i escollir la versió definitiva, que és la que es reprodueix a la cançó completa i s’exporta al WAV. Les altres alternatives continuen disponibles. Les seccions repetides (estrofes i tornades) poden tenir una elecció independent. Les cinc composicions es calculen al moment, mentre que l’àudio de les alternatives no seleccionades només es prepara quan s’escolten. La tria i les llavors queden desades al JSON i al navegador. També es poden afegir pretornades i parts instrumentals, reordenar seccions i eliminar-les.
-
 La música instrumental es prepara amb mostres enregistrades de GeneralUser GS 2.0.3, mitjançant SpessaSynth Core 4.4.9 dins d’un Web Worker. Tone.js 14.8.49 s'utilitza per reproduir les parts i la cançó sencera al navegador; si la biblioteca externa no es carrega, es manté el reproductor nadiu Web Audio. El WAV continua utilitzant exactament la mescla de les mateixes mostres. Les lletres són anotacions: no es genera veu ni cant. No necessita claus d’API ni serveis de generació externs.
 
 ## Triar guitarres, baixos i bateries
 
 A «Instruments base de la cançó» es trien els instruments que sonaran i, a «So de guitarra», «So de baix» i «Kit de bateria», se selecciona un preset enregistrat. La guitarra té els sons net, apagat, saturat i distorsionat; el baix es pot tocar amb dits o pua; la bateria ofereix els kits acústic, rock i electrònic. «Segons l'estil» conserva els presets originals (ska net/baix amb dits/bateria acústica; punk distorsionat/baix amb pua/bateria rock).
 
-A cada secció, es poden triar altres instruments i modificar separadament els tres sons. «Com a la cançó» hereta el preset base, i «Recupera els instruments i sons base» elimina totes les excepcions de la part. Després d'escollir un nou timbre, l'àudio de les parts afectades es prepara de nou en escoltar-les; la composició i les lletres no canvien. Els presets s'apliquen igualment a les cinc versions disponibles i al WAV exportat.
-
 Tone.js gestiona la reproducció de les seccions ja renderitzades, no sintetitza les notes ni carrega els bancs SFZ. Els presets de la primera fase pertanyen al SF2 GeneralUser GS existent; no són encara les biblioteques FreePats ni Karoryfer. La biblioteca Tone.js es carrega des d'un CDN fixat a 14.8.49, amb retorn automàtic a Web Audio si no està disponible. Per a instal·lacions sense xarxa, cal servir-ne una còpia local autoritzada.
 
 ## Ús
 
-Compila la web i serveix la carpeta `dist/` des d’un servidor web estàtic (HTTPS o localhost). Prem «Nova cançó», tria la base musical i genera cada part. Quan estiguin totes generades, escolta la cançó completa o exporta-la en WAV estèreo de 44.100 Hz i 16 bits.
+Compila la web i serveix la carpeta `dist/` des d’un servidor web estàtic (HTTPS o localhost). Prem «Nova cançó», marca la durada, genera la base i després les seccions i els instruments. Quan vulguis, escolta la cançó completa o exporta-la en WAV estèreo de 44.100 Hz i 16 bits.
 
 L’esborrany es desa al navegador. «Desa el projecte» exporta un JSON amb la configuració, les anotacions i les llavors necessàries per reconstruir el so. «Obre un projecte» permet recuperar-lo en un altre navegador. La lletra no es fa servir per compondre la melodia.
 

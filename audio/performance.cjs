@@ -53,7 +53,8 @@ function createPerformance(spec) {
     const guitarPatterns = punk
       ? [[0, .5, 1, 1.5, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 3, 3.5], [0, .5, 1.5, 2, 2.5, 3.5], [0, .5, 1, 1.5, 2.5, 3], [0, 1, 2, 2.5, 3, 3.5]]
       : [[.5, 1.5, 2.5, 3.5], [.5, 1.5, 2.5, 3.5, 3.75], [.5, 1.5, 3.5], [.5, 1.75, 2.5, 3.5], [.5, 1.5, 2.75, 3.5]];
-    const hits = ending ? [0] : guitarPatterns[spec.groove?.guitar ?? Math.max(0, variation)];
+    const guitarIndex = spec.layers?.guitar ?? spec.groove?.guitar ?? Math.max(0, variation);
+    const hits = ending ? [0] : guitarPatterns[guitarIndex % guitarPatterns.length];
     if (has('guitar')) hits.forEach((t, hit) => {
       const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
       const duration = ending ? bar * .75 : beat * (punk ? .4 : .22);
@@ -67,7 +68,12 @@ function createPerformance(spec) {
       const pitch = punk || k % 4 === 0 ? chord.root : k % 4 === 1 ? nearest(chord.root + 4, chord.pcs, chord.root, chord.root + 12) : k % 4 === 2 ? chord.root + 7 : chord.root + 12;
       note(2, pitch, t0 + t * beat, ending ? bar * .8 : beat * (punk ? .43 : .8), k % 2 ? 88 : 103, .003);
     });
-    if (has('synthPad')) chord.notes.forEach(pitch => note(6, pitch, t0, bar * (ending ? .8 : .94), soft ? 58 : 70, 0));
+    if (has('synthPad')) {
+      // Coixí sostingut, a blanques, a contratemps, a negres o amb síncopa.
+      const padPatterns = [[[0, 3.8]], [[0, 1.9], [2, 1.9]], [[.5, .4], [1.5, .4], [2.5, .4], [3.5, .4]], [[0, .8], [1, .8], [2, .8], [3, .8]], [[0, 1.4], [1.5, 1], [3, .9]]];
+      const pad = ending ? [[0, 3.2]] : padPatterns[(spec.layers?.synthPad ?? 0) % padPatterns.length];
+      for (const [t, length] of pad) chord.notes.forEach(pitch => note(6, pitch, t0 + t * beat, length * beat, soft ? 58 : 70, 0));
+    }
     if (ending && has('synthLead')) note(5,chord.notes.at(-1)+12,t0,bar*.7,82,0);
     if (ending) {
       if (has('trumpet')) note(3, chord.notes.at(-1) + 12, t0 + .006, bar * .68, 84);
@@ -92,15 +98,20 @@ function createPerformance(spec) {
         if (has('synthBass')) note(7,Math.max(24,pitch-12),(b*4+t)*beat,length*beat,Math.min(127,Math.round(105*strength)),0);
       }
   }
-  for (const [b, t, pitch, duration] of spec.melody) {
-    const at = b * bar + t * beat;
-    if (has('synthLead') && !(spec.type === 'outro' && b === spec.chords.length - 1))
-      note(5,pitch,at,Math.max(.07,duration*beat-.03),spec.type==='verse'?67:86,0);
-    if (spec.type === 'intro' && b < 2 || spec.type === 'outro' && b === spec.chords.length - 1) continue;
-    const chord = spec.chords[b];
-    const length = Math.max(.07, duration * beat - .045), velocity = spec.type === 'verse' ? 65 : 89;
-    if (has('trumpet')) note(3, pitch, at, length, velocity, .006);
-    if (has('trombone')) note(4, nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length * .94, velocity - 5, .006);
+  for (const instrument of ['synthLead', 'trumpet', 'trombone']) {
+    if (!has(instrument)) continue;
+    const own = Array.isArray(spec.lines?.[instrument]), line = own ? spec.lines[instrument] : spec.melody;
+    const channel = { synthLead: 5, trumpet: 3, trombone: 4 }[instrument];
+    for (const [b, t, pitch, duration] of line) {
+      const at = b * bar + t * beat, last = spec.type === 'outro' && b === spec.chords.length - 1;
+      if (last) continue;
+      // Sense capa pròpia, els metalls esperen a la segona meitat de la intro.
+      if (!own && instrument !== 'synthLead' && spec.type === 'intro' && b < 2) continue;
+      const chord = spec.chords[b], velocity = spec.type === 'verse' ? 65 : 89;
+      if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), spec.type === 'verse' ? 67 : 86, 0);
+      else if (instrument === 'trumpet') note(3, pitch, at, Math.max(.07, duration * beat - .045), velocity, .006);
+      else note(4, nearest(pitch - 12, chord.pcs, 45, 67), at + .006, Math.max(.07, duration * beat - .045) * .94, velocity - 5, .006);
+    }
   }
   events.sort((a, b) => a.time - b.time || (a.type === 'off' ? 0 : 1) - (b.type === 'off' ? 0 : 1));
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type };
