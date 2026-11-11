@@ -92,6 +92,15 @@
     horror: [['Tombes', 'Lluna', 'Vampirs', 'Difunts', 'Calaveres', 'Espectres', 'Corbs'], ['a mitjanit', 'de cementiri', 'sense ànima', 'de Tots Sants', 'i ossos', 'al soterrani']]
   };
 
+  // ── Guitarres del punk ───────────────────────────────────────────────
+  // 1: només la rítmica (la de la base); 2: rítmica i solista (guitarra 3, que fa el riff
+  // i les respostes); 3: dues rítmiques (guitarra 1 i 2) i solista.
+  const GUITAR_SETUPS = { 1: 'una guitarra (rítmica)', 2: 'dues guitarres (rítmica i solista)', 3: 'tres guitarres (dues rítmiques i solista)' };
+  function excludedBy(song) {
+    const n = song?.settings?.style === 'punk' ? song.settings.guitars : undefined;
+    return new Set(n === 1 ? ['guitar2', 'guitar3'] : n === 2 ? ['guitar2'] : []);
+  }
+
   // ── Inicis i finals de cançó, i silencis al mig ────────────────────
   // ── Recursos especials, amb mesura ─────────────────────────────────
   // La cançó automàtica té tots els recursos a l'abast (inicis i finals
@@ -112,7 +121,11 @@
   };
   const THRESHOLD = .55;
   function planHighlights(song, key, r, options = {}) {
-    const fit = FIT[key] || FIT.twotone, sections = song.sections, st = song.settings;
+    const fit0 = FIT[key] || FIT.twotone, sections = song.sections, st = song.settings, excluded = excludedBy(song);
+    // Sense guitarra solista (punk amb una o dues guitarres), no hi ha riff sol a l'inici ni al final.
+    const noRiff = st.style === 'punk' && excluded.has('guitar3');
+    const without = table => Object.fromEntries(Object.entries(table).filter(([name]) => !(noRiff && name === 'riff')));
+    const fit = { ...fit0, open: without(fit0.open), close: without(fit0.close) };
     const first = sections[0], last = sections.at(-1), outro = last.type === 'outro', punk = st.style === 'punk';
     const seconds = sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || st.bpm), 0);
     const budget = seconds < 150 ? 2 : seconds < 210 ? 3 : 4;
@@ -156,8 +169,8 @@
       const riffer = punk ? 'guitar3' : 'trumpet';
       const bridge = sections.find(s => s.type === 'bridge' || s.type === 'solo');
       const options2 = [
-        { where: first, instrument: riffer, color: punk ? (r() < .5 ? 'radio' : 'megaphone') : (r() < .6 ? 'gramophone' : 'radio'),
-          value: fit.color * (plan.opening === 'riff' ? 1.2 : first.bars >= 8 ? .8 : .6) * vary() },
+        ...(excluded.has(riffer) ? [] : [{ where: first, instrument: riffer, color: punk ? (r() < .5 ? 'radio' : 'megaphone') : (r() < .6 ? 'gramophone' : 'radio'),
+          value: fit.color * (plan.opening === 'riff' ? 1.2 : first.bars >= 8 ? .8 : .6) * vary() }]),
         ...(bridge ? song.clips.filter(c => c.start === bridge.start && ['trumpet', 'trombone', 'sax', 'guitar3', 'guitar2'].includes(c.instrument) && !c.line).slice(0, 1)
           .map(c => ({ where: bridge, instrument: c.instrument, color: punk ? 'megaphone' : r() < .5 ? 'telephone' : 'radio', value: fit.color * .85 * vary() })) : [])
       ].sort((a, b) => b.value - a.value);
@@ -211,7 +224,9 @@
       return true;
     };
     // Un instrument que ha de sonar a tota la secció: si no hi és, s'hi afegeix un clip (marcat per poder-lo desfer).
+    const excluded = excludedBy(song);
     const ensure = (sec, instrument, extra = {}) => {
+      if (excluded.has(instrument)) return false; // p. ex. punk sense guitarra solista
       const same = song.clips.filter(c => c.instrument === instrument && inside(c, sec));
       if (same.some(c => c.generated && c.start <= sec.start && c.start + c.bars >= sec.start + sec.bars)) return true;
       if (same.length) return false;
@@ -360,7 +375,10 @@
     // ── Arranjament: el riff identifica la cançó; els vents responen a la veu ──
     const register = key === 'rocksteady' || key === 'horrorpunk' ? -1 : key === 'poppunk' ? 1 : 0;
     const base = sg.base, layersOf = [];
-    const add = (sec, instrument, extra = {}) => { if (!base.includes(instrument)) layersOf.push({ sec, instrument, ...extra }); };
+    // Punk: nombre de guitarres triat (1, 2 o 3); les que no hi són no s'afegeixen enlloc.
+    if (punk) settings.guitars = [1, 2, 3].includes(Number(options.guitars)) ? Number(options.guitars) : 3;
+    const excluded = excludedBy({ settings });
+    const add = (sec, instrument, extra = {}) => { if (!base.includes(instrument) && !excluded.has(instrument)) layersOf.push({ sec, instrument, ...extra }); };
     let verses = 0;
     for (const sec of sections) {
       const sing = vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
@@ -492,7 +510,7 @@
       const prev = sections[i - 1];
       if (!prev || (sec.bpm || st.bpm) >= (prev.bpm || st.bpm) * .95) return;
       const instrument = st.style === 'punk' ? 'guitar2' : song.base.instruments.includes('organ') ? 'synthPad' : st.style === 'ska' ? 'organ' : 'synthPad';
-      if (song.base.instruments.includes(instrument) || song.clips.some(c => c.instrument === instrument && inside(c, sec))) return;
+      if (excludedBy(song).has(instrument) || song.base.instruments.includes(instrument) || song.clips.some(c => c.instrument === instrument && inside(c, sec))) return;
       song.clips.push({ id: `slow-${instrument}-${sec.id}`.slice(0, 64), instrument, start: sec.start, bars: sec.bars,
         revision: instrument === 'organ' ? 3 : instrument === 'guitar2' ? 2 : 1, generated: true });
       added.push({ section: sec, instrument });
@@ -674,5 +692,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, GUITAR_SETUPS, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

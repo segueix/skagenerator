@@ -171,6 +171,7 @@
     st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
     migrateVolumes(value);
     if (st.countIn !== undefined && typeof st.countIn !== 'boolean') fail('Configuració no vàlida');
+    if (st.guitars !== undefined && ![1, 2, 3].includes(st.guitars)) fail('Configuració no vàlida');
     st.timbres = { ...defaultTimbres(), ...(st.timbres || {}) }; st.groove = { ...defaultGroove(), ...(st.groove || {}) };
     if (st.mix !== undefined) engine.composeSongPart({ ...st }, { type: 'verse', bars: 1, energy: 50, revision: 1 });
     const base = value.base;
@@ -2095,7 +2096,11 @@
     fillSelect($('auto-key'), entries, entries.some(([key]) => key === keep) ? keep : '');
   }
   fillAutoKeys();
-  $('auto-subgenre').addEventListener('change', () => { fillAutoKeys(); renderAutoDescription(); });
+  // Punk: quantes guitarres hi ha d'haver (es pregunta abans de generar).
+  fillSelect($('auto-guitars'), Object.entries(builder.GUITAR_SETUPS).map(([n, label]) => [n, label[0].toUpperCase() + label.slice(1)]), '3');
+  const showGuitars = () => { $('auto-guitars-field').hidden = engine.SUBGENRES[$('auto-subgenre').value].style !== 'punk'; };
+  showGuitars();
+  $('auto-subgenre').addEventListener('change', () => { fillAutoKeys(); showGuitars(); renderAutoDescription(); });
   $('auto-minutes').addEventListener('input', event => { const m = Number(event.target.value); $('auto-minutes-value').textContent = `${Math.floor(m)}:${String(Math.round(m % 1 * 60)).padStart(2, '0')}`; });
   $('auto-create').addEventListener('click', async () => {
     if (busy) return;
@@ -2107,8 +2112,8 @@
       // Estructures de les últimes cançons de la biblioteca (la més recent primer): la nova se n'allunya.
       const recent = readLibrary().filter(e => Array.isArray(e.song?.sections)).sort((a, b) => b.created - a.created).slice(0, 12)
         .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
-      const vary = $('auto-vary').checked;
-      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked, vary, recent: vary ? recent : [],
+      const vary = $('auto-vary').checked, punkSong = engine.SUBGENRES[key].style === 'punk';
+      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
         ...(mode ? { key: [Number(tonic), mode] } : {}) });
       migrated = false;
       openSong(validateSong(project), '');
@@ -2119,7 +2124,7 @@
         song.edges?.middle && song.edges.middle !== 'none' && builder.MIDDLES[song.edges.middle],
         song.sections.some(s => s.ending === 'stop') && 'una aturada de la banda',
         ...song.clips.filter(c => c.color).map(c => `${INSTRUMENTS[c.instrument].toLowerCase()} amb so de ${engine.COLOR_FX[c.color].toLowerCase()}`)].filter(Boolean);
-      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${noteNames[song.settings.tonic]} ${song.settings.mode === 'major' ? 'major' : 'menor'}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions (${formText(song)})${extras.length ? `. Recursos: ${extras.join('; ')}` : ''}. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
+      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${noteNames[song.settings.tonic]} ${song.settings.mode === 'major' ? 'major' : 'menor'}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions (${formText(song)})${song.settings.guitars ? `, ${builder.GUITAR_SETUPS[song.settings.guitars]}` : ''}${extras.length ? `. Recursos: ${extras.join('; ')}` : ''}. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
       if (mobile.matches) setTab('line');
     } catch (error) { console.error(error); notify(`No s’ha pogut crear la cançó: ${reasonOf(error)}`); }
   });
