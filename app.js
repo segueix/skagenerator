@@ -153,6 +153,7 @@
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
     st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
+    migrateVolumes(value);
     if (st.countIn !== undefined && typeof st.countIn !== 'boolean') fail('Configuració no vàlida');
     st.timbres = { ...defaultTimbres(), ...(st.timbres || {}) }; st.groove = { ...defaultGroove(), ...(st.groove || {}) };
     if (st.mix !== undefined) engine.composeSongPart({ ...st }, { type: 'verse', bars: 1, energy: 50, revision: 1 });
@@ -206,6 +207,8 @@
     const edges = value.edges;
     if (edges !== undefined && (!edges || typeof edges !== 'object' || !Object.hasOwn(builder.OPENINGS, edges.opening)
       || !Object.hasOwn(builder.CLOSINGS, edges.closing) || !Object.hasOwn(builder.MIDDLES, edges.middle))) delete value.edges;
+    // Comentaris: els que no són vàlids es descarten (no impedeixen obrir la cançó).
+    if (value.comments !== undefined) value.comments = builder.cleanComments(value.comments, st.bars);
     for (const seg of segmentsOf(value)) engine.composeSongPart(value.settings, partFor(value, seg));
     return value;
   }
@@ -264,6 +267,7 @@
       const sec = seg.section, harmony = s.harmony[sec.type] || 1;
       part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
+      if (sec.volumes && Object.keys(sec.volumes).length) part.volumes = sec.volumes;
       if (sec.bpm) part.bpm = sec.bpm;
       if (sec.transpose) part.transpose = sec.transpose;
       if (sec.groove) part.groove = { ...s.settings.groove, ...sec.groove };
@@ -543,8 +547,10 @@
 
 
   // La barra vertical i el regulador inferior comparteixen la mateixa posició.
+  let playheadBar = null; // On és el capçal (per situar-hi un comentari).
   function updatePlayhead(bar) {
     const bounded = Math.max(0, Math.min(song.settings.bars, bar));
+    playheadBar = bounded;
     const head = $('playhead');
     head.style.setProperty('--pos', String(bounded / song.settings.bars));
     head.hidden = !song.base.generated;
@@ -1693,22 +1699,89 @@
     if (muted) next.add(name); else next.delete(name);
     if (next.size) sec.mute = Object.keys(INSTRUMENTS).filter(n => next.has(n)); else delete sec.mute;
   }
+  // ── Volums: general de cada instrument + ajust de cada secció ─────────
+  // El volum final d'un instrument en una secció és la suma del volum general
+  // (tota la cançó) i de l'ajust d'aquella secció. Canviar el general afecta
+  // totes les seccions i conserva els ajustos de cadascuna.
+  const VOLUME_FAMILY = { drums: 'drums', electronicDrums: 'drums', bass: 'bass', synthBass: 'bass' };
+  const dbText = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} dB`;
+  // Bateria i baix fan servir el volum general de la base (també el dels instruments electrònics).
+  const generalVolume = name => VOLUME_FAMILY[name] ? song.settings.baseVolume?.[VOLUME_FAMILY[name]] || 0 : song.settings.volumes?.[name] || 0;
+  // Projectes anteriors: el volum era dins de l'equalitzador i el d'una secció substituïa el de la cançó.
+  function migrateVolumes(value) {
+    const st = value.settings, songVolume = name => st.mix?.[name]?.volume || 0, clampDb = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(v)));
+    for (const sec of value.sections || []) {
+      if (!sec?.mix || typeof sec.mix !== 'object') continue;
+      for (const [name, band] of Object.entries(sec.mix)) {
+        if (!band || typeof band !== 'object') continue;
+        const offset = (band.volume || 0) - songVolume(name);
+        if (offset) sec.volumes = { ...(sec.volumes || {}), [name]: clampDb((sec.volumes?.[name] || 0) + offset, -24, 12) };
+        sec.mix[name] = { ...band, volume: 0 };
+        if (isFlat(sec.mix[name]) && !songVolume(name) && !st.mix?.[name]) delete sec.mix[name];
+      }
+      if (!Object.keys(sec.mix).length) delete sec.mix;
+    }
+    if (st.mix && typeof st.mix === 'object') for (const [name, band] of Object.entries(st.mix)) {
+      if (!band?.volume) continue;
+      if (VOLUME_FAMILY[name]) st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}), [VOLUME_FAMILY[name]]: clampDb((st.baseVolume?.[VOLUME_FAMILY[name]] || 0) + band.volume, -24, 6) };
+      else st.volumes = { ...(st.volumes || {}), [name]: clampDb((st.volumes?.[name] || 0) + band.volume, -24, 6) };
+      st.mix[name] = { ...band, volume: 0 };
+      if (isFlat(st.mix[name])) delete st.mix[name];
+    }
+    if (st.mix && !Object.keys(st.mix).length) delete st.mix;
+  }
+  function volumeRow(name, value, [min, max], caption, onChange, describe) {
+    const row = document.createElement('label'); row.className = `volume-row${value ? ' own' : ''}`;
+    if (name !== 'master') row.style.setProperty('--color', instrumentColors[name]);
+    const label = document.createElement('span'); label.textContent = caption;
+    const input = document.createElement('input'); input.type = 'range'; input.min = min; input.max = max; input.step = 1; input.value = value; input.disabled = busy;
+    const output = document.createElement('output'); output.textContent = describe(value);
+    input.addEventListener('input', () => { output.textContent = describe(Number(input.value)); });
+    input.addEventListener('change', () => onChange(Number(input.value)));
+    row.append(label, input, output);
+    return [row, input];
+  }
+  function renderSongVolumes() {
+    const list = $('song-volumes'); list.replaceChildren();
+    for (const name of eqNames(null)) {
+      const caption = name === 'master' ? 'Mescla total' : INSTRUMENTS[name];
+      const [row, input] = volumeRow(name, generalVolume(name), [-24, 6], caption, value => changeSongVolume(name, value), dbText);
+      input.setAttribute('aria-label', `Volum general de ${caption} a tota la cançó`);
+      list.append(row);
+    }
+  }
+  function replayAfter(change) {
+    const replay = playing && playing.kind !== 'record' ? { kind: playing.kind, bar: barAt(playing.startSeconds + playing.clock()) } : null;
+    stop(); change(); save(); updateSettingsUI(); render();
+    if (replay) { cueBar = replay.bar; play(replay.kind); }
+  }
+  function changeSongVolume(name, db) {
+    if (busy || !Number.isInteger(db) || db < -24 || db > 6) return;
+    if (VOLUME_FAMILY[name]) { changeBaseVolume(VOLUME_FAMILY[name], db); return; }
+    replayAfter(() => {
+      const volumes = { ...(song.settings.volumes || {}) };
+      if (db) volumes[name] = db; else delete volumes[name];
+      if (Object.keys(volumes).length) song.settings.volumes = volumes; else delete song.settings.volumes;
+    });
+  }
+  function changeSectionVolume(sec, name, db) {
+    if (busy || !Number.isInteger(db) || db < -24 || db > 12) return;
+    replayAfter(() => {
+      const volumes = { ...(sec.volumes || {}) };
+      if (db) volumes[name] = db; else delete volumes[name];
+      if (Object.keys(volumes).length) sec.volumes = volumes; else delete sec.volumes;
+    });
+  }
   function renderVolumes(sec) {
     const list = $('section-volumes'); list.replaceChildren();
     for (const name of eqNames(sec)) {
-      const own = sec.mix?.[name], value = (own || song.settings.mix?.[name] || flatEq()).volume;
-      const row = document.createElement('label'); row.className = `volume-row${own && own.volume !== (song.settings.mix?.[name] || flatEq()).volume ? ' own' : ''}`;
-      if (name !== 'master') row.style.setProperty('--color', instrumentColors[name]);
-      const label = document.createElement('span'); label.textContent = name === 'master' ? 'Secció sencera' : INSTRUMENTS[name];
-      const input = document.createElement('input'); input.type = 'range'; input.min = -24; input.max = 6; input.step = 1; input.value = value; input.disabled = busy;
-      input.setAttribute('aria-label', `Volum de ${label.textContent} en aquesta secció`);
-      const output = document.createElement('output'); output.textContent = `${value > 0 ? '+' : ''}${value} dB`;
-      input.addEventListener('input', () => { const v = Number(input.value); output.textContent = `${v > 0 ? '+' : ''}${v} dB`; });
-      input.addEventListener('change', () => changeEq(sec, name, 'volume', Number(input.value)));
-      row.append(label, input, output);
+      const caption = name === 'master' ? 'Secció sencera' : INSTRUMENTS[name], general = generalVolume(name);
+      const [row, input] = volumeRow(name, sec.volumes?.[name] || 0, [-24, 12], caption, value => changeSectionVolume(sec, name, value),
+        v => `${dbText(v)}${general || v ? ` · total ${dbText(general + v)}` : ''}`);
+      input.setAttribute('aria-label', `Ajust del volum de ${caption} en aquesta secció, sobre el volum general`);
       if (song.base.instruments.includes(name)) {
         const feel = document.createElement('select'); feel.className = 'feel-select'; feel.disabled = busy;
-        feel.setAttribute('aria-label', `Ritme de ${label.textContent} en aquesta secció`);
+        feel.setAttribute('aria-label', `Ritme de ${caption} en aquesta secció`);
         fillSelect(feel, FEELS, String(sec.feel?.[name] ?? 1));
         feel.addEventListener('change', () => {
           const value = Number(feel.value), next = { ...(sec.feel || {}) };
@@ -1751,6 +1824,7 @@
       state.textContent = sec ? (own ? 'Propi d’aquesta secció' : 'Com a la cançó') : (own ? 'Ajustat' : 'So de l’estil');
       title.append(label, state); row.append(title);
       for (const [key, text] of EQ_KEYS) {
+        if (key === 'volume') continue; // El volum es tria a «Volum general» i a «Volums d'aquesta secció».
         const [min, max] = engine.MIX_LIMITS[key];
         const control = document.createElement('label'); control.className = 'eq-control';
         const caption = document.createElement('span'), output = document.createElement('output');
@@ -1784,8 +1858,8 @@
     if (replay) play(replay);
   }
   function render() {
-    renderLine(); renderSection();
-    renderEq($('song-eq'), null);
+    renderLine(); renderSection(); renderComments();
+    renderEq($('song-eq'), null); renderSongVolumes();
     if (current()) renderEq($('section-eq'), current());
     const generatedLayers = song.clips.filter(c => c.generated).length;
     const total = songSeconds();
@@ -1872,7 +1946,8 @@
       const info = document.createElement('div'); info.className = 'library-info';
       const title = document.createElement('strong'); title.textContent = entry.title;
       const meta = document.createElement('small');
-      meta.textContent = `${engine.SUBGENRES[entry.subgenre]?.name || (entry.style === 'punk' ? 'Punk' : entry.style === 'urban' ? 'Urban' : 'Ska')} · ${time(entry.seconds)} · ${new Date(entry.created).toLocaleDateString('ca')}`;
+      const notes = entry.song?.comments?.length || 0;
+      meta.textContent = `${engine.SUBGENRES[entry.subgenre]?.name || (entry.style === 'punk' ? 'Punk' : entry.style === 'urban' ? 'Urban' : 'Ska')} · ${time(entry.seconds)} · ${new Date(entry.created).toLocaleDateString('ca')}${notes ? ` · 💬 ${notes}` : ''}`;
       info.append(title, meta);
       const stars = document.createElement('div'); stars.className = 'stars'; stars.setAttribute('role', 'group'); stars.setAttribute('aria-label', `Puntuació de ${entry.title}`);
       for (let n = 1; n <= 5; n++) {
@@ -1888,6 +1963,66 @@
     }
     $('library-save').hidden = !!song.libraryId; $('library-save').disabled = busy || !song.base.generated;
   }
+  // ── Comentaris de la cançó ─────────────────────────────────────────
+  // De tota la cançó, d'una secció o del punt on és el capçal. Es desen amb la
+  // cançó (i a la biblioteca) i s'exporten amb «Exporta les cançons amb comentaris».
+  fillSelect($('comment-tag'), Object.entries(builder.COMMENT_TAGS), 'general');
+  fillSelect($('comment-mood'), Object.entries(builder.COMMENT_MOODS), 'good');
+  const commentPlace = bar => bar === null ? 'Tota la cançó' : `${sectionAt(bar) ? sectionLabel(sectionAt(bar)) : 'Base sola'} · compàs ${bar + 1}`;
+  function commentOptions() {
+    const where = $('comment-where'), keep = where.value;
+    const entries = [['song', 'Tota la cançó'],
+      ...(playheadBar !== null && song.base.generated ? [['now', `On és el capçal (compàs ${Math.min(song.settings.bars, Math.floor(playheadBar) + 1)})`]] : []),
+      ...[...song.sections].sort((a, b) => a.start - b.start).map(sec => [`sec:${sec.id}`, `${sectionLabel(sec)} · compassos ${sec.start + 1}–${endOf(sec)}`])];
+    fillSelect(where, entries, entries.some(([key]) => key === keep) ? keep : 'song');
+  }
+  // Desa ara mateix la cançó oberta a la biblioteca (sense esperar el desament diferit).
+  function flushLibrary() { if (song.libraryId) { clearTimeout(libraryTimer); syncLibrary(); } }
+  function renderComments() {
+    commentOptions();
+    const list = $('comment-list'); list.replaceChildren();
+    const comments = [...(song.comments || [])].sort((a, b) => (a.bar ?? -1) - (b.bar ?? -1) || a.created - b.created);
+    for (const comment of comments) {
+      const item = document.createElement('li'); item.className = `comment ${comment.mood}`;
+      const head = document.createElement('small');
+      head.textContent = `${builder.COMMENT_MOODS[comment.mood]} · ${builder.COMMENT_TAGS[comment.tag]} · ${commentPlace(comment.bar)}`;
+      const text = document.createElement('p'); text.textContent = comment.text;
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-button'; remove.textContent = '×';
+      remove.setAttribute('aria-label', 'Esborra el comentari'); remove.title = 'Esborra el comentari';
+      remove.addEventListener('click', () => { song.comments = song.comments.filter(c => c.id !== comment.id); save(); flushLibrary(); renderComments(); });
+      item.append(head, text, remove); list.append(item);
+    }
+  }
+  function addComment() {
+    const text = $('comment-text').value.trim();
+    if (!text) { notify('Escriu el comentari abans d’afegir-lo.'); $('comment-text').focus(); return; }
+    const where = $('comment-where').value;
+    const bar = where === 'now' && playheadBar !== null ? Math.min(song.settings.bars - 1, Math.floor(playheadBar))
+      : where.startsWith('sec:') ? song.sections.find(sec => `sec:${sec.id}` === where)?.start ?? null : null;
+    song.comments = [...(song.comments || []), { id: uid(), text: text.slice(0, 1000), bar, tag: $('comment-tag').value, mood: $('comment-mood').value, created: Date.now() }].slice(-200);
+    $('comment-text').value = '';
+    const stored = !song.libraryId && song.base.generated;
+    save();
+    if (stored) addToLibrary(); else flushLibrary();
+    renderComments();
+    notify(stored ? 'Comentari afegit. La cançó s’ha desat a «Les meves cançons» perquè es pugui exportar.' : `Comentari afegit (${commentPlace(bar)}).`);
+  }
+  $('comment-add').addEventListener('click', addComment);
+  $('comment-text').addEventListener('keydown', event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) addComment(); });
+  // El capçal es mou mentre sona: l'opció «On és el capçal» s'actualitza en obrir el selector.
+  for (const type of ['focus', 'pointerdown']) $('comment-where').addEventListener(type, commentOptions);
+  $('library-export').addEventListener('click', () => {
+    flushLibrary();
+    const list = readLibrary();
+    if (song.comments?.length && !song.libraryId) list.unshift({ title: song.title, rating: 0, created: Date.now(), song });
+    if (!list.length) { notify('Encara no hi ha cap cançó per exportar. Crea’n una o desa la cançó actual.'); return; }
+    try {
+      const report = builder.feedbackReport(engine, list);
+      download(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }), `skagenerator-comentaris-${new Date().toISOString().slice(0, 10)}.json`);
+      notify(`Exportades ${report.totals.songs} cançons (${report.totals.rated} puntuades i ${report.totals.comments} comentaris).`);
+    } catch (error) { console.error(error); notify(`No s’han pogut exportar les cançons: ${reasonOf(error)}`); }
+  });
+
   // ── Cançó automàtica ───────────────────────────────────────────────
   fillSelect($('auto-subgenre'), Object.entries(engine.SUBGENRES).map(([key, sg]) => [key, `${sg.style === 'punk' ? 'Punk' : 'Ska'} · ${sg.name}`]), 'twotone');
   function renderAutoDescription() {
@@ -1925,7 +2060,7 @@
   // Seccions plegables: a l'ordinador totes obertes; al mòbil només l'essencial,
   // perquè cada pestanya càpiga en poques pantalles.
   function applyFolds() {
-    const open = { 'section-base-panel': false, 'fold-layers': true, 'fold-volumes': false, 'fold-examples': false };
+    const open = { 'section-base-panel': false, 'fold-layers': true, 'fold-volumes': false, 'fold-song-volumes': false, 'fold-examples': false };
     for (const [id, onMobile] of Object.entries(open)) $(id).open = mobile.matches ? onMobile : true;
   }
   // Alçada real del reproductor i les pestanyes fixos: el contingut i els botons

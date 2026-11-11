@@ -49,3 +49,38 @@ test('la línia té capçal desplaçable i controls M amb les dues vies de repro
   assert.match(app, /player\.start\(startedAt, fromSeconds\)/);
   assert.match(app, /function timelineMuteButton\(sec, name\)/);
 });
+
+test('volum general de cada instrument + ajust de cada secció (additius) i conversió dels projectes antics', () => {
+  const engine = require('../radioambient.js');
+  const settings = { seed: 1, style: 'ska', bpm: 120, tonic: 0, mode: 'major', volumes: { trumpet: -6, master: -2 } };
+  const part = { type: 'verse', bars: 1, energy: 60, revision: 1, instruments: ['trumpet', 'bass'], volumes: { trumpet: 3 } };
+  const mix = engine.composeSongPart(settings, part).mix;
+  assert.equal(mix.trumpet.volume, -3, 'general −6 + secció +3');
+  assert.equal(mix.master.volume, -2);
+  assert.equal(engine.composeSongPart(settings, { ...part, volumes: undefined }).mix.trumpet.volume, -6, 'les altres seccions segueixen el general');
+  // L'equalitzador de la secció no anul·la el volum general.
+  assert.equal(engine.composeSongPart(settings, { ...part, mix: { trumpet: { low: 3, mid: 0, high: 0, volume: 0 } } }).mix.trumpet.volume, -3);
+  for (const bad of [{ volumes: { trumpet: 7 } }, { volumes: { kazoo: 1 } }, { volumes: { trumpet: 1.5 } }])
+    assert.throws(() => engine.composeSongPart({ ...settings, ...bad }, part), /Volums/);
+  assert.throws(() => engine.composeSongPart(settings, { ...part, volumes: { trumpet: 13 } }), /Volums/);
+  // Conversió: abans el volum era dins de l'equalitzador i el de la secció substituïa el de la cançó.
+  const from = app.indexOf('  const VOLUME_FAMILY');
+  const to = app.indexOf('  function volumeRow(', from);
+  assert.ok(from !== -1 && to > from);
+  const scope = { isFlat: band => ['low', 'mid', 'high', 'volume'].every(k => band[k] === 0), defaultBaseVolume: () => ({ drums: 0, bass: 0 }) };
+  vm.createContext(scope);
+  vm.runInContext(app.slice(from, to) + '\nthis.migrate = migrateVolumes;', scope);
+  const old = { settings: { mix: { trumpet: { low: 2, mid: 0, high: 0, volume: -4 }, drums: { low: 0, mid: 0, high: 0, volume: -3 } }, baseVolume: { drums: 0, bass: 0 } },
+    sections: [{ mix: { trumpet: { low: 0, mid: 0, high: 0, volume: 2 } } }, { mix: { sax: { low: 0, mid: 0, high: 0, volume: -5 } } }, {}] };
+  scope.migrate(old);
+  const final = (sec, name) => {
+    const song = old.settings, band = sec.mix?.[name] || song.mix?.[name] || { volume: 0 };
+    return band.volume + (name === 'drums' ? song.baseVolume.drums : song.volumes?.[name] || 0) + (sec.volumes?.[name] || 0);
+  };
+  assert.equal(final(old.sections[0], 'trumpet'), 2, 'la secció conserva el seu volum');
+  assert.equal(final(old.sections[1], 'trumpet'), -4, 'la resta segueix la cançó');
+  assert.equal(final(old.sections[1], 'sax'), -5);
+  assert.equal(final(old.sections[2], 'drums'), -3, 'la bateria passa al volum general de la base');
+  assert.equal(old.settings.mix.trumpet.low, 2, 'l’equalització es conserva');
+  assert.equal(old.settings.mix.trumpet.volume, 0);
+});

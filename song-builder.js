@@ -460,6 +460,73 @@
       + (highlights.chosen.length ? .3 * highlights.chosen.reduce((t, c) => t + c.value, 0) / highlights.chosen.length : .2);
     return { song, score: rating };
   }
+  // ── Comentaris de les cançons i informe per analitzar-les ─────────
+  // Cada comentari és de tota la cançó (bar null) o d'un compàs concret, amb
+  // un tema i una valoració. L'informe exportat recull, per a cada cançó, la
+  // puntuació, els comentaris situats (secció, compàs i segon), un resum de les
+  // decisions del taller (estructura, recursos especials, efectes...) i el
+  // projecte complet per poder-la reproduir exactament.
+  const COMMENT_TAGS = { general: 'General', opening: 'Inici', closing: 'Final', silence: 'Silencis i aturades', fade: 'Fosos',
+    color: 'Efectes de so', melody: 'Melodia', vocal: 'Veu', harmony: 'Acords', rhythm: 'Ritme i bateria', bass: 'Baix',
+    guitar: 'Guitarres', horns: 'Vents', mix: 'Mescla i volums', structure: 'Estructura', other: 'Altres' };
+  const COMMENT_MOODS = { good: '👍 M’agrada', bad: '👎 Cal millorar', idea: '💡 Idea' };
+  const COMMENT_MAX = 200, COMMENT_TEXT = 1000;
+  function cleanComments(list, bars) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    return list.filter(c => c && typeof c === 'object' && typeof c.id === 'string' && /^[a-zA-Z0-9-]{1,64}$/.test(c.id) && !seen.has(c.id)
+      && typeof c.text === 'string' && c.text.trim() && Object.hasOwn(COMMENT_TAGS, c.tag) && Object.hasOwn(COMMENT_MOODS, c.mood)
+      && (c.bar === null || Number.isInteger(c.bar)) && seen.add(c.id))
+      .slice(0, COMMENT_MAX)
+      .map(c => ({ id: c.id, text: c.text.trim().slice(0, COMMENT_TEXT), bar: c.bar === null ? null : Math.max(0, Math.min(bars - 1, c.bar)),
+        tag: c.tag, mood: c.mood, created: Number.isFinite(c.created) ? c.created : 0 }));
+  }
+  const NOTE_NAMES = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
+  // Segon de la cançó on comença un compàs (segueix els canvis de tempo de les seccions).
+  function secondsAtBar(song, bar) {
+    let t = 0;
+    for (let b = 0; b < bar; b++) { const sec = song.sections.find(s => b >= s.start && b < s.start + s.bars); t += 240 / (sec?.bpm || song.settings.bpm); }
+    return t;
+  }
+  function describeSong(engine, song) {
+    const st = song.settings, sections = [...song.sections].sort((a, b) => a.start - b.start);
+    const typeOf = bar => sections.find(s => bar >= s.start && bar < s.start + s.bars);
+    const label = sec => sec ? `${engine.SONG_PARTS[sec.type]?.name || sec.type} (compassos ${sec.start + 1}–${sec.start + sec.bars})` : 'Base sola';
+    const fields = ['bpm', 'transpose', 'energy', 'ending', 'closing', 'fade', 'mute', 'entrance', 'exit', 'feel', 'cymbals', 'groove', 'patterns', 'timbres'];
+    const instruments = {};
+    for (const c of song.clips) instruments[c.instrument] = (instruments[c.instrument] || 0) + 1;
+    return {
+      subgenre: engine.SUBGENRES[st.subgenre]?.name || st.style, style: st.style, bpm: st.bpm, key: `${NOTE_NAMES[st.tonic]} ${st.mode === 'major' ? 'major' : 'menor'}`,
+      seconds: Math.round(secondsAtBar(song, st.bars)), bars: st.bars, base: song.base.instruments.slice(),
+      sections: sections.map(sec => Object.assign({ where: label(sec), type: sec.type, lyrics: !!sec.lyrics?.trim() },
+        ...fields.filter(f => sec[f] !== undefined).map(f => ({ [f]: sec[f] })))),
+      instruments,
+      resources: {
+        opening: song.edges?.opening ?? null, closing: song.edges?.closing ?? null, middle: song.edges?.middle ?? null,
+        stops: sections.filter(s => s.ending === 'stop').map(label),
+        silences: sections.filter(s => ['break', 'silence'].includes(s.ending)).map(label),
+        fades: sections.filter(s => s.fade).map(s => `${s.fade === 'in' ? 'entrada' : 'sortida'}: ${label(s)}`),
+        colors: song.clips.filter(c => c.color).map(c => `${c.instrument} · ${engine.COLOR_FX[c.color] || c.color} · ${label(typeOf(c.start))}`)
+      },
+      where: bar => bar === null ? 'Tota la cançó' : `${label(typeOf(bar))} · compàs ${bar + 1} · ${Math.floor(secondsAtBar(song, bar) / 60)}:${String(Math.round(secondsAtBar(song, bar) % 60)).padStart(2, '0')}`
+    };
+  }
+  function feedbackReport(engine, entries, now = Date.now()) {
+    const songs = entries.filter(e => e && e.song).map(e => {
+      const song = JSON.parse(JSON.stringify(e.song)), summary = describeSong(engine, song), where = summary.where;
+      delete summary.where; delete song.libraryId;
+      const comments = cleanComments(song.comments, song.settings.bars).map(c => ({ where: where(c.bar), bar: c.bar === null ? null : c.bar + 1,
+        tag: COMMENT_TAGS[c.tag], mood: COMMENT_MOODS[c.mood], text: c.text, date: c.created ? new Date(c.created).toISOString() : null }));
+      return { title: song.title, rating: e.rating || 0, created: e.created ? new Date(e.created).toISOString() : null, comments, summary, project: song };
+    });
+    return {
+      format: 'skagenerator-feedback', version: 1, exported: new Date(now).toISOString(),
+      about: 'Cançons del taller amb puntuació (0–5 estrelles), comentaris situats a la cançó, resum de les decisions del taller i projecte complet.',
+      totals: { songs: songs.length, rated: songs.filter(s => s.rating).length, comments: songs.reduce((t, s) => t + s.comments.length, 0) },
+      songs
+    };
+  }
+
   // Cançó automàtica: es componen tres candidates (amb tot el que sap fer el
   // taller) i es queda la que puntua millor.
   function createAutoSong(engine, key, options = {}) {
@@ -471,5 +538,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, designEdges, planHighlights, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, designEdges, planHighlights, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

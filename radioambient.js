@@ -1773,6 +1773,19 @@
     }
     // Equalitzador: greus, mitjos i aguts en dB respecte del so de l'estil, i volum.
     const MIX_LIMITS = { low: [-12, 12], mid: [-12, 12], high: [-12, 12], volume: [-24, 6] };
+    // Volum general d'un instrument (tota la cançó) i ajust relatiu de cada secció.
+    const VOLUME_LIMITS = { song: [-24, 6], section: [-24, 12] };
+    // Suma els volums generals i de la secció al volum de l'equalitzador de cada instrument.
+    function addVolumes(mix, song = {}, section = {}) {
+        const out = { ...mix };
+        for (const name of new Set([...Object.keys(song || {}), ...Object.keys(section || {})])) {
+            const extra = (song?.[name] || 0) + (section?.[name] || 0);
+            if (!extra) continue;
+            const band = out[name] || { low: 0, mid: 0, high: 0, volume: 0 };
+            out[name] = { ...band, volume: Math.max(-48, Math.min(18, (band.volume || 0) + extra)) };
+        }
+        return out;
+    }
     function checkMix(mix) {
         if (mix === undefined) return;
         if (!mix || typeof mix !== 'object' || Array.isArray(mix) || Object.entries(mix).some(([name, band]) =>
@@ -2356,6 +2369,10 @@
             throw new Error('Versió musical no vàlida');
         checkGroove(settings.groove, settings.style); checkGroove(part.groove, settings.style);
         checkMix(settings.mix); checkMix(part.mix); checkFx(settings.fx); checkFx(part.fx);
+        // Volums additius: el general de cada instrument (tota la cançó) i l'ajust de la secció, en dB.
+        for (const [volumes, [lo, hi]] of [[settings.volumes, VOLUME_LIMITS.song], [part.volumes, VOLUME_LIMITS.section]])
+            if (volumes !== undefined && (!volumes || typeof volumes !== 'object' || Array.isArray(volumes) || Object.entries(volumes).some(([name, db]) =>
+                (name !== 'master' && !Object.hasOwn(SONG_INSTRUMENTS, name)) || !Number.isInteger(db) || db < lo || db > hi))) throw new Error('Volums d’instrument no vàlids');
         const baseVolume = settings.baseVolume === undefined ? {} : settings.baseVolume;
         if (!baseVolume || typeof baseVolume !== 'object' || Array.isArray(baseVolume)
             || Object.entries(baseVolume).some(([name, db]) => !['drums', 'bass'].includes(name) || !Number.isInteger(db) || db < -24 || db > 6))
@@ -2563,7 +2580,7 @@
             guitarBase: part.guitarBase !== false,
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn, closing: part.type === 'outro' ? part.closing : undefined }),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
-            mix: { ...(settings.mix || {}), ...(part.mix || {}) },
+            mix: addVolumes({ ...(settings.mix || {}), ...(part.mix || {}) }, settings.volumes, part.volumes),
             baseVolume: { ...baseVolume },
             fx: { ...(settings.fx || {}), ...(part.fx || {}) },
             colors: { ...(part.colors || {}) },
@@ -2659,7 +2676,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

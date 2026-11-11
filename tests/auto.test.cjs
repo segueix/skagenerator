@@ -205,3 +205,31 @@ test('la cançó automàtica fa servir els recursos especials amb mesura i als m
   assert(closings('hardcore').filter(c => c === 'cold').length >= 5);
   assert(!closings('hardcore').includes('fadeout'));
 });
+
+test('comentaris de les cançons i informe exportable per analitzar-les', () => {
+  const song = builder.createAutoSong(engine, 'poppunk', { seed: 8 });
+  const chorus = song.sections.find(s => s.type === 'chorus');
+  song.comments = [
+    { id: 'c1', text: '  La tornada enganxa  ', bar: chorus.start, tag: 'melody', mood: 'good', created: 1 },
+    { id: 'c2', text: 'Final massa sobtat', bar: null, tag: 'closing', mood: 'bad', created: 2 },
+    { id: 'c3', text: 'Fora de la cançó', bar: 9999, tag: 'other', mood: 'idea', created: 3 },
+    { id: 'c1', text: 'repetit', bar: null, tag: 'general', mood: 'good' },
+    { id: 'c4', text: '   ', bar: null, tag: 'general', mood: 'good' },
+    { id: 'c5', text: 'tema dolent', bar: null, tag: 'kazoo', mood: 'good' }];
+  const clean = builder.cleanComments(song.comments, song.settings.bars);
+  assert.deepEqual(clean.map(c => c.id), ['c1', 'c2', 'c3']);
+  assert.equal(clean[0].text, 'La tornada enganxa');
+  assert.equal(clean[2].bar, song.settings.bars - 1, 'el compàs es limita a la cançó');
+  const report = builder.feedbackReport(engine, [{ rating: 4, created: 5, song }, { rating: 0, created: 6, song: { ...song, comments: [] } }], 0);
+  assert.equal(report.format, 'skagenerator-feedback');
+  assert.deepEqual(report.totals, { songs: 2, rated: 1, comments: 3 });
+  const first = report.songs[0];
+  assert.equal(first.rating, 4);
+  assert.match(first.comments[0].where, /^Tornada \(compassos \d+–\d+\) · compàs \d+ · \d+:\d\d$/);
+  assert.equal(first.comments[0].mood, '👍 M’agrada'); assert.equal(first.comments[1].where, 'Tota la cançó');
+  assert.equal(first.summary.sections.length, song.sections.length);
+  assert.equal(first.summary.resources.opening, song.edges.opening);
+  assert.equal(first.project.title, song.title);
+  assert(!('libraryId' in first.project));
+  assert.doesNotThrow(() => JSON.stringify(report));
+});

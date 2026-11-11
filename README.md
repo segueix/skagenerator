@@ -167,6 +167,23 @@ L’avís de la cançó nova diu quins recursos ha triat.
 
 En generar a mà la trompeta, el trombó, el saxo, el sintetitzador o la melodia de veu (amb línia pròpia), el taller prova **24 versions** i es queda la que fa la millor línia dins de les seves seccions: acords, clímax, cadències, ritme i cap xoc amb les altres línies que sonen. «Genera’n una altra» sempre en dona una de diferent.
 
+### Comentaris i exportació per analitzar les cançons
+
+Al pas 2 hi ha el panell **«💬 Comentaris de la cançó»**. Cada comentari té:
+- **On**: tota la cançó, una secció o el punt on és el capçal (es pot aturar la reproducció on passa alguna cosa i comentar-ho);
+- **Tema**: inici, final, silencis, fosos, efectes de so, melodia, veu, acords, ritme, baix, guitarres, vents, mescla, estructura…;
+- **Valoració**: 👍 m’agrada, 👎 cal millorar o 💡 idea.
+
+Els comentaris es desen amb la cançó i al projecte JSON. Si la cançó encara no era a «Les meves cançons», s’hi desa sola en afegir el primer comentari. A la biblioteca, cada cançó mostra quants comentaris té (💬).
+
+**«⇩ Exporta les cançons amb comentaris»** (a «Les meves cançons») baixa un fitxer `skagenerator-comentaris-AAAA-MM-DD.json` amb totes les cançons de la biblioteca. Per a cada una inclou:
+- la puntuació;
+- els comentaris situats (secció, compàs i minut:segon);
+- un resum de les decisions del taller: estructura, intensitats, tempo i to de cada secció, i recursos especials (inici, final, aturades, silencis, fosos, efectes de color);
+- el projecte complet, per poder-la reproduir exactament.
+
+Amb aquest fitxer es pot veure quins recursos funcionen i quins no, i ajustar-ne l’algorisme. La veu gravada no s’hi inclou.
+
 ## Flux de treball
 
 Hi ha una sola vista, que es treballa de baix cap amunt:
@@ -215,7 +232,9 @@ Tot es pot ajustar a cada secció («Tempo de la secció», «To de la secció»
 ## Volum per seccions, diverses guitarres i efectes
 
 - **Intensitat de cada secció** (10–100 %): controla la força amb què toquen tots els instruments de la secció. Abans els metalls sonaven uns 9 dB més fluix a les estrofes de manera automàtica; ara depenen només d’aquesta intensitat.
-- **Volums d’aquesta secció**: un control de volum per instrument i per a la secció sencera, en dB respecte de la cançó (és el mateix volum que hi ha a l’equalitzador de la secció).
+- **Volum general de cada instrument** (panell de la base): un control per instrument de la cançó i per a la mescla total, de −24 a +6 dB, que s’aplica a totes les seccions. Els de bateria i baix són els mateixos que el «Volum general de la base».
+- **Volums d’aquesta secció**: un ajust per instrument i per a la secció sencera, de −24 a +12 dB, que **se suma** al volum general. Cada fila mostra el total (p. ex. «+4 dB · total −2 dB»). Si després canvies el volum general, totes les seccions el segueixen i conserven el seu ajust.
+- Els equalitzadors de la cançó i de la secció tracten només greus, mitjos i aguts. Els projectes anteriors, que tenien el volum dins de l’equalitzador, es converteixen sols i sonen igual.
 - **Fins a tres guitarres a la mateixa secció**: Guitarra 1 (rítmica), Guitarra 2 (rítmica una octava amunt, amb un patró diferent) i Guitarra 3 (arpegis i punteig). Cadascuna té el seu canal, el seu clip, el seu so i el seu efecte.
 - **Efectes de guitarra** per a cada clip: boost net, saturació de cinta, crunch, overdrive, distorsió, metal, fuzz i lo-fi, amb **guany** i **to**. La cadena és la d’un pedal i un amplificador: filtre d’entrada, saturació amb sobremostreig ×2, pantalla d’altaveu i nivell compensat (la guitarra sona igual de forta amb efecte que sense). Amb efectes de guany alt, la reverberació es redueix.
 

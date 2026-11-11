@@ -598,3 +598,18 @@ body.recording .transport-play { background: #ef4444; }
   .page-heading .intro-copy { display: none; }
   .section-play .button { flex: 1 1 0; }
 }
+
+/* Comentaris de la cançó */
+.comments { margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid var(--line, rgba(127,127,127,.25)); }
+.comments h3 { margin: 0 0 4px; font-size: 16px; }
+.comment-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; align-items: end; margin-top: 8px; }
+.comment-form .comment-text { grid-column: 1 / -1; }
+.comment-form textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 8px; border-radius: 8px; resize: vertical; }
+.comment-form .button { grid-column: 1 / -1; justify-self: start; }
+.comment-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.comment { position: relative; padding: 8px 48px 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--muted) 8%, transparent); border-left: 4px solid var(--muted); }
+.comment.good { border-left-color: #2e9e6b; } .comment.bad { border-left-color: #d14b4b; } .comment.idea { border-left-color: #d9a400; }
+.comment small { color: var(--muted); font-size: 12px; }
+.comment p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment .icon-button { position: absolute; top: 2px; right: 2px; }
+@media (max-width: 899px) { .comment-form { grid-template-columns: 1fr; } }
