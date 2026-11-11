@@ -129,6 +129,30 @@ test('tres guitarres poden sonar a la mateixa secció amb sons i efectes propis'
     assert.throws(() => engine.composeSongPart({ ...config, fx }, part), /Efecte/);
 });
 
+test('guitarra 3: arpegis, riffs i respostes sempre harmonitzen amb els acords', () => {
+  // Els acords prestats de diversos estils són especialment importants:
+  // la melodia de l'escala no sempre encaixa en el tercer grau de l'acord.
+  for (const style of ['ska', 'punk']) for (const mode of ['major', 'minor']) {
+    const tonic = style === 'ska' ? (mode === 'major' ? 0 : 9) : (mode === 'major' ? 2 : 9);
+    if (!engine.SONG_STYLES[style].keys.some(([k, m]) => k === tonic && m === mode)) continue;
+    const cfg = { ...config, style, bpm: engine.SONG_STYLES[style].bpm.default, tonic, mode,
+      instruments: ['guitar', 'guitar2', 'guitar3'], humanize: 0 };
+    for (const line of ['own', 'riff', 'answer']) {
+      const section = { ...part, type: 'chorus', bars: 8, layers: { guitar3: 3 },
+        ...(line === 'own' ? {} : { lineModes: { guitar3: line } }) };
+      const spec = engine.composeSongPart(cfg, section), music = createPerformance(spec);
+      const notes = music.events.filter(e => e.type === 'on' && e.channel === 15);
+      assert(notes.length > 0, `calen notes per a ${style}/${mode}/${line}`);
+      for (const event of notes) {
+        const chord = spec.chords[Math.min(spec.chords.length - 1, Math.floor(event.time / (spec.beat * 4) + 1e-6))];
+        assert(chord.pcs.includes(event.note % 12),
+          `guitarra 3 desentonada a ${style}/${mode}/${line}: ${event.note} fora de ${chord.pcs}`);
+        assert(event.note >= 62 && event.note <= 79, `registre excessiu a ${line}: ${event.note}`);
+      }
+    }
+  }
+});
+
 test('el trombó toca la seva línia tal com està composta, una octava avall', () => {
   const spec = engine.composeSongPart({ ...config, instruments: ['trombone'] }, { ...part, type: 'chorus', layers: { trombone: 3 } });
   const notes = createPerformance(spec).events.filter(e => e.type === 'on' && (e.channel === 4 || e.channel === 13)).map(e => e.note);

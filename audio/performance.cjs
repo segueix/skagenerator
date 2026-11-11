@@ -230,13 +230,23 @@ function createPerformance(spec) {
         pitches.forEach((pitch, k) => note(14, pitch, t0 + t * beat + .009 + k * .006, ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? hit % 2 ? 70 : 88 : 80));
       });
     }
-    // Guitarra 3: amb línia pròpia (riff de la cançó o respostes) fa de guitarra
-    // solista; si no, arpegis i punteig sobre l'acord.
+    // Guitarra 3: punteig dins del registre real de la guitarra i harmonitzat
+    // amb l'acord que sona a cada compàs. Els riffs de l'escala poden contenir
+    // notes de pas que xoquin amb acords prestats o amb les altres guitarres.
+    // Manté el contorn rítmic, però resol les altures a notes de l'acord.
     if (has('guitar3') && Array.isArray(spec.lines?.guitar3)) {
-      if (b === 0) for (const [nb, t, pitch, duration] of spec.lines.guitar3)
-        note(15, pitch, nb * bar + t * beat, Math.max(.06, duration * beat * .9), t % 1 === 0 ? 96 : 84, .004);
+      if (b === 0) for (const [nb, t, pitch, duration] of spec.lines.guitar3) {
+        const harmony = spec.chords[nb];
+        if (!harmony) continue;
+        const tuned = nearest(pitch, harmony.pcs, 62, 79);
+        note(15, tuned, nb * bar + t * beat, Math.max(.06, duration * beat * .9), t % 1 === 0 ? 96 : 84, .004);
+      }
     } else if (has('guitar3')) {
-      const tones = [...chord.notes, chord.notes[0] + 12].map(n => n + 12), index = (spec.layers?.guitar3 ?? 0) % 5;
+      // Abans el quart to era una altra octava sobre l'acord i pujava fins
+      // a notes extremes. La quarta nota repeteix una veu interior de l'acord.
+      const upper = chord.notes.map(n => nearest(n + 12, chord.pcs, 62, 79));
+      const tones = [upper[0], upper[1] ?? upper[0], upper[2] ?? upper[0], upper[0]];
+      const index = (spec.layers?.guitar3 ?? 0) % 5;
       const shapes = [
         [[0, 0], [.5, 1], [1, 2], [1.5, 3], [2, 0], [2.5, 1], [3, 2], [3.5, 3]],
         [[0, 3], [.5, 2], [1, 1], [1.5, 0], [2, 3], [2.5, 2], [3, 1], [3.5, 0]],
