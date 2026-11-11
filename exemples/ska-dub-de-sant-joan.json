@@ -138,7 +138,7 @@
       "instrument": "vocal",
       "start": 4,
       "bars": 8,
-      "revision": 16,
+      "revision": 7,
       "generated": true
     },
     {
@@ -146,7 +146,7 @@
       "instrument": "vocal",
       "start": 12,
       "bars": 8,
-      "revision": 25,
+      "revision": 41,
       "generated": true
     },
     {
@@ -154,7 +154,7 @@
       "instrument": "trumpet",
       "start": 12,
       "bars": 8,
-      "revision": 27,
+      "revision": 3,
       "generated": true
     },
     {
@@ -178,7 +178,7 @@
       "instrument": "synthLead",
       "start": 20,
       "bars": 8,
-      "revision": 41,
+      "revision": 59,
       "generated": true
     },
     {
@@ -212,7 +212,7 @@
       "instrument": "vocal",
       "start": 28,
       "bars": 8,
-      "revision": 16,
+      "revision": 7,
       "generated": true
     },
     {
@@ -220,7 +220,7 @@
       "instrument": "vocal",
       "start": 36,
       "bars": 8,
-      "revision": 25,
+      "revision": 41,
       "generated": true
     },
     {
@@ -228,7 +228,7 @@
       "instrument": "trumpet",
       "start": 36,
       "bars": 16,
-      "revision": 14,
+      "revision": 3,
       "generated": true
     },
     {
@@ -236,7 +236,7 @@
       "instrument": "sax",
       "start": 36,
       "bars": 16,
-      "revision": 21,
+      "revision": 51,
       "generated": true
     }
   ]

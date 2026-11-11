@@ -11,8 +11,13 @@
     let a = seed >>> 0;
     return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   }
-  // Qualitat d'una línia: graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques.
-  function lineScore(notes) {
+  // Qualitat d'una línia [compàs, temps, nota, durada]. Contorn: graus conjunts,
+  // salts compensats, registre equilibrat i poques notes repetides mecànicament.
+  // Amb context ({ chords, others }) també puntua l'encaix amb l'harmonia, un sol
+  // clímax per frase, l'equilibri entre repetició i novetat rítmica, les
+  // cadències de final de frase i els xocs amb les altres línies que sonen alhora.
+  const CLASH = new Set([1, 6, 11]); // segona menor, trító i setena major
+  function lineScore(notes, context = {}) {
     if (!notes || notes.length < 3) return -100;
     const p = notes.map(n => n[2]), range = Math.max(...p) - Math.min(...p);
     let steps = 0, leaps = 0, recovered = 0, stuck = 0, run = 1, turns = 0;
@@ -24,7 +29,60 @@
       if (i > 1 && Math.sign(d) && Math.sign(p[i - 1] - p[i - 2]) && Math.sign(d) !== Math.sign(p[i - 1] - p[i - 2])) turns++;
     }
     const n = p.length - 1;
-    return 5 * steps / n - 3 * leaps / n + 1.5 * recovered / Math.max(1, leaps) - 1.2 * stuck - Math.abs(range - 10) * .35 - Math.abs(turns / n - .35) * 2;
+    let score = 5 * steps / n - 3 * leaps / n + 1.5 * recovered / Math.max(1, leaps) - 1.2 * stuck - Math.abs(range - 10) * .35 - Math.abs(turns / n - .35) * 2;
+    const { chords, others = [] } = context;
+    const fits = (note, which) => !chords?.[note[0]] || (which || chords[note[0]].pcs).includes(note[2] % 12);
+    // Encaix amb l'harmonia: notes de l'acord als temps.
+    if (chords) {
+      const on = notes.filter(note => note[1] % 1 === 0);
+      if (on.length) score += 3 * on.filter(note => fits(note)).length / on.length - 1.5;
+    }
+    // Frases de quatre compassos: un sol clímax i un final que reposa (nota de l'acord, prou llarga).
+    const phrases = new Map();
+    for (const note of notes) { const k = Math.floor(note[0] / 4); if (!phrases.has(k)) phrases.set(k, []); phrases.get(k).push(note); }
+    let climax = 0, cadence = 0;
+    for (const list of phrases.values()) {
+      const top = Math.max(...list.map(note => note[2])), tops = list.filter(note => note[2] === top).length;
+      climax += list.length < 3 ? 0 : tops === 1 ? 1 : -.4 * (tops - 1);
+      const end = list[list.length - 1];
+      cadence += (end[3] >= 1 ? .5 : 0) + (chords ? (fits(end) ? .5 : -.3) : 0);
+    }
+    score += .6 * climax / phrases.size + 1.5 * cadence / phrases.size;
+    // Repetició i novetat rítmica: ni tots els compassos iguals ni tots diferents.
+    const bars = new Map();
+    for (const note of notes) bars.set(note[0], `${bars.get(note[0]) || ''}${note[1]}:${note[3]},`);
+    if (bars.size >= 4) score -= 2.5 * Math.abs(new Set(bars.values()).size / bars.size - .5);
+    // Xocs: intervals dissonants entre notes que sonen alhora amb una altra línia.
+    if (others.length) {
+      let clashes = 0;
+      const span = ([b, t, , d]) => [b * 4 + t, b * 4 + t + d];
+      for (const note of notes) {
+        const [s0, e0] = span(note);
+        for (const line of others) for (const other of line) {
+          const [s1, e1] = span(other);
+          if (Math.min(e0, e1) - Math.max(s0, s1) >= .25 && CLASH.has(Math.abs(note[2] - other[2]) % 12)) clashes++;
+        }
+      }
+      score -= 6 * clashes / notes.length;
+    }
+    return score;
+  }
+  const mean = line => line.reduce((t, note) => t + note[2], 0) / Math.max(1, line.length);
+  // Harmonia de la cançó sencera: estrofa i tornada contrastades, tornada que
+  // comença a la tònica, arribada a la tornada des de la dominant i pont diferent.
+  function harmonyScore(chordsOf) {
+    const cycle = type => chordsOf(type)?.slice(0, 4).join(' ');
+    const verse = chordsOf('verse'), chorus = chordsOf('chorus'), lead = chordsOf('prechorus') || verse, middle = chordsOf('bridge') || chordsOf('solo');
+    let score = 0;
+    if (verse && chorus) {
+      const known = new Set(verse.slice(0, 4));
+      score += .6 * new Set(chorus.slice(0, 4).filter(c => !known.has(c))).size;
+      if (cycle('verse') === cycle('chorus')) score -= 3;
+      if (/^(I|i|Imaj7|i7)$/.test(chorus[0])) score += 1;
+    }
+    if (lead) { const end = lead[lead.length - 1]; score += /^V7?$/.test(end) ? 1.5 : /^(v7?|IV|iv|bVII|ii7)$/.test(end) ? .6 : 0; }
+    if (middle) score += [verse, chorus].every(list => !list || list.slice(0, 4).join(' ') !== middle.slice(0, 4).join(' ')) ? .5 : 0;
+    return score;
   }
   const TITLES = {
     ska: [['Ball', 'Nit', 'Festa', 'Passeig', 'Revetlla', 'Matinada', 'Rumbeta', 'Vermut', 'Contratemps', 'Rude boy'],
@@ -145,8 +203,7 @@
       }
     }
     // ── Millor versió de cada línia pròpia (la mateixa per a seccions iguals) ──
-    const partFor = (sec, layers, extra) => {
-      const h = harmony[sec.type] || 1;
+    const partFor = (sec, layers, extra, h = harmony[sec.type] || 1) => {
       const part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: h,
         groove: { ...groove, ...(sec.groove || {}) }, instruments: [...base, ...Object.keys(layers)], layers };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
@@ -154,22 +211,50 @@
       if (extra?.register) part.register = extra.register;
       return part;
     };
-    const chosen = new Map(), clips = [];
+    // ── Harmonia: es proven diverses combinacions i es queda la que dona més forma a la cançó ──
+    const kinds = Object.keys(harmony);
+    let bestHarmony = { ...harmony }, bestForm = -Infinity;
+    for (let c = 0; c < 8; c++) {
+      const trial = c === 0 ? { ...harmony } : Object.fromEntries(kinds.map(type => [type, 1 + Math.floor(r() * 5)]));
+      const chordsOf = type => {
+        const sec = of(type)[0];
+        return sec ? engine.composeSongPart(settings, { ...partFor(sec, {}, null, trial[type]), instruments: [] }).chords.map(ch => ch.symbol || ch.pcs.join('-')) : null;
+      };
+      const form = harmonyScore(chordsOf);
+      if (form > bestForm) { bestForm = form; bestHarmony = trial; }
+    }
+    Object.assign(harmony, bestHarmony);
+
+    // ── Millor versió de cada línia pròpia (la mateixa per a seccions iguals) ──
+    // Cada candidata es puntua dins de la seva secció: amb els acords i amb les
+    // línies que ja hi sonen (riffs i línies triades abans), per evitar xocs.
+    // La veu de la tornada, a més, ha de quedar per sobre de la de l'estrofa.
+    const chosen = new Map(), clips = [], revisions = [], voiceMean = {};
     layersOf.forEach((layer, i) => {
       let revision = layer.revision;
       if (revision === undefined && MELODIC.includes(layer.instrument) && !layer.line) {
         const memo = `${layer.instrument}:${layer.sec.type}`;
         if (chosen.has(memo)) revision = chosen.get(memo);
         else {
-          let best = -Infinity;
+          const company = layersOf.map((o, j) => [o, j]).filter(([o, j]) => o.sec === layer.sec && o.instrument !== layer.instrument
+            && (MELODIC.includes(o.instrument) || o.line) && (o.line === 'riff' || j < i));
+          const layers = Object.fromEntries(company.map(([o, j]) => [o.instrument, revisions[j] || 1]));
+          const lineModes = Object.fromEntries(company.filter(([o]) => o.line).map(([o]) => [o.instrument, o.line]));
+          let best = -Infinity, bestLine = null;
           for (let rev = 1; rev <= 30; rev++) {
-            const spec = engine.composeSongPart(settings, partFor(layer.sec, { [layer.instrument]: rev }, layer));
-            const score = lineScore(spec.lines[layer.instrument]);
-            if (score > best) { best = score; revision = rev; }
+            const part = partFor(layer.sec, { ...layers, [layer.instrument]: rev }, layer);
+            if (Object.keys(lineModes).length) part.lineModes = lineModes;
+            const spec = engine.composeSongPart(settings, part), line = spec.lines[layer.instrument];
+            const others = Object.entries(spec.lines).filter(([name]) => name !== layer.instrument).map(([, l]) => l);
+            let score = lineScore(line, { chords: spec.chords, others });
+            if (layer.instrument === 'vocal' && layer.sec.type === 'chorus' && voiceMean.verse !== undefined) score += mean(line) >= voiceMean.verse + 2 ? 1.5 : -1.5;
+            if (score > best) { best = score; revision = rev; bestLine = line; }
           }
           chosen.set(memo, revision);
+          if (layer.instrument === 'vocal' && bestLine) voiceMean[layer.sec.type] = mean(bestLine);
         }
       }
+      revisions[i] = revision;
       const clip = { id: `${id}-c${i + 1}`, instrument: layer.instrument, start: layer.sec.start, bars: layer.sec.bars, revision: revision || 1, generated: true };
       for (const field of ['line', 'fx', 'register', 'feel']) if (layer[field] !== undefined) clip[field] = layer[field];
       clips.push(clip);
@@ -178,5 +263,5 @@
     const title = `${pick(words[0])} ${pick(words[1])}`;
     return { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
   }
-  return { createAutoSong, lineScore };
+  return { createAutoSong, lineScore, harmonyScore };
 });

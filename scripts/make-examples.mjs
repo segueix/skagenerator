@@ -1,44 +1,20 @@
 // Genera les cançons d'exemple (exemples/*.json): 5 de ska i 5 de punk.
 // Cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica,
 // tempo, to, efectes i lletra) i, per a cada instrument melòdic, es proven
-// 60 versions i es tria la que té millor línia (graus conjunts, salts
-// compensats, registre equilibrat i poques repeticions mecàniques).
+// 60 versions i es tria la que té millor línia (contorn, encaix amb els
+// acords, un sol clímax per frase, cadències i ritme ni monòton ni caòtic).
 import { mkdir, writeFile } from 'node:fs/promises';
 import engine from '../radioambient.js';
+import builder from '../song-builder.js';
 
 const TYPES = engine.SONG_PARTS;
 const MELODIC = ['vocal', 'trumpet', 'trombone', 'sax', 'synthLead'];
 
-// Mateix recompte de síl·labes que l'app (app.js).
-function syllableCount(line) {
-  let total = 0;
-  for (const word of line.toLowerCase().match(/[a-zàèéíïòóúüç·'’-]+/g) || []) {
-    const clean = word.replace(/(q|g)u(?=[eiéèí])/g, '$1');
-    for (const group of clean.match(/[aeiouàèéíïòóúü]+/g) || []) {
-      let count = 0;
-      for (let i = 0; i < group.length; i++) { const next = group[i + 1]; count++; if (next && 'iu'.includes(next) && !'iu'.includes(group[i])) i++; }
-      total += count;
-    }
-  }
-  return total;
-}
-const syllables = text => (text || '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, 32).map(l => Math.max(1, Math.min(24, syllableCount(l))));
+// Lletra: síl·labes, síl·labes tòniques i versos repetits (com a l'app).
+const lyricInfo = text => engine.analyzeLyrics(text);
 
-// Qualitat d'una línia melòdica [compàs, temps, nota, durada].
-function lineScore(notes) {
-  if (notes.length < 3) return -100;
-  const p = notes.map(n => n[2]), range = Math.max(...p) - Math.min(...p);
-  let steps = 0, leaps = 0, recovered = 0, stuck = 0, run = 1, turns = 0;
-  for (let i = 1; i < p.length; i++) {
-    const d = p[i] - p[i - 1], a = Math.abs(d);
-    if (a > 0 && a <= 2) steps++;
-    if (a >= 5) { leaps++; const next = p[i + 1] - p[i]; if (next !== undefined && Math.sign(next) === -Math.sign(d) && Math.abs(next) <= 2) recovered++; }
-    if (d === 0) { run++; if (run >= 3) stuck++; } else run = 1;
-    if (i > 1 && Math.sign(d) && Math.sign(p[i - 1] - p[i - 2]) && Math.sign(d) !== Math.sign(p[i - 1] - p[i - 2])) turns++;
-  }
-  const n = p.length - 1;
-  return 5 * steps / n - 3 * leaps / n + 1.5 * recovered / Math.max(1, leaps) - 1.2 * stuck - Math.abs(range - 10) * .35 - Math.abs(turns / n - .35) * 2;
-}
+// Qualitat de cada línia dins de la seva secció (acords i cadències), com a la cançó automàtica.
+const { lineScore } = builder;
 
 function build(def) {
   const id = def.slug;
@@ -57,7 +33,7 @@ function build(def) {
     if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
     if (sec.bpm) part.bpm = sec.bpm;
     if (sec.transpose) part.transpose = sec.transpose;
-    if (layers.vocal) { if (register) part.register = register; const s = syllables(sec.lyrics); if (s.length) part.syllables = s; }
+    if (layers.vocal) { if (register) part.register = register; const info = lyricInfo(sec.lyrics); if (info.syllables.length) Object.assign(part, info); }
     return part;
   };
   const pickRevision = (instrument, covered, register) => {
@@ -67,7 +43,7 @@ function build(def) {
       let score = 0;
       for (const sec of covered) {
         const spec = engine.composeSongPart(settings, partFor(sec, { [instrument]: rev }, register));
-        score += lineScore(spec.lines[instrument] || []);
+        score += lineScore(spec.lines[instrument] || [], { chords: spec.chords });
       }
       if (score > bestScore) { bestScore = score; best = rev; }
     }

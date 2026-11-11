@@ -19,7 +19,7 @@ A la primera pantalla hi ha **10 cançons fetes amb el taller** (5 de ska i 5 de
 | Estiu, no te’n vagis | Punk | 172 | 1:29 | Pop-punk d’estiu: guitarra aguda amb overdrive a les tornades, arpegis a les estrofes, veu aguda, pretornada que empeny i última tornada un to amunt. |
 | Mig Temps | Punk | 150 | 1:33 | Punk fosc i melòdic en Mi menor: patró a mig temps, baix amb riff molt present, arpegis amb crunch, guitarra metal a les tornades i un pont que baixa de to. |
 
-Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques).
+Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (vegeu «Composició: melodies i selector de qualitat»).
 
 ## Realisme: preses diferents i arranjament viu
 
@@ -84,10 +84,28 @@ El subgènere també es pot triar al panell de la base, juntament amb el **balan
 ### Harmonia i riffs
 
 - Cada subgènere té paletes d’acords per secció amb acords prestats (bVII, bVI, iv), dominants secundàries (V7/vi, V7/IV) i setenes.
-- Cada cançó té un **riff** propi (ritme de dos compassos i contorn melòdic) que es repeteix a la intro, les tornades i el final, adaptat als acords de cada secció.
+- Cada cançó té un **riff** propi (ritme generat de dos compassos —una cèl·lula a contratemps a l’ska o a cops avall al punk, i un segon compàs que la contesta amb una nota llarga— i contorn melòdic) que es repeteix a la intro, les tornades i el final, adaptat als acords de cada secció.
 - El trombó toca el riff harmonitzat una tercera per sota de la trompeta.
 - Amb la línia **Respon a la veu**, els metalls o la guitarra solista toquen fragments del riff als silencis de la melodia de veu (pregunta i resposta).
 - A cada instrument melòdic (trompeta, trombó, saxo, sintetitzador i guitarra 3) l’opció **LÍNIA** tria entre línia pròpia, riff de la cançó o resposta a la veu.
+
+### Composició: melodies i selector de qualitat
+
+**El motiu es desenvolupa.** Les línies de vent, sintetitzador i la melodia de base ja no repeteixen la mateixa frase de quatre compassos: la secció es construeix per blocs **A – A′ – B – A″**. A′ repeteix A però acaba oberta (a la terça o la quinta de l’acord), B és una frase nova de contrast una mica més aguda i A″ tanca a la fonamental. En vuit compassos: A i A″; en dotze: A, B i A″.
+
+**La veu segueix la lletra de debò:**
+- **Síl·labes tòniques a temps**: el taller troba la tònica de cada paraula (accent gràfic; si no n’hi ha, planes les acabades en vocal, vocal + s, -en o -in, i agudes la resta; articles, preposicions i pronoms febles són àtons) i allarga la síl·laba anterior perquè la tònica caigui a la part del temps. El temps que sobra allarga les tòniques.
+- **Versos repetits, mateixa melodia**: si un vers es repeteix dins la secció («Rude boys del Raval»), es canta igual.
+- **Estrofes germanes**: cada frase té el seu propi atzar, de manera que dues estrofes amb la mateixa versió tenen la mateixa melodia adaptada a les síl·labes de cada vers.
+
+**Selector de qualitat.** Per triar la millor de 30 (cançó automàtica) o 60 (exemples) versions de cada línia, a més del contorn (graus conjunts, salts compensats, registre, poques notes repetides) es valora:
+- encaix amb l’harmonia (notes de l’acord als temps);
+- un sol clímax per frase;
+- equilibri entre repetició i novetat rítmica d’un compàs a l’altre;
+- cadències: final de frase llarg i en una nota de l’acord;
+- **xocs** amb les altres línies que sonen alhora (segones menors, trítons i setenes majors), comprovats contra el riff i les línies ja triades de la secció.
+
+**La cançó sencera.** La cançó automàtica prova 8 combinacions d’harmonia i es queda la que dona més forma: estrofa i tornada amb acords diferents, tornada que comença a la tònica, arribada a la tornada des de la dominant i pont diferent de tots dos. La veu de la tornada es tria perquè quedi per sobre de la de l’estrofa.
 
 ## Flux de treball
 

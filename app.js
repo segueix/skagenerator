@@ -283,8 +283,9 @@
       // La melodia de veu segueix la lletra de la secció: una frase per vers.
       if ('vocal' in extra.layers) {
         if (extra.register) part.register = extra.register;
-        const syllables = seg.section ? lyricSyllables(seg.section.lyrics) : [];
-        if (syllables.length) part.syllables = syllables;
+        // Síl·labes de cada vers, síl·labes tòniques (cauen a temps) i versos repetits (es canten igual).
+        const lyric = engine.analyzeLyrics(seg.section?.lyrics || '');
+        if (lyric.syllables.length) Object.assign(part, lyric);
       }
     }
     return part;

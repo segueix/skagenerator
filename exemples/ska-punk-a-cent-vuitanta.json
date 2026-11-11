@@ -116,7 +116,7 @@
       "instrument": "trumpet",
       "start": 0,
       "bars": 4,
-      "revision": 20,
+      "revision": 24,
       "generated": true
     },
     {
@@ -132,7 +132,7 @@
       "instrument": "vocal",
       "start": 4,
       "bars": 8,
-      "revision": 57,
+      "revision": 53,
       "generated": true
     },
     {
@@ -140,7 +140,7 @@
       "instrument": "vocal",
       "start": 12,
       "bars": 8,
-      "revision": 42,
+      "revision": 21,
       "generated": true
     },
     {
@@ -161,7 +161,7 @@
       "instrument": "trumpet",
       "start": 12,
       "bars": 8,
-      "revision": 40,
+      "revision": 55,
       "generated": true
     },
     {
@@ -177,7 +177,7 @@
       "instrument": "vocal",
       "start": 20,
       "bars": 8,
-      "revision": 57,
+      "revision": 53,
       "generated": true
     },
     {
@@ -185,7 +185,7 @@
       "instrument": "vocal",
       "start": 28,
       "bars": 8,
-      "revision": 42,
+      "revision": 21,
       "generated": true
     },
     {
@@ -206,7 +206,7 @@
       "instrument": "trumpet",
       "start": 28,
       "bars": 8,
-      "revision": 40,
+      "revision": 55,
       "generated": true
     },
     {
@@ -222,7 +222,7 @@
       "instrument": "trombone",
       "start": 36,
       "bars": 8,
-      "revision": 18,
+      "revision": 48,
       "generated": true
     },
     {
@@ -243,7 +243,7 @@
       "instrument": "vocal",
       "start": 44,
       "bars": 8,
-      "revision": 42,
+      "revision": 21,
       "generated": true
     },
     {
@@ -264,7 +264,7 @@
       "instrument": "trumpet",
       "start": 44,
       "bars": 12,
-      "revision": 8,
+      "revision": 33,
       "generated": true
     },
     {
@@ -272,7 +272,7 @@
       "instrument": "sax",
       "start": 44,
       "bars": 12,
-      "revision": 32,
+      "revision": 36,
       "generated": true
     },
     {
@@ -280,7 +280,7 @@
       "instrument": "trombone",
       "start": 44,
       "bars": 12,
-      "revision": 6,
+      "revision": 57,
       "generated": true
     }
   ]

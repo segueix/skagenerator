@@ -96,3 +96,35 @@ test('una secció pot quedar sense cap instrument (base silenciada) i continua t
   const organ = engine.composeSongPart({ seed: 5, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'verse', bars: 2, energy: 50, revision: 1, instruments: ['organ'], layers: { organ: 3 } });
   assert.equal(organ.layers.organ, 2);
 });
+
+test('el selector de qualitat puntua l’harmonia, el clímax, les cadències i els xocs entre línies', () => {
+  const C = engine.chordFromSymbol(0, 'I'), chords = Array(4).fill(C);
+  // Mateix contorn: notes de l'acord a temps (do-mi-sol) contra notes de fora (re-fa-la).
+  const line = pitches => pitches.map((p, i) => [Math.floor(i / 4), i % 4, p, i === pitches.length - 1 ? 2 : 1]);
+  const inside = line([60, 62, 64, 65, 67, 65, 64, 62, 60, 62, 64, 62, 60]), outside = line([62, 64, 65, 67, 69, 67, 65, 64, 62, 64, 65, 64, 62]);
+  assert(builder.lineScore(inside, { chords }) > builder.lineScore(outside, { chords }) + 1, 'encaix amb els acords');
+  // Una segona menor sostinguda contra una altra línia resta punts.
+  const clash = inside.map(([b, t, , d]) => [b, t, 61, d]), unison = inside.map(([b, t, p, d]) => [b, t, p - 12, d]);
+  assert(builder.lineScore(inside, { chords, others: [unison] }) > builder.lineScore(inside, { chords, others: [clash] }) + 3, 'xocs');
+  // Un sol clímax per frase.
+  const one = line([60, 62, 64, 67, 72, 67, 64, 62, 60]), many = line([60, 72, 64, 72, 62, 72, 64, 72, 60]);
+  assert(builder.lineScore(one) > builder.lineScore(many));
+  // La forma de la cançó: estrofa i tornada diferents i arribada a la tornada des de la dominant.
+  const form = map => builder.harmonyScore(type => map[type] || null);
+  assert(form({ verse: ['vi', 'IV', 'ii', 'V'], chorus: ['I', 'V', 'vi', 'IV'] }) > form({ verse: ['I', 'V', 'vi', 'IV'], chorus: ['I', 'V', 'vi', 'IV'] }) + 3);
+});
+
+test('la cançó automàtica tria versions sense xocs i amb la veu de la tornada més aguda', () => {
+  for (const key of ['twotone', 'poppunk', 'rocksteady']) {
+    const song = builder.createAutoSong(engine, key, { seed: 31 });
+    const voice = type => {
+      const sec = song.sections.find(s => s.type === type), clip = song.clips.find(c => c.instrument === 'vocal' && c.start === sec.start);
+      const h = song.harmony[type] || 1, p = { type, bars: sec.bars, energy: sec.energy, revision: h, instruments: ['vocal'], layers: { vocal: clip.revision } };
+      if (['intro', 'verse', 'chorus'].includes(type)) p.variantIndex = (h - 1) % 5;
+      for (const f of ['bpm', 'transpose']) if (sec[f] !== undefined) p[f] = sec[f];
+      const line = engine.composeSongPart(song.settings, p).lines.vocal;
+      return line.reduce((t, n) => t + n[2], 0) / line.length;
+    };
+    assert(voice('chorus') > voice('verse') + 1, `${key}: tornada més aguda que l’estrofa`);
+  }
+});

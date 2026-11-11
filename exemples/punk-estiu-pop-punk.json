@@ -171,7 +171,7 @@
       "instrument": "vocal",
       "start": 4,
       "bars": 8,
-      "revision": 39,
+      "revision": 59,
       "generated": true,
       "register": 1
     },
@@ -180,7 +180,7 @@
       "instrument": "vocal",
       "start": 12,
       "bars": 4,
-      "revision": 31,
+      "revision": 15,
       "generated": true,
       "register": 1
     },
@@ -189,7 +189,7 @@
       "instrument": "vocal",
       "start": 16,
       "bars": 8,
-      "revision": 42,
+      "revision": 55,
       "generated": true,
       "register": 1
     },
@@ -219,7 +219,7 @@
       "instrument": "vocal",
       "start": 24,
       "bars": 8,
-      "revision": 39,
+      "revision": 59,
       "generated": true,
       "register": 1
     },
@@ -228,7 +228,7 @@
       "instrument": "vocal",
       "start": 32,
       "bars": 4,
-      "revision": 31,
+      "revision": 15,
       "generated": true,
       "register": 1
     },
@@ -237,7 +237,7 @@
       "instrument": "vocal",
       "start": 36,
       "bars": 8,
-      "revision": 42,
+      "revision": 55,
       "generated": true,
       "register": 1
     },
@@ -254,7 +254,7 @@
       "instrument": "vocal",
       "start": 44,
       "bars": 8,
-      "revision": 4,
+      "revision": 11,
       "generated": true,
       "register": 1
     },
@@ -276,7 +276,7 @@
       "instrument": "vocal",
       "start": 52,
       "bars": 8,
-      "revision": 42,
+      "revision": 55,
       "generated": true,
       "register": 1
     },
