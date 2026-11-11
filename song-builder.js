@@ -292,7 +292,10 @@
     const liked = (options.liked || []).filter(Boolean), model = liked.length && r() < .5 ? pick(liked).settings : null;
     let bpm = model ? model.bpm + Math.round((r() - .5) * 8) : sg.bpm[0] + Math.round(r() * (sg.bpm[1] - sg.bpm[0]));
     bpm = Math.max(sg.bpm[0], Math.min(sg.bpm[1], bpm, engine.SONG_STYLES[sg.style].bpm.max));
-    const [tonic, mode] = model && sg.keys.some(([t, m]) => t === model.tonic && m === model.mode) ? [model.tonic, model.mode] : pick(sg.keys);
+    // Tonalitat: la triada (si és una de les del subgènere); si no, la d'una cançó que t'ha agradat o una a l'atzar.
+    const chosenKey = Array.isArray(options.key) && sg.keys.find(([t, m]) => t === options.key[0] && m === options.key[1]);
+    const fromModel = model && sg.keys.some(([t, m]) => t === model.tonic && m === model.mode) ? [model.tonic, model.mode] : null;
+    const [tonic, mode] = chosenKey || fromModel || pick(sg.keys);
     const groove = model?.groove && sg.groove.drums.includes(model.groove.drums) ? { ...model.groove }
       : { drums: pick(sg.groove.drums), bass: pick(sg.groove.bass), guitar: pick(sg.groove.guitar) };
     const settings = { style: sg.style, subgenre: key, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,

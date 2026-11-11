@@ -64,7 +64,22 @@ Kits i baixos gravats nous: **Big Rusty** (greu), **kit de club de jazz**, **kit
 
 ## Cançó automàtica, biblioteca i puntuacions
 
-Al panell **Cançó automàtica** tries un subgènere, la durada (de 2 a 4 minuts) i si vols melodia de veu, i el taller compon una cançó sencera: introducció, estrofes, pretornades, tornades, pont o solo i final, amb els canvis de tempo propis del subgènere (introduccions lentes, ponts a mig temps, última tornada pujada de to…). Cada cançó es desa sola a **Les meves cançons**, al navegador, i s’hi pot posar de 1 a 5 estrelles. Quan d’un subgènere tens cançons de ★4 o més, les noves cançons d’aquest subgènere s’inspiren sovint en el seu tempo, tonalitat i groove. També pots desar-hi la cançó que estàs fent a mà.
+Al panell **Cançó automàtica** tries un subgènere, la **tonalitat** (a l’atzar o una de les pròpies del subgènere), la durada (de 2 a 4 minuts) i si vols melodia de veu, i el taller compon una cançó sencera: introducció, estrofes, pretornades, tornades, pont o solo i final, amb els canvis de tempo propis del subgènere (introduccions lentes, ponts a mig temps, última tornada pujada de to…). Cada cançó es desa sola a **Les meves cançons**, al navegador, i s’hi pot posar de 1 a 5 estrelles. Quan d’un subgènere tens cançons de ★4 o més, les noves cançons d’aquest subgènere s’inspiren sovint en el seu tempo, tonalitat i groove. També pots desar-hi la cançó que estàs fent a mà.
+
+### Tonalitats de cada subgènere
+
+Cada subgènere té de 4 a 7 tonalitats pròpies (només en els modes per als quals té progressions d’acords). Al selector **«Tonalitat»** es pot triar una d’aquestes o deixar-la a l’atzar.
+
+| Subgènere | Tonalitats |
+|---|---|
+| Ska jamaicà | Fa, Si♭, Mi♭, Do i Sol majors (bemolls, còmodes per als vents) |
+| Rocksteady | La, Re, Sol i Do menors; Do i Fa majors |
+| Ska 2-tone | Do, Sol, Fa i Si♭ majors; La, Re i Sol menors |
+| Ska-punk | Sol, Do, Si♭, Fa i Mi♭ majors; La i Re menors |
+| Punk del 77 | La, Mi, Re, Sol i Do majors; Mi i La menors |
+| Hardcore | Si, Mi, La i Re menors |
+| Pop-punk | Re, Sol, Mi, La i Do majors |
+| Horror punk | Mi, La i Sol majors; Mi, La, Si i Re menors |
 
 ### Subgèneres amb personalitat
 

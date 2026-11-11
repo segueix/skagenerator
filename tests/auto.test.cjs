@@ -274,3 +274,17 @@ test('millores dels comentaris: transicions suaus, guitarra 2, varietat al punk 
   const after = builder.densityBoost(song, verse);
   assert(after > before && after <= 3, `${before} → ${after}`);
 });
+
+test('la cançó automàtica deixa triar la tonalitat entre les del subgènere', () => {
+  for (const [key, sg] of Object.entries(engine.SUBGENRES)) {
+    assert(sg.keys.length >= 4, `${key}: diverses tonalitats`);
+    for (const [tonic, mode] of sg.keys) {
+      assert(sg.harmony[mode], `${key}: hi ha acords per al mode ${mode}`);
+      const song = builder.createAutoSong(engine, key, { seed: 7, key: [tonic, mode], candidates: 1 });
+      assert.deepEqual([song.settings.tonic, song.settings.mode], [tonic, mode]);
+    }
+    // Una tonalitat que no és del subgènere s'ignora (es tria a l'atzar entre les seves).
+    const other = builder.createAutoSong(engine, key, { seed: 7, key: [1, 'major'], candidates: 1 });
+    assert(sg.keys.some(([t, m]) => t === other.settings.tonic && m === other.settings.mode));
+  }
+});
