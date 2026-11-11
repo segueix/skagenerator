@@ -67,7 +67,7 @@
   const BASE_SOUNDS = ['drums', 'bass', 'guitar'], BASE_PATTERNS = {
     organ: ['Contratemps', '«Bubble»', 'Sostingut', 'Blanques', 'Síncopa'],
     synthPad: ['Sostingut', 'Blanques', 'Contratemps', 'Negres', 'Síncopa'] };
-  const validBaseEdits = s => (s.mute === undefined || Array.isArray(s.mute) && s.mute.length <= BASE_CHOICES.length && new Set(s.mute).size === s.mute.length && s.mute.every(n => BASE_CHOICES.includes(n)))
+  const validBaseEdits = s => (s.mute === undefined || Array.isArray(s.mute) && s.mute.length <= Object.keys(INSTRUMENTS).length && new Set(s.mute).size === s.mute.length && s.mute.every(n => Object.hasOwn(INSTRUMENTS, n)))
     && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => BASE_SOUNDS.includes(n)))
     && (s.patterns === undefined || !!s.patterns && typeof s.patterns === 'object' && !Array.isArray(s.patterns)
       && Object.entries(s.patterns).every(([n, i]) => Object.hasOwn(BASE_PATTERNS, n) && Number.isInteger(i) && i >= 0 && i < 5));
@@ -197,7 +197,7 @@
   // Clips que sonen dins d'un tram, amb els compassos on sonen.
   function layersFor(s, seg, options) {
     if (options.baseOnly) return null;
-    const active = s.clips.filter(c => c.generated && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
+    const active = s.clips.filter(c => c.generated && !(seg.section?.mute || []).includes(c.instrument) && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
     const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {}, lineModes = {};
     let register;
@@ -383,6 +383,7 @@
   function audioError(error) { status(`Error: ${reasonOf(error)}`, 'error'); console.error(error); }
 
   let context, source, gainNode, tonePlayer, playToken = 0, animation, playing = null;
+  let cueBar = 0, scrubBar = null; // Posició triada manualment a la cançó.
   $('tone-status').textContent = tone ? ' · Tone.js' : ' · Web Audio';
   // S'ha de cridar directament des del clic: els navegadors només deixen
   // engegar l'àudio dins d'un gest de l'usuari.
@@ -403,7 +404,7 @@
     buffer.getChannelData(0).set(data[0]); buffer.getChannelData(1).set(data[1]);
     return buffer;
   }
-  async function startBuffer(data, token) {
+  async function startBuffer(data, token, fromSeconds = 0) {
     const ended = () => { if (token === playToken) { stop(); render(); } };
     if (tone) {
       try {
@@ -411,8 +412,8 @@
         if (raw.state !== 'running') throw new Error('Tone.js no està actiu');
         const player = new tone.Player(makeBuffer(raw, data)).toDestination();
         player.volume.value = -1.938; player.onstop = ended;
-        const startedAt = tone.now(); player.start(startedAt); tonePlayer = player;
-        return () => tone.now() - startedAt;
+        const startedAt = tone.now(); player.start(startedAt, fromSeconds); tonePlayer = player;
+        return () => fromSeconds + tone.now() - startedAt;
       } catch (error) { console.warn('Tone.js no ha pogut reproduir; es fa servir Web Audio.', error); tonePlayer = null; }
     }
     if (!context) throw new Error('Aquest navegador no admet Web Audio');
@@ -421,8 +422,8 @@
     source = context.createBufferSource(); source.buffer = makeBuffer(context, data);
     gainNode = context.createGain(); gainNode.gain.value = .8;
     source.connect(gainNode); gainNode.connect(context.destination); source.onended = ended;
-    const startedAt = context.currentTime; source.start();
-    return () => context.currentTime - startedAt;
+    const startedAt = context.currentTime; source.start(0, fromSeconds);
+    return () => fromSeconds + context.currentTime - startedAt;
   }
   function stop() {
     playToken++;
@@ -430,14 +431,15 @@
     if (tonePlayer) { const player = tonePlayer; tonePlayer = null; player.onstop = () => {}; try { player.stop(); } catch {} player.dispose(); }
     if (source) { source.onended = null; try { source.stop(); } catch {} source = null; }
     if (gainNode) { gainNode.disconnect(); gainNode = null; }
-    cancelAnimationFrame(animation); playing = null; document.body.classList.remove('playing');
+    cancelAnimationFrame(animation); playing = null; cueBar = 0; scrubBar = null; document.body.classList.remove('playing');
     $('song-progress').value = 0; $('playback-time').textContent = '00:00'; $('playhead').hidden = true;
   }
   async function play(kind) {
     const sec = current();
     if (playing && playing.kind === kind && (kind !== 'section' || playing.id === sec?.id)) { stop(); render(); return; }
     if (busy || !song.base.generated) return;
-    stop();
+    const requestedBar = cueBar;
+    stop(); cueBar = requestedBar;
     const token = playToken, unlocked = unlockAudio();
     setBusy(true);
     try {
@@ -446,8 +448,11 @@
       if (kind === 'section') { data = withVoice(await renderSpec(specFor(segmentOf(sec))), frameAt(sec.start)); startBar = sec.start; bars = sec.bars; }
       else data = kind === 'base' ? await songAudio({ baseOnly: true }) : withVoice(await songAudio(), 0);
       if (token !== playToken) return;
-      const clock = await startBuffer(data, token);
-      playing = { kind, id: sec?.id, startBar, bars, startSeconds: secondsAt(startBar), seconds: data[0].length / RATE, clock };
+      const seconds = data[0].length / RATE, startSeconds = secondsAt(startBar);
+      const targetBar = kind === 'section' && (cueBar < startBar || cueBar >= startBar + bars) ? startBar : Math.max(startBar, cueBar);
+      const offset = Math.max(0, Math.min(seconds - .05, secondsAt(targetBar) - startSeconds));
+      const clock = await startBuffer(data, token, offset);
+      playing = { kind, id: sec?.id, startBar, bars, startSeconds, seconds, data, clock };
       document.body.classList.add('playing');
       runTick(token);
     } catch (error) {
@@ -460,11 +465,12 @@
   function runTick(token) {
     const tick = () => {
       if (!playing || token !== playToken) return;
+      if (scrubBar !== null) { animation = requestAnimationFrame(tick); return; }
       const elapsed = Math.min(playing.seconds, playing.clock()), bar = barAt(playing.startSeconds + elapsed);
-      $('song-progress').value = elapsed / playing.seconds; $('playback-time').textContent = time(elapsed);
-      $('playhead').hidden = bar > playing.startBar + playing.bars || bar < 0;
+      $('song-progress').value = Math.max(0, Math.min(1, secondsAt(bar) / songSeconds()));
+      $('playback-time').textContent = time(Math.max(0, secondsAt(bar)));
+      updatePlayhead(bar);
       $('tempo-badge').textContent = `♩ ${bpmAtBar(Math.max(0, Math.floor(bar)))} BPM`;
-      $('playhead').style.setProperty('--pos', String(Math.max(0, Math.min(1, bar / song.settings.bars))));
       const active = song.sections.find(s => bar >= s.start && bar < s.start + s.bars);
       $('transport-subtitle').textContent = playing.kind === 'record' ? `● Gravant · ${active ? sectionLabel(active) : 'base'}`
         : playing.kind === 'base' ? 'Escoltant · base musical'
@@ -478,6 +484,81 @@
       animation = requestAnimationFrame(tick);
     };
     tick();
+  }
+
+
+  // La barra vertical i el regulador inferior comparteixen la mateixa posició.
+  function updatePlayhead(bar) {
+    const bounded = Math.max(0, Math.min(song.settings.bars, bar));
+    const head = $('playhead');
+    head.style.setProperty('--pos', String(bounded / song.settings.bars));
+    head.hidden = !song.base.generated;
+    head.setAttribute('aria-valuemax', String(Math.round(songSeconds())));
+    head.setAttribute('aria-valuenow', String(Math.round(secondsAt(bounded))));
+    head.setAttribute('aria-valuetext', time(secondsAt(bounded)));
+  }
+  function showSeekPreview(bar) {
+    scrubBar = cueBar = Math.max(0, Math.min(song.settings.bars - .01, bar));
+    updatePlayhead(scrubBar);
+    $('song-progress').value = Math.max(0, Math.min(1, secondsAt(scrubBar) / songSeconds()));
+    $('playback-time').textContent = time(secondsAt(scrubBar));
+  }
+  function barFromPointer(event) {
+    const rect = $('line-ruler').getBoundingClientRect();
+    return Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * song.settings.bars;
+  }
+  // Quan ja sona, reutilitza el buffer perquè arrossegar el capçal sigui instantani.
+  // Si sortim d'una secció reproduïda individualment, passem a la cançó completa.
+  async function seekToBar(bar) {
+    if (busy || recording || !song.base.generated) return;
+    const target = Math.max(0, Math.min(song.settings.bars - .01, bar));
+    const previous = playing, inside = previous?.kind !== 'section'
+      || target >= previous.startBar && target < previous.startBar + previous.bars;
+    const reusable = previous && previous.kind !== 'record' && inside && previous.data;
+    stop(); cueBar = target;
+    if (!reusable) {
+      render();
+      if (previous && previous.kind !== 'record') play(previous.kind === 'section' ? 'song' : previous.kind);
+      return;
+    }
+    const token = playToken;
+    const unlocked = unlockAudio();
+    try {
+      await unlocked;
+      if (token !== playToken) return;
+      const offset = Math.max(0, Math.min(previous.seconds - .05, secondsAt(target) - previous.startSeconds));
+      const clock = await startBuffer(previous.data, token, offset);
+      if (token !== playToken) return;
+      playing = { ...previous, clock };
+      document.body.classList.add('playing');
+      render(); runTick(token);
+    } catch (error) {
+      audioError(error); stop(); render(); notify(`No s’ha pogut anar a aquest punt: ${reasonOf(error)}`);
+    }
+  }
+
+  // El botó M modifica només l'instrument i la secció corresponents.
+  function timelineMuteButton(sec, name) {
+    const muted = (sec.mute || []).includes(name);
+    const button = document.createElement('button'); button.type = 'button';
+    button.className = `track-mute${muted ? ' is-muted' : ''}`;
+    button.textContent = 'M'; button.setAttribute('aria-pressed', String(muted));
+    button.setAttribute('aria-label', `${muted ? 'Activa' : 'Silencia'} ${INSTRUMENTS[name]} a ${sectionLabel(sec)}`);
+    button.title = `${muted ? 'Torna a activar' : 'Silencia'} ${INSTRUMENTS[name]} només a ${sectionLabel(sec)}`;
+    button.disabled = busy || !!recording;
+    button.addEventListener('pointerdown', event => event.stopPropagation());
+    button.addEventListener('keydown', event => event.stopPropagation());
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      if (busy || recording) return;
+      const kind = playing?.kind;
+      const at = playing ? barAt(playing.startSeconds + playing.clock()) : cueBar;
+      setMute(sec, name, !muted);
+      stop(); cueBar = Math.max(0, Math.min(song.settings.bars - .01, at));
+      save(); render();
+      if (kind === 'song' || kind === 'section' || kind === 'base') play(kind);
+    });
+    return button;
   }
 
   // ── La teva veu ─────────────────────────────────────────────────────
@@ -1106,6 +1187,7 @@
         block.className = `line-base ready piece${muted ? ' muted' : ''}${note && !muted ? ' own' : ''}${sec.id === selected && selectedBase === name ? ' selected' : ''}${busy ? ' disabled' : ''}`;
         block.style.left = pct(seg.start); block.style.width = pct(seg.bars);
         block.textContent = note;
+        block.append(timelineMuteButton(sec, name));
         block.setAttribute('aria-label', `${INSTRUMENTS[name]} a ${sectionLabel(sec)}${note ? `: ${note}` : ''}. Toca per triar-lo.`);
         const pick = () => {
           if (busy) return;
@@ -1281,6 +1363,18 @@
         handles(element); bindDrag(element, 'clip', clip);
         lane.append(element);
       }
+      // Botons M superposats al tram real de cada instrument i secció.
+      for (const sec of song.sections) for (const clip of song.clips) {
+        if (clip.instrument !== name || !clip.generated || !overlaps(clip, sec)) continue;
+        const from = Math.max(clip.start, sec.start), to = Math.min(endOf(clip), endOf(sec));
+        if ((sec.mute || []).includes(name)) {
+          const overlay = document.createElement('span'); overlay.className = 'line-muted-range';
+          overlay.style.left = pct(from); overlay.style.width = pct(to - from); lane.append(overlay);
+        }
+        const mute = timelineMuteButton(sec, name);
+        mute.classList.add('on-layer'); mute.style.left = pct((from + to) / 2);
+        lane.append(mute);
+      }
       lane.addEventListener('click', event => {
         if (busy || event.target !== lane) return;
         const rect = lane.getBoundingClientRect(), bar = clamp(Math.floor((event.clientX - rect.left) / rect.width * total), 0, total - 1);
@@ -1295,6 +1389,7 @@
       : song.sections.length ? 'Arrossega una secció per moure-la o reordenar-la, i estira-la per les vores. Els instruments també es poden moure i estirar.'
       : 'Fes clic a la fila «Seccions» on vulguis que comenci la primera secció.';
     renderLineActions(); applyZoom(false);
+    updatePlayhead(scrubBar ?? (playing ? barAt(playing.startSeconds + playing.clock()) : cueBar));
   }
   function renderSection() {
     const sec = current(), editor = $('section-editor');
@@ -1466,7 +1561,7 @@
   function setMute(sec, name, muted) {
     const next = new Set(sec.mute || []);
     if (muted) next.add(name); else next.delete(name);
-    if (next.size) sec.mute = BASE_CHOICES.filter(n => next.has(n)); else delete sec.mute;
+    if (next.size) sec.mute = Object.keys(INSTRUMENTS).filter(n => next.has(n)); else delete sec.mute;
   }
   function renderVolumes(sec) {
     const list = $('section-volumes'); list.replaceChildren();
@@ -1569,7 +1664,9 @@
     if (!playing) {
       $('transport-subtitle').textContent = !song.base.generated ? 'Comença generant la base' : generatedLayers ? 'Escolta com creix la cançó' : 'Marca seccions i afegeix-hi instruments';
       $('playback-duration').textContent = time(total); $('play-song').textContent = '▶';
-    } else { $('playback-duration').textContent = time(playing.seconds); $('play-song').textContent = playing.kind === 'song' ? '■' : '▶'; }
+      $('song-progress').value = Math.max(0, Math.min(1, secondsAt(cueBar) / total));
+      $('playback-time').textContent = time(secondsAt(cueBar));
+    } else { $('playback-duration').textContent = time(total); $('play-song').textContent = playing.kind === 'song' ? '■' : '▶'; }
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
@@ -1580,6 +1677,7 @@
     for (const key of ['play-base', 'play-song', 'download-song', 'play-section', 'play-song-inline']) $(key).disabled = busy || !ready;
     $('add-section').disabled = busy || !ready;
     $('stop-playback').disabled = !playing;
+    $('song-progress').disabled = busy || !ready || !!recording;
     document.body.classList.toggle('busy', busy);
     renderTabs(); renderVoice();
     if ($('library-list').childElementCount || readLibrary().length) renderLibrary();
@@ -1733,6 +1831,39 @@
     .forEach(key => $(key).addEventListener('change', changeSettings));
   $('song-humanize').addEventListener('input', event => { const v = Number(event.target.value); $('song-humanize-value').textContent = v ? `${v} %` : 'quantitzat'; });
   $('song-swing').addEventListener('input', event => { $('song-swing-value').textContent = `${event.target.value} %`; });
+
+  // Clic al regle, arrossegament del capçal o regulador inferior.
+  $('line-ruler').addEventListener('click', event => seekToBar(barFromPointer(event)));
+  const head = $('playhead'); let draggingHead = false;
+  head.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || busy || recording || !song.base.generated) return;
+    event.preventDefault(); event.stopPropagation();
+    draggingHead = true; head.setPointerCapture(event.pointerId);
+    showSeekPreview(barFromPointer(event));
+  });
+  head.addEventListener('pointermove', event => {
+    if (draggingHead) { event.preventDefault(); showSeekPreview(barFromPointer(event)); }
+  });
+  head.addEventListener('pointerup', event => {
+    if (!draggingHead) return;
+    draggingHead = false; const target = barFromPointer(event); scrubBar = null; seekToBar(target);
+  });
+  head.addEventListener('pointercancel', () => {
+    draggingHead = false; scrubBar = null; updatePlayhead(playing ? barAt(playing.startSeconds + playing.clock()) : cueBar);
+  });
+  head.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const currentBar = playing ? barAt(playing.startSeconds + playing.clock()) : cueBar;
+    seekToBar(event.key === 'Home' ? 0 : event.key === 'End' ? song.settings.bars - .01
+      : currentBar + (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 4 : 1));
+  });
+  $('song-progress').addEventListener('input', event => showSeekPreview(barAt(Number(event.target.value) * songSeconds())));
+  $('song-progress').addEventListener('change', event => {
+    const target = scrubBar ?? barAt(Number(event.target.value) * songSeconds());
+    scrubBar = null; seekToBar(target);
+  });
+
   $('zoom-in').addEventListener('click', () => stepZoom(1));
   $('zoom-out').addEventListener('click', () => stepZoom(-1));
   $('zoom-fit').addEventListener('click', () => setZoom('fit'));

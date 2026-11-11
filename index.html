@@ -96,14 +96,14 @@
         <button type="button" class="icon-button" id="zoom-out" aria-label="Allunya la línia">−</button>
         <button type="button" class="icon-button" id="zoom-in" aria-label="Apropa la línia">＋</button>
         <button type="button" class="text-button" id="zoom-fit">↔ Tota la cançó</button>
-        <span id="zoom-label" class="zoom-label"></span>
+        <span id="zoom-label" class="zoom-label"></span><span class="zoom-label">Arrossega la barra rosa per canviar de punt · M = silencia</span>
       </div>
       <div class="line-scroll" id="line-scroll"><div class="line" id="line">
         <div class="line-row ruler"><span class="line-label">Compàs</span><div class="line-track" id="line-ruler"></div></div>
         <div class="line-row"><span class="line-label">Seccions</span><div class="line-track sections" id="section-track" title="Fes clic per marcar una secció"></div></div>
         <div id="base-rows"></div>
         <div id="layer-rows"></div>
-        <i class="playhead" id="playhead" hidden></i>
+        <button type="button" class="playhead" id="playhead" role="slider" aria-label="Posició de reproducció de la cançó. Arrossega per anar a un altre punt" aria-valuemin="0" aria-valuemax="360" aria-valuenow="0" aria-valuetext="00:00" hidden></button>
       </div></div>
       <div class="line-actions" id="line-actions" role="toolbar" aria-label="Accions de l’element triat a la línia" hidden></div>
       <div class="variety-bar"><button type="button" id="add-variety" class="button primary">✦ Dona-li varietat</button><span>Canvis de tempo, pujada de to a l’última tornada i un altre ritme de bateria en alguna secció.</span><button type="button" id="clear-variety" class="text-button" hidden>↶ Treu la varietat</button></div>
@@ -168,7 +168,7 @@
     </section>
     <div class="bottom-notes" data-panel="song"><span><span class="live-dot"></span> Es desa automàticament en aquest navegador</span><button class="text-button" id="export-project">↓ Desa el projecte</button><label class="text-button import-label" for="import-project">↑ Obre un projecte<input type="file" id="import-project" accept=".json,application/json" hidden></label></div>
   </main>
-  <footer class="transport" aria-label="Reproductor de la cançó"><div class="transport-content"><button id="play-song" class="transport-play" aria-label="Escoltar la cançó completa" disabled>▶</button><div class="transport-title"><span class="title-line"><strong id="transport-title">Nova cançó</strong><span class="tempo-badge" id="tempo-badge">♩ 128 BPM</span></span><span id="transport-subtitle">Comença generant la base</span></div><div class="transport-progress"><div class="progress-label"><span id="playback-time">00:00</span><span id="ready-count">Genera la base per començar</span><span id="playback-duration">01:51</span></div><progress id="song-progress" value="0" max="1" aria-label="Progrés de reproducció"></progress></div><button id="stop-playback" class="icon-button" aria-label="Aturar reproducció" disabled>■</button><button id="download-song" class="button download" disabled aria-label="Exporta la cançó en WAV">↓ <span class="download-label">Exporta WAV</span></button></div></footer>
+  <footer class="transport" aria-label="Reproductor de la cançó"><div class="transport-content"><button id="play-song" class="transport-play" aria-label="Escoltar la cançó completa" disabled>▶</button><div class="transport-title"><span class="title-line"><strong id="transport-title">Nova cançó</strong><span class="tempo-badge" id="tempo-badge">♩ 128 BPM</span></span><span id="transport-subtitle">Comença generant la base</span></div><div class="transport-progress"><div class="progress-label"><span id="playback-time">00:00</span><span id="ready-count">Genera la base per començar</span><span id="playback-duration">01:51</span></div><input type="range" id="song-progress" min="0" max="1" step="0.0001" value="0" aria-label="Tria el punt de reproducció de la cançó" disabled></div><button id="stop-playback" class="icon-button" aria-label="Aturar reproducció" disabled>■</button><button id="download-song" class="button download" disabled aria-label="Exporta la cançó en WAV">↓ <span class="download-label">Exporta WAV</span></button></div></footer>
   <nav class="tabbar" aria-label="Passos de la cançó">
     <button type="button" class="tab" data-tab="song"><span class="tab-icon" aria-hidden="true">♪</span><span>Cançó</span></button>
     <button type="button" class="tab" data-tab="base"><span class="tab-icon" aria-hidden="true">◉</span><span>Base</span><i class="tab-badge" id="tab-base"></i></button>

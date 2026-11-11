@@ -211,7 +211,17 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 14px 24px; display: grid
 .line-section:hover .handle::after, .line-clip:hover .handle::after, .selected .handle::after, .dragging .handle::after { opacity: .55; }
 .dragging { cursor: grabbing; z-index: 6; box-shadow: 0 10px 24px #00000040; opacity: .95; }
 .dragging::after { content: attr(data-hint); position: absolute; right: 6px; bottom: 3px; font-size: 11px; font-weight: 800; color: var(--text); background: var(--surface); border-radius: 5px; padding: 0 5px; white-space: nowrap; }
-.playhead { position: absolute; top: 0; bottom: 0; left: calc(var(--label) + (100% - var(--label) - 10px) * var(--pos, 0)); width: 3px; border-radius: 2px; background: var(--pink); box-shadow: 0 0 10px var(--pink); pointer-events: none; z-index: 7; }
+.playhead { position: absolute; top: 0; bottom: 0; left: calc(var(--label) + (100% - var(--label) - 10px) * var(--pos, 0)); width: 20px; margin-left: -10px; padding: 0; background: transparent; border: 0; cursor: ew-resize; touch-action: none; z-index: 7; }
+.playhead::before { content: ''; position: absolute; top: 0; bottom: 0; left: 9px; width: 3px; border-radius: 2px; background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+.playhead::after { content: ''; position: absolute; top: 0; left: 4px; width: 13px; height: 13px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 0 2px var(--surface); }
+.playhead:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.track-mute { position: absolute; z-index: 5; right: 2px; top: 50%; transform: translateY(-50%); width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--text); font-size: 12px; font-weight: 800; line-height: 1; font-family: inherit; cursor: pointer; }
+.track-mute:hover, .track-mute:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.track-mute.is-muted { background: #ad2447; color: #fff; border-color: #ad2447; }
+.track-mute:disabled { opacity: .5; cursor: not-allowed; }
+.track-mute.on-layer { right: auto; transform: translate(-50%, -50%); }
+.line-muted-range { position: absolute; top: 2px; bottom: 2px; border-radius: 6px; background: repeating-linear-gradient(-45deg, #0a090a66 0 5px, #77777755 5px 10px); pointer-events: none; z-index: 3; }
+.line-base.piece { padding-right: 30px; }
 @media (pointer: coarse) {
   .handle { width: 22px; } .handle.left { left: -6px; } .handle.right { right: -6px; }
   .handle::after { opacity: .45; left: 9px; }
@@ -262,6 +272,13 @@ progress { width: 100%; height: 6px; border: 0; border-radius: 3px; overflow: hi
 progress::-webkit-progress-bar { background: var(--surface-3); }
 progress::-webkit-progress-value { background: linear-gradient(90deg, var(--teal), var(--pink)); }
 progress::-moz-progress-bar { background: linear-gradient(90deg, var(--teal), var(--pink)); }
+#song-progress { display: block; width: 100%; height: 18px; margin: 0; padding: 0; border: 0; border-radius: 9px; background: transparent; appearance: none; -webkit-appearance: none; cursor: ew-resize; }
+#song-progress::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--surface-3); }
+#song-progress::-moz-range-track { height: 6px; border-radius: 3px; background: var(--surface-3); }
+#song-progress::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; margin-top: -5.5px; border: 2px solid var(--surface); border-radius: 50%; background: var(--pink); box-shadow: 0 0 0 1px var(--line-strong); }
+#song-progress::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid var(--surface); border-radius: 50%; background: var(--pink); }
+#song-progress:disabled { opacity: .55; cursor: not-allowed; }
+#song-progress:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
 
 /* ── Pestanyes (mòbil) ───────────────────────────────────────────── */
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 26; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
@@ -461,6 +478,7 @@ body.recording .transport-play { background: #ef4444; }
 .line-base.piece.muted { background: repeating-linear-gradient(-45deg, var(--surface) 0 5px, var(--surface-3) 5px 10px); color: var(--faint); border: 1.5px dashed var(--line-strong); font-style: italic; }
 .line-base.piece.selected { box-shadow: 0 0 0 3px var(--text); z-index: 2; }
 .line-base.piece.disabled { pointer-events: none; opacity: .6; }
+.line-base.piece:has(.track-mute) { padding-right: 30px; }
 .base-lane .line-label { font-weight: 600; }
 .line-actions { position: sticky; bottom: calc(var(--dock, 150px) + 8px); z-index: 8; scroll-margin-bottom: calc(var(--dock, 150px) + 16px); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding: 10px;
   border-radius: 14px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: 0 8px 24px #00000026; }
@@ -526,7 +544,7 @@ body.recording .transport-play { background: #ef4444; }
   .transport-content { position: relative; grid-template-columns: auto minmax(0, 1fr) auto auto auto; grid-template-areas: "play title time stop download"; gap: 8px; padding: 8px 10px 6px; }
   .transport-play { width: 44px; height: 44px; font-size: 16px; }
   .transport-progress { display: contents; }
-  .transport-progress progress { position: absolute; left: 0; right: 0; top: 0; height: 4px; border-radius: 0; }
+  .transport-progress #song-progress { position: absolute; left: 0; right: 0; top: -7px; height: 20px; border-radius: 0; }
   .progress-label { grid-area: time; flex-direction: column; align-items: flex-end; gap: 0; font-size: 11px; line-height: 1.25; }
   .transport .icon-button, .transport .download { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
   .transport-title .title-line { min-width: 0; overflow: hidden; }
