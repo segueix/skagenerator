@@ -295,6 +295,22 @@ L’efecte **«Horror punk (estil Misfits)»** imita el so de guitarra dels prim
 
 Amb aquest efecte, la guitarra principal també toca a la manera del grup: acords de quinta (fonamental, quinta i octava) **tot a cops avall en corxeres**, **apagats amb el palmell a les estrofes** i **oberts a les tornades**, amb **dues guitarres iguals a esquerra i dreta**. La guitarra entra neta a l’«amplificador» perquè no es distorsioni dues vegades. Per sonar com ells: estil Punk, 160–200 BPM.
 
+## Cançó a partir d’una lletra
+
+Al panell de cançó automàtica, **«✍ Lletra (opcional)»** permet enganxar la lletra abans de crear la cançó.
+
+**Reconeixement de les seccions:**
+- Per títols: «Estrofa 2», «Tornada:», «[Chorus]», «Pretornada», «Pont», «Intro», «Final»… (també en castellà i en anglès).
+- Si no n’hi ha, per la forma: l’estrofa que es repeteix és la tornada, i un grup repetit que va just abans de la tornada és la pretornada. Una estrofa única entre les dues últimes tornades és el pont, si hi ha tres tornades o més, o si fa una altra llargada que les estrofes. Una estrofa curta abans de la tornada és la pretornada.
+- Un títol de tornada sense text la repeteix, i «Tornada x2» la repeteix dues vegades.
+- La llista mostra cada secció reconeguda amb els versos i les síl·labes, i el tipus es pot corregir abans de crear.
+
+**Com es crea la cançó:**
+- Cada estrofa és una secció amb la seva lletra, i cada vers és una frase de la melodia de veu, amb una nota per síl·laba i les tòniques a temps.
+- Les seccions d’una mateixa mena fan la mateixa llargada: 2 compassos per vers, o 4 si algun vers passa d’11 síl·labes.
+- S’hi afegeixen intro i final. El títol és el primer vers de la tornada.
+- Si la lletra és curta per a la durada triada, els versos passen a ocupar 4 compassos (frases amples) i s’hi afegeixen un instrumental, una tornada final repetida i una intro més llarga.
+
 ## Esquema per escriure la lletra
 
 Amb la cançó generada, **«📋 Copia l’esquema de la lletra»** (pas 2) copia al porta-retalls quants versos ha de tenir cada secció i quantes síl·labes cada vers. **«Baixa’l en .txt»** en baixa el mateix text. Com es calcula:

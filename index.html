@@ -30,6 +30,12 @@
         <label class="check-row"><input type="checkbox" id="auto-vocal" checked> <span>Amb melodia de veu</span></label>
         <label class="check-row"><input type="checkbox" id="auto-vary" checked> <span>Estructura diferent de les últimes cançons</span></label>
       </div>
+      <details class="auto-lyrics" id="auto-lyrics-panel">
+        <summary><strong>✍ Lletra (opcional)</strong> <span>Enganxa-la i la cançó es farà a la seva mida</span></summary>
+        <p class="hint">Separa les estrofes amb una línia en blanc. Pots posar-hi títols («Estrofa», «Tornada», «Pretornada», «Pont», «[Chorus]»…); si no, el taller les reconeix: l’estrofa que es repeteix és la tornada. Un títol de tornada sense text (o «Tornada x2») la repeteix.</p>
+        <textarea id="auto-lyrics" rows="8" placeholder="Baixo pel carrer amb sabates de xarol&#10;la ciutat fa olor de mar i de cafè&#10;&#10;Rude boys del Raval&#10;ballant a contratemps"></textarea>
+        <ol id="auto-lyrics-preview" class="lyrics-preview" aria-label="Seccions reconegudes a la lletra"></ol>
+      </details>
       <p class="step-copy" id="auto-description"></p>
       <button type="button" id="auto-create" class="button primary">✦ Crea la cançó</button>
     </section>

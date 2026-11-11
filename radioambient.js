@@ -2219,11 +2219,12 @@
     // frases amb pauses i una tornada amb un motiu que es repeteix. Registre
     // cantable, salts curts, notes de l'acord als temps forts i final de frase
     // en una nota estable.
-    function composeVocal(r, chords, bars, type, scalePcs, syllables, register, stress, repeats) {
+    function composeVocal(r, chords, bars, type, scalePcs, syllables, register, stress, repeats, wide) {
         const shift = register * 5, lo = 57 + shift, hi = 74 + shift;
         const center = (type === 'chorus' ? 67 : type === 'prechorus' ? 66 : type === 'verse' ? 63 : 64) + shift;
         const notes = [], lyrics = Array.isArray(syllables) && syllables.length > 0;
-        const longest = lyrics ? Math.max(...syllables) : 0, phraseBars = longest > 11 && bars >= 4 ? 4 : 2;
+        // Frases de 2 compassos; de 4 si algun vers és llarg o si la secció demana frases amples (lletra curta).
+        const longest = lyrics ? Math.max(...syllables) : 0, phraseBars = (longest > 11 || wide) && bars >= 4 ? 4 : 2;
         const base = Math.floor(r() * 4294967296);
         const rhythmFor = (count, span, accents, pr) => {
             const firstStressed = accents && accents[0] === 0;
@@ -2375,6 +2376,7 @@
         if (part.repeats !== undefined && (!Array.isArray(part.repeats) || part.repeats.length > 32
             || part.repeats.some((j, i) => !Number.isInteger(j) || j < -1 || j >= i))) throw new Error('Versos repetits no vàlids');
         if (part.register !== undefined && ![-1, 0, 1].includes(part.register)) throw new Error('Registre de la veu no vàlid');
+        if (part.phraseBars !== undefined && ![2, 4].includes(part.phraseBars)) throw new Error('Llargada de frase no vàlida');
         const instruments = part.instruments === undefined ? (settings.instruments === undefined ? style.instruments : settings.instruments) : part.instruments;
         // Una secció pot quedar sense cap instrument (p. ex. tota la base silenciada): sona en silenci.
         if (!Array.isArray(instruments) || new Set(instruments).size !== instruments.length
@@ -2515,7 +2517,7 @@
             layerIndex[name] = (rev - 1) % 5;
             if (name === 'vocal') {
                 const vr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
-                lines.vocal = composeVocal(vr, chords, bars, part.type, ctx.scalePcs, part.syllables, part.register || 0, part.stress, part.repeats);
+                lines.vocal = composeVocal(vr, chords, bars, part.type, ctx.scalePcs, part.syllables, part.register || 0, part.stress, part.repeats, part.phraseBars === 4);
                 return;
             }
             if (!['trumpet', 'trombone', 'synthLead', 'sax'].includes(name)) return;

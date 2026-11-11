@@ -373,3 +373,58 @@ test('esquema de la lletra: versos, síl·labes i tòniques de cada secció a pa
   // Les frases es tallen pels silencis de la melodia.
   assert.deepEqual(builder.phrasesOf([[0, 0, 60, 1], [0, 1, 62, 1], [0, 3, 64, 1], [1, 0, 65, 1]]).map(p => p.length), [2, 2]);
 });
+
+test('lletra enganxada: reconeix les seccions i fa la cançó a la mida dels versos', () => {
+  const chorus = 'Rude boys del Raval\nballant a contratemps\nrude boys del Raval\nningú no ens atura avui';
+  const pre = 'Puja el volum\ntothom a la pista';
+  const plain = ['Baixo pel carrer amb sabates de xarol\nla ciutat fa olor de mar i de cafè\nel bus de nit ja no passa pel barri\nperò el ritme m’empeny endavant',
+    pre, chorus, 'La mare em diu que torni aviat\nperò la banda encara no ha acabat\nel trombó riu i la trompeta crida\ni jo segueixo el baix fins a l’alba',
+    pre, chorus, 'Quan s’apaguen els llums\nencara sentim el ritme', chorus].join('\n\n');
+  assert.deepEqual(builder.parseLyricsSheet(plain).map(s => s.type), ['verse', 'prechorus', 'chorus', 'verse', 'prechorus', 'chorus', 'bridge', 'chorus']);
+  // Amb títols (també en anglès), tornada sense text i «x2».
+  const labelled = '[Estrofa 1]\nCendres al terrat\nsirenes a mitjanit\n\nTornada:\nNo tornarem a casa\nfins que caigui el sol\n\nVerse 2\nVidres al metro\ncrits contra el vent\n\n[Chorus]\n\nPont\nRes no s’acaba avui\n\nTornada x2';
+  const sheet = builder.parseLyricsSheet(labelled);
+  assert.deepEqual(sheet.map(s => s.type), ['verse', 'chorus', 'verse', 'chorus', 'bridge', 'chorus', 'chorus']);
+  assert.equal(sheet[3].text, 'No tornarem a casa\nfins que caigui el sol');
+  // La cançó: una secció per estrofa, amb la lletra, la melodia de veu i una nota per síl·laba.
+  for (const key of ['twotone', 'punk77']) {
+    const stanzas = builder.parseLyricsSheet(plain);
+    const song = builder.createAutoSong(engine, key, { seed: 5, lyrics: stanzas, vocal: false });
+    const sung = song.sections.filter(s => s.lyrics);
+    // Totes les estrofes de la lletra, en ordre (de vegades amb la tornada final repetida).
+    assert.deepEqual(sung.map(s => s.type).slice(0, stanzas.length), stanzas.map(s => s.type));
+    assert(sung.slice(stanzas.length).every(s => s.type === 'chorus'));
+    assert.equal(song.title, 'Rude boys del Raval');
+    assert.equal(song.sections[0].type, 'intro'); assert.equal(song.sections.at(-1).type, 'outro');
+    for (const sec of sung) {
+      const voice = song.clips.find(c => c.instrument === 'vocal' && c.start === sec.start);
+      assert(voice, `${key}: veu a ${sec.type}`);
+      const info = engine.analyzeLyrics(sec.lyrics), h = song.harmony[sec.type] || 1;
+      const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: h, instruments: ['vocal'], layers: { vocal: voice.revision }, ...info };
+      if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
+      for (const f of ['bpm', 'transpose', 'feel']) if (sec[f] !== undefined) part[f] = sec[f];
+      const notes = engine.composeSongPart(song.settings, part).lines.vocal;
+      assert.equal(notes.length, info.syllables.reduce((t, n) => t + n, 0), `${key}: una nota per síl·laba a ${sec.type}`);
+    }
+    // Totes les tornades fan la mateixa llargada.
+    assert.equal(new Set(song.sections.filter(s => s.type === 'chorus').map(s => s.bars)).size, 1);
+  }
+});
+
+test('lletra curta: frases amples i seccions afegides per acostar-se a la durada triada', () => {
+  const text = 'Cendres al terrat\nsirenes a mitjanit\n\nNo tornarem a casa\nfins que caigui el sol\n\nVidres al metro\ncrits contra el vent\n\nNo tornarem a casa\nfins que caigui el sol';
+  const seconds = s => s.sections.reduce((t, x) => t + x.bars * 240 / (x.bpm || s.settings.bpm), 0);
+  const short = builder.createAutoSong(engine, 'punk77', { seed: 2, minutes: 2, lyrics: builder.parseLyricsSheet(text) });
+  const long = builder.createAutoSong(engine, 'punk77', { seed: 2, minutes: 3, lyrics: builder.parseLyricsSheet(text) });
+  assert.deepEqual(builder.parseLyricsSheet(text).map(s => s.type), ['verse', 'chorus', 'verse', 'chorus'], 'amb dues tornades, l’estrofa del mig no és un pont');
+  assert(seconds(long) >= seconds(short) && seconds(long) > 70, `${seconds(long).toFixed(0)} s`);
+  assert(long.sections.some(s => s.type === 'solo'), 'instrumental afegit');
+  assert(long.sections.some(s => s.phraseBars === 4), 'frases de 4 compassos');
+  // Amb frases amples, cada vers ocupa 4 compassos (una frase per vers).
+  const verse = long.sections.find(s => s.type === 'verse' && s.phraseBars === 4), voice = long.clips.find(c => c.instrument === 'vocal' && c.start === verse.start);
+  const h = long.harmony.verse || 1;
+  const notes = engine.composeSongPart(long.settings, { type: 'verse', bars: verse.bars, energy: 60, revision: h, variantIndex: (h - 1) % 5, instruments: ['vocal'],
+    layers: { vocal: voice.revision }, phraseBars: 4, ...engine.analyzeLyrics(verse.lyrics) }).lines.vocal;
+  assert(notes.filter(n => n[0] < 4).length === engine.analyzeLyrics(verse.lyrics).syllables[0], 'el primer vers ocupa els 4 primers compassos');
+  assert.throws(() => engine.composeSongPart(long.settings, { type: 'verse', bars: 8, energy: 60, revision: 1, instruments: ['vocal'], layers: { vocal: 1 }, phraseBars: 3 }), /frase/);
+});
