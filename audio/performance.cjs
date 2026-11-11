@@ -46,8 +46,10 @@ function createPerformance(spec) {
   const patch = (channel, [bank, program], pan, volume) => ({ channel, bank, program, pan, volume });
   // Amb un efecte de guany alt, la guitarra entra neta a l'«amplificador» (com una
   // guitarra real a un pedal): no es distorsiona dues vegades.
-  const amped = name => ['crunch', 'overdrive', 'distortion', 'metal', 'fuzz', 'horrorpunk'].includes(spec.fx?.[name]?.type);
-  const misfits = spec.fx?.guitar?.type === 'horrorpunk';
+  // Totes les variants d'horror punk (horrorpunk, horrorpunkB…) toquen a l'estil Misfits.
+  const isHorror = type => typeof type === 'string' && type.startsWith('horrorpunk');
+  const amped = name => ['crunch', 'overdrive', 'distortion', 'metal', 'fuzz'].includes(spec.fx?.[name]?.type) || isHorror(spec.fx?.[name]?.type);
+  const misfits = isHorror(spec.fx?.guitar?.type);
   const realBrass = { 3: !chosen('trumpet'), 4: spec.timbres?.trombone === 'vsco' };
   const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [

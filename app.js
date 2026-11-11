@@ -1028,8 +1028,8 @@
     else if (id === 'song-guitar-fx') {
       const type = event.target.value;
       if (type === 'none') delete st.fx;
-      else { const setting = { type, drive: type === 'horrorpunk' ? 70 : 60, tone: type === 'horrorpunk' ? 60 : 50 }; st.fx = { guitar: setting, guitar2: { ...setting }, guitar3: { ...setting } }; }
-      if (type === 'horrorpunk') notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
+      else { const horror = type.startsWith('horrorpunk'), setting = { type, drive: horror ? 70 : 60, tone: horror ? 60 : 50 }; st.fx = { guitar: setting, guitar2: { ...setting }, guitar3: { ...setting } }; }
+      if (type.startsWith('horrorpunk')) notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
         : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
     }
     const replay = id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize'].includes(id) ? playing?.kind : null;

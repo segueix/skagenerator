@@ -78,9 +78,26 @@ const FX = {
   // amb un punt de fuzz (part rectificada que fa brunzir), mitjos plens (sense el
   // buit del metal), greus ajustats i presència a 2,5 kHz per tallar la mescla.
   horrorpunk: { gain: [40, 58], curve: x => { const soft = Math.tanh(x * 1.2), hard = Math.max(-.8, Math.min(.8, x)); return .6 * soft + .4 * hard + .08 * Math.abs(soft); },
-    tight: 140, mid: 5, scoop: 0, presence: 4, cab: 5200 }
+    tight: 140, mid: 5, scoop: 0, presence: 4, cab: 5200 },
+  // Quatre variants ajustades a una gravació de referència d'horror punk (guitarres
+  // fosques i gruixudes, poca presència a 2 kHz i brunzit a 3,5-6 kHz). Comparant
+  // l'espectre de la banda (bateria, baix i guitarres) amb la referència, l'efecte
+  // original quedava a 3,0 dB de mitjana; aquestes, entre 1,3 i 2,2 dB.
+  // A: la més fidel a l'espectre de la referència.
+  horrorpunkFidel: { gain: [40, 58], curve: x => { const soft = Math.tanh(x * 1.2), hard = Math.max(-.8, Math.min(.8, x)); return .6 * soft + .4 * hard + .08 * Math.abs(soft); },
+    tight: 140, mid: 8, scoop: 0, presence: -5, presenceHz: 1900, fizz: [3400, 5], cab: 5600, level: 4 },
+  // B: fuzz retallat amb part rectificada, brunzidor i agressiu.
+  horrorpunkFuzz: { gain: [48, 66], curve: x => { const h = Math.max(-.6, Math.min(.6, x * 1.1)); return h * .85 + Math.abs(Math.tanh(x)) * .22; },
+    tight: 160, mid: 6, scoop: 0, presence: -3, presenceHz: 1900, fizz: [3800, 5], cab: 5800, level: 4 },
+  // C: doble saturació, paret de guitarres gruixuda i fosca.
+  horrorpunkGruixut: { gain: [44, 62], curve: x => Math.tanh(Math.tanh(x * 1.6) * 2.2) * .95,
+    tight: 90, mid: 7, scoop: 0, presence: -6, presenceHz: 1900, body: [230, 4], fizz: [3400, 3], cab: 4600, level: 4 },
+  // D: menys guany i més mitjos: garatge cru, s'hi senten més les notes.
+  horrorpunkGaratge: { gain: [28, 44], curve: x => x > 0 ? Math.tanh(x) : Math.tanh(x * .8) / .8 * .9,
+    tight: 150, mid: 10, scoop: 0, presence: -5, presenceHz: 1900, body: [900, 2], fizz: [3600, 7], cab: 6000, level: 4 }
 };
 export const GUITAR_FX_TYPES = Object.keys(FX);
+export const GUITAR_FX_DEFS = FX;
 export function createGuitarFx(fx, sampleRate) {
   const def = fx && FX[fx.type];
   if (!def) return null;
@@ -90,11 +107,14 @@ export function createGuitarFx(fx, sampleRate) {
   const side = () => ({
     tight: biquad('highpass', def.tight, 0, sampleRate, .7), mid: biquad('peak', 720, def.mid, sampleRate, .9),
     scoop: biquad('peak', 500, def.scoop, sampleRate, .7), low: biquad('highpass', 90, 0, sampleRate, .7),
-    presence: biquad('peak', 2500, def.presence || 0, sampleRate, .9),
+    presence: biquad('peak', def.presenceHz || 2500, def.presence || 0, sampleRate, .9),
+    // Cos (greus-mitjos després de la saturació) i brunzit (aguts després de la pantalla).
+    body: biquad('peak', def.body?.[0] || 220, def.body?.[1] || 0, sampleRate, .8),
+    fizz: biquad('high', def.fizz?.[0] || 4000, def.fizz?.[1] || 0, sampleRate),
     cab1: biquad('lowpass', cutoff, 0, sampleRate, .7), cab2: biquad('lowpass', cutoff * 1.15, 0, sampleRate, .6),
     last: 0, hold: 0, count: 0, inLevel: 1e-6, outLevel: 1e-6
   });
-  const sides = [side(), side()], smooth = Math.exp(-1 / (.06 * sampleRate));
+  const sides = [side(), side()], smooth = Math.exp(-1 / (.06 * sampleRate)), level = 10 ** ((def.level || 0) / 20);
   const bitStep = 2 / (2 ** (8 - drive * 4)), crushEvery = Math.max(1, Math.round(sampleRate / (8000 + tone * 14000)));
   return {
     reverb: def.gain[1] > 42 ? .3 : .6,
@@ -108,11 +128,12 @@ export function createGuitarFx(fx, sampleRate) {
         if (s.count++ % crushEvery === 0) s.hold = Math.round(y / bitStep) * bitStep;
         y = s.hold;
       }
-      y = run(s.cab2, run(s.cab1, run(s.low, run(s.presence, run(s.scoop, y)))));
+      y = run(s.cab2, run(s.cab1, run(s.low, run(s.presence, run(s.scoop, def.body ? run(s.body, y) : y)))));
+      if (def.fizz) y = run(s.fizz, y);
       // Nivell compensat: segueix la sonoritat de la guitarra sense efecte.
       s.inLevel = smooth * s.inLevel + (1 - smooth) * x * x;
       s.outLevel = smooth * s.outLevel + (1 - smooth) * y * y;
-      return y * Math.min(8, Math.sqrt(s.inLevel / s.outLevel));
+      return y * Math.min(8, Math.sqrt(s.inLevel / s.outLevel)) * level;
     }
   };
 }

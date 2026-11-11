@@ -1754,7 +1754,8 @@
     // Efectes de guitarra que aplica el motor de mostres (vegeu audio/render.mjs).
     const GUITAR_FX = { none: 'Net, sense efecte', boost: 'Boost net', tape: 'Saturació de cinta', crunch: 'Crunch',
         overdrive: 'Overdrive (pedal verd)', distortion: 'Distorsió', metal: 'Metal (guany alt)', fuzz: 'Fuzz', lofi: 'Lo-fi (8 bits)',
-        horrorpunk: 'Horror punk (estil Misfits)' };
+        horrorpunk: 'Horror punk (estil Misfits)', horrorpunkFidel: 'Horror punk A · fidel a la gravació', horrorpunkFuzz: 'Horror punk B · fuzz brunzidor',
+        horrorpunkGruixut: 'Horror punk C · serra gruixuda', horrorpunkGaratge: 'Horror punk D · garatge cru' };
     const GUITARS = ['guitar', 'guitar2', 'guitar3'];
     function checkFx(fx) {
         if (fx === undefined) return;
