@@ -37,8 +37,16 @@ test('els filtres de megàfon, telèfon, ràdio i similars processen només la v
     assert.equal(out.length, source.length, effect);
     assert(out.every(Number.isFinite), `mostres finites: ${effect}`);
     assert(out.every(x => Math.abs(x) <= 1), `sense saturació digital: ${effect}`);
-    if (effect !== 'clean') assert(Math.abs(strength(out) - strength(clean)) > .002,
-      `el preset ${effect} modifica efectivament el so`);
+    if (effect !== 'clean') {
+      // Cada preset té una resposta espectral: «càlida» afecta sobretot els
+      // greus, no necessàriament una nota a 1.200 Hz.
+      const differs = [140, 1200, 5200].some(hz => {
+        const input = tone(44100, .3, 44100, hz);
+        return Math.abs(strength(processVoice(input, { effect })) -
+          strength(processVoice(input, { effect: 'clean' }))) > .002;
+      });
+      assert(differs, `el preset ${effect} modifica efectivament el so`);
+    }
   }
   // Els filtres shelving són recursius: un signe erroni pot fer divergir
   // els greus/aguts al llarg d'una gravació encara que un clip curt funcioni.
