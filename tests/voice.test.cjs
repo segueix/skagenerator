@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { mixVoice, placeTake, levelTake, resampleLinear } = require('../audio-utils.js');
+const { mixVoice, processVoice, VOICE_EFFECTS, placeTake, levelTake, resampleLinear } = require('../audio-utils.js');
 
 const tone = (length, value = .5, rate = 44100, hz = 440) => Float32Array.from({ length }, (_, i) => value * Math.sin(2 * Math.PI * hz * i / rate));
 
@@ -26,6 +26,39 @@ test('el filtre treu el soroll greu i el limitador evita la saturació', () => {
   assert(Math.abs(out[0][40000] - .8) < .01, 'el component continu desapareix');
   const loud = mixVoice(mix, tone(44100, 1), { gainDb: 12 });
   assert(loud[0].every(x => Math.abs(x) <= 1));
+});
+
+test('els filtres de megàfon, telèfon, ràdio i similars processen només la veu', () => {
+  const source = tone(44100, .3, 44100, 1200), before = source.slice();
+  const clean = processVoice(source, { effect: 'clean' });
+  const strength = data => Math.sqrt(data.reduce((sum, x) => sum + x * x, 0) / data.length);
+  for (const effect of Object.keys(VOICE_EFFECTS)) {
+    const out = processVoice(source, { effect });
+    assert.equal(out.length, source.length, effect);
+    assert(out.every(Number.isFinite), `mostres finites: ${effect}`);
+    assert(out.every(x => Math.abs(x) <= 1), `sense saturació digital: ${effect}`);
+    if (effect !== 'clean') assert(Math.abs(strength(out) - strength(clean)) > .002,
+      `el preset ${effect} modifica efectivament el so`);
+  }
+  assert.deepEqual(source, before, 'la gravació original no queda modificada');
+});
+
+test('el megàfon retalla greus i aguts; els tres reguladors de l’EQ canvien el so', () => {
+  const rate = 44100, rms = data => Math.sqrt(data.reduce((sum, x) => sum + x * x, 0) / data.length);
+  const compare = (hz, effect) => rms(processVoice(tone(rate, .2, rate, hz), { effect }));
+  assert(compare(120, 'megaphone') < compare(120, 'clean') * .4, 'el megàfon retalla els greus');
+  assert(compare(6500, 'megaphone') < compare(6500, 'clean') * .5, 'el megàfon retalla els aguts');
+  const sound = tone(rate, .1, rate, 1200);
+  const center = rms(processVoice(sound, { effect: 'clean' }));
+  assert(rms(processVoice(sound, { effect: 'clean', eq: { mid: 10 } })) > center * 1.4,
+    'els mitjos es poden augmentar');
+  assert(rms(processVoice(sound, { effect: 'clean', eq: { mid: -10 } })) < center * .8,
+    'els mitjos es poden reduir');
+  const stereo = [new Float32Array(rate), new Float32Array(rate)];
+  const out = mixVoice(stereo, sound, { effect: 'telephone', eq: { high: -8 }, rate });
+  assert(out[0].some(x => x !== 0) && out[0].every((x, i) => x === out[1][i]));
+  assert.throws(() => processVoice(sound, { effect: 'x' }), /Filtre/);
+  assert.throws(() => processVoice(sound, { eq: { low: 15 } }), /Equalitzador/);
 });
 
 test('regravar un tros conserva la resta de la veu', () => {

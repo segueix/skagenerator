@@ -170,6 +170,27 @@
           <label><span class="field-label">VOLUM DE LA VEU <output id="voice-volume-value">0 dB</output></span><input type="range" id="voice-volume" min="-24" max="12" step="1" value="0" aria-label="Volum de la veu"></label>
           <label><span class="field-label">SINCRONIA <output id="voice-offset-value">0 ms</output></span><input type="range" id="voice-offset" min="-300" max="300" step="5" value="0" aria-label="Ajust de sincronia de la veu"><small class="slider-hint"><span>← avança la veu</span><span>la retarda →</span></small></label>
         </div>
+        <div class="voice-fx-panel" role="group" aria-label="Filtres i equalitzador de la veu enregistrada">
+          <label><span class="field-label">EFECTE DE VEU</span>
+            <select id="voice-effect" aria-label="Filtre de veu">
+              <option value="clean">Natural · sense efecte</option>
+              <option value="megaphone">Megàfon · potent i metàl·lic</option>
+              <option value="telephone">Telèfon · veu estreta</option>
+              <option value="radio">Ràdio antiga · saturada</option>
+              <option value="walkie">Walkie-talkie · comunicació</option>
+              <option value="robot">Robòtica · veu modulada</option>
+              <option value="lofi">Lo-fi · degradada</option>
+              <option value="warm">Càlida · més cos</option>
+            </select>
+          </label>
+          <p class="eq-help">Aquests efectes s'apliquen només a la veu enregistrada, tant quan escoltes com quan exportes l'àudio. La gravació original es conserva.</p>
+          <div class="voice-eq-grid" role="group" aria-label="Equalitzador de tres bandes de la veu">
+            <label><span class="field-label">GREUS <output id="voice-eq-low-value">0 dB</output></span><input id="voice-eq-low" type="range" min="-12" max="12" step="1" value="0" aria-label="Greus de la veu"></label>
+            <label><span class="field-label">MITJOS <output id="voice-eq-mid-value">0 dB</output></span><input id="voice-eq-mid" type="range" min="-12" max="12" step="1" value="0" aria-label="Mitjos de la veu"></label>
+            <label><span class="field-label">AGUTS <output id="voice-eq-high-value">0 dB</output></span><input id="voice-eq-high" type="range" min="-12" max="12" step="1" value="0" aria-label="Aguts de la veu"></label>
+          </div>
+          <button id="voice-eq-reset" type="button" class="button">↶ Restableix l'equalitzador</button>
+        </div>
         <div class="step-actions"><button type="button" id="play-voice" class="button listen">▷ Escolta amb la veu</button><button type="button" id="download-voice" class="button">↓ Només la veu (WAV)</button><button type="button" id="delete-voice" class="button danger">Esborra la veu</button></div>
       </div>
     </section>

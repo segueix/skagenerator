@@ -384,6 +384,13 @@ main > *, .step-panel, .line-scroll { min-width: 0; max-width: 100%; }
 .meter i { display: block; height: 100%; width: 0; border-radius: 5px; background: linear-gradient(90deg, var(--good), var(--amber) 75%, var(--bad)); transition: width .06s linear; }
 .voice-controls { margin-top: 14px; display: grid; gap: 12px; }
 .voice-sliders { display: grid; gap: 14px; }
+.voice-fx-panel { display: grid; gap: 12px; padding: 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.voice-fx-panel > label, .voice-eq-grid label { display: grid; gap: 6px; min-width: 0; }
+.voice-fx-panel .eq-help { margin: 0; }
+.voice-eq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr)); gap: 12px; }
+.voice-eq-grid .field-label { display: flex; justify-content: space-between; gap: 8px; }
+.voice-eq-grid output { font-variant-numeric: tabular-nums; }
+.voice-fx-panel > button { justify-self: start; }
 .slider-hint { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
 body.recording .transport-play { background: #ef4444; }
 .tabbar { grid-template-columns: repeat(5, 1fr); }

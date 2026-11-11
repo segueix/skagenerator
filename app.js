@@ -20,6 +20,8 @@
   const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
   const LINES = [['own', 'Pròpia'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu']];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
+  const VOICE_EFFECTS = audioUtils.VOICE_EFFECTS, VOICE_EQ_KEYS = audioUtils.VOICE_EQ_KEYS;
+  const flatVoiceEq = () => ({ low: 0, mid: 0, high: 0 });
   const FEELS = [['1', 'Normal'], ['0.5', 'Mig temps (½)'], ['2', 'Doble temps (×2)']];
   const CYMBAL_MODES = [['all', 'Amb platets'], ['hats', 'Sense plats (només charles)'], ['none', 'Sense platets'], ['rim', 'Sense platets, pols a l’aro']];
   const ENDINGS = [['fill', 'Redoble (segons el que ve)'], ['stop', 'Aturada de la banda'], ['none', 'Sense redoble']];
@@ -183,7 +185,12 @@
     if (value.voice !== undefined) {
       const v = value.voice;
       if (!v || typeof v.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(v.id) || typeof v.enabled !== 'boolean'
-        || !Number.isFinite(v.volume) || v.volume < -24 || v.volume > 12 || !Number.isFinite(v.offsetMs) || v.offsetMs < -500 || v.offsetMs > 500) fail('Veu no vàlida');
+        || !Number.isFinite(v.volume) || v.volume < -24 || v.volume > 12 || !Number.isFinite(v.offsetMs) || v.offsetMs < -500 || v.offsetMs > 500
+        || (v.effect !== undefined && !Object.hasOwn(VOICE_EFFECTS, v.effect))
+        || (v.eq !== undefined && (!v.eq || typeof v.eq !== 'object' || Array.isArray(v.eq)
+          || Object.keys(v.eq).some(key => !VOICE_EQ_KEYS.includes(key))
+          || VOICE_EQ_KEYS.some(key => !Number.isInteger(v.eq[key] ?? 0) || Math.abs(v.eq[key] ?? 0) > 12)))) fail('Veu no vàlida');
+      v.effect ??= 'clean'; v.eq = { ...flatVoiceEq(), ...(v.eq || {}) };
     }
     for (const seg of segmentsOf(value)) engine.composeSongPart(value.settings, partFor(value, seg));
     return value;
@@ -587,7 +594,7 @@
   // La veu es grava al mateix context d'àudio que reprodueix la música, de
   // manera que la posició de cada mostra es coneix exactament. Es desa a
   // IndexedDB (és massa gran per a localStorage) en 16 bits.
-  let voiceData = null, recording = null;
+  let voiceData = null, recording = null, processedVoiceCache = null;
   const voiceDb = {
     open() {
       return this.ready ??= new Promise((resolve, reject) => {
@@ -616,9 +623,19 @@
     catch (error) { console.warn(error); }
     render();
   }
+  function filteredVoice() {
+    if (!voiceData) return null;
+    const key = JSON.stringify([song.voice?.effect || 'clean', song.voice?.eq || flatVoiceEq()]);
+    if (processedVoiceCache?.source === voiceData && processedVoiceCache?.key === key)
+      return processedVoiceCache.data;
+    const data = audioUtils.processVoice(voiceData, { effect: song.voice?.effect || 'clean', eq: song.voice?.eq || flatVoiceEq(), rate: RATE });
+    processedVoiceCache = { source: voiceData, key, data };
+    return data;
+  }
   function withVoice(data, fromFrame) {
     if (!voiceData || !song.voice?.enabled) return data;
-    return audioUtils.mixVoice(data, voiceData, { from: fromFrame, gainDb: song.voice.volume, offset: Math.round(song.voice.offsetMs / 1000 * RATE), rate: RATE });
+    return audioUtils.mixVoice(data, filteredVoice(), { from: fromFrame, processed: true,
+      gainDb: song.voice.volume, offset: Math.round(song.voice.offsetMs / 1000 * RATE), rate: RATE });
   }
   async function captureNode(ctx, input, onBlock) {
     if (ctx.audioWorklet && window.AudioWorkletNode) {
@@ -701,7 +718,7 @@
     const trimmed = take.subarray(start);
     if (trimmed.length < RATE * .3) { notify('La gravació és massa curta i no s’ha desat.'); return; }
     voiceData = audioUtils.placeTake(voiceData, trimmed, keepFrom, keepFrom);
-    song.voice ??= { id: uid(), enabled: true, volume: 0, offsetMs: 0 };
+    song.voice ??= { id: uid(), enabled: true, volume: 0, offsetMs: 0, effect: 'clean', eq: flatVoiceEq() };
     song.voice.enabled = true; save();
     voiceDb.put(song.voice.id, toInt16(voiceData).buffer)
       .then(() => notify('Veu desada. Prem «Escolta amb la veu» o ▶ per sentir-ho tot junt.'))
@@ -726,9 +743,16 @@
       $('voice-enabled').checked = song.voice.enabled;
       $('voice-volume').value = song.voice.volume; $('voice-volume-value').textContent = `${song.voice.volume > 0 ? '+' : ''}${song.voice.volume} dB`;
       $('voice-offset').value = song.voice.offsetMs; $('voice-offset-value').textContent = `${song.voice.offsetMs > 0 ? '+' : ''}${song.voice.offsetMs} ms`;
+      $('voice-effect').value = song.voice.effect || 'clean';
+      for (const key of VOICE_EQ_KEYS) {
+        const db = song.voice.eq?.[key] ?? 0;
+        $(`voice-eq-${key}`).value = db;
+        $(`voice-eq-${key}-value`).textContent = `${db > 0 ? '+' : ''}${db} dB`;
+      }
     }
     $('play-voice').textContent = playing?.kind === 'song' ? '■ Atura' : '▷ Escolta amb la veu';
-    for (const key of ['voice-enabled', 'voice-volume', 'voice-offset', 'play-voice', 'download-voice', 'delete-voice']) $(key).disabled = busy;
+    for (const key of ['voice-enabled', 'voice-volume', 'voice-offset', 'voice-effect', 'voice-eq-reset',
+      ...VOICE_EQ_KEYS.map(key => `voice-eq-${key}`), 'play-voice', 'download-voice', 'delete-voice']) $(key).disabled = busy;
   }
 
   // ── Generació ───────────────────────────────────────────────────────
@@ -2107,7 +2131,12 @@
   $('delete-voice').addEventListener('click', deleteVoice);
   $('download-voice').addEventListener('click', () => {
     if (!voiceData) return;
-    download(new Blob([audioUtils.encodeWav([voiceData, voiceData], RATE)], { type: 'audio/wav' }), `${fileName()}-veu.wav`);
+    const gain = 10 ** ((song.voice?.volume || 0) / 20), data = filteredVoice();
+    const mono = Float32Array.from(data, x => {
+      const value = x * gain, a = Math.abs(value);
+      return a > .93 ? Math.sign(value) * (.93 + .055 * Math.tanh((a - .93) / .055)) : value;
+    });
+    download(new Blob([audioUtils.encodeWav([mono, mono], RATE)], { type: 'audio/wav' }), `${fileName()}-veu.wav`);
   });
   $('voice-enabled').addEventListener('change', event => { if (!song.voice) return; stop(); song.voice.enabled = event.target.checked; save(); render(); });
   for (const [key, field, unit] of [['voice-volume', 'volume', 'dB'], ['voice-offset', 'offsetMs', 'ms']]) {
@@ -2118,6 +2147,25 @@
       if (replay === 'song' || replay === 'section') play(replay);
     });
   }
+  function updateVoiceProcessing(change) {
+    if (!song.voice || busy) return;
+    const replay = playing?.kind, position = playing ? barAt(playing.startSeconds + playing.clock()) : 0;
+    stop();
+    change(song.voice); save(); render();
+    if (replay === 'song' || replay === 'section') { cueBar = position; play(replay); }
+  }
+  $('voice-effect').addEventListener('change', event =>
+    updateVoiceProcessing(voice => { voice.effect = event.target.value; }));
+  for (const key of VOICE_EQ_KEYS) {
+    const input = $(`voice-eq-${key}`);
+    input.addEventListener('input', event => {
+      const db = Number(event.target.value);
+      $(`voice-eq-${key}-value`).textContent = `${db > 0 ? '+' : ''}${db} dB`;
+    });
+    input.addEventListener('change', event =>
+      updateVoiceProcessing(voice => { voice.eq = { ...flatVoiceEq(), ...(voice.eq || {}), [key]: Number(event.target.value) }; }));
+  }
+  $('voice-eq-reset').addEventListener('click', () => updateVoiceProcessing(voice => { voice.eq = flatVoiceEq(); }));
   window.addEventListener('pagehide', stop);
   let firstTab = song.base.generated ? (song.sections.length ? 'line' : 'line') : 'song';
   try { firstTab = sessionStorage.getItem('skagenerator.tab') || firstTab; } catch {}
