@@ -616,3 +616,14 @@ body.recording .transport-play { background: #ef4444; }
 
 .library-export { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
 .library-export .text-button { margin: 0; }
+
+/* Recursos visibles a la línia: fosos, silencis, efectes de color */
+.line-marks { font-size: 10px; font-weight: 600; color: var(--text); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.line-fade { position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--text) 22%, transparent); }
+.line-fade.in { clip-path: polygon(0 0, 100% 0, 0 100%); }
+.line-fade.out { clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.line-silence { position: absolute; top: 0; bottom: 0; right: 0; pointer-events: none; border-left: 2px dashed var(--text);
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--surface) 85%, transparent) 0 4px, transparent 4px 8px); }
+.line-clip.colored { background-image: repeating-linear-gradient(90deg, #ffffff33 0 2px, transparent 2px 6px); }
+.line-clip-tag { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 10px; font-weight: 700; color: #fff;
+  text-shadow: 0 1px 2px #0008; white-space: nowrap; overflow: hidden; max-width: calc(100% - 10px); pointer-events: none; }

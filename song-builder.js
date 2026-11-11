@@ -199,7 +199,15 @@
       .sort((a, b) => LAYER_ORDER.indexOf(a) - LAYER_ORDER.indexOf(b));
     const drums = base.find(name => name === 'drums' || name === 'electronicDrums');
     const riffer = punk ? 'guitar3' : 'trumpet', voice = options.vocal ?? song.clips.some(c => c.instrument === 'vocal');
-    const only = (sec, keep) => { const mute = playing(sec).filter(name => !keep.includes(name)); if (mute.length) sec.mute = mute; return true; };
+    // Només sonen els instruments triats. La bateria no calla del tot: entra a l'últim compàs amb
+    // un redoble, perquè el pas a la secció següent no sigui brusc.
+    const only = (sec, keep) => {
+      const fill = drums && !keep.includes(drums) && sec.bars >= 2;
+      const mute = playing(sec).filter(name => !keep.includes(name) && !(fill && name === drums));
+      if (mute.length) sec.mute = mute;
+      if (fill) sec.entrance = { ...(sec.entrance || {}), [drums]: sec.bars - 1 };
+      return true;
+    };
     // Un instrument que ha de sonar a tota la secció: si no hi és, s'hi afegeix un clip (marcat per poder-lo desfer).
     const ensure = (sec, instrument, extra = {}) => {
       const same = song.clips.filter(c => c.instrument === instrument && inside(c, sec));
@@ -227,7 +235,7 @@
       riddim: () => base.includes('bass') && !!drums && only(first, ['bass', drums]),
       halftime: () => {
         if (first.feel || first.bpm) return false;
-        first.feel = { drums: .5, bass: .5 }; first.bpm = Math.max(40, Math.round(st.bpm * .85));
+        first.feel = { drums: .5, bass: .5 }; first.bpm = Math.max(40, Math.round(st.bpm * .94));
         return true;
       }
     };
@@ -235,7 +243,7 @@
       hit: () => true,
       fadeout: () => { last.fade = 'out'; if (outro) last.closing = 'fade'; return true; },
       cold: () => outro && (last.closing = 'cold', true),
-      ritard: () => !last.bpm && (last.bpm = Math.max(40, Math.round(st.bpm * .78)), true),
+      ritard: () => !last.bpm && (last.bpm = Math.max(40, Math.round(st.bpm * .93)), true),
       ring: () => outro && last.bars >= 2 && (last.closing = 'ring', true),
       breakdown: () => {
         // Primer callen les capes de dalt, després la guitarra i el baix; la bateria fa el cop final.
@@ -289,15 +297,22 @@
       : { drums: pick(sg.groove.drums), bass: pick(sg.groove.bass), guitar: pick(sg.groove.guitar) };
     const settings = { style: sg.style, subgenre: key, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
-    if (sg.fx) settings.fx = { guitar: { ...sg.fx }, guitar2: { ...sg.fx }, guitar3: { ...sg.fx } };
+    // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
+    const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
+    if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
+    // Ska jamaicà: el baix tapava els vents (comentaris de les cançons): baix més suau i vents més presents.
+    if (key === 'jamaican') { settings.baseVolume = { drums: 0, bass: -3 }; settings.volumes = { trumpet: 2, trombone: 2, sax: 2 }; }
     for (const option of ['drumTune', 'humanize', 'cymbals', 'countIn']) if (sg[option] !== undefined) settings[option] = sg[option];
     if (settings.swing === 0) delete settings.swing;
 
     // ── Estructura de 2 a 4 minuts ────────────────────────────────────
-    const len = bpm >= 160 ? 16 : 8, pre = ['twotone', 'poppunk', 'jamaican'].includes(key) && r() < .7;
+    // Punk del 77: de vegades pretornada i intro llarga (abans totes les cançons tenien la mateixa forma).
+    const len = bpm >= 160 ? 16 : 8;
+    const pre = ['twotone', 'poppunk', 'jamaican'].includes(key) && r() < .7 || key === 'punk77' && r() < .35;
+    const introBars = key === 'jamaican' || key === 'rocksteady' || key === 'punk77' && r() < .3 ? 8 : 4;
     const middle = punk ? 'bridge' : key === 'rocksteady' ? 'bridge' : r() < .6 ? 'solo' : 'bridge';
     const block = () => [['verse', len], ...(pre ? [['prechorus', 4]] : []), ['chorus', len]];
-    let plan = [['intro', key === 'jamaican' || key === 'rocksteady' ? 8 : 4], ...block(), ...block(), [middle, 8], ['chorus', len], ['outro', punk ? 4 : 8]];
+    let plan = [['intro', introBars], ...block(), ...block(), [middle, 8], ['chorus', len], ['outro', punk ? 4 : 8]];
     const seconds = list => list.reduce((t, [, bars]) => t + bars * 240 / bpm, 0), target = minutes * 60;
     // Ajust voraç: afegeix o treu blocs fins que la durada s'acosta al que s'ha demanat (sempre entre 2 i 4 minuts).
     const ok = list => seconds(list) >= 125 && seconds(list) <= 235;
@@ -335,9 +350,11 @@
     const of = type => sections.filter(s => s.type === type), lastChorus = of('chorus').at(-1);
     // ── Moviments propis del subgènere (tempo, to, ritme) ─────────────
     const tempo = (sec, factor) => { if (sec) sec.bpm = Math.max(40, Math.min(240, Math.round(bpm * factor))); };
-    if (key === 'jamaican') { tempo(sections[0], .88); }
+    // Canvis de tempo suaus (els salts grans sonaven bruscos): com a molt un 7 %. Per sonar
+    // «més lent» sense canviar de tempo, la bateria i el baix van a mig temps.
+    if (key === 'jamaican') { tempo(sections[0], .94); }
     // Rocksteady: estrofes amb cops d'aro en lloc de charles (sense platets); horror punk: intro de toms sense platets.
-    if (key === 'rocksteady') { tempo(of('bridge')[0], .86); tempo(of('outro')[0], .9); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
+    if (key === 'rocksteady') { tempo(of('bridge')[0], .93); tempo(of('outro')[0], .95); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
     if (key === 'horrorpunk') sections[0].cymbals = 'none';
     // Un altre ritme de bateria a la segona estrofa (de vegades), com fa «Dona-li varietat».
     const drumCount = engine.SONG_GROOVES[sg.style].drums.length;
@@ -345,9 +362,11 @@
     if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });
     if (key === 'twotone' || key === 'punk77') sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     if (key === 'skapunk') { const b = of('bridge')[0] || of('solo')[0]; if (b) b.feel = { drums: .5 }; tempo(lastChorus, 1.04); sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 1; }); }
-    if (key === 'hardcore') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); tempo(of('bridge')[0], .5); }
+    if (key === 'hardcore') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); const b = of('bridge')[0]; if (b) b.feel = { drums: .5, bass: .5 }; }
     if (key === 'poppunk') { of('prechorus').forEach(s => tempo(s, 1.04)); const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; }); }
-    if (key === 'horrorpunk') { tempo(sections[0], .65); const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
+    if (key === 'horrorpunk') { sections[0].feel = { drums: .5, bass: .5 }; const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
+    // Punk: de vegades una segona bateria a contratemps a partir de la segona tornada.
+    if (['punk77', 'hardcore', 'horrorpunk'].includes(key) && r() < .55) of('chorus').slice(1).forEach(s => { s.offbeat = true; });
     const harmony = {};
     for (const type of new Set(sections.map(s => s.type))) harmony[type] = 1 + Math.floor(r() * 5);
 
@@ -372,7 +391,12 @@
         if (sec.type === 'bridge') { if (key === 'rocksteady') add(sec, 'synthPad', { revision: 1 }); else add(sec, 'trombone'); if (key === 'skapunk') add(sec, 'guitar3', { revision: 4, fx: { type: 'crunch', drive: 40, tone: 50 } }); }
       } else {
         if (sec.type === 'intro') { add(sec, 'guitar3', { line: 'riff' }); if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 }); }
-        if (sec.type === 'verse') { verses++; if (key === 'poppunk') add(sec, 'guitar3', { revision: 1, fx: { type: 'none', drive: 50, tone: 50 } }); else if (verses > 1) add(sec, 'guitar3', { line: 'answer' }); }
+        if (sec.type === 'verse') {
+          verses++;
+          // Sense la segona guitarra les estrofes perdien força (comentaris de les cançons).
+          if (key !== 'poppunk' || verses > 1) add(sec, 'guitar2', { revision: 2 });
+          if (key === 'poppunk') add(sec, 'guitar3', { revision: 1, fx: { type: 'none', drive: 50, tone: 50 } }); else if (verses > 1) add(sec, 'guitar3', { line: 'answer' });
+        }
         if (sec.type === 'prechorus') add(sec, 'guitar2', { revision: 2 });
         if (sec.type === 'chorus') { add(sec, 'guitar2', { revision: 2 }); if (key !== 'hardcore') add(sec, 'guitar3', { line: 'riff' }); }
         if (sec.type === 'bridge') {
@@ -444,6 +468,8 @@
     const words = TITLES[key === 'horrorpunk' ? 'horror' : punk ? 'punk' : 'ska'];
     const title = `${pick(words[0])} ${pick(words[1])}`;
     const song = { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
+    // Si alguna secció s'alenteix, s'hi afegeix un instrument que sosté el so.
+    reinforceSlowdowns(song);
     // ── Inici, final i silencis: una manera diferent a cada cançó ──
     const revisionsOf = Object.fromEntries(MELODIC.map(name => [name, chosen.get(`${name}:intro`) || chosen.get(`${name}:verse`) || chosen.get(`${name}:chorus`) || 1]));
     // Recursos especials: només els que aporten més en aquesta cançó (vegeu planHighlights).
@@ -460,6 +486,49 @@
       + (highlights.chosen.length ? .3 * highlights.chosen.reduce((t, c) => t + c.value, 0) / highlights.chosen.length : .2);
     return { song, score: rating };
   }
+  // ── Transicions i densitat (a partir dels comentaris de les cançons) ──
+  // Quan la cançó s'alenteix d'una secció a l'altra, s'hi afegeix un instrument que
+  // sosté el so (guitarra 2 al punk, orgue sostingut a l'ska o coixí si l'orgue ja
+  // és a la base) perquè el canvi no buidi la cançó.
+  function reinforceSlowdowns(song) {
+    const st = song.settings, sections = [...song.sections].sort((a, b) => a.start - b.start), added = [];
+    const inside = (c, sec) => c.start < sec.start + sec.bars && sec.start < c.start + c.bars;
+    sections.forEach((sec, i) => {
+      const prev = sections[i - 1];
+      if (!prev || (sec.bpm || st.bpm) >= (prev.bpm || st.bpm) * .95) return;
+      const instrument = st.style === 'punk' ? 'guitar2' : song.base.instruments.includes('organ') ? 'synthPad' : st.style === 'ska' ? 'organ' : 'synthPad';
+      if (song.base.instruments.includes(instrument) || song.clips.some(c => c.instrument === instrument && inside(c, sec))) return;
+      song.clips.push({ id: `slow-${instrument}-${sec.id}`.slice(0, 64), instrument, start: sec.start, bars: sec.bars,
+        revision: instrument === 'organ' ? 3 : instrument === 'guitar2' ? 2 : 1, generated: true });
+      added.push({ section: sec, instrument });
+    });
+    return added;
+  }
+  // Pes sonor de cada instrument dins de la banda (les guitarres distorsionades pesen més).
+  const WEIGHT = { drums: 3, electronicDrums: 3, bass: 2, synthBass: 2, guitar: 2, guitar2: 2, guitar3: 1.5, trumpet: 1.2, trombone: 1.2, sax: 1.2,
+    organ: 1, synthPad: 1, synthLead: 1, vocal: .8 };
+  const CLEAN_FX = ['none', 'boost', 'tape', 'lofi'];
+  function sectionWeight(song, sec) {
+    const mute = sec.mute || [], st = song.settings;
+    const loud = name => ['guitar', 'guitar2'].includes(name) && st.fx?.[name] && !CLEAN_FX.includes(st.fx[name].type);
+    const weight = name => (WEIGHT[name] || 1) + (loud(name) ? 1 : 0);
+    let total = song.base.instruments.filter(name => !mute.includes(name)).reduce((t, name) => t + weight(name), 0);
+    const seen = new Set();
+    for (const c of song.clips) {
+      if (!c.generated || mute.includes(c.instrument) || !(c.start < sec.start + sec.bars && sec.start < c.start + c.bars)) continue;
+      // Cada presa de guitarra 1 o 2 suma; la resta d'instruments, un cop.
+      if (['guitar', 'guitar2'].includes(c.instrument) || !seen.has(c.instrument)) { total += weight(c.instrument); seen.add(c.instrument); }
+    }
+    return total;
+  }
+  // Si en una secció en desapareixen instruments (sobretot guitarres fortes), la resta puja una mica:
+  // fins a 3 dB, segons el pes que falta respecte de la secció més plena de la cançó.
+  function densityBoost(song, sec) {
+    const weight = sectionWeight(song, sec), full = Math.max(...song.sections.map(s => sectionWeight(song, s)));
+    if (!weight || weight >= full) return 0;
+    return Math.min(3, Math.round(5 * Math.log10(full / weight)));
+  }
+
   // ── Comentaris de les cançons i informe per analitzar-les ─────────
   // Cada comentari és de tota la cançó (bar null) o d'un compàs concret, amb
   // un tema i una valoració. L'informe exportat recull, per a cada cançó, la
@@ -538,5 +607,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, designEdges, planHighlights, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

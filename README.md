@@ -184,6 +184,24 @@ Els comentaris es desen amb la cançó i al projecte JSON. Si la cançó encara 
 
 Amb aquest fitxer es pot veure quins recursos funcionen i quins no, i ajustar-ne l’algorisme. La veu gravada no s’hi inclou.
 
+### Millores a partir dels comentaris de les cançons
+
+Amb el primer fitxer de comentaris exportat (6 cançons, 12 comentaris) s'han fet aquests canvis:
+
+| Comentari | Canvi |
+|---|---|
+| «Transicions molt brusques», «canvi de velocitat exagerat de ràpid a lent» | Els canvis de tempo automàtics i de «Dona-li varietat» són com a molt d’un 7–8 % (abans fins al 35 %). Per sonar més lent sense saltar de tempo, la bateria i el baix van a mig temps. On la cançó s’alenteix s’hi afegeix un instrument que sosté el so (guitarra 2 al punk, orgue sostingut o coixí a l’ska). |
+| «La transició d’intro a estrofa és brusca» | En les intros on la bateria no toca (el riff sol, veu i guitarra…), la bateria entra a l’últim compàs amb un redoble. |
+| «Sense la guitarra 2 la cançó perd força» | La guitarra 2 també toca a les estrofes del punk. |
+| «Si desapareix un instrument la resta hauria de pujar» | Compensació automàtica: si en una secció falten instruments (sobretot guitarres distorsionades), la resta puja fins a 3 dB, segons el pes que falta respecte de la secció més plena. |
+| «Falta volum a la guitarra solista» | Guitarra 3 (punteig) +3 dB. |
+| «La bateria punk hauria de ser més arrítmica» | Al punk, la bateria empeny i respira més (més humanització, també als tempos ràpids) i no toca tots els compassos iguals: bombos i caixes de més i plats a contratemps. |
+| «Es podrien posar dues bateries per portar el contratemps» | Opció **«Bateria: dues bateries, la segona a contratemps»** a cada secció (timbal base a cada contratemps i charles obert a 2 i 4). La cançó automàtica la posa de vegades a les tornades del punk. |
+| «Les tres cançons punk 77 són molt semblants» | Punk del 77 amb més tonalitats (també menors), 3 ritmes de bateria, 3 de baix, 4 de guitarra, 4 sons de guitarra (distorsió, overdrive, crunch, fuzz), de vegades pretornada i intro llarga. |
+| «El baix està massa fort i els vents queden baixos» (ska jamaicà) | Ska jamaicà amb el baix −3 dB i els vents +2 dB. |
+
+**A la línia** es veuen els recursos de cada secció: una rampa per al fos d’entrada o de sortida, una zona ratllada per al silenci o el cop i silenci, i icones a la informació de la secció (◢ ◣ fosos, ⏸ aturada, ∅ silenci, ✂ tall en sec, 🥁 redoble final, ≡ capes, 🥁🥁 dues bateries), amb el text sencer en passar-hi per sobre. Els clips amb efecte de color mostren l’aparell: 📻 Ràdio antiga, 📢 Megàfon, ☎ Telèfon, 💿 Gramòfon.
+
 ## Flux de treball
 
 Hi ha una sola vista, que es treballa de baix cap amunt:

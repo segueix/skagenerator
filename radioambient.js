@@ -1890,6 +1890,9 @@
         const pickFill = (wanted, salt = 0) => { const list = FILLS[wanted]; return list[((options.fill || 0) * 7 + salt * 3 + index) % list.length]; };
         const hit = (b, t, note, force) => line.push([b, t, note, force]);
         const big = energy >= 70, quiet = energy < 45, half = Math.max(1, Math.floor(bars / 2));
+        // Atzar fix per compàs (la mateixa secció sona sempre igual).
+        const vary = b => { let h = Math.imul((options.fill || 0) + 1, 2654435761) ^ Math.imul(b + 1, 40503) ^ Math.imul(index + 1, 97);
+            h = Math.imul(h ^ (h >>> 15), 2246822519); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
         const buildBars = type === 'intro' ? Math.min(2, half) : 0;
         for (let b = 0; b < bars; b++) {
             const final = type === 'outro' && b === bars - 1 && !fading;
@@ -1938,6 +1941,19 @@
                 else if (hat === 'toms') hit(b, t, k % 4 === 3 ? 45 : 43, k % 2 ? 68 : 88);
                 else if (hat === 'offbeat') hit(b, t, k % 2 && big ? 46 : 42, k % 2 ? 84 : 48);
                 else hit(b, t, k === 7 && !quiet && !build ? 46 : 42, k % 2 ? 56 : 76);
+            }
+            // Punk: el bateria no toca tots els compassos iguals (bombos i caixes de més, plat a contratemps).
+            if (styleName === 'punk' && !build && !drop && !last && !quiet && !crescendo) {
+                const v = vary(b);
+                if (v < .2) hit(b, 1.5, 36, 96);
+                else if (v < .35) hit(b, 3.5, 36, 98);
+                else if (v < .45) hit(b, 2.75, 38, 72);
+                else if (v < .53 && big) hit(b, 1.5, 49, 92);
+                else if (v < .6) hit(b, 3.75, 38, 66);
+            }
+            // Segona bateria a contratemps: timbal base a cada contratemps i charles obert a 2 i 4.
+            if (options.offbeat && !build && !crescendo) for (let t = .5; t < Math.min(4, fillFrom); t += 1) {
+                hit(b, t, 43, 86); if (t === 1.5 || t === 3.5) hit(b, t, 46, 72);
             }
             if (crescendo) {
                 // Caixa en corxeres i després semicorxeres, cada cop més forta.
@@ -2013,15 +2029,18 @@
                 verse: [['I', 'IV', 'V', 'IV'], ['I', 'bVII', 'IV', 'I'], ['I', 'V', 'IV', 'V']],
                 chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'I', 'V', 'vi'], ['I', 'IV', 'bVII', 'IV']], bridge: [['vi', 'IV', 'I', 'V']] },
               minor: { verse: [['i', 'bVI', 'bVII', 'i']], chorus: [['bVI', 'bVII', 'i', 'bIII']], bridge: [['iv', 'bVI', 'bVII', 'V']] } } },
-        punk77: { name: 'Punk del 77', style: 'punk', bpm: [180, 205], swing: 0, keys: [[9, 'major'], [4, 'major'], [2, 'major'], [7, 'major']],
-            groove: { drums: [0], bass: [0], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, humanize: .55, countIn: true,
-            fx: { type: 'distortion', drive: 60, tone: 60 },
+        punk77: { name: 'Punk del 77', style: 'punk', bpm: [180, 205], swing: 0, keys: [[9, 'major'], [4, 'major'], [2, 'major'], [7, 'major'], [0, 'major'], [4, 'minor'], [9, 'minor']],
+            groove: { drums: [0, 2, 5], bass: [0, 1, 3], guitar: [0, 1, 2, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, humanize: .75, countIn: true,
+            fx: { type: 'distortion', drive: 60, tone: 60 }, fxChoices: [['distortion', 55, 65], ['overdrive', 70, 60], ['crunch', 75, 55], ['fuzz', 55, 50]],
             description: 'Tres acords, corxeres a cops avall i tornades per cridar: directe, ràpid i sense floritures.',
             harmony: { major: {
                 verse: [['I', 'IV', 'V', 'IV'], ['I', 'I', 'IV', 'V'], ['I', 'bVII', 'IV', 'I']],
-                chorus: [['I', 'IV', 'V', 'I'], ['IV', 'V', 'I', 'I'], ['I', 'V', 'IV', 'IV']], bridge: [['IV', 'IV', 'V', 'V']] } } },
+                chorus: [['I', 'IV', 'V', 'I'], ['IV', 'V', 'I', 'I'], ['I', 'V', 'IV', 'IV']], bridge: [['IV', 'IV', 'V', 'V'], ['vi', 'IV', 'I', 'V']] },
+              minor: {
+                verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'iv', 'bVII', 'i'], ['i', 'bIII', 'bVII', 'iv']],
+                chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'bVII', 'iv', 'i'], ['bIII', 'bVII', 'i', 'V']], bridge: [['iv', 'iv', 'V', 'V']] } } },
         hardcore: { name: 'Hardcore', style: 'punk', bpm: [200, 220], swing: 0, keys: [[11, 'minor'], [4, 'minor'], [9, 'minor'], [2, 'minor']],
-            groove: { drums: [2, 3], bass: [3, 4], guitar: [2, 0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'growly', guitar: 'clean' }, drumTune: -2, humanize: .35, countIn: true,
+            groove: { drums: [2, 3], bass: [3, 4], guitar: [2, 0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'growly', guitar: 'clean' }, drumTune: -2, humanize: .5, countIn: true,
             fx: { type: 'fuzz', drive: 75, tone: 55 },
             description: 'Molt ràpid i agressiu: D-beat, fuzz, tornades en doble temps i un tros lent i pesant («breakdown»).',
             harmony: { minor: {
@@ -2036,7 +2055,7 @@
                 chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'I', 'V', 'vi'], ['vi', 'IV', 'I', 'V']],
                 prechorus: [['IV', 'V', 'vi', 'V']], bridge: [['ii', 'IV', 'vi', 'V'], ['IV', 'V', 'iii', 'vi']] } } },
         horrorpunk: { name: 'Horror punk', style: 'punk', bpm: [170, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [4, 'minor'], [9, 'minor']],
-            groove: { drums: [0], bass: [0], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, drumTune: -3, humanize: .5, countIn: true,
+            groove: { drums: [0, 2, 4], bass: [0, 1], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, drumTune: -3, humanize: .65, countIn: true,
             fx: { type: 'horrorpunk', drive: 70, tone: 60 },
             description: 'A l’estil dels Misfits: guitarres «serra mecànica» doblades, acords prestats foscos, veu greu i «whoa-oh».',
             harmony: { major: {
@@ -2345,6 +2364,7 @@
         }
         if (part.entrance && part.exit && Object.entries(part.exit).some(([name, bar]) => bar <= (part.entrance[name] ?? 0))) throw new Error('Entrades o sortides d’instruments no vàlides');
         if (part.countIn !== undefined && typeof part.countIn !== 'boolean') throw new Error('Compte d’entrada no vàlid');
+        if (part.offbeat !== undefined && typeof part.offbeat !== 'boolean') throw new Error('Segona bateria no vàlida');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
             || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name) || !['riff', 'answer'].includes(mode))))
             throw new Error('Mode de línia no vàlid');
@@ -2578,7 +2598,7 @@
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             ranges: audibleRanges, guitarTakes: guitarTakes.map(take => ({ ...take })),
             guitarBase: part.guitarBase !== false,
-            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn, closing: part.type === 'outro' ? part.closing : undefined }),
+            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn, closing: part.type === 'outro' ? part.closing : undefined, offbeat: part.offbeat }),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: addVolumes({ ...(settings.mix || {}), ...(part.mix || {}) }, settings.volumes, part.volumes),
             baseVolume: { ...baseVolume },

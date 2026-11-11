@@ -21,7 +21,8 @@ export const EQ_PRESETS = {
 // Presència de la trompeta (gravat VSCO i alternatives GM): el volum MIDI
 // ja és gairebé al màxim, així que es reforça el senyal sec sense saturar-lo.
 // El compressor i el limitador final continuen protegint la mescla.
-export const INSTRUMENT_GAIN_DB = { trumpet: 3 };
+// La guitarra solista (punteig) quedava tapada per les guitarres rítmiques distorsionades.
+export const INSTRUMENT_GAIN_DB = { trumpet: 3, guitar3: 3 };
 export const SONG_GAIN = 10 ** (5.5 / 20);
 export const EQ_BANDS = { low: 120, mid: 900, high: 6000 };
 // Reverberació: el baix sec, la bateria curta, metalls i orgue amb sala.

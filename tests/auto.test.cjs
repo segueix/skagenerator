@@ -233,3 +233,44 @@ test('comentaris de les cançons i informe exportable per analitzar-les', () => 
   assert(!('libraryId' in first.project));
   assert.doesNotThrow(() => JSON.stringify(report));
 });
+
+test('millores dels comentaris: transicions suaus, guitarra 2, varietat al punk i compensació de volum', () => {
+  // Canvis de tempo de la cançó automàtica: com a molt un 7 % (abans hi havia salts del 35 %).
+  for (const key of Object.keys(engine.SUBGENRES)) for (let seed = 1; seed <= 4; seed++) {
+    const song = builder.createAutoSong(engine, key, { seed: seed * 17 });
+    for (const sec of song.sections) if (sec.bpm) assert(Math.abs(sec.bpm / song.settings.bpm - 1) <= .071, `${key}: ${sec.type} a ${sec.bpm} (cançó ${song.settings.bpm})`);
+    // Una intro on la bateria no toca: entra a l'últim compàs amb un redoble.
+    const intro = song.sections[0];
+    if (intro.entrance?.drums !== undefined) assert.equal(intro.entrance.drums, intro.bars - 1);
+    assert(!(intro.mute || []).includes('drums') || intro.bars < 2 || song.edges.opening === 'band', `${key}: la bateria no queda muda a la intro`);
+    // Les estrofes punk porten guitarra 2.
+    if (['punk77', 'hardcore', 'horrorpunk'].includes(key)) for (const verse of song.sections.filter(s => s.type === 'verse'))
+      assert(song.clips.some(c => c.instrument === 'guitar2' && c.start === verse.start), `${key}: guitarra 2 a l’estrofa`);
+  }
+  // El punk del 77 ja no surt sempre igual.
+  const prints = new Set(), sounds = new Set();
+  for (let seed = 1; seed <= 10; seed++) {
+    const song = builder.createAutoSong(engine, 'punk77', { seed: seed * 31 });
+    prints.add(JSON.stringify([song.settings.tonic, song.settings.mode, song.settings.groove, song.sections.map(s => s.type + s.bars).join()]));
+    sounds.add(song.settings.fx.guitar.type);
+  }
+  assert(prints.size >= 8, `punk del 77 variat: ${prints.size}`); assert(sounds.size >= 3, `sons de guitarra: ${[...sounds]}`);
+  // Ska jamaicà: baix més suau i vents més presents.
+  const jamaican = builder.createAutoSong(engine, 'jamaican', { seed: 5 });
+  assert(jamaican.settings.baseVolume.bass < 0 && jamaican.settings.volumes.trumpet > 0);
+  // Reforç quan la cançó s'alenteix: un instrument que sosté el so.
+  const song = builder.createAutoSong(engine, 'punk77', { seed: 3 });
+  const bridge = song.sections.find(s => s.type === 'bridge');
+  song.clips = song.clips.filter(c => !(c.instrument === 'guitar2' && c.start === bridge.start));
+  bridge.bpm = Math.round(song.settings.bpm * .9);
+  const added = builder.reinforceSlowdowns(song);
+  assert.deepEqual(added.map(a => [a.section.id, a.instrument]), [[bridge.id, 'guitar2']]);
+  assert.equal(builder.reinforceSlowdowns(song).length, 0, 'no es duplica');
+  // Compensació: si calla una guitarra forta, la resta puja una mica (com a molt 3 dB).
+  const verse = song.sections.find(s => s.type === 'verse');
+  assert.equal(builder.densityBoost(song, song.sections.find(s => s.type === 'chorus')), 0);
+  const before = builder.densityBoost(song, verse);
+  verse.mute = ['guitar', 'guitar2'];
+  const after = builder.densityBoost(song, verse);
+  assert(after > before && after <= 3, `${before} → ${after}`);
+});

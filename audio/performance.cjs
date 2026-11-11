@@ -137,14 +137,16 @@ function createPerformance(spec) {
   // arrossega; al punk la guitarra i la bateria empenyen endavant.
   const human = spec.humanize ?? .5;
   const FEEL = {
-    drums: [0, 3, 2.6, 8], electronicDrums: [0, 0, .4, 3],
+    // Punk: la bateria empeny i respira més (menys mecànica); l'ska, més regular.
+    drums: punk ? [-3, 5, 4.5, 11] : [0, 3, 2.6, 8], electronicDrums: [0, 0, .4, 3],
     bass: [spec.style === 'ska' ? 9 : punk ? -1 : 4, 4, 3.5, 8], synthBass: [0, .5, .5, 2],
     guitar: [punk ? -4 : 3, 4, 3.5, 9], guitar2: [punk ? -3 : 5, 4, 4.5, 9], guitar3: [2, 5, 6, 10], organ: [5, 4, 5, 8],
     trumpet: [punk ? 3 : 9, 7, 8, 9], trombone: [punk ? 4 : 11, 7, 8, 9], sax: [punk ? 4 : 10, 7, 8, 9], vocal: [12, 8, 9, 9],
     synthLead: [0, 1, 1, 3], synthPad: [0, 0, 0, 0]
   };
   // Als tempos ràpids els músics han de ser més justos: les desviacions s'escalen amb el temps de negra.
-  const tempoScale = Math.max(.55, Math.min(1.15, beat / .43));
+  // Als tempos ràpids les desviacions es redueixen (menys al punk, que és cru per definició).
+  const tempoScale = Math.max(punk ? .85 : .55, Math.min(1.15, beat / .43));
   // Membres de la bateria: peu (bombo i pedal del charles), mà de la caixa, mà dels platets i toms.
   const limb = (channel, key) => { if (channel !== 9 && channel !== 10) return 0; const pitch = pieceOf(key); return [35, 36, 44].includes(pitch) ? 1 : [37, 38, 39, 40].includes(pitch) ? 2 : [42, 46, 51, 53, 59].includes(pitch) ? 3 : 4; };
   // Deriva lenta i contínua (suma de sinusoides amb fases pròpies de cada músic):

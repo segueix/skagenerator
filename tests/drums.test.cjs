@@ -103,3 +103,15 @@ test('gravacions alternades a la bateria i guitarres doblades amb preses diferen
   const takes = channel => horror.events.filter(e => e.type === 'on' && e.channel === channel).map(e => e.time);
   assert(takes(0).some((t, i) => Math.abs(takes(1)[i] - t - .009) > .002), 'cada presa té el seu ritme humà');
 });
+
+test('bateria punk menys mecànica i segona bateria a contratemps', () => {
+  const engine = require('../radioambient.js');
+  const spec = extra => engine.composeSongPart({ seed: 9, style: 'punk', bpm: 186, tonic: 9, mode: 'major' },
+    { type: 'verse', bars: 16, energy: 75, revision: 1, instruments: ['drums'], fill: 3, ...extra });
+  const bars = line => { const out = []; for (const [b, t, note] of line) (out[b] ||= []).push(`${t}:${note}`); return out.map(x => x.sort().join()); };
+  const plain = bars(spec().drumLine).slice(0, 15);
+  assert(new Set(plain).size >= 4, 'els compassos no són tots iguals');
+  const off = spec({ offbeat: true }).drumLine.filter(([b, t, note]) => note === 43 && b < 15);
+  assert(off.length >= 40 && off.every(([, t]) => t % 1 === .5), 'timbal base a cada contratemps');
+  assert.throws(() => spec({ offbeat: 'sí' }), /Segona bateria/);
+});
