@@ -232,7 +232,9 @@ Tot es pot ajustar a cada secció («Tempo de la secció», «To de la secció»
 ## Volum per seccions, diverses guitarres i efectes
 
 - **Intensitat de cada secció** (10–100 %): controla la força amb què toquen tots els instruments de la secció. Abans els metalls sonaven uns 9 dB més fluix a les estrofes de manera automàtica; ara depenen només d’aquesta intensitat.
-- **Volums d’aquesta secció**: un control de volum per instrument i per a la secció sencera, en dB respecte de la cançó (és el mateix volum que hi ha a l’equalitzador de la secció).
+- **Volum general de cada instrument** (panell de la base): un control per instrument de la cançó i per a la mescla total, de −24 a +6 dB, que s’aplica a totes les seccions. Els de bateria i baix són els mateixos que el «Volum general de la base».
+- **Volums d’aquesta secció**: un ajust per instrument i per a la secció sencera, de −24 a +12 dB, que **se suma** al volum general. Cada fila mostra el total (p. ex. «+4 dB · total −2 dB»). Si després canvies el volum general, totes les seccions el segueixen i conserven el seu ajust.
+- Els equalitzadors de la cançó i de la secció tracten només greus, mitjos i aguts. Els projectes anteriors, que tenien el volum dins de l’equalitzador, es converteixen sols i sonen igual.
 - **Fins a tres guitarres a la mateixa secció**: Guitarra 1 (rítmica), Guitarra 2 (rítmica una octava amunt, amb un patró diferent) i Guitarra 3 (arpegis i punteig). Cadascuna té el seu canal, el seu clip, el seu so i el seu efecte.
 - **Efectes de guitarra** per a cada clip: boost net, saturació de cinta, crunch, overdrive, distorsió, metal, fuzz i lo-fi, amb **guany** i **to**. La cadena és la d’un pedal i un amplificador: filtre d’entrada, saturació amb sobremostreig ×2, pantalla d’altaveu i nivell compensat (la guitarra sona igual de forta amb efecte que sense). Amb efectes de guany alt, la reverberació es redueix.
 
