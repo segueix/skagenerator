@@ -46,8 +46,9 @@
     </section>
 
     <section class="examples" data-panel="song" aria-labelledby="examples-title">
-      <div class="section-heading"><h2 id="examples-title">Cançons d’exemple</h2><span>5 de ska i 5 de punk fetes amb aquest taller · obre-les, escolta-les i canvia el que vulguis</span></div>
+      <details class="fold" id="fold-examples"><summary><div class="section-heading fold-heading"><h2 id="examples-title">Cançons d’exemple</h2><span>5 de ska i 5 de punk fetes amb aquest taller · obre-les, escolta-les i canvia el que vulguis</span></div></summary>
       <div id="example-list" class="example-list"></div>
+    </details>
     </section>
     <section class="step-panel step-base" data-panel="base" aria-labelledby="base-title">
       <div class="section-heading"><h2 id="base-title"><span class="step" aria-hidden="true">1</span>La base musical</h2><span id="base-state" class="state-pill">Pendent de generar</span></div>
@@ -89,7 +90,7 @@
 
     <section class="step-panel step-line" data-panel="line" aria-labelledby="line-title">
       <div class="section-heading"><h2 id="line-title"><span class="step" aria-hidden="true">2</span>La línia de la cançó</h2><span id="duration-total"></span></div>
-      <p class="step-copy"><span class="touch-tip">Llisca per recórrer la línia i fes servir − ＋ per apropar-la. Toca una secció, un instrument o un tros de la base per triar-lo: els botons de sota el mouen, l’allarguen o l’escurcen. Un cop triat, també el pots arrossegar o estirar per les vores. Toca’l una altra vegada per editar-lo. </span><span class="desktop-copy">Fes clic a la fila «Seccions» per afegir una secció. Arrossega-la per moure-la (o deixa-la sobre una altra per reordenar) i estira-la per les vores: la resta es desplaça. Cada instrument és un clip a la seva pista que pot travessar seccions: mou-lo o estira’l igual, i fes clic en un espai buit de la pista per afegir-ne un altre.</span></p>
+      <p class="step-copy"><details class="touch-tip touch-help"><summary>Com s’edita amb el dit</summary>Llisca per recórrer la línia i fes servir − ＋ per apropar-la. Toca una secció, un instrument o un tros de la base per triar-lo: els botons que apareixen a sota el mouen, l’allarguen o l’escurcen. Un cop triat, també el pots arrossegar o estirar per les vores. Toca’l una altra vegada per editar-lo.</details><span class="desktop-copy">Fes clic a la fila «Seccions» per afegir una secció. Arrossega-la per moure-la (o deixa-la sobre una altra per reordenar) i estira-la per les vores: la resta es desplaça. Cada instrument és un clip a la seva pista que pot travessar seccions: mou-lo o estira’l igual, i fes clic en un espai buit de la pista per afegir-ne un altre.</span></p>
       <div class="line-toolbar" role="group" aria-label="Zoom de la línia">
         <button type="button" class="icon-button" id="zoom-out" aria-label="Allunya la línia">−</button>
         <button type="button" class="icon-button" id="zoom-in" aria-label="Apropa la línia">＋</button>
@@ -122,24 +123,24 @@
           <label class="energy-field"><span class="field-label">INTENSITAT <output id="section-energy-value">55 %</output></span><input id="section-energy" type="range" min="10" max="100" step="5" aria-label="Intensitat de la secció"><small class="slider-hint"><span>Suau</span><span>Força de tots els instruments</span><span>Enèrgica</span></small></label>
         </div>
         <p class="chords-line"><span id="section-chords" class="chords"></span><button type="button" id="section-reharmonize" class="text-button">↻ Altres acords</button></p>
-        <div class="base-panel" id="section-base-panel">
-          <div class="layer-heading"><strong>LA BASE EN AQUESTA SECCIÓ</strong><span>Fes-la callar, canvia’n el patró o el so només aquí</span></div>
+        <div class="step-actions section-play"><button type="button" id="play-section" class="button listen">▷ Escolta la secció</button><button type="button" id="play-song-inline" class="button listen">▷ Escolta tota la cançó</button></div>
+        <details class="fold base-panel" id="section-base-panel">
+          <summary class="layer-heading"><strong>LA BASE EN AQUESTA SECCIÓ</strong><span>Fes-la callar, canvia’n el patró o el so només aquí</span></summary>
           <ol id="section-base" class="layer-list base-list"></ol>
-        </div>
-        <div class="layer-panel">
-          <div class="layer-heading"><strong>INSTRUMENTS QUE SONEN EN AQUESTA SECCIÓ</strong><span>A més de la base · un a un</span></div>
+        </details>
+        <details class="fold layer-panel" id="fold-layers" open>
+          <summary class="layer-heading"><strong>INSTRUMENTS QUE SONEN EN AQUESTA SECCIÓ</strong><span>A més de la base · un a un</span></summary>
           <ol id="layer-list" class="layer-list"></ol>
           <div class="add-layer"><select id="layer-instrument" aria-label="Instrument per afegir"></select><button type="button" id="add-layer" class="button">＋ Afegeix l’instrument</button><button type="button" id="copy-previous" class="text-button" hidden>⇢ Allarga fins aquí els instruments de la secció anterior</button></div>
-        </div>
-        <div class="section-volumes">
-          <div class="layer-heading"><strong>VOLUMS D’AQUESTA SECCIÓ</strong><span>dB respecte de la cançó · 0 = igual</span></div>
+        </details>
+        <details class="fold section-volumes" id="fold-volumes">
+          <summary class="layer-heading"><strong>VOLUMS D’AQUESTA SECCIÓ</strong><span>dB respecte de la cançó · 0 = igual</span></summary>
           <div id="section-volumes" class="volume-list"></div>
-        </div>
+        </details>
         <details class="eq-panel" id="section-eq-panel"><summary>Equalitzador d’aquesta secció <span>per instrument i per a la secció sencera</span></summary>
           <p class="eq-help">Per defecte cada fila segueix l’equalitzador de la cançó. En moure’n un control, aquella fila passa a ser pròpia d’aquesta secció.</p>
           <div id="section-eq" class="eq-list"></div>
         </details>
-        <div class="step-actions"><button type="button" id="play-section" class="button listen">▷ Escolta la secció</button><button type="button" id="play-song-inline" class="button listen">▷ Escolta tota la cançó</button></div>
         <div class="lyrics-heading"><label class="field-label" for="section-lyrics">LLETRA I IDEES</label><span>Opcional · només anotacions</span></div><textarea id="section-lyrics" rows="3" maxlength="5000" placeholder="Escriu la lletra: una línia per vers…"></textarea><p class="lyrics-info" id="lyrics-info"></p>
       </div>
     </section>

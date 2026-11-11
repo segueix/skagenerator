@@ -32,6 +32,14 @@ Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a
 - **La base també s’edita per seccions**: cada instrument de la base té la seva pista a la línia, partida per seccions. A cada secció es pot silenciar (p. ex. una intro només de guitarra), canviar-ne el patró (bateria, baix, guitarra, orgue i coixí) o el so (bateria, baix i guitarra), i triar els platets. «Com la cançó» torna al valor general. Si una secció es queda sense cap instrument, sona en silenci.
 - Així les cançons automàtiques es poden editar del tot, base inclosa. El pop-punk i el punk del 77 de vegades comencen amb una intro només de guitarra.
 
+### Pantalles pensades per al mòbil
+
+- **Reproductor compacte**: una sola fila (reproduir, títol i tempo, temps, aturar, exportar) amb el progrés en una barra fina; deixa més espai al contingut.
+- **Botons d’edició de la línia sempre a la vista**: en triar un element, la barra de botons queda fixada just sobre el reproductor.
+- **Seccions plegables**: a la pestanya «Secció», la base, els volums i l’equalitzador es despleguen quan calen (la pestanya passa de més de 5.600 px a uns 2.200); les cançons d’exemple també es pleguen. A l’ordinador tot continua obert.
+- **«Escolta la secció»** és a dalt de tot de la pestanya, i les etiquetes de la línia fan servir noms curts.
+- Controls de 44 px com a mínim (estrelles, selectors, botons d’esborrar) i cap desbordament horitzontal a 360 px d’amplada.
+
 ## Bateria: platets, afinació i humanització
 
 Al panell de la base hi ha tres controls nous per a la bateria i el ritme:

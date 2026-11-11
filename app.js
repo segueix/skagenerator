@@ -14,6 +14,8 @@
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const GUITARS = ['guitar', 'guitar2', 'guitar3'];
+  // Noms curts per a les etiquetes de la línia (hi caben al mòbil).
+  const SHORT = { guitar: 'Guitarra 1', guitar2: 'Guitarra 2', guitar3: 'Guitarra 3', trombone: '2a veu vent', sax: 'Saxo', synthLead: 'Sinte melodia', synthPad: 'Sinte acords', synthBass: 'Baix sinte', electronicDrums: 'Bat. electr.', vocal: 'Veu (guia)' };
   const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
   const LINES = [['own', 'Pròpia'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu']];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
@@ -1081,7 +1083,7 @@
     }
     for (const name of song.base.instruments) {
       const row = document.createElement('div'); row.className = 'line-row base-lane';
-      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = INSTRUMENTS[name].replace(/ \(.*\)/, '');
+      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = SHORT[name] || INSTRUMENTS[name];
       label.title = `${INSTRUMENTS[name]} · base`;
       const track = document.createElement('div'); track.className = 'line-track lane base'; track.style.setProperty('--color', instrumentColors[name]);
       for (const seg of segmentsOf(song)) {
@@ -1111,13 +1113,18 @@
   function openSectionEditor(base = false) {
     render();
     if (mobile.matches) setTab('section', !base);
+    $(base ? 'section-base-panel' : 'fold-layers').open = true;
     const target = base ? document.querySelector(`#section-base [data-base="${selectedBase}"]`) || $('section-base-panel') : null;
     target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
   // ── Barra d'accions de l'element triat (pensada per al mòbil) ───────
   function actionButton(bar, label, title, handler, options = {}) {
     const button = document.createElement('button'); button.type = 'button'; button.className = `button ${options.className || ''}`;
-    button.textContent = label; button.title = title; button.setAttribute('aria-label', title); button.disabled = busy || !!options.disabled;
+    // «✎ Edita»: al mòbil només es veu la icona (el text queda per als lectors de pantalla).
+    const [icon, ...words] = label.split(' ');
+    if (words.length && options.compact) { button.append(icon, Object.assign(document.createElement('span'), { className: 'action-text', textContent: ` ${words.join(' ')}` })); }
+    else button.textContent = label;
+    button.title = title; button.setAttribute('aria-label', title); button.disabled = busy || !!options.disabled;
     button.addEventListener('click', () => { if (!busy) handler(); });
     bar.append(button); return button;
   }
@@ -1140,7 +1147,7 @@
       actionButton(bar, '▶', 'Mou-lo un compàs endavant', () => move(1), { disabled: endOf(clip) >= hi });
       actionButton(bar, '−', 'Escurça’l un compàs', () => lineEdit(() => { clip.bars -= 1; }), { disabled: clip.bars <= 1 });
       actionButton(bar, '＋', 'Allarga’l un compàs', () => lineEdit(() => { clip.bars += 1; }), { disabled: endOf(clip) >= hi });
-      actionButton(bar, '✎ Edita', 'Edita’l al panell de la secció', () => { selected = sectionAt(clip.start)?.id ?? selected; openSectionEditor(); }, { className: 'primary' });
+      actionButton(bar, '✎ Edita', 'Edita’l al panell de la secció', () => { selected = sectionAt(clip.start)?.id ?? selected; openSectionEditor(); }, { className: 'primary', compact: true });
       actionButton(bar, '🗑', 'Elimina aquest clip', () => { removeClip(clip); selectedClip = null; render(); }, { className: 'danger' });
     } else if (sec && selectedBase && song.base.instruments.includes(selectedBase)) {
       const name = selectedBase, muted = (sec.mute || []).includes(name);
@@ -1160,7 +1167,7 @@
       actionButton(bar, '−', 'Escurça-la un compàs', () => lineEdit(() => resizeSectionRight(sec, sec.bars - 1)), { disabled: sec.bars <= 1 });
       actionButton(bar, '＋', 'Allarga-la un compàs', () => lineEdit(() => resizeSectionRight(sec, sec.bars + 1)), { disabled: sec.bars >= MAX_SECTION });
       actionButton(bar, '⧉', 'Duplica-la just després', () => lineEdit(() => duplicateSection(sec)));
-      actionButton(bar, '✎ Edita', 'Edita la secció', () => openSectionEditor(), { className: 'primary' });
+      actionButton(bar, '✎ Edita', 'Edita la secció', () => openSectionEditor(), { className: 'primary', compact: true });
       actionButton(bar, '🗑', 'Elimina la secció', () => removeSection(), { className: 'danger' });
     }
     bar.hidden = !bar.childElementCount || !song.base.generated;
@@ -1198,7 +1205,7 @@
     const scroller = $('line-scroll'), line = $('line'), before = scroller.scrollLeft / Math.max(1, scroller.scrollWidth);
     const label = parseFloat(getComputedStyle(line).getPropertyValue('--label')) || 112;
     let px = barPx();
-    if (px === null) px = Math.max(2, (scroller.clientWidth - label - 24) / song.settings.bars);
+    if (px === null) px = Math.max(2, (scroller.clientWidth - label - 36) / song.settings.bars);
     line.style.setProperty('--bar-px', `${px}px`);
     $('zoom-label').textContent = zoom === 'fit' ? 'Tota la cançó' : `${Math.round(px)} px per compàs`;
     $('zoom-out').disabled = px <= ZOOMS[0]; $('zoom-in').disabled = px >= ZOOMS.at(-1);
@@ -1250,7 +1257,7 @@
     for (const c of song.clips) if (!used.includes(c.instrument)) used.push(c.instrument);
     for (const name of used) {
       const row = document.createElement('div'); row.className = 'line-row';
-      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = INSTRUMENTS[name];
+      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = SHORT[name] || INSTRUMENTS[name]; label.title = INSTRUMENTS[name];
       const lane = document.createElement('div'); lane.className = 'line-track lane'; lane.title = `Fes clic en un espai buit per afegir ${INSTRUMENTS[name].toLowerCase()}`;
       lane.style.setProperty('--color', instrumentColors[name]);
       for (const clip of song.clips.filter(c => c.instrument === name)) {
@@ -1658,6 +1665,18 @@
 
   // ── Mòbil: un pas per pantalla, amb pestanyes ──────────────────────
   const mobile = window.matchMedia('(max-width: 899px)');
+  // Seccions plegables: a l'ordinador totes obertes; al mòbil només l'essencial,
+  // perquè cada pestanya càpiga en poques pantalles.
+  function applyFolds() {
+    const open = { 'section-base-panel': false, 'fold-layers': true, 'fold-volumes': false, 'fold-examples': false };
+    for (const [id, onMobile] of Object.entries(open)) $(id).open = mobile.matches ? onMobile : true;
+  }
+  // Alçada real del reproductor i les pestanyes fixos: el contingut i els botons
+  // d'edició de la línia es col·loquen just per sobre.
+  function measureDock() {
+    const height = ['.transport', '.tabbar'].reduce((total, selector) => { const el = document.querySelector(selector); return total + (el && getComputedStyle(el).display !== 'none' ? el.offsetHeight : 0); }, 0);
+    document.documentElement.style.setProperty('--dock', `${height}px`);
+  }
   function setTab(name, scroll = true) {
     document.body.dataset.tab = name;
     for (const tab of document.querySelectorAll('.tab')) tab.setAttribute('aria-selected', String(tab.dataset.tab === name));
@@ -1704,7 +1723,10 @@
   $('zoom-in').addEventListener('click', () => stepZoom(1));
   $('zoom-out').addEventListener('click', () => stepZoom(-1));
   $('zoom-fit').addEventListener('click', () => setZoom('fit'));
-  window.addEventListener('resize', () => applyZoom());
+  window.addEventListener('resize', () => { applyZoom(); measureDock(); });
+  mobile.addEventListener('change', applyFolds);
+  if (typeof ResizeObserver === 'function') { const observer = new ResizeObserver(measureDock); for (const selector of ['.transport', '.tabbar']) observer.observe(document.querySelector(selector)); }
+  applyFolds(); measureDock();
   $('song-title').addEventListener('input', event => { song.title = event.target.value; $('transport-title').textContent = song.title || 'Nova cançó'; save(); });
   $('generate-base').addEventListener('click', generateBase);
   $('play-base').addEventListener('click', () => play('base'));
