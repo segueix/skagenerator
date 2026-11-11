@@ -66,6 +66,12 @@ Kits i baixos gravats nous: **Big Rusty** (greu), **kit de club de jazz**, **kit
 
 Al panell **Cançó automàtica** tries un subgènere, la **tonalitat** (a l’atzar o una de les pròpies del subgènere), la durada (de 2 a 4 minuts) i si vols melodia de veu, i el taller compon una cançó sencera: introducció, estrofes, pretornades, tornades, pont o solo i final, amb els canvis de tempo propis del subgènere (introduccions lentes, ponts a mig temps, última tornada pujada de to…). Cada cançó es desa sola a **Les meves cançons**, al navegador, i s’hi pot posar de 1 a 5 estrelles. Quan d’un subgènere tens cançons de ★4 o més, les noves cançons d’aquest subgènere s’inspiren sovint en el seu tempo, tonalitat i groove. També pots desar-hi la cançó que estàs fent a mà.
 
+### Estructures diferents a cada cançó
+
+La forma de la cançó automàtica surt d’un catàleg de plantilles: 20 al punk i 10 a l’ska. Algunes comencen per la tornada, n’hi ha sense pont, amb estrofa doble, pretornada o solo, amb un **pont trencat** (bateria i baix a mig temps, guitarra 2) o amb un **riff curt** entre blocs. Cada tipus de secció tria la llargada (4, 8 o 16 compassos segons el tempo) i de vegades l’última tornada és doble. Es proven 160 combinacions, es guarda la millor de cada plantilla i es tria entre plantilles. Així cap forma no guanya per tenir més versions dins de la durada.
+
+Amb **«Estructura diferent de les últimes cançons»** (activada per defecte), cada forma es compara amb les de les 12 cançons més recents de la biblioteca: ordre de les seccions i llargades. Les més recents i les del mateix subgènere pesen més, i al punk la repetició es penalitza encara més. L’avís de la cançó nova mostra la forma, per exemple «intro › estrofa › tornada › estrofa › tornada › pont › tornada ×2 › final».
+
 ### Tonalitats de cada subgènere
 
 Cada subgènere té de 4 a 7 tonalitats pròpies (només en els modes per als quals té progressions d’acords). Al selector **«Tonalitat»** es pot triar una d’aquestes o deixar-la a l’atzar.

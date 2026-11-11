@@ -260,7 +260,8 @@ test('millores dels comentaris: transicions suaus, guitarra 2, varietat al punk 
   assert(jamaican.settings.baseVolume.bass < 0 && jamaican.settings.volumes.trumpet > 0);
   // Reforç quan la cançó s'alenteix: un instrument que sosté el so.
   const song = builder.createAutoSong(engine, 'punk77', { seed: 3 });
-  const bridge = song.sections.find(s => s.type === 'bridge');
+  // Una secció del mig (no totes les formes tenen pont), sense guitarra 2, que s'alenteix.
+  const bridge = song.sections.find((s, i) => i > 1 && s.type === 'verse');
   song.clips = song.clips.filter(c => !(c.instrument === 'guitar2' && c.start === bridge.start));
   bridge.bpm = Math.round(song.settings.bpm * .9);
   const added = builder.reinforceSlowdowns(song);
@@ -287,4 +288,40 @@ test('la cançó automàtica deixa triar la tonalitat entre les del subgènere',
     const other = builder.createAutoSong(engine, key, { seed: 7, key: [1, 'major'], candidates: 1 });
     assert(sg.keys.some(([t, m]) => t === other.settings.tonic && m === other.settings.mode));
   }
+});
+
+test('estructures variades: es penalitza repetir la forma de les últimes cançons (sobretot al punk)', () => {
+  const plan = s => s.sections.map(x => [x.type, x.bars]);
+  assert.equal(builder.formSimilarity(plan({ sections: [{ type: 'intro', bars: 4 }, { type: 'verse', bars: 16 }] }), [['intro', 4], ['verse', 16]]), 1);
+  assert(builder.formSimilarity([['intro', 4], ['verse', 16], ['chorus', 16]], [['chorus', 8], ['bridge', 8]]) < .4);
+  for (const key of ['punk77', 'hardcore', 'horrorpunk', 'twotone']) {
+    const measure = vary => {
+      const recent = [], forms = new Set(); let sim = 0, n = 0;
+      for (let i = 0; i < 10; i++) {
+        const song = builder.createAutoSong(engine, key, { seed: 500 + i, recent: vary ? recent : [], vary });
+        const p = plan(song);
+        // Durada dins de 2–4 minuts i seccions vàlides.
+        const seconds = song.sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || song.settings.bpm), 0);
+        assert(seconds >= 120 && seconds <= 240, `${key}: ${seconds.toFixed(0)} s`);
+        for (const r of recent.slice(0, 3)) { sim += builder.formSimilarity(p, r.plan); n++; }
+        recent.unshift({ subgenre: key, style: song.settings.style, plan: p });
+        forms.add(p.map(([t]) => t).join());
+      }
+      return { forms: forms.size, sim: sim / n };
+    };
+    const off = measure(false), on = measure(true);
+    assert(on.sim < off.sim, `${key}: menys semblança (${off.sim.toFixed(2)} → ${on.sim.toFixed(2)})`);
+    assert(on.forms >= 6, `${key}: ${on.forms} formes diferents de 10`);
+  }
+  // Pont trencat a mig temps i riff curt entre blocs: tenen arranjament propi.
+  let breakdown = false, riff = false;
+  for (let seed = 1; seed <= 40 && !(breakdown && riff); seed++) {
+    const song = builder.createAutoSong(engine, 'punk77', { seed, candidates: 1 });
+    for (const sec of song.sections) {
+      const clips = song.clips.filter(c => c.start === sec.start);
+      if (sec.type === 'bridge' && sec.feel?.bass === .5) { breakdown = true; assert(clips.some(c => c.instrument === 'guitar2')); }
+      if (sec.type === 'solo' && sec.bars === 4) { riff = true; assert(clips.some(c => c.line === 'riff')); }
+    }
+  }
+  assert(breakdown && riff);
 });

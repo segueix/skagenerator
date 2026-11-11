@@ -119,7 +119,9 @@
     const vary = () => .8 + r() * .4; // una mica d’atzar perquè no sigui sempre el mateix
     const best = (table, context) => Object.entries(table).map(([name, v]) => [name, v * context(name) * vary()]).sort((a, b) => b[1] - a[1])[0] || [null, 0];
     const candidates = [];
-    const [opening, openValue] = best(fit.open, name => ({
+    // Si la cançó comença directament per la tornada, no es buida: com a molt, compte de baquetes.
+    const openTable = first.type === 'intro' ? fit.open : { countin: fit.open.countin || .5 };
+    const [opening, openValue] = best(openTable, name => ({
       fadein: first.bars >= 8 || st.bpm <= 125 ? 1 : .3, voice: options.vocal ? 1 : 0, countin: st.countIn ? 0 : 1,
       halftime: first.bpm ? 0 : 1, buildup: first.bars >= 4 ? 1 : .4 })[name] ?? 1);
     if (opening) candidates.push({ kind: 'opening', name: opening, value: openValue });
@@ -309,44 +311,26 @@
     if (settings.swing === 0) delete settings.swing;
 
     // ── Estructura de 2 a 4 minuts ────────────────────────────────────
-    // Punk del 77: de vegades pretornada i intro llarga (abans totes les cançons tenien la mateixa forma).
-    const len = bpm >= 160 ? 16 : 8;
-    const pre = ['twotone', 'poppunk', 'jamaican'].includes(key) && r() < .7 || key === 'punk77' && r() < .35;
-    const introBars = key === 'jamaican' || key === 'rocksteady' || key === 'punk77' && r() < .3 ? 8 : 4;
-    const middle = punk ? 'bridge' : key === 'rocksteady' ? 'bridge' : r() < .6 ? 'solo' : 'bridge';
-    const block = () => [['verse', len], ...(pre ? [['prechorus', 4]] : []), ['chorus', len]];
-    let plan = [['intro', introBars], ...block(), ...block(), [middle, 8], ['chorus', len], ['outro', punk ? 4 : 8]];
-    const seconds = list => list.reduce((t, [, bars]) => t + bars * 240 / bpm, 0), target = minutes * 60;
-    // Ajust voraç: afegeix o treu blocs fins que la durada s'acosta al que s'ha demanat (sempre entre 2 i 4 minuts).
-    const ok = list => seconds(list) >= 125 && seconds(list) <= 235;
-    const score = list => Math.abs(seconds(list) - target) + (ok(list) ? 0 : 1000);
-    const variants = list => {
-      const out = [], mid = list.findIndex(([type]) => type === middle), verses = list.filter(([t]) => t === 'verse').length;
-      out.push([...list.slice(0, mid), ...block(), ...list.slice(mid)]);
-      out.push([...list.slice(0, -1), ['chorus', len], list[list.length - 1]]);
-      out.push([...list.slice(0, mid + 1), [middle === 'solo' ? 'bridge' : 'solo', 8], ...list.slice(mid + 1)]);
-      if (verses > 1) { const v = list.findIndex(([t]) => t === 'verse'); out.push([...list.slice(0, v), ...list.slice(v + (pre ? 3 : 2))]); }
-      const p = list.findIndex(([t]) => t === 'prechorus'); if (p >= 0) out.push(list.filter((_, i) => i !== p));
-      if (list[0][1] > 4) out.push([['intro', 4], ...list.slice(1)]);
-      const c = list.findIndex(([t], i) => t === 'chorus' && list[i + 1]?.[0] === 'chorus'); if (c >= 0) out.push(list.filter((_, i) => i !== c));
-      out.push(list.map(([type, bars]) => [type, type === 'verse' && bars < 16 ? bars * 2 : bars]));
-      out.push(list.map(([type, bars]) => [type, type === 'verse' && bars > 8 ? bars / 2 : bars]));
-      return out.filter(l => l.length <= 24 && l.reduce((t, [, b]) => t + b, 0) <= 256);
-    };
-    for (let guard = 0; guard < 12; guard++) {
-      const best = variants(plan).reduce((a, b) => (score(b) < score(a) ? b : a), plan);
-      if (score(best) >= score(plan) - 4) break;
-      plan = best;
-    }
+    // Es proven moltes formes (catàleg de plantilles i llargades variables) i es tria la que
+    // s'acosta a la durada demanada i s'assembla menys a les estructures de les últimes cançons.
+    const target = minutes * 60;
+    const form = chooseForm({ key, style: sg.style, bpm, target, r, recent: options.recent || [], vary: options.vary !== false });
+    let plan = form.plan;
+    const formPenalty = form.penalty;
 
     const id = `auto-${seed.toString(36)}`, sections = [];
     let at = 0;
     const energy = { intro: 55, verse: 62, prechorus: 76, chorus: 90, bridge: 55, solo: 82, outro: 60 };
     // Corba d'energia: cada estrofa i cada tornada una mica més plenes que l'anterior.
-    const seen = {};
-    plan.forEach(([type, bars], i) => {
+    const seen = {}, roles = new Map();
+    plan.forEach(([type, bars, role], i) => {
       const n = seen[type] = (seen[type] || 0) + 1, grow = type === 'verse' ? (n - 1) * 6 : type === 'chorus' ? (n - 1) * 3 : 0;
-      sections.push({ id: `${id}-s${i + 1}`, type, start: at, bars, lyrics: '', energy: Math.min(100, energy[type] + grow + (type === 'chorus' && i > plan.length - 4 ? 6 : 0)) });
+      const sec = { id: `${id}-s${i + 1}`, type, start: at, bars, lyrics: '', energy: Math.min(100, energy[type] + grow + (type === 'chorus' && i > plan.length - 4 ? 6 : 0)) };
+      // Pont trencat («breakdown»): bateria i baix a mig temps, pesant. Riff: interludi curt amb el riff de la cançó.
+      if (role === 'breakdown') { sec.feel = { drums: .5, bass: .5 }; sec.energy = 80; }
+      if (role === 'riff') sec.energy = 85;
+      if (role) roles.set(sec, role);
+      sections.push(sec);
       at += bars;
     });
     settings.bars = at;
@@ -355,10 +339,10 @@
     const tempo = (sec, factor) => { if (sec) sec.bpm = Math.max(40, Math.min(240, Math.round(bpm * factor))); };
     // Canvis de tempo suaus (els salts grans sonaven bruscos): com a molt un 7 %. Per sonar
     // «més lent» sense canviar de tempo, la bateria i el baix van a mig temps.
-    if (key === 'jamaican') { tempo(sections[0], .94); }
+    if (key === 'jamaican') { tempo(of('intro')[0], .94); }
     // Rocksteady: estrofes amb cops d'aro en lloc de charles (sense platets); horror punk: intro de toms sense platets.
     if (key === 'rocksteady') { tempo(of('bridge')[0], .93); tempo(of('outro')[0], .95); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
-    if (key === 'horrorpunk') sections[0].cymbals = 'none';
+    if (key === 'horrorpunk' && of('intro')[0]) of('intro')[0].cymbals = 'none';
     // Un altre ritme de bateria a la segona estrofa (de vegades), com fa «Dona-li varietat».
     const drumCount = engine.SONG_GROOVES[sg.style].drums.length;
     if (of('verse').length > 1 && key !== 'hardcore' && r() < .5) of('verse')[1].groove = { drums: (groove.drums + 1 + Math.floor(r() * (drumCount - 1))) % drumCount };
@@ -367,7 +351,7 @@
     if (key === 'skapunk') { const b = of('bridge')[0] || of('solo')[0]; if (b) b.feel = { drums: .5 }; tempo(lastChorus, 1.04); sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 1; }); }
     if (key === 'hardcore') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); const b = of('bridge')[0]; if (b) b.feel = { drums: .5, bass: .5 }; }
     if (key === 'poppunk') { of('prechorus').forEach(s => tempo(s, 1.04)); const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; }); }
-    if (key === 'horrorpunk') { sections[0].feel = { drums: .5, bass: .5 }; const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
+    if (key === 'horrorpunk') { if (of('intro')[0]) of('intro')[0].feel = { drums: .5, bass: .5 }; const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
     // Punk: de vegades una segona bateria a contratemps a partir de la segona tornada.
     if (['punk77', 'hardcore', 'horrorpunk'].includes(key) && r() < .55) of('chorus').slice(1).forEach(s => { s.offbeat = true; });
     const harmony = {};
@@ -380,6 +364,13 @@
     let verses = 0;
     for (const sec of sections) {
       const sing = vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
+      const role = roles.get(sec);
+      if (role === 'riff') {
+        if (punk) { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
+        else { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (key !== 'rocksteady') add(sec, 'sax', { line: 'riff' }); }
+        continue;
+      }
+      if (role === 'breakdown' && punk) { add(sec, 'guitar2', { revision: 2 }); continue; }
       if (sing) add(sec, 'vocal', register ? { register } : {});
       if (!punk) {
         if (sec.type === 'intro' || sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (key !== 'rocksteady') add(sec, 'sax', { line: 'riff' }); }
@@ -484,7 +475,8 @@
       if (clip) clip.color = highlights.color.color;
     }
     // Puntuació de la cançó: forma harmònica, qualitat mitjana de les línies i varietat d'inici, final i silencis.
-    const rating = bestForm + quality / Math.max(1, judged) + 
+    // La forma que s'assembla a les últimes cançons resta punts.
+    const rating = bestForm + quality / Math.max(1, judged) - 1.5 * formPenalty + 
       // Premia que els recursos aplicats encaixin bé (no que n'hi hagi molts).
       + (highlights.chosen.length ? .3 * highlights.chosen.reduce((t, c) => t + c.value, 0) / highlights.chosen.length : .2);
     return { song, score: rating };
@@ -507,6 +499,78 @@
     });
     return added;
   }
+  // ── Formes de cançó ────────────────────────────────────────────────
+  // Plantilles: I intro, V estrofa, P pretornada, C tornada, B pont, K pont trencat a mig temps
+  // («breakdown»), S instrumental (solo), R riff curt entre blocs, O final. Algunes comencen
+  // directament per la tornada o no tenen pont; el punk en té més perquè és on les cançons
+  // s'assemblaven més.
+  const FORMS = {
+    punk: ['IVCVCBCO', 'IVCVCCO', 'CVCVCBCO', 'IVPCVPCBCO', 'IVVCVCSCCO', 'IVCVCSCO', 'IVCSVCBCO', 'ICVCVCBCO', 'IVCVCBCCO',
+      'IVCRVCKCO', 'VCVCKCCO', 'IVCVCKCO', 'IVVCVVCBCO', 'ICVCRVCCO', 'IVPCVPCSCO',
+      'IVCVCRVCKCCO', 'IVVCVCKCCO', 'IVCVCKVCCO', 'ICVCVCKCCO', 'IVCRVCRVCBCO'],
+    ska: ['IVPCVPCSCO', 'IVCVCBSCO', 'IVCVCSCO', 'ICVCSVCCO', 'IVVCSVCO', 'IVPCVPCBCO', 'IVCSVCBCO', 'IVCRVCSCO', 'IVCVCBCCO', 'IVCVCRVCSCO'],
+    urban: ['IVCVCBCO', 'IVCVCCO']
+  };
+  const FORM_TYPES = { I: 'intro', V: 'verse', P: 'prechorus', C: 'chorus', B: 'bridge', K: 'bridge', S: 'solo', R: 'solo', O: 'outro' };
+  // Semblança entre dues estructures (0 = res a veure, 1 = idèntiques): ordre de les seccions i llargades.
+  function editDistance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function formSimilarity(a, b) {
+    if (!a.length || !b.length) return 0;
+    const types = x => x.map(([t]) => t), full = x => x.map(([t, n]) => `${t}${n}`), n = Math.max(a.length, b.length);
+    return .7 * (1 - editDistance(types(a), types(b)) / n) + .3 * (1 - editDistance(full(a), full(b)) / n);
+  }
+  // Penalització per repetir: les cançons més recents i del mateix subgènere (o estil) pesen més.
+  function formPenaltyOf(plan, recent, key, style) {
+    return recent.slice(0, 12).reduce((t, song, i) => {
+      const weight = .85 ** i * (song.subgenre === key ? 1 : song.style === style ? .7 : .3);
+      return t + weight * formSimilarity(plan, song.plan) ** 3;
+    }, 0);
+  }
+  function chooseForm({ key, style, bpm, target, r, recent = [], vary = true }) {
+    const fast = bpm >= 160, punk = style === 'punk', pick = list => list[Math.floor(r() * list.length)];
+    const lengths = {
+      I: fast ? [4, 4, 8] : [4, 8, 8], V: fast ? [8, 16, 16] : [8, 8, 16], P: fast ? [4, 8] : [4, 4, 8], C: fast ? [8, 16, 16] : [8, 8, 16],
+      B: [8, 8, 16], K: fast ? [8, 16] : [8], S: fast ? [8, 16] : [8, 16], R: [4], O: fast ? [4, 4, 8] : [4, 8, 8]
+    };
+    // Gèneres: el hardcore sense pretornada i amb breakdown; el rocksteady sense solos ràpids.
+    let templates = FORMS[style] || FORMS.punk;
+    if (key === 'hardcore') templates = templates.filter(t => !t.includes('P'));
+    if (key === 'rocksteady') templates = templates.filter(t => !t.includes('R'));
+    const seconds = plan => plan.reduce((t, [, bars]) => t + bars * 240 / bpm, 0);
+    const candidates = [];
+    for (let k = 0; k < 160; k++) {
+      const template = pick(templates), sizes = {};
+      // Cada tipus de secció té la mateixa llargada a tota la cançó (com en una cançó real).
+      // K i R porten un paper especial: pont trencat a mig temps i riff curt entre blocs.
+      const plan = [...template].map(token => [FORM_TYPES[token], sizes[token] ??= pick(lengths[token]), ...(token === 'K' ? ['breakdown'] : token === 'R' ? ['riff'] : [])]);
+      // De vegades l'última tornada és doble (el doble de llarga), per acabar amb força.
+      if (r() < .25) { const last = plan.map(([t]) => t).lastIndexOf('chorus'); if (plan[last][1] <= 16) plan[last] = ['chorus', plan[last][1] * 2]; }
+      const total = plan.reduce((t, [, bars]) => t + bars, 0), time = seconds(plan);
+      if (plan.length > 24 || total > 256 || time < 125 || time > 235) continue;
+      const penalty = vary ? formPenaltyOf(plan, recent, key, style) : 0;
+      // Dins de ±20 s de la durada demanada, qualsevol forma serveix: així no guanya sempre la mateixa.
+      // Més de 45 s lluny de la durada demanada ja no compensa. Al punk, repetir forma pesa més.
+      const off = Math.abs(time - target);
+      candidates.push({ plan, penalty, template, score: Math.max(0, off - 20) / 30 + Math.max(0, off - 45) / 8 + (punk ? 6 : 4) * penalty + r() * .6 });
+    }
+    // Si cap forma no encaixa amb la durada, la clàssica ajustada.
+    if (!candidates.length) {
+      const len = fast ? 16 : 8;
+      return { plan: [['intro', 4], ['verse', len], ['chorus', len], ['verse', len], ['chorus', len], ['bridge', 8], ['chorus', len], ['outro', 4]], penalty: 0 };
+    }
+    // La millor versió de cada plantilla, i després la millor plantilla: així totes les formes
+    // tenen les mateixes opcions (abans guanyaven les que tenien més versions dins de la durada).
+    const byTemplate = new Map();
+    for (const c of candidates) if (!byTemplate.has(c.template) || c.score < byTemplate.get(c.template).score) byTemplate.set(c.template, c);
+    return [...byTemplate.values()].map(c => ({ ...c, score: c.score + r() * .8 })).sort((a, b) => a.score - b.score)[0];
+  }
+
   // Pes sonor de cada instrument dins de la banda (les guitarres distorsionades pesen més).
   const WEIGHT = { drums: 3, electronicDrums: 3, bass: 2, synthBass: 2, guitar: 2, guitar2: 2, guitar3: 1.5, trumpet: 1.2, trombone: 1.2, sax: 1.2,
     organ: 1, synthPad: 1, synthLead: 1, vocal: .8 };
@@ -610,5 +674,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });
