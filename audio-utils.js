@@ -34,20 +34,100 @@
     }
     return result;
   }
+  // ── Filtres de la veu enregistrada ──────────────────────────────────
+  // Els presets combinen bandes de freqüència, saturació i, quan escau,
+  // modulació. El so es calcula a partir de la presa original, sense alterar-la.
+  const VOICE_EFFECTS = Object.freeze({
+    clean: 'Natural', megaphone: 'Megàfon', telephone: 'Telèfon',
+    radio: 'Ràdio antiga', walkie: 'Walkie-talkie',
+    robot: 'Robòtica', lofi: 'Lo-fi', warm: 'Càlida'
+  });
+  const VOICE_EQ_KEYS = ['low', 'mid', 'high'];
+  function voiceBiquad(type, hz, gainDb, rate, q = .7071067811865476) {
+    const w = 2 * Math.PI * Math.min(rate * .44, hz) / rate, c = Math.cos(w), s = Math.sin(w);
+    const alpha = s / (2 * q), A = 10 ** (gainDb / 40);
+    let b0, b1, b2, a0, a1, a2;
+    if (type === 'highpass') {
+      b0 = (1 + c) / 2; b1 = -(1 + c); b2 = (1 + c) / 2;
+      a0 = 1 + alpha; a1 = -2 * c; a2 = 1 - alpha;
+    } else if (type === 'lowpass') {
+      b0 = (1 - c) / 2; b1 = 1 - c; b2 = (1 - c) / 2;
+      a0 = 1 + alpha; a1 = -2 * c; a2 = 1 - alpha;
+    } else if (type === 'peak') {
+      b0 = 1 + alpha * A; b1 = -2 * c; b2 = 1 - alpha * A;
+      a0 = 1 + alpha / A; a1 = -2 * c; a2 = 1 - alpha / A;
+    } else {
+      const sign = type === 'lowshelf' ? 1 : -1, root = 2 * Math.sqrt(A) * s / Math.SQRT2;
+      b0 = A * ((A + 1) - sign * (A - 1) * c + root);
+      b1 = 2 * sign * A * ((A - 1) - sign * (A + 1) * c);
+      b2 = A * ((A + 1) - sign * (A - 1) * c - root);
+      a0 = (A + 1) + sign * (A - 1) * c + root;
+      a1 = -2 * sign * ((A - 1) + sign * (A + 1) * c);
+      a2 = (A + 1) - sign * (A - 1) * c + root;
+    }
+    return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
+      a1: a1 / a0, a2: a2 / a0, x1: 0, x2: 0, y1: 0, y2: 0 };
+  }
+  function voiceTick(f, x) {
+    const y = f.b0 * x + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+    f.x2 = f.x1; f.x1 = x; f.y2 = f.y1; f.y1 = y;
+    return y;
+  }
+  function processVoice(voice, options = {}) {
+    if (!(voice instanceof Float32Array)) throw new Error('Mostres de veu no vàlides');
+    const { effect = 'clean', eq = {}, rate = 44100 } = options;
+    if (!Object.hasOwn(VOICE_EFFECTS, effect)) throw new Error('Filtre de veu no vàlid');
+    if (!Number.isFinite(rate) || rate < 8000 || rate > 96000) throw new Error('Freqüència de veu no vàlida');
+    if (!eq || typeof eq !== 'object' || Array.isArray(eq) ||
+      Object.keys(eq).some(key => !VOICE_EQ_KEYS.includes(key)) ||
+      VOICE_EQ_KEYS.some(key => !Number.isFinite(eq[key] ?? 0) || Math.abs(eq[key] ?? 0) > 12))
+      throw new Error('Equalitzador de veu no vàlid');
+    const preset = {
+      clean: { highpass: 80 },
+      megaphone: { highpass: 480, lowpass: 3200, peak: [1700, 8], drive: 3.3 },
+      telephone: { highpass: 330, lowpass: 3000, peak: [1300, 2] },
+      radio: { highpass: 260, lowpass: 4100, peak: [1600, 4], drive: 2.1 },
+      walkie: { highpass: 420, lowpass: 2900, peak: [1900, 5], drive: 2.6 },
+      robot: { highpass: 160, lowpass: 4300, peak: [1100, 3], robot: true },
+      lofi: { highpass: 190, lowpass: 3700, drive: 2, hold: 4 },
+      warm: { highpass: 70, lowpass: 7500, low: 3, high: -2 }
+    }[effect];
+    const chain = [voiceBiquad('highpass', preset.highpass, 0, rate)];
+    if (preset.lowpass) chain.push(voiceBiquad('lowpass', preset.lowpass, 0, rate));
+    if (preset.peak) chain.push(voiceBiquad('peak', preset.peak[0], preset.peak[1], rate, 1));
+    if (preset.low) chain.push(voiceBiquad('lowshelf', 240, preset.low, rate));
+    if (preset.high) chain.push(voiceBiquad('highshelf', 3500, preset.high, rate));
+    for (const [key, type, hz] of [['low', 'lowshelf', 180], ['mid', 'peak', 1200], ['high', 'highshelf', 4500]])
+      if (eq[key]) chain.push(voiceBiquad(type, hz, eq[key], rate, key === 'mid' ? 1 : .707));
+    const result = new Float32Array(voice.length);
+    let held = 0;
+    for (let i = 0; i < voice.length; i++) {
+      // La saturació és abans del pas baix per evitar aguts artificials.
+      let x = voice[i];
+      if (preset.drive) x = Math.tanh(x * preset.drive) / Math.sqrt(preset.drive);
+      if (preset.hold) {
+        if (i % preset.hold === 0) held = Math.round(x * 2048) / 2048;
+        x = held;
+      }
+      for (const f of chain) x = voiceTick(f, x);
+      if (preset.robot) x *= .3 + .7 * Math.sin(2 * Math.PI * 52 * i / rate);
+      result[i] = Math.max(-1, Math.min(1, x));
+    }
+    return result;
+  }
   // ── Veu gravada (mono, a la mateixa freqüència que la cançó) ──────────
   // Suma la veu, centrada i amb un filtre passaaltes de 80 Hz, a un tros de
   // la cançó que comença a la mostra «from». «offset» desplaça la veu
   // (positiu: més tard) per afinar la sincronia.
   function mixVoice(mix, voice, options = {}) {
     check(mix);
-    const { from = 0, gainDb = 0, offset = 0, rate = 44100 } = options;
+    const { from = 0, gainDb = 0, offset = 0, rate = 44100, processed = false } = options;
     const out = [mix[0].slice(), mix[1].slice()];
     if (!(voice instanceof Float32Array) || !voice.length) return out;
-    const gain = 10 ** (gainDb / 20) * Math.SQRT1_2, a = Math.exp(-2 * Math.PI * 80 / rate);
-    let x1 = 0, y1 = 0;
+    const vocal = processed ? voice : processVoice(voice, options);
+    const gain = 10 ** (gainDb / 20) * Math.SQRT1_2;
     for (let i = 0; i < out[0].length; i++) {
-      const at = from + i - offset, x = at >= 0 && at < voice.length ? voice[at] : 0;
-      const y = a * (y1 + x - x1); x1 = x; y1 = y;
+      const at = from + i - offset, y = at >= 0 && at < vocal.length ? vocal[at] : 0;
       for (const channel of out) {
         let v = channel[i] + y * gain;
         const level = Math.abs(v);
@@ -98,5 +178,5 @@
     }
     return wav;
   }
-  return { joinStereo, mixSections, mixVoice, placeTake, levelTake, resampleLinear, encodeWav };
+  return { joinStereo, mixSections, mixVoice, processVoice, VOICE_EFFECTS, VOICE_EQ_KEYS, placeTake, levelTake, resampleLinear, encodeWav };
 });
