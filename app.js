@@ -1962,6 +1962,11 @@
       row.append(info, stars, open, remove); box.append(row);
     }
     $('library-save').hidden = !!song.libraryId; $('library-save').disabled = busy || !song.base.generated;
+    // Botó d'exportar amb el nombre de cançons que tenen comentaris.
+    const commented = exportableSongs().filter(hasComments).length;
+    $('library-export').textContent = `⇩ Baixa les cançons amb comentaris${commented ? ` (${commented})` : ''}`;
+    $('library-export').disabled = !commented;
+    $('library-export').title = commented ? `Un sol fitxer amb les ${commented} cançons que tenen comentaris` : 'Encara no hi ha cap cançó amb comentaris';
   }
   // ── Comentaris de la cançó ─────────────────────────────────────────
   // De tota la cançó, d'una secció o del punt on és el capçal. Es desen amb la
@@ -2011,17 +2016,30 @@
   $('comment-text').addEventListener('keydown', event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) addComment(); });
   // El capçal es mou mentre sona: l'opció «On és el capçal» s'actualitza en obrir el selector.
   for (const type of ['focus', 'pointerdown']) $('comment-where').addEventListener(type, commentOptions);
-  $('library-export').addEventListener('click', () => {
-    flushLibrary();
+  // Cançons per exportar: les de la biblioteca i, si té comentaris i no hi és, la cançó oberta.
+  function exportableSongs() {
     const list = readLibrary();
     if (song.comments?.length && !song.libraryId) list.unshift({ title: song.title, rating: 0, created: Date.now(), song });
-    if (!list.length) { notify('Encara no hi ha cap cançó per exportar. Crea’n una o desa la cançó actual.'); return; }
+    return list;
+  }
+  function hasComments(entry) { return !!entry.song?.comments?.length; }
+  // Totes les cançons amb comentaris en un sol fitxer (o totes, amb «Baixa-les totes»).
+  function exportSongs(onlyCommented) {
+    flushLibrary();
+    const all = exportableSongs(), list = onlyCommented ? all.filter(hasComments) : all;
+    if (!list.length) {
+      notify(onlyCommented ? 'Encara no hi ha cap cançó amb comentaris. Afegeix-ne al panell «Comentaris de la cançó».' : 'Encara no hi ha cap cançó per exportar. Crea’n una o desa la cançó actual.');
+      return;
+    }
     try {
       const report = builder.feedbackReport(engine, list);
-      download(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }), `skagenerator-comentaris-${new Date().toISOString().slice(0, 10)}.json`);
-      notify(`Exportades ${report.totals.songs} cançons (${report.totals.rated} puntuades i ${report.totals.comments} comentaris).`);
+      const name = `skagenerator-${onlyCommented ? 'comentaris' : 'totes'}-${new Date().toISOString().slice(0, 10)}.json`;
+      download(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }), name);
+      notify(`Baixades ${report.totals.songs} cançons en un sol fitxer (${report.totals.comments} comentaris i ${report.totals.rated} puntuades): ${name}.`);
     } catch (error) { console.error(error); notify(`No s’han pogut exportar les cançons: ${reasonOf(error)}`); }
-  });
+  }
+  $('library-export').addEventListener('click', () => exportSongs(true));
+  $('library-export-all').addEventListener('click', () => exportSongs(false));
 
   // ── Cançó automàtica ───────────────────────────────────────────────
   fillSelect($('auto-subgenre'), Object.entries(engine.SUBGENRES).map(([key, sg]) => [key, `${sg.style === 'punk' ? 'Punk' : 'Ska'} · ${sg.name}`]), 'twotone');

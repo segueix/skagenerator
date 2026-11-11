@@ -613,3 +613,6 @@ body.recording .transport-play { background: #ef4444; }
 .comment p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment .icon-button { position: absolute; top: 2px; right: 2px; }
 @media (max-width: 899px) { .comment-form { grid-template-columns: 1fr; } }
+
+.library-export { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.library-export .text-button { margin: 0; }
