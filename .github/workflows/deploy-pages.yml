@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache
-          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs', 'extra-instruments.json', 'scripts/extra-instruments.mjs') }}
+          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs', 'extra-instruments.json', 'scripts/extra-instruments.mjs', 'round-robin.json') }}
           restore-keys: soundbanks-
       - name: Passar els tests
         run: npm test

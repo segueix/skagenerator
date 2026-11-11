@@ -197,7 +197,8 @@ test('la bateria segueix la forma de cada secció', () => {
   const roll = at(pre, 3, 38);
   assert(roll.length >= 12 && roll.at(-1)[3] > roll[0][3], 'crescendo abans de la tornada');
   const outro = drums('outro');
-  assert.deepEqual(outro.filter(hit => hit[0] === 3).map(hit => hit[1]), [0, 0, 0]);
+  assert.deepEqual(outro.filter(hit => hit[0] === 3).map(hit => hit[1]), [0, 0, 0, 0]);
+  assert(outro.filter(hit => hit[0] === 2 && hit[1] >= 2).length >= 4, 'redoble gran abans del cop final');
   assert.notDeepEqual(drums('verse', 4, 30), drums('verse', 4, 90));
 });
 
@@ -261,7 +262,7 @@ test('cada instrument pot anar a mig temps o a doble temps dins la secció', () 
   const spec = feel => engine.composeSongPart(cfg, { ...part('verse', 4), layers: { trumpet: 2 }, ...(feel ? { feel } : {}) });
   const notes = (s, channel) => performance.createPerformance(s).events.filter(e => e.type === 'on' && e.channel === channel);
   const normal = spec(), double = spec({ drums: 2 }), half = spec({ drums: .5, bass: .5 });
-  const kicks = s => notes(s, 9).filter(e => e.note === 36).length;
+  const kicks = s => notes(s, 9).filter(e => [36, 88, 89].includes(e.note)).length; // bombo i les seves gravacions alternades
   assert(kicks(double) > kicks(normal) * 1.6, 'doble temps: el doble de cops');
   assert(kicks(half) < kicks(normal) * .7, 'mig temps: la meitat de cops');
   assert(notes(half, 9).every(e => e.time < half.seconds));

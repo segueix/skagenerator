@@ -21,6 +21,7 @@
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
   const FEELS = [['1', 'Normal'], ['0.5', 'Mig temps (½)'], ['2', 'Doble temps (×2)']];
   const CYMBAL_MODES = [['all', 'Amb platets'], ['hats', 'Sense plats (només charles)'], ['none', 'Sense platets'], ['rim', 'Sense platets, pols a l’aro']];
+  const ENDINGS = [['fill', 'Redoble (segons el que ve)'], ['stop', 'Aturada de la banda'], ['none', 'Sense redoble']];
   const DRUM_TUNES = [['2', 'Aguda (+2)'], ['0', 'Natural'], ['-2', 'Greu (−2)'], ['-4', 'Molt greu (−4)'], ['-6', 'Profunda (−6)']];
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
@@ -138,6 +139,7 @@
       || !profile.keys.some(([k, m]) => k === st.tonic && m === st.mode) || !Number.isInteger(st.seed) || st.seed < 1 || st.seed > 4294967295
       || !Number.isInteger(st.bars) || st.bars < MIN_BARS || st.bars > MAX_BARS) fail('Configuració no vàlida');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
+    if (st.countIn !== undefined && typeof st.countIn !== 'boolean') fail('Configuració no vàlida');
     st.timbres = { ...defaultTimbres(), ...(st.timbres || {}) }; st.groove = { ...defaultGroove(), ...(st.groove || {}) };
     if (st.mix !== undefined) engine.composeSongPart({ ...st }, { type: 'verse', bars: 1, energy: 50, revision: 1 });
     const base = value.base;
@@ -153,7 +155,7 @@
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
-        || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
+        || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.ending !== undefined && !['stop', 'none'].includes(s.ending)) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
         || !validBaseEdits(s) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
@@ -229,6 +231,14 @@
       if (sec.transpose) part.transpose = sec.transpose;
       if (sec.groove) part.groove = { ...s.settings.groove, ...sec.groove };
       if (sec.cymbals) part.cymbals = sec.cymbals;
+      // Arranjament: el redoble final depèn de la secció que ve, i cada secció en tria un de diferent.
+      if (!options.baseOnly) {
+        const list = segmentsOf(s), index = list.findIndex(x => x.section === sec), after = list[index + 1];
+        part.next = after ? after.section?.type ?? 'verse' : 'end';
+        part.fill = s.sections.indexOf(sec) % 1000;
+        if (sec.ending) part.ending = sec.ending;
+        if (s.settings.countIn && sec.start === 0) part.countIn = true;
+      }
       if (sec.timbres && Object.keys(sec.timbres).length) part.timbres = { ...sec.timbres };
       if (sec.patterns) { const layers = {}; for (const [name, index] of Object.entries(sec.patterns)) if (base.includes(name)) layers[name] = index + 1; if (Object.keys(layers).length) part.layers = layers; }
       if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
@@ -972,6 +982,7 @@
     fillSelect($('song-subgenre'), [['', '— Cap (estil general)'], ...Object.entries(engine.SUBGENRES).filter(([, sg]) => sg.style === st.style).map(([key, sg]) => [key, sg.name])], st.subgenre || '');
     $('song-swing').value = Math.round((st.swing || 0) * 100); $('song-swing-value').textContent = `${Math.round((st.swing || 0) * 100)} %`;
     fillSelect($('song-cymbals'), CYMBAL_MODES, st.cymbals || 'all');
+    $('song-count-in').checked = !!st.countIn;
     fillSelect($('song-drum-tune'), DRUM_TUNES, String(st.drumTune || 0));
     const human = Math.round((st.humanize ?? .5) * 100);
     $('song-humanize').value = human; $('song-humanize-value').textContent = human ? `${human} %` : 'quantitzat';
@@ -1013,7 +1024,7 @@
         if (sg.swing) st.swing = sg.swing; else delete st.swing;
         st.groove = { drums: sg.groove.drums[0], bass: sg.groove.bass[0], guitar: sg.groove.guitar[0] };
         st.timbres = { ...defaultTimbres(), ...(sg.timbres || {}) };
-        for (const key of ['drumTune', 'humanize', 'cymbals']) if (sg[key] !== undefined) st[key] = sg[key]; else delete st[key];
+        for (const key of ['drumTune', 'humanize', 'cymbals', 'countIn']) if (sg[key] !== undefined) st[key] = sg[key]; else delete st[key];
         if (sg.fx) st.fx = { guitar: { ...sg.fx }, guitar2: { ...sg.fx }, guitar3: { ...sg.fx } }; else delete st.fx;
         if (st.bpm < sg.bpm[0] || st.bpm > sg.bpm[1]) st.bpm = Math.min(profile.bpm.max, Math.round((sg.bpm[0] + sg.bpm[1]) / 2));
         if (!sg.keys.some(([t, m]) => t === st.tonic && m === st.mode)) [st.tonic, st.mode] = sg.keys[0];
@@ -1022,6 +1033,7 @@
       }
     }
     else if (id === 'song-swing') { const v = Number(event.target.value) / 100; if (v) st.swing = v; else delete st.swing; }
+    else if (id === 'song-count-in') { if (event.target.checked) st.countIn = true; else delete st.countIn; }
     else if (id === 'song-cymbals') { if (event.target.value === 'all') delete st.cymbals; else st.cymbals = event.target.value; }
     else if (id === 'song-drum-tune') { const v = Number(event.target.value); if (v) st.drumTune = v; else delete st.drumTune; }
     else if (id === 'song-humanize') { const v = Number(event.target.value) / 100; if (v === .5) delete st.humanize; else st.humanize = v; }
@@ -1032,7 +1044,7 @@
       if (type.startsWith('horrorpunk')) notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
         : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
     }
-    const replay = id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize'].includes(id) ? playing?.kind : null;
+    const replay = id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   }
@@ -1236,7 +1248,7 @@
       block.setAttribute('aria-label', `${sectionLabel(sec)}, compassos ${sec.start + 1} a ${endOf(sec)}. Arrossega per moure-la o reordenar-la; fletxes per allargar-la, Maj+fletxes per moure-la.`);
       const name = document.createElement('strong'); name.textContent = sectionLabel(sec);
       const count = song.clips.filter(c => c.generated && overlaps(c, sec)).length;
-      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.${sec.bpm ? ` · ♩${sec.bpm}` : ''}${sec.transpose ? ` · ${sec.transpose > 0 ? '↑' : '↓'}${Math.abs(sec.transpose)}` : ''}`;
+      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.${sec.bpm ? ` · ♩${sec.bpm}` : ''}${sec.transpose ? ` · ${sec.transpose > 0 ? '↑' : '↓'}${Math.abs(sec.transpose)}` : ''}${sec.ending === 'stop' ? ' · ⏸' : ''}`;
       if (sec.bpm) block.classList.add('tempo-change');
       block.append(name, info); handles(block); bindDrag(block, 'section', sec);
       block.addEventListener('keydown', event => {
@@ -1302,6 +1314,7 @@
       t === 0 ? `Igual que la cançó (${keyOf(0)})` : `${t > 0 ? '+' : '−'}${Math.abs(t)} semitò${Math.abs(t) > 1 ? 'ns' : ''} · ${keyOf(t)}`]), String(sec.transpose || 0));
     $('section-key-name').textContent = sec.transpose ? '↑ modulació' : '';
     renderSectionBase(sec);
+    fillSelect($('section-ending'), ENDINGS, sec.ending || 'fill');
     $('section-bpm').value = sec.bpm ?? ''; $('section-bpm').placeholder = String(song.settings.bpm);
     $('section-bpm-hint').textContent = sec.bpm ? (sec.bpm > song.settings.bpm ? 'més ràpida que la cançó' : sec.bpm < song.settings.bpm ? 'més lenta que la cançó' : 'igual que la cançó') : `buit = ${song.settings.bpm} (cançó)`;
     const energy = sec.energy ?? TYPES[sec.type].energy;
@@ -1560,7 +1573,7 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-ending']) $(key).disabled = busy;
     $('add-variety').disabled = busy || !ready || song.sections.length < 3;
     $('clear-variety').hidden = !song.sections.some(s => s.bpm || s.transpose || s.groove || s.feel?.drums);
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
@@ -1716,7 +1729,7 @@
   paintTheme();
 
   // ── Esdeveniments ───────────────────────────────────────────────────
-  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize']
+  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in']
     .forEach(key => $(key).addEventListener('change', changeSettings));
   $('song-humanize').addEventListener('input', event => { const v = Number(event.target.value); $('song-humanize-value').textContent = v ? `${v} %` : 'quantitzat'; });
   $('song-swing').addEventListener('input', event => { $('song-swing-value').textContent = `${event.target.value} %`; });
@@ -1746,6 +1759,9 @@
     apply(sec); const replay = playing?.kind; stop(); save(); render();
     if (replay === 'song' || replay === 'section') play(replay);
   }
+  $('section-ending').addEventListener('change', event => changeSectionValue(sec => {
+    if (event.target.value === 'fill') delete sec.ending; else sec.ending = event.target.value;
+  }));
   $('section-transpose').addEventListener('change', event => changeSectionValue(sec => {
     const t = Number(event.target.value); if (t) sec.transpose = t; else delete sec.transpose;
   }));

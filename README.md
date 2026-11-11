@@ -21,6 +21,18 @@ A la primera pantalla hi ha **10 cançons fetes amb el taller** (5 de ska i 5 de
 
 Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques).
 
+## Realisme: preses diferents i arranjament viu
+
+**Que res no soni dues vegades igual**
+- **Gravacions alternades a la bateria**: als kits gravats, el bombo, la caixa, el cop d’aro i el charles tenen tres gravacions de cada força (a les tecles MIDI lliures 88–103, vegeu `round-robin.json`). Cada cop repetit en fa servir una de diferent, mai la mateixa dues vegades seguides. Als kits Big Rusty i Virtuosity són preses diferents de la mateixa força; al Muldjord, que té una gravació per a cada força, són les de força veïna. Els kits GM no en tenen.
+- **Guitarres doblades**: a l’horror punk i al punk, les dues guitarres són dues «preses»: una afinada 5 cèntims avall i l’altra 7 amunt, la segona amb el pedal menys saturat i més brillant, i cadascuna amb el seu propi ritme humà. Desapareix el so de «fase» de dues guitarres idèntiques.
+
+**Arranjament**
+- **Redobles variats**: el redoble del final de cada secció depèn del que ve després (petit cap a una estrofa, gran cap a una tornada, un solo o el final) i cada secció en tria un de diferent d’una col·lecció de 15.
+- **Aturades de la banda**: «Final de la secció → Aturada de la banda» fa que tota la banda doni un cop junta i calli fins al redoble que entra a la secció següent. Les cançons automàtiques en fan una o dues abans d’alguna tornada.
+- **Compte d’entrada**: opció del panell de la base (activada per defecte als subgèneres punk). El primer compàs són quatre cops de baqueta i la banda entra després.
+- **Final**: redoble gran al penúltim compàs i cop final de tota la banda amb dos plats.
+
 ## La línia al mòbil i la base editable
 
 - **Lliscar sense moure res**: amb el dit, la línia es llisca per sobre de les seccions i els instruments. Un toc tria l’element; només l’element triat es pot arrossegar o estirar (amb vores més amples), i un segon toc l’obre per editar-lo.

@@ -138,6 +138,13 @@ export function createGuitarFx(fx, sampleRate) {
   };
 }
 
+// Efecte d'un canal: el de l'instrument, amb el retoc propi de la segona presa d'una guitarra doblada.
+function fxFor(score, patch) {
+  const fx = score.fx?.[patch.instrument];
+  if (!fx || !patch.fxTweak) return fx;
+  const clampPct = v => Math.max(0, Math.min(100, v));
+  return { ...fx, drive: clampPct(fx.drive + patch.fxTweak.drive), tone: clampPct(fx.tone + patch.fxTweak.tone) };
+}
 export async function renderSampledPart(bank, spec, sampleRate = 44100, options = {}) {
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
   const score = performance.createPerformance(spec);
@@ -160,7 +167,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       // L'enviament a la reverberació segueix el volum de l'instrument.
       const level = Math.min(1, 10 ** ((score.mix[patch.instrument]?.volume || 0) / 20));
       // Amb distorsió, menys sala: la reverberació surt de la guitarra neta.
-      const wet = createGuitarFx(score.fx?.[patch.instrument], sampleRate)?.reverb ?? 1;
+      const wet = createGuitarFx(fxFor(score, patch), sampleRate)?.reverb ?? 1;
       synth.controllerChange(patch.channel, 91, Math.round((REVERB[patch.instrument] ?? 20) * level * wet));
       synth.controllerChange(patch.channel, 93, 0);
     }
@@ -175,7 +182,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       // gainDb: guany fix del so triat (calibrat perquè tots els kits i baixos sonin al mateix nivell).
       const user = patch.gainDb ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + patch.gainDb } : score.mix[patch.instrument];
       const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, user, sampleRate);
-      const fx = createGuitarFx(score.fx?.[patch.instrument], sampleRate);
+      const fx = createGuitarFx(fxFor(score, patch), sampleRate);
       if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);
     }
     const outputs = Array.from({ length: synth.midiChannels.length }, (_, channel) => eqs.has(channel) ? [new Float32Array(BLOCK), new Float32Array(BLOCK)] : dummy);

@@ -1,4 +1,9 @@
 'use strict';
+const ROUND_ROBIN = require('../round-robin.json');
+// Tecla d'una gravació alternada → peça original (per a la humanització).
+const ORIGINAL = {};
+for (const [drum, keys] of Object.entries(ROUND_ROBIN.keys)) for (const key of keys) ORIGINAL[key] = Number(drum);
+const pieceOf = pitch => ORIGINAL[pitch] ?? pitch;
 
 function rng(seed) {
   let a = seed >>> 0;
@@ -118,7 +123,7 @@ function createPerformance(spec) {
   // Als tempos ràpids els músics han de ser més justos: les desviacions s'escalen amb el temps de negra.
   const tempoScale = Math.max(.55, Math.min(1.15, beat / .43));
   // Membres de la bateria: peu (bombo i pedal del charles), mà de la caixa, mà dels platets i toms.
-  const limb = (channel, pitch) => channel !== 9 && channel !== 10 ? 0 : [35, 36, 44].includes(pitch) ? 1 : [37, 38, 39, 40].includes(pitch) ? 2 : [42, 46, 51, 53, 59].includes(pitch) ? 3 : 4;
+  const limb = (channel, key) => { if (channel !== 9 && channel !== 10) return 0; const pitch = pieceOf(key); return [35, 36, 44].includes(pitch) ? 1 : [37, 38, 39, 40].includes(pitch) ? 2 : [42, 46, 51, 53, 59].includes(pitch) ? 3 : 4; };
   // Deriva lenta i contínua (suma de sinusoides amb fases pròpies de cada músic):
   // un humà s'avança o s'endarrereix uns quants mil·lisegons durant uns compassos.
   const phases = new Map(), seedBase = (spec.seed >>> 0) || 1;
@@ -138,14 +143,19 @@ function createPerformance(spec) {
     const name = instrumentOf[channel], spread = (FEEL[name] || [0, 0, 0, 0])[3] / 100;
     let v = velocity * (1 + human * (spread * gauss() + .05 * drift(channel * 8 + 7, start)));
     // Accents mètrics al charles i al ride: més fort a la parte del temps, més suau a les semicorxeres.
-    if ((channel === 9 || channel === 10) && [42, 44, 46, 51, 59].includes(pitch)) {
+    if ((channel === 9 || channel === 10) && [42, 44, 46, 51, 59].includes(pieceOf(pitch))) {
       const frac = (start / beat) % 1;
       v *= 1 + human * (frac < .08 || frac > .92 ? .1 : Math.abs(frac - .5) < .08 ? -.02 : -.14);
     }
     return v;
   }
+  // Compte d'entrada (primer compàs només amb baquetes) i aturada de la banda
+  // (després del cop, només sona la bateria fins a la secció següent).
+  if (spec.stopAt !== undefined && (!Number.isFinite(spec.stopAt) || spec.stopAt <= 0 || spec.stopAt > spec.seconds)) throw new Error('Aturada no vàlida');
+  const silentBand = (channel, start) => channel !== 9 && channel !== 10 && ((spec.countIn && start < bar - .01) || (spec.stopAt !== undefined && start >= spec.stopAt - .01));
   function play(channel, pitch, start, duration, velocity, jitter, exact) {
-    if (start >= spec.seconds || !audible(channel, start)) return;
+    if (start >= spec.seconds || !audible(channel, start) || silentBand(channel, start)) return;
+    if (spec.stopAt !== undefined && channel !== 9 && channel !== 10 && start < spec.stopAt) duration = Math.min(duration, spec.stopAt - start);
     // jitter 0 = instrument electrònic, a temps exacte.
     // Humanització 0 = quantitzat: temps i força exactes, com una caixa de ritmes.
     const shift = jitter === 0 || !human ? 0 : humanTime(channel, pitch, start);
@@ -263,6 +273,16 @@ function createPerformance(spec) {
   // La bateria ve escrita a la partitura; el kit acústic i l'electrònic la comparteixen.
   if (spec.drumLine !== undefined && (!Array.isArray(spec.drumLine) || spec.drumLine.some(hit => !Array.isArray(hit)
     || hit.length !== 4 || !hit.every(Number.isFinite) || hit[2] < 27 || hit[2] > 87))) throw new Error('Partitura de bateria no vàlida');
+  // Gravacions alternades: als kits gravats, cada cop repetit d'una peça fa servir
+  // una gravació diferent (mai la mateixa dues vegades seguides).
+  const kitProgram = channels.find(c => c.channel === 9)?.program, alternates = new Set(ROUND_ROBIN.kits[String(kitProgram)] || []);
+  const lastTake = new Map();
+  const take = drum => {
+    if (!alternates.has(String(drum))) return drum;
+    const previous = lastTake.get(drum) ?? 0, next = (previous + 1 + Math.floor(random() * 2)) % 3;
+    lastTake.set(drum, next);
+    return next ? ROUND_ROBIN.keys[String(drum)][next - 1] : drum;
+  };
   const snareFeel = spec.style === 'ska' ? .009 : punk ? -.003 : 0;
   const drumBars = new Map();
   for (const [b, t, drum] of spec.drumLine || []) { if (!drumBars.has(b)) drumBars.set(b, new Set()); drumBars.get(b).add(`${t}:${drum}`); }
@@ -336,6 +356,9 @@ function createPerformance(spec) {
   }
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
+  // Alternança en ordre de temps (els cops fantasma també compten). La bateria no
+  // fa cas de les notes off, així que només cal canviar la tecla de cada cop.
+  for (const e of events) if (e.type === 'on' && e.channel === 9) e.note = take(e.note);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
   const level = { '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   // Guany fix (dB) dels kits i baixos gravats addicionals: calibrat amb parts reals
@@ -347,6 +370,17 @@ function createPerformance(spec) {
     if (entry.channel === 4 && entry.bank === 2 && entry.program === 66) entry.volume = 110; });
   // Estil Misfits: les dues guitarres igual de fortes i obertes a banda i banda.
   if (misfits) for (const [channel, pan] of [[0, 22], [1, 106]]) Object.assign(channels.find(c => c.channel === channel), { pan, volume: 62 });
+  // Guitarres doblades com en un disc: el guitarrista toca la part dues vegades, i
+  // cada presa queda una mica desafinada respecte de l'altra i amb el pedal en un
+  // punt diferent. Amb el ritme humà propi de cada canal, desapareix el so de «fase».
+  if (has('guitar') && (misfits || amped('guitar') || punk)) {
+    const detune = { 0: -5, 1: 7 };
+    for (const [channel, cents] of Object.entries(detune)) {
+      const value = Math.round(8192 + cents / 200 * 8192);
+      events.unshift({ time: 0, type: 'pitch', channel: Number(channel), value });
+    }
+    channels.find(c => c.channel === 1).fxTweak = { drive: -10, tone: 8 };
+  }
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
 }
 module.exports = { createPerformance };
