@@ -75,16 +75,24 @@ test('la cançó automàtica compon cançons senceres de 2 a 4 minuts per a cada
       const active = song.clips.filter(c => c.start < sec.start + sec.bars && sec.start < c.start + c.bars);
       const h = song.harmony[sec.type] || 1, lineModes = Object.fromEntries(active.filter(c => c.line).map(c => [c.instrument, c.line]));
       const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: h, groove: { ...song.settings.groove, ...(sec.groove || {}) },
-        instruments: [...song.base.instruments, ...active.map(c => c.instrument)], layers: Object.fromEntries(active.map(c => [c.instrument, c.revision])) };
+        instruments: [...song.base.instruments.filter(n => !(sec.mute || []).includes(n)), ...active.map(c => c.instrument)], layers: Object.fromEntries(active.map(c => [c.instrument, c.revision])) };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
       for (const f of ['bpm', 'transpose', 'feel', 'cymbals']) if (sec[f] !== undefined) part[f] = sec[f];
       if (Object.keys(lineModes).length) part.lineModes = lineModes;
       const spec = engine.composeSongPart(song.settings, part);
-      assert(createPerformance(spec).events.length > 0);
+      if (spec.instruments.length) assert(createPerformance(spec).events.length > 0);
     }
     titles.add(song.title);
     fingerprints.add(JSON.stringify([song.settings.subgenre, song.settings.bpm, song.settings.tonic, song.settings.mode]));
   }
   assert(fingerprints.size >= 20, 'cançons diferents entre elles');
   assert.deepEqual(builder.createAutoSong(engine, 'poppunk', { seed: 9 }), builder.createAutoSong(engine, 'poppunk', { seed: 9 }), 'reproduïble');
+});
+
+test('una secció pot quedar sense cap instrument (base silenciada) i continua tenint acords i durada', () => {
+  const spec = engine.composeSongPart({ seed: 5, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'intro', bars: 4, energy: 50, revision: 1, instruments: [] });
+  assert.equal(spec.instruments.length, 0); assert.equal(spec.chords.length, 4); assert(spec.seconds > 6);
+  // Patró propi de l'orgue de la base en una secció.
+  const organ = engine.composeSongPart({ seed: 5, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'verse', bars: 2, energy: 50, revision: 1, instruments: ['organ'], layers: { organ: 3 } });
+  assert.equal(organ.layers.organ, 2);
 });

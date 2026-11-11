@@ -89,14 +89,21 @@
 
     <section class="step-panel step-line" data-panel="line" aria-labelledby="line-title">
       <div class="section-heading"><h2 id="line-title"><span class="step" aria-hidden="true">2</span>La línia de la cançó</h2><span id="duration-total"></span></div>
-      <p class="step-copy"><span class="touch-tip">Toca una secció per editar-la. Arrossega-la o estira-la per les vores; llisca la línia pels espais buits. </span><span class="desktop-copy">Fes clic a la fila «Seccions» per afegir una secció. Arrossega-la per moure-la (o deixa-la sobre una altra per reordenar) i estira-la per les vores: la resta es desplaça. Cada instrument és un clip a la seva pista que pot travessar seccions: mou-lo o estira’l igual, i fes clic en un espai buit de la pista per afegir-ne un altre.</span></p>
-      <div class="line-scroll"><div class="line" id="line">
+      <p class="step-copy"><span class="touch-tip">Llisca per recórrer la línia i fes servir − ＋ per apropar-la. Toca una secció, un instrument o un tros de la base per triar-lo: els botons de sota el mouen, l’allarguen o l’escurcen. Un cop triat, també el pots arrossegar o estirar per les vores. Toca’l una altra vegada per editar-lo. </span><span class="desktop-copy">Fes clic a la fila «Seccions» per afegir una secció. Arrossega-la per moure-la (o deixa-la sobre una altra per reordenar) i estira-la per les vores: la resta es desplaça. Cada instrument és un clip a la seva pista que pot travessar seccions: mou-lo o estira’l igual, i fes clic en un espai buit de la pista per afegir-ne un altre.</span></p>
+      <div class="line-toolbar" role="group" aria-label="Zoom de la línia">
+        <button type="button" class="icon-button" id="zoom-out" aria-label="Allunya la línia">−</button>
+        <button type="button" class="icon-button" id="zoom-in" aria-label="Apropa la línia">＋</button>
+        <button type="button" class="text-button" id="zoom-fit">↔ Tota la cançó</button>
+        <span id="zoom-label" class="zoom-label"></span>
+      </div>
+      <div class="line-scroll" id="line-scroll"><div class="line" id="line">
         <div class="line-row ruler"><span class="line-label">Compàs</span><div class="line-track" id="line-ruler"></div></div>
         <div class="line-row"><span class="line-label">Seccions</span><div class="line-track sections" id="section-track" title="Fes clic per marcar una secció"></div></div>
-        <div class="line-row"><span class="line-label">Base</span><div class="line-track" id="base-track"></div></div>
+        <div id="base-rows"></div>
         <div id="layer-rows"></div>
         <i class="playhead" id="playhead" hidden></i>
       </div></div>
+      <div class="line-actions" id="line-actions" role="toolbar" aria-label="Accions de l’element triat a la línia" hidden></div>
       <div class="variety-bar"><button type="button" id="add-variety" class="button primary">✦ Dona-li varietat</button><span>Canvis de tempo, pujada de to a l’última tornada i un altre ritme de bateria en alguna secció.</span><button type="button" id="clear-variety" class="text-button" hidden>↶ Treu la varietat</button></div>
       <div class="step-actions"><button id="add-section" class="button">＋ Afegeix una secció al final</button><button type="button" class="button primary next-step mobile-only" data-go="section" id="next-section">Edita la secció →</button><span class="hint" id="line-hint"></span></div>
     </section>
@@ -112,11 +119,13 @@
           <label><span class="field-label">DURADA <span id="section-time"></span></span><div class="tempo-control"><input id="section-bars" type="number" min="1" max="32" step="1" aria-label="Durada de la secció en compassos"><span>COMPASSOS</span></div></label>
           <label class="bpm-field"><span class="field-label">TEMPO DE LA SECCIÓ <span id="section-bpm-hint"></span></span><div class="tempo-control"><input id="section-bpm" type="number" min="40" max="240" step="1" inputmode="numeric" aria-label="Tempo d’aquesta secció en BPM; buit per seguir el de la cançó"><span>BPM</span></div></label>
           <label><span class="field-label">TO DE LA SECCIÓ <span id="section-key-name"></span></span><select id="section-transpose" aria-label="Canvi de to d’aquesta secció"></select></label>
-          <label><span class="field-label">PATRÓ DE BATERIA</span><select id="section-groove" aria-label="Patró de bateria d’aquesta secció"></select></label>
-          <label><span class="field-label">PLATETS</span><select id="section-cymbals" aria-label="Platets de la bateria en aquesta secció"></select></label>
           <label class="energy-field"><span class="field-label">INTENSITAT <output id="section-energy-value">55 %</output></span><input id="section-energy" type="range" min="10" max="100" step="5" aria-label="Intensitat de la secció"><small class="slider-hint"><span>Suau</span><span>Força de tots els instruments</span><span>Enèrgica</span></small></label>
         </div>
         <p class="chords-line"><span id="section-chords" class="chords"></span><button type="button" id="section-reharmonize" class="text-button">↻ Altres acords</button></p>
+        <div class="base-panel" id="section-base-panel">
+          <div class="layer-heading"><strong>LA BASE EN AQUESTA SECCIÓ</strong><span>Fes-la callar, canvia’n el patró o el so només aquí</span></div>
+          <ol id="section-base" class="layer-list base-list"></ol>
+        </div>
         <div class="layer-panel">
           <div class="layer-heading"><strong>INSTRUMENTS QUE SONEN EN AQUESTA SECCIÓ</strong><span>A més de la base · un a un</span></div>
           <ol id="layer-list" class="layer-list"></ol>

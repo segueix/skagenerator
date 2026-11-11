@@ -21,6 +21,17 @@ A la primera pantalla hi ha **10 cançons fetes amb el taller** (5 de ska i 5 de
 
 Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques).
 
+## La línia al mòbil i la base editable
+
+- **Lliscar sense moure res**: amb el dit, la línia es llisca per sobre de les seccions i els instruments. Un toc tria l’element; només l’element triat es pot arrossegar o estirar (amb vores més amples), i un segon toc l’obre per editar-lo.
+- **Zoom**: botons − ＋ i «Tota la cançó». Al mòbil, per defecte cada compàs fa 24 px; l’elecció es recorda.
+- **Botons d’edició** sota la línia per a l’element triat, sense haver d’encertar vores petites:
+  - secció: posar-la abans o després de la veïna, escurçar-la o allargar-la un compàs, duplicar-la just després, editar-la o eliminar-la;
+  - instrument: moure’l un compàs, escurçar-lo o allargar-lo, editar-lo o eliminar-lo;
+  - tros de la base: silenciar-lo o tornar-lo a fer sonar, i obrir-ne el patró i el so.
+- **La base també s’edita per seccions**: cada instrument de la base té la seva pista a la línia, partida per seccions. A cada secció es pot silenciar (p. ex. una intro només de guitarra), canviar-ne el patró (bateria, baix, guitarra, orgue i coixí) o el so (bateria, baix i guitarra), i triar els platets. «Com la cançó» torna al valor general. Si una secció es queda sense cap instrument, sona en silenci.
+- Així les cançons automàtiques es poden editar del tot, base inclosa. El pop-punk i el punk del 77 de vegades comencen amb una intro només de guitarra.
+
 ## Bateria: platets, afinació i humanització
 
 Al panell de la base hi ha tres controls nous per a la bateria i el ritme:
