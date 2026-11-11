@@ -14,6 +14,7 @@
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const GUITARS = ['guitar', 'guitar2', 'guitar3'];
+  const STACKABLE_GUITARS = ['guitar', 'guitar2']; // Diverses preses simultànies de la guitarra 1 i la 2.
   // Noms curts per a les etiquetes de la línia (hi caben al mòbil).
   const SHORT = { guitar: 'Guitarra 1', guitar2: 'Guitarra 2', guitar3: 'Guitarra 3', trombone: '2a veu vent', sax: 'Saxo', synthLead: 'Sinte melodia', synthPad: 'Sinte acords', synthBass: 'Baix sinte', electronicDrums: 'Bat. electr.', vocal: 'Veu (guia)' };
   const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
@@ -169,9 +170,9 @@
     value.clips.sort((a, b) => a.start - b.start);
     for (const c of value.clips) {
       if (typeof c.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(c.id) || ids.has(c.id) || !Object.hasOwn(INSTRUMENTS, c.instrument)
-        || base.instruments.includes(c.instrument) || !Number.isInteger(c.start) || !Number.isInteger(c.bars) || c.start < 0 || c.bars < 1
+        || (base.instruments.includes(c.instrument) && !STACKABLE_GUITARS.includes(c.instrument)) || !Number.isInteger(c.start) || !Number.isInteger(c.bars) || c.start < 0 || c.bars < 1
         || c.start + c.bars > st.bars || !Number.isInteger(c.revision) || c.revision < 1 || c.revision > MAX_REV || typeof c.generated !== 'boolean') fail('Instrument no vàlid');
-      if (value.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start + c.bars && c.start < o.start + o.bars)) fail('Instruments encavalcats');
+      if (!STACKABLE_GUITARS.includes(c.instrument) && value.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start + c.bars && c.start < o.start + o.bars)) fail('Instruments encavalcats');
       if (c.sound !== undefined && (!GUITARS.includes(c.instrument) || !timbreOptions.guitar.some(([key]) => key === c.sound))) fail('So de guitarra no vàlid');
       if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
       if (c.feel !== undefined && ![.5, 2].includes(c.feel)) fail('Ritme no vàlid');
@@ -204,9 +205,18 @@
     if (options.baseOnly) return null;
     const active = s.clips.filter(c => c.generated && !(seg.section?.mute || []).includes(c.instrument) && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
-    const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {}, lineModes = {};
+    const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {}, lineModes = {}, guitarTakes = [];
     let register;
     for (const c of active) {
+      // Cada guitarra és una presa separada, encara que una altra del mateix
+      // tipus ja soni. No es fusionen les revisions ni els efectes.
+      if (c.instrument === 'guitar' || c.instrument === 'guitar2') {
+        guitarTakes.push({ id: c.id, instrument: c.instrument, revision: c.revision,
+          from: Math.max(0, c.start - seg.start), to: Math.min(seg.bars, c.start + c.bars - seg.start),
+          ...(c.sound ? { sound: c.sound } : {}), ...(c.fx ? { fx: c.fx } : {}),
+          ...(c.feel ? { feel: c.feel } : {}) });
+        continue;
+      }
       if (!(c.instrument in layers)) {
         if (c.feel) feel[c.instrument] = c.feel;
         if (c.line) lineModes[c.instrument] = c.line;
@@ -218,7 +228,7 @@
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
     }
     for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
-    return { layers, ranges, timbres, fx, feel, register, lineModes };
+    return { layers, ranges, timbres, fx, feel, register, lineModes, guitarTakes };
   }
   function partFor(s, seg, options = {}) {
     // Els instruments de la base silenciats en aquesta secció no sonen.
@@ -249,7 +259,14 @@
       if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
-    part.instruments = [...base, ...Object.keys(extra?.layers || {})];
+    // La guitarra 1 de la base continua sonant; cada clip de guitarra 1 o 2
+    // afegeix una veu pròpia sense duplicar noms a la llista d'instruments.
+    part.instruments = [...new Set([...base, ...Object.keys(extra?.layers || {}),
+      ...(extra?.guitarTakes || []).map(take => take.instrument)])];
+    if (extra?.guitarTakes.length) {
+      part.guitarTakes = extra.guitarTakes;
+      part.guitarBase = base.includes('guitar');
+    }
     if (extra) {
       part.layers = { ...(part.layers || {}), ...extra.layers }; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges;
       if (Object.keys(extra.timbres).length) part.timbres = { ...(part.timbres || {}), ...extra.timbres };
@@ -747,8 +764,8 @@
     const before = { revision: clip.revision, generated: clip.generated }, home = sectionAt(clip.start);
     let reused = null;
     if (!clip.generated) {
-      // Un instrument que entra en una secció del mateix tipus repeteix la idea, com una tornada.
-      reused = home && song.clips.find(c => c !== clip && c.generated && c.instrument === clip.instrument && sectionAt(c.start)?.type === home.type);
+      // Les guitarres superposades necessiten revisions independents.
+      reused = !STACKABLE_GUITARS.includes(clip.instrument) && home && song.clips.find(c => c !== clip && c.generated && c.instrument === clip.instrument && sectionAt(c.start)?.type === home.type);
       if (reused) clip.revision = reused.revision;
     } else { const previous = clip.revision; do clip.revision = newRev(); while (clip.revision === previous); }
     clip.generated = true;
@@ -850,7 +867,7 @@
     const previous = song.sections.filter(s => s !== sec && s.start < sec.start).at(-1);
     const end = endOf(sec), newStart = clamp(start, Math.max(previous ? endOf(previous) : 0, end - MAX_SECTION), end - 1);
     // Els instruments que entraven amb la secció hi continuen entrant.
-    for (const c of song.clips) if (c.start === sec.start && endOf(c) > newStart && !song.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start && endOf(o) > newStart)) {
+    for (const c of song.clips) if (c.start === sec.start && endOf(c) > newStart && (STACKABLE_GUITARS.includes(c.instrument) || !song.clips.some(o => o !== c && o.instrument === c.instrument && o.start < c.start && endOf(o) > newStart))) {
       c.bars = endOf(c) - newStart; c.start = newStart;
     }
     sec.start = newStart; sec.bars = end - newStart;
@@ -869,7 +886,7 @@
       const delta = start - sec.start, inside = song.clips.filter(c => c.start >= sec.start && endOf(c) <= endOf(sec));
       for (const c of inside) {
         const moved = { ...c, start: c.start + delta };
-        if (!song.clips.some(o => o !== c && !inside.includes(o) && o.instrument === c.instrument && overlaps(o, moved))) c.start = moved.start;
+        if (STACKABLE_GUITARS.includes(c.instrument) || !song.clips.some(o => o !== c && !inside.includes(o) && o.instrument === c.instrument && overlaps(o, moved))) c.start = moved.start;
       }
       sec.start = start; song.sections.sort((a, b) => a.start - b.start);
       return true;
@@ -898,11 +915,12 @@
     song.sections.sort((a, b) => a.start - b.start);
     resolveClips();
   }
-  // Dos clips del mateix instrument no es poden trepitjar: l'anterior s'escurça.
+  // Només els instruments que no són guitarres apilables s'escurcen si coincideixen.
   function resolveClips() {
     song.clips.sort((a, b) => a.start - b.start);
     for (const c of song.clips) c.bars = Math.min(c.bars, song.settings.bars - c.start);
     for (const name of Object.keys(INSTRUMENTS)) {
+      if (STACKABLE_GUITARS.includes(name)) continue;
       const list = song.clips.filter(c => c.instrument === name);
       for (let i = 1; i < list.length; i++) if (list[i].start < endOf(list[i - 1])) list[i - 1].bars = list[i].start - list[i - 1].start;
     }
@@ -911,6 +929,7 @@
 
   // ── Edició de la línia: instruments ────────────────────────────────
   function clipBounds(clip, instrument = clip.instrument) {
+    if (STACKABLE_GUITARS.includes(instrument)) return [0, song.settings.bars];
     const others = song.clips.filter(c => c !== clip && c.instrument === instrument);
     const before = others.filter(c => endOf(c) <= clip.start).map(endOf), after = others.filter(c => c.start >= endOf(clip)).map(c => c.start);
     return [Math.max(0, ...before), Math.min(song.settings.bars, ...after)];
@@ -919,8 +938,9 @@
     if (song.clips.length >= MAX_CLIPS) { notify(`Com a màxim hi pot haver ${MAX_CLIPS} clips d’instrument.`); return null; }
     const others = song.clips.filter(c => c.instrument === instrument);
     let start = from;
-    for (const c of others.sort((a, b) => a.start - b.start)) if (c.start <= start && endOf(c) > start) start = endOf(c);
-    const next = Math.min(to, ...others.filter(c => c.start >= start).map(c => c.start));
+    if (!STACKABLE_GUITARS.includes(instrument))
+      for (const c of others.sort((a, b) => a.start - b.start)) if (c.start <= start && endOf(c) > start) start = endOf(c);
+    const next = STACKABLE_GUITARS.includes(instrument) ? to : Math.min(to, ...others.filter(c => c.start >= start).map(c => c.start));
     if (next - start < 1) { notify(`${INSTRUMENTS[instrument]} ja sona en aquest tram. Estira el seu clip a la línia si el vols allargar.`); return null; }
     const clip = { id: uid(), instrument, start, bars: next - start, revision: newRev(), generated: false };
     song.clips.push(clip); song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id; selectedBase = null;
@@ -1019,7 +1039,7 @@
       const clip = d.item;
       if (d.mode === 'move') {
         const moved = { ...clip, start };
-        done = !song.clips.some(o => o !== clip && o.instrument === clip.instrument && overlaps(o, moved));
+        done = STACKABLE_GUITARS.includes(clip.instrument) || !song.clips.some(o => o !== clip && o.instrument === clip.instrument && overlaps(o, moved));
         if (done) clip.start = start; else notify(`Aquí ja sona un altre clip de ${INSTRUMENTS[clip.instrument].toLowerCase()}.`);
       } else { clip.start = start; clip.bars = bars; done = true; }
       song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id; selectedBase = null;
@@ -1048,7 +1068,7 @@
   }
   function applyBase(instruments) {
     song.base.instruments = instruments;
-    const kept = song.clips.filter(c => !instruments.includes(c.instrument)), removed = song.clips.length - kept.length;
+    const kept = song.clips.filter(c => STACKABLE_GUITARS.includes(c.instrument) || !instruments.includes(c.instrument)), removed = song.clips.length - kept.length;
     song.clips = kept;
     if (removed) notify('Els instruments que ara formen part de la base ja sonen a totes les seccions.');
   }
@@ -1244,7 +1264,7 @@
       bar.append(title);
       const move = delta => lineEdit(() => {
         const moved = { ...clip, start: clip.start + delta };
-        if (moved.start < 0 || endOf(moved) > song.settings.bars || song.clips.some(o => o !== clip && o.instrument === clip.instrument && overlaps(o, moved))) { notify('No es pot moure més: hi ha un altre clip o s’acaba la cançó.'); return false; }
+        if (moved.start < 0 || endOf(moved) > song.settings.bars || (!STACKABLE_GUITARS.includes(clip.instrument) && song.clips.some(o => o !== clip && o.instrument === clip.instrument && overlaps(o, moved)))) { notify('No es pot moure més: hi ha un altre clip o s’acaba la cançó.'); return false; }
         clip.start = moved.start; song.clips.sort((a, b) => a.start - b.start);
       });
       actionButton(bar, '◀', 'Mou-lo un compàs enrere', () => move(-1), { disabled: clip.start <= lo });
@@ -1360,11 +1380,23 @@
     const used = [];
     for (const c of song.clips) if (!used.includes(c.instrument)) used.push(c.instrument);
     for (const name of used) {
+      // Clips solapats de guitarra 1 o 2 es reparteixen en pistes visibles;
+      // cap clip tapa la forma d'ona/rectangle d'una altra guitarra.
+      const stacks = [];
+      for (const clip of song.clips.filter(c => c.instrument === name)) {
+        const rowIndex = STACKABLE_GUITARS.includes(name)
+          ? stacks.findIndex(takes => endOf(takes[takes.length - 1]) <= clip.start) : 0;
+        const laneIndex = rowIndex < 0 ? stacks.length : rowIndex;
+        (stacks[laneIndex] ||= []).push(clip);
+      }
+      for (const [laneIndex, laneClips] of stacks.entries()) {
       const row = document.createElement('div'); row.className = 'line-row';
-      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = SHORT[name] || INSTRUMENTS[name]; label.title = INSTRUMENTS[name];
+      const label = document.createElement('span'); label.className = 'line-label';
+      label.textContent = (SHORT[name] || INSTRUMENTS[name]) + (laneIndex ? ` · pista ${laneIndex + 1}` : '');
+      label.title = INSTRUMENTS[name];
       const lane = document.createElement('div'); lane.className = 'line-track lane'; lane.title = `Fes clic en un espai buit per afegir ${INSTRUMENTS[name].toLowerCase()}`;
       lane.style.setProperty('--color', instrumentColors[name]);
-      for (const clip of song.clips.filter(c => c.instrument === name)) {
+      for (const clip of laneClips) {
         const element = document.createElement('div'); element.tabIndex = 0; element.setAttribute('role', 'button');
         element.className = `line-clip${clip.generated ? ' ready' : ''}${clip.id === selectedClip ? ' selected' : ''}`;
         element.style.left = pct(clip.start); element.style.width = pct(clip.bars);
@@ -1374,8 +1406,8 @@
         lane.append(element);
       }
       // Botons M superposats al tram real de cada instrument i secció.
-      for (const sec of song.sections) for (const clip of song.clips) {
-        if (clip.instrument !== name || !clip.generated || !overlaps(clip, sec)) continue;
+      for (const sec of song.sections) for (const clip of laneClips) {
+        if (!clip.generated || !overlaps(clip, sec)) continue;
         const from = Math.max(clip.start, sec.start), to = Math.min(endOf(clip), endOf(sec));
         if ((sec.mute || []).includes(name)) {
           const overlay = document.createElement('span'); overlay.className = 'line-muted-range';
@@ -1394,9 +1426,10 @@
         notify(`${clipLabel(clip)} afegit. Prem «Genera» al panell de la secció.`);
       });
       row.append(label, lane); rows.append(row);
+      }
     }
     $('line-hint').textContent = !song.base.generated ? 'Primer genera la base (pas 1).'
-      : song.sections.length ? 'Arrossega una secció per moure-la o reordenar-la, i estira-la per les vores. Els instruments també es poden moure i estirar.'
+      : song.sections.length ? 'Arrossega una secció o un instrument per moure’l o estirar-lo. Pots afegir diverses guitarres 1 i 2 simultàniament.'
       : 'Fes clic a la fila «Seccions» on vulguis que comenci la primera secció.';
     renderLineActions(); applyZoom(false);
     updatePlayhead(scrubBar ?? (playing ? barAt(playing.startSeconds + playing.clock()) : cueBar));
@@ -1455,7 +1488,7 @@
       item.append(clipTone(clip));
       list.append(item);
     });
-    const available = Object.keys(INSTRUMENTS).filter(name => !song.base.instruments.includes(name) && !clips.some(c => c.instrument === name && c.start <= sec.start && endOf(c) >= endOf(sec)));
+    const available = Object.keys(INSTRUMENTS).filter(name => STACKABLE_GUITARS.includes(name) || (!song.base.instruments.includes(name) && !clips.some(c => c.instrument === name && c.start <= sec.start && endOf(c) >= endOf(sec))));
     const chosen = available.includes($('layer-instrument').value) ? $('layer-instrument').value : available[0];
     fillSelect($('layer-instrument'), available.map(name => [name, INSTRUMENTS[name]]), chosen);
     $('layer-instrument').disabled = busy || !available.length; $('add-layer').disabled = busy || !available.length;

@@ -2281,6 +2281,16 @@
             !Object.hasOwn(SONG_INSTRUMENTS, name) || !Array.isArray(list) || !list.length || list.some(range => !Array.isArray(range)
                 || range.length !== 2 || !Number.isInteger(range[0]) || !Number.isInteger(range[1]) || range[0] < 0 || range[1] > bars || range[0] >= range[1])))
             throw new Error('Trams d’instruments no vàlids');
+        const guitarTakes = part.guitarTakes ?? [];
+        if (!Array.isArray(guitarTakes) || guitarTakes.length > 96 || guitarTakes.some(take =>
+            !take || !['guitar', 'guitar2'].includes(take.instrument)
+            || typeof take.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(take.id)
+            || !Number.isInteger(take.revision) || take.revision < 1 || take.revision > 1000000
+            || !Number.isInteger(take.from) || !Number.isInteger(take.to) || take.from < 0 || take.from >= take.to || take.to > bars
+            || (take.feel !== undefined && ![.5, 2].includes(take.feel))
+            || (take.sound !== undefined && !['auto', 'clean', 'cleanGm', 'muted', 'overdrive', 'distortion'].includes(take.sound))))
+            throw new Error('Preses de guitarra no vàlides');
+        if (part.guitarBase !== undefined && typeof part.guitarBase !== 'boolean') throw new Error('Guitarra base no vàlida');
         const lines = {}, layerIndex = {};
         const rhythmPool = [RHYTHMS.r1, RHYTHMS.r2, RHYTHMS.r3, RHYTHMS.r4, RHYTHMS.r5, RHYTHMS.r6, RHYTHMS.r7, RHYTHMS.r9];
         Object.keys(layers).forEach(name => {
@@ -2357,7 +2367,8 @@
         if (part.ending === 'stop' && bars > 1) drumOptions.stopAt = ((bars - 1) * 4 + .75) * 60 / tempo;
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
-            ranges: JSON.parse(JSON.stringify(ranges)),
+            ranges: JSON.parse(JSON.stringify(ranges)), guitarTakes: guitarTakes.map(take => ({ ...take })),
+            guitarBase: part.guitarBase !== false,
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn }),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: { ...(settings.mix || {}), ...(part.mix || {}) },

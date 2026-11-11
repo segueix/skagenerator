@@ -56,6 +56,7 @@ function createPerformance(spec) {
   const amped = name => ['crunch', 'overdrive', 'distortion', 'metal', 'fuzz'].includes(spec.fx?.[name]?.type) || isHorror(spec.fx?.[name]?.type);
   const misfits = isHorror(spec.fx?.guitar?.type);
   const realBrass = { 3: !chosen('trumpet'), 4: spec.timbres?.trombone === 'vsco' };
+  const guitarTakes = Array.isArray(spec.guitarTakes) ? spec.guitarTakes : [];
   const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
     patch(0, chosen('guitar') ?? (punk && !amped('guitar') ? [0, 30] : [2, 27]), 42, 94),
@@ -75,8 +76,27 @@ function createPerformance(spec) {
     { channel: 10, program: 24, pan: 64, volume: 106, drums: true, ...(spec.drumTune ? { tune: spec.drumTune } : {}) },
     { ...patch(9, chosen('drums') ?? [0, 69], 64, 106), drums: true, ...(spec.drumTune ? { tune: spec.drumTune } : {}) }
   ];
+  // Cada presa de guitarra té un canal MIDI independent: així no es trepitgen
+  // les notes ni els presets de dues guitarres de la mateixa família.
+  const takeChannels = new Map();
+  for (const [index, take] of guitarTakes.entries()) {
+    const channel = 17 + index, family = take.instrument;
+    const chosenSound = take.sound || spec.timbres?.[family] || 'auto';
+    const settingsFx = take.fx || spec.fx?.[family];
+    const takeAmped = settingsFx && (['crunch', 'overdrive', 'distortion', 'metal', 'fuzz'].includes(settingsFx.type) || isHorror(settingsFx.type));
+    const fallback = family === 'guitar' ? (punk && !takeAmped ? [0, 30] : [2, 27])
+      : (punk && !takeAmped ? [0, 30] : [2, 27]);
+    const preset = presets[family][chosenSound] ?? fallback;
+    const entry = patch(channel, preset, index % 2 ? 93 : 35, 84);
+    if (take.fx) entry.clipFx = take.fx;
+    channels.push(entry);
+    instrumentOf[channel] = family;
+    takeChannels.set(channel, take);
+  }
   // Un instrument amb trams només sona dins d'aquests compassos.
   function audible(channel, start) {
+    const take = takeChannels.get(channel);
+    if (take) { const position = start / bar + 1e-6; return position >= take.from && position < take.to; }
     const list = spec.ranges?.[instrumentOf[channel]];
     if (!list) return true;
     const at = start / bar + 1e-6;
@@ -89,7 +109,7 @@ function createPerformance(spec) {
   if (spec.feel !== undefined && (!spec.feel || typeof spec.feel !== 'object' || Object.values(spec.feel).some(f => ![.5, 1, 2].includes(f))))
     throw new Error('Ritme no vàlid');
   function feel(channel, start, duration, pitch) {
-    const factor = spec.feel?.[instrumentOf[channel]] ?? 1;
+    const factor = takeChannels.get(channel)?.feel ?? spec.feel?.[instrumentOf[channel]] ?? 1;
     if (factor === 1) return [[start, duration, pitch]];
     const abs = start / beat + 1e-9, index = Math.floor(abs / 4), within = abs - index * 4;
     if (factor === 2) return [0, 2].map(offset => [(index * 4 + within / 2 + offset) * beat, duration / 2, pitch]);
@@ -156,6 +176,8 @@ function createPerformance(spec) {
   function play(channel, pitch, start, duration, velocity, jitter, exact) {
     if (start >= spec.seconds || !audible(channel, start) || silentBand(channel, start)) return;
     if (spec.stopAt !== undefined && channel !== 9 && channel !== 10 && start < spec.stopAt) duration = Math.min(duration, spec.stopAt - start);
+    const guitarTake = takeChannels.get(channel);
+    if (guitarTake) duration = Math.min(duration, guitarTake.to * bar - start);
     // jitter 0 = instrument electrònic, a temps exacte.
     // Humanització 0 = quantitzat: temps i força exactes, com una caixa de ritmes.
     const shift = jitter === 0 || !human ? 0 : humanTime(channel, pitch, start);
@@ -206,14 +228,14 @@ function createPerformance(spec) {
     // Horror punk (estil Misfits): acords de quinta tot a cops avall en corxeres,
     // apagats amb el palmell a les estrofes i oberts a les tornades, amb dues
     // guitarres iguals a esquerra i dreta (paret de guitarres).
-    if (has('guitar') && misfits) {
+    if (has('guitar') && spec.guitarBase !== false && misfits) {
       const open = ['chorus', 'prechorus', 'solo', 'outro'].includes(spec.type);
       (ending ? [0] : [0, .5, 1, 1.5, 2, 2.5, 3, 3.5]).forEach(t => [chord.root + 12, chord.root + 19, chord.root + 24].forEach((pitch, k) => {
         const length = ending ? bar * .75 : beat * (open ? .46 : .2), force = open ? 104 : 86;
         note(0, pitch, t0 + t * beat + k * .004, length, force, .002);
         note(1, pitch, t0 + t * beat + .009 + k * .004, length, force - 4, .002);
       }));
-    } else if (has('guitar')) hits.forEach((t, hit) => {
+    } else if (has('guitar') && spec.guitarBase !== false) hits.forEach((t, hit) => {
       const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
       const duration = ending ? bar * .75 : beat * (punk ? .4 : .22);
       pitches.forEach((pitch, k) => {
@@ -223,12 +245,30 @@ function createPerformance(spec) {
       });
     });
     // Guitarra 2: rítmica aguda (acords una octava amunt) amb el seu propi patró.
-    if (has('guitar2')) {
+    if (has('guitar2') && !guitarTakes.some(take => take.instrument === 'guitar2')) {
       const index = ((spec.layers?.guitar2 ?? 2) + 2) % guitarPatterns.length;
       (ending ? [0] : guitarPatterns[index]).forEach((t, hit) => {
         const pitches = punk ? [chord.root + 24, chord.root + 31] : chord.notes.map(n => n + 12).reverse();
         pitches.forEach((pitch, k) => note(14, pitch, t0 + t * beat + .009 + k * .006, ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? hit % 2 ? 70 : 88 : 80));
       });
+    }
+    // Preses independents de guitarra 1 i 2: patró i canal propis, sempre
+    // sobre els mateixos acords de la secció, amb els seus sons i efectes.
+    for (const [takeIndex, take] of guitarTakes.entries()) {
+      const channel = 17 + takeIndex;
+      const index = (take.revision + takeIndex * 3 + (take.instrument === 'guitar2' ? 2 : 0)) % guitarPatterns.length;
+      const pattern = ending ? [0] : guitarPatterns[index];
+      if (take.instrument === 'guitar') {
+        const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
+        for (const [hit, t] of pattern.entries()) for (const [k, pitch] of pitches.entries())
+          note(channel, pitch, t0 + t * beat + k * .007 + .004 * (takeIndex % 3),
+            ending ? bar * .7 : beat * (punk ? .35 : .22), punk ? (hit % 2 ? 76 : 95) : 82);
+      } else {
+        const pitches = punk ? [chord.root + 24, chord.root + 31] : chord.notes.map(n => n + 12).reverse();
+        for (const [hit, t] of pattern.entries()) for (const [k, pitch] of pitches.entries())
+          note(channel, pitch, t0 + t * beat + .009 + k * .006 + .004 * (takeIndex % 3),
+            ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? (hit % 2 ? 68 : 84) : 78);
+      }
     }
     // Guitarra 3: punteig dins del registre real de la guitarra i harmonitzat
     // amb l'acord que sona a cada compàs. Els riffs de l'escala poden contenir
@@ -383,7 +423,7 @@ function createPerformance(spec) {
   // Guitarres doblades com en un disc: el guitarrista toca la part dues vegades, i
   // cada presa queda una mica desafinada respecte de l'altra i amb el pedal en un
   // punt diferent. Amb el ritme humà propi de cada canal, desapareix el so de «fase».
-  if (has('guitar') && (misfits || amped('guitar') || punk)) {
+  if (has('guitar') && spec.guitarBase !== false && (misfits || amped('guitar') || punk)) {
     const detune = { 0: -5, 1: 7 };
     for (const [channel, cents] of Object.entries(detune)) {
       const value = Math.round(8192 + cents / 200 * 8192);
