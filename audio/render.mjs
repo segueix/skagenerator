@@ -65,6 +65,14 @@ export function createEqualizer(name, user, sampleRate) {
   };
 }
 
+// Volums additius de la base: independents dels EQ de cada secció i
+// comuns a bateria i baix acústics i electrònics.
+export function baseVolumeDb(score, instrument) {
+  const family = instrument === 'drums' || instrument === 'electronicDrums' ? 'drums'
+    : instrument === 'bass' || instrument === 'synthBass' ? 'bass' : null;
+  return family ? (score.baseVolume?.[family] || 0) : 0;
+}
+
 // ── Efectes de guitarra ───────────────────────────────────────────────
 // Cadena de pedal i amplificador: filtre d'entrada → guany → saturació (amb
 // sobremostreig ×2 per evitar sorolls digitals) → pantalla d'altaveu (pas alt,
@@ -169,7 +177,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       synth.controllerChange(patch.channel, 7, patch.volume);
       synth.controllerChange(patch.channel, 10, patch.pan);
       // L'enviament a la reverberació segueix el volum de l'instrument.
-      const level = Math.min(1, 10 ** ((score.mix[patch.instrument]?.volume || 0) / 20));
+      const level = Math.min(1, 10 ** (((score.mix[patch.instrument]?.volume || 0) + baseVolumeDb(score, patch.instrument)) / 20));
       // Amb distorsió, menys sala: la reverberació surt de la guitarra neta.
       const wet = createGuitarFx(fxFor(score, patch), sampleRate)?.reverb ?? 1;
       synth.controllerChange(patch.channel, 91, Math.round((REVERB[patch.instrument] ?? 20) * level * wet));
@@ -184,7 +192,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     for (const patch of score.channels) {
       // La segona veu de vent amb saxo fa servir la corba del saxo.
       // gainDb: guany fix del so triat (calibrat perquè tots els kits i baixos sonin al mateix nivell).
-      const user = patch.gainDb ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + patch.gainDb } : score.mix[patch.instrument];
+      const totalTrim = (patch.gainDb || 0) + baseVolumeDb(score, patch.instrument);
+      const user = totalTrim ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + totalTrim } : score.mix[patch.instrument];
       const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, user, sampleRate);
       const fx = createGuitarFx(fxFor(score, patch), sampleRate);
       if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);

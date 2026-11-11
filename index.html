@@ -59,6 +59,13 @@
           <label><span class="field-label">BALANCEIG (SHUFFLE) <output id="song-swing-value">0 %</output></span><input type="range" id="song-swing" min="0" max="70" step="5" value="0" aria-label="Balanceig de les corxeres"><small class="slider-hint"><span>Recte</span><span>Tresets</span></small></label>
         </div>
         <fieldset class="instrument-picker"><legend>INSTRUMENTS DE LA BASE · SONEN TOTA LA CANÇÓ</legend><div id="base-instruments"></div></fieldset>
+        <div class="base-volume-panel" role="group" aria-label="Volums generals de la bateria i el baix">
+          <div class="base-volume-heading"><strong>VOLUM GENERAL DE LA BASE</strong><small>Bateria i baix durant tota la cançó · 0 dB = volum original. S’afegeix als ajustos de cada secció.</small></div>
+          <div class="base-volume-grid">
+            <label class="base-volume-control" for="base-volume-drums"><span class="field-label">BATERIA <output id="base-volume-drums-value" for="base-volume-drums">0 dB</output></span><input type="range" id="base-volume-drums" min="-24" max="6" step="1" value="0" aria-label="Volum general de bateria, en decibels"><small class="slider-hint"><span>−24 dB</span><span>+6 dB</span></small></label>
+            <label class="base-volume-control" for="base-volume-bass"><span class="field-label">BAIX <output id="base-volume-bass-value" for="base-volume-bass">0 dB</output></span><input type="range" id="base-volume-bass" min="-24" max="6" step="1" value="0" aria-label="Volum general del baix, en decibels"><small class="slider-hint"><span>−24 dB</span><span>+6 dB</span></small></label>
+          </div>
+        </div>
         <div class="timbre-picker drum-picker" role="group" aria-label="Bateria i humanització">
           <label><span class="field-label">PLATETS DE LA BATERIA</span><select id="song-cymbals" aria-label="Platets de la bateria"></select></label>
           <label><span class="field-label">AFINACIÓ DE LA BATERIA</span><select id="song-drum-tune" aria-label="Afinació de la bateria"></select></label>

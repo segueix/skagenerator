@@ -115,6 +115,19 @@ test('la força dels metalls depèn de la intensitat, no del tipus de secció', 
   assert(mean(velocities('verse', 90)) > mean(velocities('verse', 30)) + 10, 'la intensitat canvia la força');
 });
 
+test('els volums generals de bateria i baix són independents del volum de cada secció', () => {
+  const adjusted = engine.composeSongPart({ ...config, baseVolume: { drums: -8, bass: 4 },
+    mix: { bass: { low: 0, mid: 0, high: 0, volume: -3 } } },
+    { ...part, mix: { bass: { low: 0, mid: 0, high: 0, volume: 2 } } });
+  assert.deepEqual(adjusted.baseVolume, { drums: -8, bass: 4 });
+  assert.equal(adjusted.mix.bass.volume, 2, 'el retoc de secció continua intacte');
+  assert.deepEqual(createPerformance(adjusted).baseVolume, adjusted.baseVolume);
+  for (const value of [-25, 7, 1.5, NaN, null])
+    assert.throws(() => engine.composeSongPart({ ...config, baseVolume: { drums: value } }, part), /Volums generals/);
+  for (const invalid of [{ guitar: 3 }, [], 'silent', null])
+    assert.throws(() => engine.composeSongPart({ ...config, baseVolume: invalid }, part), /Volums generals/);
+});
+
 test('tres guitarres poden sonar a la mateixa secció amb sons i efectes propis', () => {
   const spec = engine.composeSongPart({ ...config, instruments: ['guitar', 'guitar2', 'guitar3'],
     fx: { guitar2: { type: 'distortion', drive: 70, tone: 40 } } },
