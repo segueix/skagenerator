@@ -2152,7 +2152,8 @@
             || part.syllables.some(n => !Number.isInteger(n) || n < 1 || n > 24))) throw new Error('Síl·labes de la lletra no vàlides');
         if (part.register !== undefined && ![-1, 0, 1].includes(part.register)) throw new Error('Registre de la veu no vàlid');
         const instruments = part.instruments === undefined ? (settings.instruments === undefined ? style.instruments : settings.instruments) : part.instruments;
-        if (!Array.isArray(instruments) || !instruments.length || new Set(instruments).size !== instruments.length
+        // Una secció pot quedar sense cap instrument (p. ex. tota la base silenciada): sona en silenci.
+        if (!Array.isArray(instruments) || new Set(instruments).size !== instruments.length
             || instruments.some(instrument => !Object.hasOwn(SONG_INSTRUMENTS, instrument))) throw new Error('Selecciona instruments vàlids');
         const energy = Number(part.energy);
         if (!Number.isFinite(energy) || energy < 0 || energy > 100) throw new Error('Intensitat no vàlida');

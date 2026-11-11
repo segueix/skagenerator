@@ -96,6 +96,8 @@
     // Rocksteady: estrofes amb cops d'aro en lloc de charles (sense platets); horror punk: intro de toms sense platets.
     if (key === 'rocksteady') { tempo(of('bridge')[0], .86); tempo(of('outro')[0], .9); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
     if (key === 'horrorpunk') sections[0].cymbals = 'none';
+    // Pop-punk i punk del 77: de vegades la intro és només guitarra (la base calla) i la banda entra a l'estrofa.
+    if ((key === 'poppunk' || key === 'punk77') && r() < .5) sections[0].mute = ['drums', 'bass'];
     if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });
     if (key === 'twotone' || key === 'punk77') sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     if (key === 'skapunk') { const b = of('bridge')[0] || of('solo')[0]; if (b) b.feel = { drums: .5 }; tempo(lastChorus, 1.04); sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 1; }); }

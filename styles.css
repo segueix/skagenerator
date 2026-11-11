@@ -176,7 +176,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 14px 24px; display: grid
 
 /* ── Línia de la cançó ───────────────────────────────────────────── */
 .line-scroll { overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); scrollbar-width: thin; }
-.line { position: relative; min-width: max(100%, calc(var(--label) + var(--bars) * 20px)); padding: 6px 10px 10px 0; }
+.line { position: relative; width: max(100%, calc(var(--label) + var(--bars) * var(--bar-px, 20px) + 10px)); padding: 6px 10px 10px 0; }
 .line-row { display: grid; grid-template-columns: var(--label) 1fr; align-items: center; min-height: 36px; }
 .line-label { position: sticky; left: 0; z-index: 5; align-self: stretch; display: flex; align-items: center; padding: 0 10px 0 12px; background: var(--surface-2); font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 6px 0 8px -6px #00000026; }
 .line-row.ruler .line-label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
@@ -300,7 +300,6 @@ progress::-moz-progress-bar { background: linear-gradient(90deg, var(--teal), va
   .timbre-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .step-actions .button { flex: 0 0 auto; }
   .hint { flex-basis: auto; }
-  .line { min-width: max(100%, calc(var(--label) + var(--bars) * 13px)); }
   .section-fields { grid-template-columns: 1.3fr 1fr 1fr; }
   .section-fields label:first-child { grid-column: auto; }
   .layer-row { grid-template-columns: auto 1fr auto auto; }
@@ -446,4 +445,122 @@ body.recording .transport-play { background: #ef4444; }
   .auto-grid { grid-template-columns: 1.4fr 1fr auto; }
   #auto-create { width: auto; min-width: 240px; }
   .library-row { grid-template-columns: 1fr auto auto auto; grid-template-areas: "info stars open remove"; }
+}
+
+/* ── Línia: zoom, pistes de la base i accions (mòbil) ────────────── */
+.line-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.line-toolbar .icon-button { width: 40px; height: 40px; font-size: 20px; font-weight: 800; }
+.zoom-label { font-size: 12px; color: var(--faint); margin-left: auto; }
+.line-section.context { box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 45%, transparent); }
+.line-track.lane.base { cursor: default; }
+.line-track.lane.base:hover { background: transparent; }
+.line-base.piece { cursor: pointer; padding: 0 6px; font-size: 11px; color: var(--text); border-left: 2px solid var(--surface-2);
+  background: color-mix(in srgb, var(--color) 55%, var(--surface)); }
+.line-base.gap { background: color-mix(in srgb, var(--color) 30%, var(--surface)); opacity: .7; }
+.line-base.piece.own { background: color-mix(in srgb, var(--color) 75%, var(--surface)); font-weight: 800; }
+.line-base.piece.muted { background: repeating-linear-gradient(-45deg, var(--surface) 0 5px, var(--surface-3) 5px 10px); color: var(--faint); border: 1.5px dashed var(--line-strong); font-style: italic; }
+.line-base.piece.selected { box-shadow: 0 0 0 3px var(--text); z-index: 2; }
+.line-base.piece.disabled { pointer-events: none; opacity: .6; }
+.base-lane .line-label { font-weight: 600; }
+.line-actions { position: sticky; bottom: calc(var(--dock, 150px) + 8px); z-index: 8; scroll-margin-bottom: calc(var(--dock, 150px) + 16px); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding: 10px;
+  border-radius: 14px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: 0 8px 24px #00000026; }
+.line-actions[hidden] { display: none; }
+.line-actions-title { display: flex; flex-direction: column; flex: 1 1 100%; min-width: 0; }
+.line-actions-title strong { font-size: 14px; }
+.line-actions-title small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.line-actions .button { min-width: 48px; min-height: 44px; padding: 8px 12px; font-size: 16px; flex: 1 0 auto; }
+.line-actions .button.primary, .line-actions .button.danger { font-size: 14px; }
+.line-actions .button.danger { color: var(--bad, #dc2626); }
+.base-panel { margin: 14px 0; }
+.base-row { grid-template-columns: 1fr !important; border-left: 4px solid var(--color); }
+.base-row.muted { opacity: .75; }
+.base-row.muted .base-tone { display: none; }
+.base-row.selected { box-shadow: 0 0 0 3px var(--text); }
+.base-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.base-toggle input { width: 22px; height: 22px; accent-color: var(--color); flex: none; }
+.base-toggle span { display: flex; flex-direction: column; }
+.base-toggle small { color: var(--muted); font-size: 12px; }
+.base-tone { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }
+@media (min-width: 900px) {
+  .line-actions { position: static; scroll-margin-bottom: 110px; }
+  .line-actions-title { flex: 1 1 auto; }
+  .line-actions .button { flex: 0 0 auto; }
+}
+/* Amb el dit: la línia es llisca per sobre dels elements; només l'element
+   triat captura el gest per arrossegar-lo, amb vores més amples. */
+@media (pointer: coarse) {
+  .line-section, .line-clip { touch-action: pan-x pan-y; }
+  .line-section.selected, .line-clip.selected { touch-action: none; }
+  .handle { display: none; width: 26px; }
+  .selected > .handle { display: block; }
+  .handle.left { left: -6px; } .handle.right { right: -6px; }
+  .selected > .handle::after { opacity: .8; width: 6px; left: 10px; top: 18%; bottom: 18%; }
+  .line-track.sections { height: 64px; }
+  .line-track.lane { height: 44px; }
+  .line-row { min-height: 46px; }
+}
+@media (max-width: 899px) {
+  :root { --label: 86px; }
+  .line-label { font-size: 11px; padding: 0 6px 0 8px; }
+}
+
+/* ── Seccions plegables ──────────────────────────────────────────── */
+.fold > summary { cursor: pointer; list-style: none; min-height: 44px; align-items: center; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary.layer-heading { justify-content: flex-start; padding: 6px 0; margin-bottom: 4px; }
+.fold > summary::before, .touch-help > summary::before { content: '▸'; color: var(--primary); font-weight: 800; margin-right: 8px; }
+.fold[open] > summary::before, .touch-help[open] > summary::before { content: '▾'; }
+.fold > summary { display: flex; }
+.fold-heading { flex: 1; margin: 0; }
+.fold.section-volumes, .fold.base-panel, .fold.layer-panel { margin: 10px 0; padding: 4px 12px 10px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.fold:not([open]).section-volumes, .fold:not([open]).base-panel, .fold:not([open]).layer-panel { padding-bottom: 4px; }
+.touch-help { margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+.touch-help > summary { cursor: pointer; list-style: none; font-weight: 700; color: var(--primary); min-height: 36px; display: flex; align-items: center; }
+.touch-help > summary::-webkit-details-marker { display: none; }
+.section-play { margin: 10px 0; }
+
+/* ── Mòbil: reproductor compacte, objectius tàctils i línia ──────── */
+@media (max-width: 899px) {
+  body { padding-bottom: calc(var(--dock, 124px) + 16px + env(safe-area-inset-bottom)); }
+  /* Reproductor en una sola fila; el progrés és una barra fina a dalt. */
+  .transport-content { position: relative; grid-template-columns: auto minmax(0, 1fr) auto auto auto; grid-template-areas: "play title time stop download"; gap: 8px; padding: 8px 10px 6px; }
+  .transport-play { width: 44px; height: 44px; font-size: 16px; }
+  .transport-progress { display: contents; }
+  .transport-progress progress { position: absolute; left: 0; right: 0; top: 0; height: 4px; border-radius: 0; }
+  .progress-label { grid-area: time; flex-direction: column; align-items: flex-end; gap: 0; font-size: 11px; line-height: 1.25; }
+  .transport .icon-button, .transport .download { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
+  .transport-title .title-line { min-width: 0; overflow: hidden; }
+  .notice { top: calc(8px + env(safe-area-inset-top)); z-index: 60; font-size: 13px; padding: 10px 14px; }
+  /* Objectius tàctils de 44 px com a mínim. */
+  input[type=range] { min-height: 40px; }
+  select, input[type=number], input[type=text] { min-height: 44px; font-size: 16px; }
+  .star { width: 40px; height: 44px; font-size: 24px; }
+  .stars { gap: 0; }
+  .library-row .icon-button, .eq-reset, .layer-row > .icon-button { width: 44px; height: 44px; }
+  .library-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "info remove" "stars stars" "open open"; }
+  .library-row > .button { min-height: 44px; }
+  .library-row .stars { justify-content: space-between; max-width: 260px; }
+  #library-sort { min-height: 44px; }
+  select.feel-select { min-height: 44px; height: 44px; }
+  .touch-help > summary { min-height: 44px; }
+  .instrument-toggle { min-height: 44px; }
+  /* Línia: etiquetes estretes i files més baixes (s'edita amb els botons). */
+  :root { --label: 78px; }
+  .line-track.lane { height: 36px; }
+  .line-row { min-height: 38px; }
+  .line-track.sections { height: 58px; }
+  .line-toolbar { margin-bottom: 6px; }
+  .zoom-label { display: none; }
+  .line-actions { padding: 8px; gap: 6px; box-shadow: 0 -2px 18px #00000030, 0 8px 24px #00000026; }
+  .line-actions .button { min-width: 0; padding: 6px 4px; flex: 1 1 0; }
+  .line-actions .action-text { display: none; }
+  .line-actions-title { flex-direction: row; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
+  .line-actions-title strong { flex: none; }
+  /* Reproductor: títol a dalt i tempo a sota. */
+  .transport-title .title-line { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .transport-title .title-line strong { max-width: 100%; }
+  .transport-title .tempo-badge { font-size: 11px; padding: 0 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  #transport-subtitle { display: none; }
+  .page-heading .intro-copy { display: none; }
+  .section-play .button { flex: 1 1 0; }
 }

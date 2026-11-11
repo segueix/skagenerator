@@ -14,6 +14,8 @@
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const GUITARS = ['guitar', 'guitar2', 'guitar3'];
+  // Noms curts per a les etiquetes de la línia (hi caben al mòbil).
+  const SHORT = { guitar: 'Guitarra 1', guitar2: 'Guitarra 2', guitar3: 'Guitarra 3', trombone: '2a veu vent', sax: 'Saxo', synthLead: 'Sinte melodia', synthPad: 'Sinte acords', synthBass: 'Baix sinte', electronicDrums: 'Bat. electr.', vocal: 'Veu (guia)' };
   const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
   const LINES = [['own', 'Pròpia'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu']];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
@@ -60,6 +62,14 @@
   const defaultGroove = () => ({ drums: 0, bass: 0, guitar: 0 });
   const validTimbres = input => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
     && Object.entries(input).every(([name, value]) => timbreOptions[name]?.some(([preset]) => preset === value));
+  // Edició de la base per secció: instruments silenciats, so propi i patró (orgue i coixí).
+  const BASE_SOUNDS = ['drums', 'bass', 'guitar'], BASE_PATTERNS = {
+    organ: ['Contratemps', '«Bubble»', 'Sostingut', 'Blanques', 'Síncopa'],
+    synthPad: ['Sostingut', 'Blanques', 'Contratemps', 'Negres', 'Síncopa'] };
+  const validBaseEdits = s => (s.mute === undefined || Array.isArray(s.mute) && s.mute.length <= BASE_CHOICES.length && new Set(s.mute).size === s.mute.length && s.mute.every(n => BASE_CHOICES.includes(n)))
+    && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => BASE_SOUNDS.includes(n)))
+    && (s.patterns === undefined || !!s.patterns && typeof s.patterns === 'object' && !Array.isArray(s.patterns)
+      && Object.entries(s.patterns).every(([n, i]) => Object.hasOwn(BASE_PATTERNS, n) && Number.isInteger(i) && i >= 0 && i < 5));
   const validGroove = (input, style) => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
     && Object.entries(input).every(([family, index]) => Object.hasOwn(engine.SONG_GROOVES[style], family) && Number.isInteger(index)
       && index >= 0 && index < engine.SONG_GROOVES[style][family].length);
@@ -143,7 +153,8 @@
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
-        || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals)) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
+        || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
+        || !validBaseEdits(s) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
@@ -203,7 +214,8 @@
     return { layers, ranges, timbres, fx, feel, register, lineModes };
   }
   function partFor(s, seg, options = {}) {
-    const base = s.base.instruments, extra = layersFor(s, seg, options);
+    // Els instruments de la base silenciats en aquesta secció no sonen.
+    const mute = seg.section?.mute || [], base = s.base.instruments.filter(name => !mute.includes(name)), extra = layersFor(s, seg, options);
     let part;
     if (!seg.section) {
       // Si la cançó acaba amb base sola, l'últim tram fa de final.
@@ -217,13 +229,15 @@
       if (sec.transpose) part.transpose = sec.transpose;
       if (sec.groove) part.groove = { ...s.settings.groove, ...sec.groove };
       if (sec.cymbals) part.cymbals = sec.cymbals;
+      if (sec.timbres && Object.keys(sec.timbres).length) part.timbres = { ...sec.timbres };
+      if (sec.patterns) { const layers = {}; for (const [name, index] of Object.entries(sec.patterns)) if (base.includes(name)) layers[name] = index + 1; if (Object.keys(layers).length) part.layers = layers; }
       if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
     part.instruments = [...base, ...Object.keys(extra?.layers || {})];
     if (extra) {
-      part.layers = extra.layers; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges;
-      if (Object.keys(extra.timbres).length) part.timbres = extra.timbres;
+      part.layers = { ...(part.layers || {}), ...extra.layers }; if (Object.keys(extra.ranges).length) part.ranges = extra.ranges;
+      if (Object.keys(extra.timbres).length) part.timbres = { ...(part.timbres || {}), ...extra.timbres };
       if (Object.keys(extra.fx).length) part.fx = extra.fx;
       if (Object.keys(extra.feel).length) part.feel = { ...(part.feel || {}), ...extra.feel };
       if (Object.keys(extra.lineModes).length) part.lineModes = extra.lineModes;
@@ -254,7 +268,7 @@
     const saved = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
     song = saved ? validateSong(JSON.parse(saved)) : newSong();
   } catch { song = newSong(); storageAvailable = false; }
-  let selected = song.sections[0]?.id || null, selectedClip = null, busy = false, noticeTimer;
+  let selected = song.sections[0]?.id || null, selectedClip = null, selectedBase = null, busy = false, noticeTimer;
   const current = () => song.sections.find(s => s.id === selected) || null;
   // Mapa de tempo: cada secció pot tenir el seu BPM; els trams de base sola
   // segueixen el de la cançó. secondsAt i barAt converteixen compassos i temps.
@@ -326,6 +340,8 @@
   async function renderSpec(spec, onProgress = audioProgress) {
     const key = JSON.stringify(spec);
     if (cache.has(key)) { const data = cache.get(key); cache.delete(key); cache.set(key, data); return data; }
+    // Secció sense cap instrument (tota la base silenciada): silenci amb la mateixa cua.
+    if (!spec.instruments.length) { const frames = Math.round((spec.seconds + 1.5) * RATE); return [new Float32Array(frames), new Float32Array(frames)]; }
     const data = await sampleAudio.render(spec, RATE, { onProgress });
     cache.set(key, data); cachedFrames += data[0].length;
     while (cachedFrames > FRAME_BUDGET && cache.size > 1) {
@@ -681,7 +697,7 @@
     song.harmony[type] ??= newRev();
     const sec = { id: uid(), type, start, bars, lyrics: '' };
     song.sections.push(sec); song.sections.sort((a, b) => a.start - b.start);
-    selected = sec.id; stop(); save(); render();
+    selected = sec.id; selectedClip = null; selectedBase = null; stop(); save(); render();
     notify(`${sectionLabel(sec)} marcada als compassos ${start + 1}–${start + bars}. Ara afegeix-hi un instrument.`);
   }
   function previousSection(sec) { return song.sections.filter(s => s.start < sec.start).at(-1); }
@@ -811,7 +827,7 @@
     const next = Math.min(to, ...others.filter(c => c.start >= start).map(c => c.start));
     if (next - start < 1) { notify(`${INSTRUMENTS[instrument]} ja sona en aquest tram. Estira el seu clip a la línia si el vols allargar.`); return null; }
     const clip = { id: uid(), instrument, start, bars: next - start, revision: newRev(), generated: false };
-    song.clips.push(clip); song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id;
+    song.clips.push(clip); song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id; selectedBase = null;
     return clip;
   }
   function addLayer() {
@@ -843,10 +859,18 @@
     element.addEventListener('pointerdown', event => beginDrag(event, kind, item, event.target.dataset.edge || 'move'));
     element.addEventListener('pointermove', dragMove);
     element.addEventListener('pointerup', dragEnd);
-    element.addEventListener('pointercancel', () => { if (drag) { drag = null; render(); } });
+    element.addEventListener('pointercancel', () => { if (drag) { const wasTap = drag.tap; drag = null; if (!wasTap) render(); } });
   }
+  // Amb el dit, un element que no està triat no s'arrossega: així la línia es pot
+  // lliscar per sobre de les seccions. Un toc el tria; un cop triat ja es pot
+  // arrossegar o estirar per les vores, i un segon toc l'obre per editar-lo.
+  const isPicked = (kind, item) => kind === 'section' ? item.id === selected && !selectedClip && !selectedBase : item.id === selectedClip;
   function beginDrag(event, kind, item, mode) {
     if (busy || event.button > 0) return;
+    if (event.pointerType !== 'mouse' && !isPicked(kind, item)) {
+      drag = { tap: true, kind, item, x0: event.clientX, y0: event.clientY, pointer: event.pointerId };
+      return;
+    }
     event.preventDefault(); event.stopPropagation();
     const element = event.currentTarget, rect = element.parentElement.getBoundingClientRect();
     drag = { kind, item, mode, element, x0: event.clientX, left: rect.left, perBar: rect.width / song.settings.bars, delta: 0, moved: false, pointer: event.pointerId };
@@ -861,7 +885,7 @@
     return [start, endOf(item) - start];
   }
   function dragMove(event) {
-    if (!drag || event.pointerId !== drag.pointer) return;
+    if (!drag || event.pointerId !== drag.pointer || drag.tap) return;
     const dx = event.clientX - drag.x0;
     if (Math.abs(dx) > 4 && !drag.moved) { drag.moved = true; drag.element.classList.add('dragging'); }
     if (!drag.moved) return;
@@ -873,17 +897,28 @@
   function dragEnd(event) {
     if (!drag || event.pointerId !== drag.pointer) return;
     const d = drag; drag = null;
-    if (!d.moved) {
-      if (d.kind === 'section') { selected = d.item.id; selectedClip = null; if (mobile.matches) { render(); setTab('section'); return; } }
+    if (d.tap) {
+      if (Math.hypot(event.clientX - d.x0, event.clientY - d.y0) > 10) return;
+      selectedBase = null;
+      if (d.kind === 'section') { selected = d.item.id; selectedClip = null; }
       else { selectedClip = d.item.id; selected = sectionAt(d.item.start)?.id ?? selected; }
-      render(); return;
+      render(); revealActions(); return;
+    }
+    if (!d.moved) {
+      const again = isPicked(d.kind, d.item);
+      selectedBase = null;
+      if (d.kind === 'section') { selected = d.item.id; selectedClip = null; }
+      else { selectedClip = d.item.id; selected = sectionAt(d.item.start)?.id ?? selected; }
+      // Segon toc (amb el dit) sobre l'element triat: obre'n l'editor.
+      if (again && event.pointerType !== 'mouse') { openSectionEditor(); return; }
+      render(); revealActions(); return;
     }
     stop();
     const [start, bars] = preview(d), pointerBar = Math.floor((event.clientX - d.left) / d.perBar);
     let done;
     if (d.kind === 'section') {
       done = d.mode === 'move' ? moveSection(d.item, start, pointerBar) : d.mode === 'right' ? resizeSectionRight(d.item, bars) : resizeSectionLeft(d.item, start);
-      selected = d.item.id;
+      selected = d.item.id; selectedClip = null; selectedBase = null;
     } else {
       const clip = d.item;
       if (d.mode === 'move') {
@@ -891,7 +926,7 @@
         done = !song.clips.some(o => o !== clip && o.instrument === clip.instrument && overlaps(o, moved));
         if (done) clip.start = start; else notify(`Aquí ja sona un altre clip de ${INSTRUMENTS[clip.instrument].toLowerCase()}.`);
       } else { clip.start = start; clip.bars = bars; done = true; }
-      song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id;
+      song.clips.sort((a, b) => a.start - b.start); selectedClip = clip.id; selectedBase = null;
     }
     if (done) save();
     render();
@@ -1024,6 +1059,169 @@
       handle.title = edge === 'left' ? 'Arrossega per moure l’inici' : 'Arrossega per allargar o escurçar'; element.append(handle);
     }
   }
+  // ── Pistes de la base a la línia ───────────────────────────────────
+  // Una pista per instrument de la base, partida per seccions: cada tros es pot
+  // triar (i silenciar, canviar de patró o de so) com qualsevol altre element.
+  function baseNote(sec, name) {
+    if ((sec.mute || []).includes(name)) return 'silenci';
+    const family = name === 'electronicDrums' ? 'drums' : name === 'synthBass' ? 'bass' : name, notes = [];
+    if (sec.groove?.[family] !== undefined && ['drums', 'bass', 'guitar'].includes(name)) notes.push(engine.SONG_GROOVES[song.settings.style][family][sec.groove[family]]);
+    if (sec.patterns?.[name] !== undefined) notes.push(BASE_PATTERNS[name][sec.patterns[name]]);
+    if (sec.timbres?.[name]) notes.push(timbreOptions[name].find(([k]) => k === sec.timbres[name])?.[1].split(' · ')[0]);
+    if (name === 'drums' && sec.cymbals) notes.push(CYMBAL_MODES.find(([k]) => k === sec.cymbals)[1].toLowerCase());
+    return notes.join(' · ');
+  }
+  function renderBaseRows() {
+    const rows = $('base-rows'); rows.replaceChildren();
+    const total = song.settings.bars;
+    if (!song.base.generated) {
+      const row = document.createElement('div'); row.className = 'line-row';
+      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = 'Base';
+      const track = document.createElement('div'); track.className = 'line-track';
+      span(track, 0, total, 'line-base', `${song.base.instruments.map(name => INSTRUMENTS[name]).join(' + ')} · pendent de generar`);
+      row.append(label, track); rows.append(row); return;
+    }
+    for (const name of song.base.instruments) {
+      const row = document.createElement('div'); row.className = 'line-row base-lane';
+      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = SHORT[name] || INSTRUMENTS[name];
+      label.title = `${INSTRUMENTS[name]} · base`;
+      const track = document.createElement('div'); track.className = 'line-track lane base'; track.style.setProperty('--color', instrumentColors[name]);
+      for (const seg of segmentsOf(song)) {
+        const sec = seg.section;
+        if (!sec) { span(track, seg.start, seg.bars, 'line-base ready gap'); continue; }
+        const muted = (sec.mute || []).includes(name), note = baseNote(sec, name);
+        const block = document.createElement('div'); block.tabIndex = 0; block.setAttribute('role', 'button');
+        block.className = `line-base ready piece${muted ? ' muted' : ''}${note && !muted ? ' own' : ''}${sec.id === selected && selectedBase === name ? ' selected' : ''}${busy ? ' disabled' : ''}`;
+        block.style.left = pct(seg.start); block.style.width = pct(seg.bars);
+        block.textContent = note;
+        block.setAttribute('aria-label', `${INSTRUMENTS[name]} a ${sectionLabel(sec)}${note ? `: ${note}` : ''}. Toca per triar-lo.`);
+        const pick = () => {
+          if (busy) return;
+          const again = selected === sec.id && selectedBase === name;
+          selected = sec.id; selectedBase = name; selectedClip = null;
+          if (again) { openSectionEditor(true); return; }
+          render(); revealActions();
+        };
+        block.addEventListener('click', pick);
+        block.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); pick(); } });
+        track.append(block);
+      }
+      row.append(label, track); rows.append(row);
+    }
+  }
+  // Obre el panell de la secció (al mòbil, la pestanya) i, si cal, la part de la base.
+  function openSectionEditor(base = false) {
+    render();
+    if (mobile.matches) setTab('section', !base);
+    $(base ? 'section-base-panel' : 'fold-layers').open = true;
+    const target = base ? document.querySelector(`#section-base [data-base="${selectedBase}"]`) || $('section-base-panel') : null;
+    target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  // ── Barra d'accions de l'element triat (pensada per al mòbil) ───────
+  function actionButton(bar, label, title, handler, options = {}) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = `button ${options.className || ''}`;
+    // «✎ Edita»: al mòbil només es veu la icona (el text queda per als lectors de pantalla).
+    const [icon, ...words] = label.split(' ');
+    if (words.length && options.compact) { button.append(icon, Object.assign(document.createElement('span'), { className: 'action-text', textContent: ` ${words.join(' ')}` })); }
+    else button.textContent = label;
+    button.title = title; button.setAttribute('aria-label', title); button.disabled = busy || !!options.disabled;
+    button.addEventListener('click', () => { if (!busy) handler(); });
+    bar.append(button); return button;
+  }
+  function lineEdit(change) { stop(); if (change() !== false) save(); render(); }
+  function renderLineActions() {
+    const bar = $('line-actions'); bar.replaceChildren();
+    const clip = song.clips.find(c => c.id === selectedClip), sec = current();
+    const title = document.createElement('div'); title.className = 'line-actions-title';
+    if (clip) {
+      const [lo, hi] = clipBounds(clip);
+      title.append(Object.assign(document.createElement('strong'), { textContent: INSTRUMENTS[clip.instrument] }),
+        Object.assign(document.createElement('small'), { textContent: `Compassos ${clip.start + 1}–${endOf(clip)} · ${clip.bars} c.` }));
+      bar.append(title);
+      const move = delta => lineEdit(() => {
+        const moved = { ...clip, start: clip.start + delta };
+        if (moved.start < 0 || endOf(moved) > song.settings.bars || song.clips.some(o => o !== clip && o.instrument === clip.instrument && overlaps(o, moved))) { notify('No es pot moure més: hi ha un altre clip o s’acaba la cançó.'); return false; }
+        clip.start = moved.start; song.clips.sort((a, b) => a.start - b.start);
+      });
+      actionButton(bar, '◀', 'Mou-lo un compàs enrere', () => move(-1), { disabled: clip.start <= lo });
+      actionButton(bar, '▶', 'Mou-lo un compàs endavant', () => move(1), { disabled: endOf(clip) >= hi });
+      actionButton(bar, '−', 'Escurça’l un compàs', () => lineEdit(() => { clip.bars -= 1; }), { disabled: clip.bars <= 1 });
+      actionButton(bar, '＋', 'Allarga’l un compàs', () => lineEdit(() => { clip.bars += 1; }), { disabled: endOf(clip) >= hi });
+      actionButton(bar, '✎ Edita', 'Edita’l al panell de la secció', () => { selected = sectionAt(clip.start)?.id ?? selected; openSectionEditor(); }, { className: 'primary', compact: true });
+      actionButton(bar, '🗑', 'Elimina aquest clip', () => { removeClip(clip); selectedClip = null; render(); }, { className: 'danger' });
+    } else if (sec && selectedBase && song.base.instruments.includes(selectedBase)) {
+      const name = selectedBase, muted = (sec.mute || []).includes(name);
+      title.append(Object.assign(document.createElement('strong'), { textContent: `${INSTRUMENTS[name]} · base` }),
+        Object.assign(document.createElement('small'), { textContent: `${sectionLabel(sec)}${baseNote(sec, name) ? ` · ${baseNote(sec, name)}` : ' · com la cançó'}` }));
+      bar.append(title);
+      actionButton(bar, muted ? '🔊 Fes-la sonar' : '🔇 Silencia-la aquí', muted ? 'Torna a fer sonar aquest instrument en aquesta secció' : 'Silencia aquest instrument només en aquesta secció',
+        () => changeSectionValue(s => setMute(s, name, !muted)));
+      actionButton(bar, '✎ Patró i so', 'Canvia el patró o el so d’aquest instrument en aquesta secció', () => openSectionEditor(true), { className: 'primary' });
+    } else if (sec) {
+      title.append(Object.assign(document.createElement('strong'), { textContent: sectionLabel(sec) }),
+        Object.assign(document.createElement('small'), { textContent: `Compassos ${sec.start + 1}–${endOf(sec)} · ${sec.bars} c. · ${time(sec.bars * barSeconds(sec.bpm))}` }));
+      bar.append(title);
+      const index = song.sections.indexOf(sec), before = song.sections[index - 1], after = song.sections[index + 1];
+      actionButton(bar, '⇠', 'Posa-la abans de la secció anterior', () => lineEdit(() => reorder(sec, before)), { disabled: !before });
+      actionButton(bar, '⇢', 'Posa-la després de la secció següent', () => lineEdit(() => reorder(sec, song.sections[index + 2] || null)), { disabled: !after });
+      actionButton(bar, '−', 'Escurça-la un compàs', () => lineEdit(() => resizeSectionRight(sec, sec.bars - 1)), { disabled: sec.bars <= 1 });
+      actionButton(bar, '＋', 'Allarga-la un compàs', () => lineEdit(() => resizeSectionRight(sec, sec.bars + 1)), { disabled: sec.bars >= MAX_SECTION });
+      actionButton(bar, '⧉', 'Duplica-la just després', () => lineEdit(() => duplicateSection(sec)));
+      actionButton(bar, '✎ Edita', 'Edita la secció', () => openSectionEditor(), { className: 'primary', compact: true });
+      actionButton(bar, '🗑', 'Elimina la secció', () => removeSection(), { className: 'danger' });
+    }
+    bar.hidden = !bar.childElementCount || !song.base.generated;
+  }
+  // En triar un element a la línia, els botons es fan visibles (al mòbil quedarien sota el reproductor).
+  function revealActions() {
+    const bar = $('line-actions');
+    if (!bar.hidden) requestAnimationFrame(() => bar.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  }
+  // Duplica una secció just després: la resta es desplaça i els instruments que
+  // hi sonen continuen a la còpia.
+  function duplicateSection(sec) {
+    if (song.sections.length >= MAX_SECTIONS) { notify(`Com a màxim hi pot haver ${MAX_SECTIONS} seccions.`); return false; }
+    const edge = endOf(sec), newEnd = Math.max(0, ...[...song.sections, ...song.clips].map(item => endOf(item) >= edge ? endOf(item) + sec.bars : endOf(item)));
+    if (newEnd > maxSongBars()) { notify(`La cançó no pot passar de ${maxSongBars()} compassos.`); return false; }
+    const inside = song.clips.filter(c => c.start >= sec.start && endOf(c) < edge);
+    const tight = Math.max(0, ...song.sections.map(endOf)) === song.settings.bars;
+    ripple(edge, sec.bars); fitSong(tight, sec.bars);
+    const copy = { ...JSON.parse(JSON.stringify(sec)), id: uid(), start: edge, lyrics: sec.lyrics };
+    song.sections.push(copy); song.sections.sort((a, b) => a.start - b.start);
+    for (const c of inside) if (song.clips.length < MAX_CLIPS) song.clips.push({ ...JSON.parse(JSON.stringify(c)), id: uid(), start: c.start + sec.bars });
+    resolveClips(); selected = copy.id;
+    notify(`${sectionLabel(copy)} afegida just després de ${sectionLabel(sec)}.`);
+  }
+  // ── Zoom de la línia ────────────────────────────────────────────────
+  const ZOOMS = [4, 6, 9, 13, 18, 24, 32, 44, 60];
+  let zoom = null;
+  try { const stored = localStorage.getItem('skagenerator.zoom'); zoom = stored === 'fit' ? 'fit' : Number(stored) || null; } catch {}
+  // Per defecte: compassos amples al mòbil (fàcils de tocar), més estrets a l'ordinador.
+  function barPx() {
+    if (zoom === 'fit') return null;
+    return zoom || (window.matchMedia('(max-width: 899px)').matches ? 24 : 13);
+  }
+  function applyZoom(keep = true) {
+    const scroller = $('line-scroll'), line = $('line'), before = scroller.scrollLeft / Math.max(1, scroller.scrollWidth);
+    const label = parseFloat(getComputedStyle(line).getPropertyValue('--label')) || 112;
+    let px = barPx();
+    if (px === null) px = Math.max(2, (scroller.clientWidth - label - 36) / song.settings.bars);
+    line.style.setProperty('--bar-px', `${px}px`);
+    $('zoom-label').textContent = zoom === 'fit' ? 'Tota la cançó' : `${Math.round(px)} px per compàs`;
+    $('zoom-out').disabled = px <= ZOOMS[0]; $('zoom-in').disabled = px >= ZOOMS.at(-1);
+    if (keep) scroller.scrollLeft = before * scroller.scrollWidth;
+  }
+  function setZoom(next) {
+    zoom = next;
+    try { localStorage.setItem('skagenerator.zoom', String(next)); } catch {}
+    applyZoom();
+    document.querySelector('.line .selected')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+  function stepZoom(direction) {
+    const px = parseFloat($('line').style.getPropertyValue('--bar-px')) || barPx() || 13;
+    const next = direction > 0 ? ZOOMS.find(z => z > px + .5) : [...ZOOMS].reverse().find(z => z < px - .5);
+    if (next) setZoom(next);
+  }
   function renderLine() {
     const total = song.settings.bars;
     $('line').style.setProperty('--bars', total);
@@ -1033,7 +1231,7 @@
     const track = $('section-track'); track.replaceChildren(); track.classList.toggle('locked', !song.base.generated || busy);
     for (const sec of song.sections) {
       const block = document.createElement('div'); block.tabIndex = 0; block.setAttribute('role', 'button');
-      block.className = `line-section${sec.id === selected ? ' selected' : ''}${busy ? ' disabled' : ''}`;
+      block.className = `line-section${sec.id === selected ? (selectedClip || selectedBase ? ' context' : ' selected') : ''}${busy ? ' disabled' : ''}`;
       block.style.left = pct(sec.start); block.style.width = pct(sec.bars); block.style.setProperty('--color', colors[sec.type]);
       block.setAttribute('aria-label', `${sectionLabel(sec)}, compassos ${sec.start + 1} a ${endOf(sec)}. Arrossega per moure-la o reordenar-la; fletxes per allargar-la, Maj+fletxes per moure-la.`);
       const name = document.createElement('strong'); name.textContent = sectionLabel(sec);
@@ -1043,7 +1241,7 @@
       block.append(name, info); handles(block); bindDrag(block, 'section', sec);
       block.addEventListener('keydown', event => {
         if (busy) return;
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selected = sec.id; selectedClip = null; render(); return; }
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selected = sec.id; selectedClip = null; selectedBase = null; render(); return; }
         const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
         if (!step) return;
         event.preventDefault(); stop();
@@ -1053,15 +1251,13 @@
       });
       track.append(block);
     }
-    const baseTrack = $('base-track'); baseTrack.replaceChildren();
-    span(baseTrack, 0, total, `line-base${song.base.generated ? ' ready' : ''}`,
-      `${song.base.instruments.map(name => INSTRUMENTS[name]).join(' + ')}${song.base.generated ? '' : ' · pendent de generar'}`);
+    renderBaseRows();
     const rows = $('layer-rows'); rows.replaceChildren();
     const used = [];
     for (const c of song.clips) if (!used.includes(c.instrument)) used.push(c.instrument);
     for (const name of used) {
       const row = document.createElement('div'); row.className = 'line-row';
-      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = INSTRUMENTS[name];
+      const label = document.createElement('span'); label.className = 'line-label'; label.textContent = SHORT[name] || INSTRUMENTS[name]; label.title = INSTRUMENTS[name];
       const lane = document.createElement('div'); lane.className = 'line-track lane'; lane.title = `Fes clic en un espai buit per afegir ${INSTRUMENTS[name].toLowerCase()}`;
       lane.style.setProperty('--color', instrumentColors[name]);
       for (const clip of song.clips.filter(c => c.instrument === name)) {
@@ -1086,6 +1282,7 @@
     $('line-hint').textContent = !song.base.generated ? 'Primer genera la base (pas 1).'
       : song.sections.length ? 'Arrossega una secció per moure-la o reordenar-la, i estira-la per les vores. Els instruments també es poden moure i estirar.'
       : 'Fes clic a la fila «Seccions» on vulguis que comenci la primera secció.';
+    renderLineActions(); applyZoom(false);
   }
   function renderSection() {
     const sec = current(), editor = $('section-editor');
@@ -1104,10 +1301,7 @@
     fillSelect($('section-transpose'), Array.from({ length: 13 }, (_, i) => i - 6).map(t => [String(t),
       t === 0 ? `Igual que la cançó (${keyOf(0)})` : `${t > 0 ? '+' : '−'}${Math.abs(t)} semitò${Math.abs(t) > 1 ? 'ns' : ''} · ${keyOf(t)}`]), String(sec.transpose || 0));
     $('section-key-name').textContent = sec.transpose ? '↑ modulació' : '';
-    const drums = engine.SONG_GROOVES[song.settings.style].drums;
-    fillSelect($('section-groove'), [['inherit', `Com la cançó (${drums[song.settings.groove.drums]})`], ...drums.map((name, i) => [String(i), name])],
-      sec.groove?.drums === undefined ? 'inherit' : String(sec.groove.drums));
-    fillSelect($('section-cymbals'), [['inherit', `Com la cançó (${CYMBAL_MODES.find(([k]) => k === (song.settings.cymbals || 'all'))[1].toLowerCase()})`], ...CYMBAL_MODES], sec.cymbals || 'inherit');
+    renderSectionBase(sec);
     $('section-bpm').value = sec.bpm ?? ''; $('section-bpm').placeholder = String(song.settings.bpm);
     $('section-bpm-hint').textContent = sec.bpm ? (sec.bpm > song.settings.bpm ? 'més ràpida que la cançó' : sec.bpm < song.settings.bpm ? 'més lenta que la cançó' : 'igual que la cançó') : `buit = ${song.settings.bpm} (cançó)`;
     const energy = sec.energy ?? TYPES[sec.type].energy;
@@ -1209,6 +1403,58 @@
     if (replay === 'song' || replay === 'section') play(replay);
   }
   // Volums ràpids de la secció (fan servir l'equalitzador de la secció).
+  // ── La base dins d'una secció ──────────────────────────────────────
+  // Cada instrument de la base es pot silenciar, canviar de patró o de so només
+  // en aquesta secció; «Com la cançó» torna al valor general.
+  function renderSectionBase(sec) {
+    const list = $('section-base'); list.replaceChildren();
+    const grooves = engine.SONG_GROOVES[song.settings.style];
+    for (const name of song.base.instruments) {
+      const muted = (sec.mute || []).includes(name);
+      const item = document.createElement('li'); item.className = `layer-row base-row${muted ? ' muted' : ' ready'}${name === selectedBase ? ' selected' : ''}`;
+      item.style.setProperty('--color', instrumentColors[name]); item.dataset.base = name;
+      const toggle = document.createElement('label'); toggle.className = 'base-toggle';
+      const box = document.createElement('input'); box.type = 'checkbox'; box.checked = !muted; box.disabled = busy;
+      box.setAttribute('aria-label', `${INSTRUMENTS[name]} sona en aquesta secció`);
+      box.addEventListener('change', () => changeSectionValue(s => setMute(s, name, !box.checked)));
+      const text = document.createElement('span');
+      const strong = document.createElement('strong'); strong.textContent = INSTRUMENTS[name];
+      const small = document.createElement('small'); small.textContent = muted ? 'En silenci en aquesta secció' : 'Sona en aquesta secció';
+      text.append(strong, small); toggle.append(box, text); item.append(toggle);
+      const controls = document.createElement('div'); controls.className = 'clip-tone base-tone';
+      const field = (label, entries, value, onChange) => {
+        const wrap = document.createElement('label'); const caption = document.createElement('span'); caption.className = 'field-label'; caption.textContent = label;
+        const select = document.createElement('select'); fillSelect(select, entries, value); select.disabled = busy || muted;
+        select.setAttribute('aria-label', `${label.toLowerCase()} de ${INSTRUMENTS[name].toLowerCase()} en aquesta secció`);
+        select.addEventListener('change', () => changeSectionValue(s => onChange(s, select.value)));
+        wrap.append(caption, select); controls.append(wrap);
+      };
+      const family = name === 'electronicDrums' ? 'drums' : name === 'synthBass' ? 'bass' : name;
+      if (grooves[family] && ['drums', 'bass', 'guitar'].includes(name)) {
+        const general = grooves[family][song.settings.groove[family]];
+        field('PATRÓ', [['inherit', `Com la cançó (${general})`], ...grooves[family].map((label, i) => [String(i), label])], sec.groove?.[family] === undefined ? 'inherit' : String(sec.groove[family]),
+          (s, v) => { const next = { ...(s.groove || {}) }; if (v === 'inherit') delete next[family]; else next[family] = Number(v); if (Object.keys(next).length) s.groove = next; else delete s.groove; });
+      }
+      if (BASE_PATTERNS[name]) field('PATRÓ', [['inherit', 'Com la cançó'], ...BASE_PATTERNS[name].map((label, i) => [String(i), label])], sec.patterns?.[name] === undefined ? 'inherit' : String(sec.patterns[name]),
+        (s, v) => { const next = { ...(s.patterns || {}) }; if (v === 'inherit') delete next[name]; else next[name] = Number(v); if (Object.keys(next).length) s.patterns = next; else delete s.patterns; });
+      if (BASE_SOUNDS.includes(name)) {
+        const general = timbreOptions[name].find(([k]) => k === song.settings.timbres[name])?.[1] || 'Segons l’estil';
+        field('SO', [['inherit', `Com la cançó (${general})`], ...timbreOptions[name].filter(([k]) => k !== 'auto')], sec.timbres?.[name] || 'inherit',
+          (s, v) => { const next = { ...(s.timbres || {}) }; if (v === 'inherit') delete next[name]; else next[name] = v; if (Object.keys(next).length) s.timbres = next; else delete s.timbres; });
+      }
+      // Els platets valen per a la bateria acústica i l'electrònica: es mostren a la primera.
+      if (name === song.base.instruments.find(n => n === 'drums' || n === 'electronicDrums'))
+        field('PLATETS', [['inherit', `Com la cançó (${CYMBAL_MODES.find(([k]) => k === (song.settings.cymbals || 'all'))[1].toLowerCase()})`], ...CYMBAL_MODES], sec.cymbals || 'inherit',
+          (s, v) => { if (v === 'inherit') delete s.cymbals; else s.cymbals = v; });
+      if (controls.childElementCount) item.append(controls);
+      list.append(item);
+    }
+  }
+  function setMute(sec, name, muted) {
+    const next = new Set(sec.mute || []);
+    if (muted) next.add(name); else next.delete(name);
+    if (next.size) sec.mute = BASE_CHOICES.filter(n => next.has(n)); else delete sec.mute;
+  }
   function renderVolumes(sec) {
     const list = $('section-volumes'); list.replaceChildren();
     for (const name of eqNames(sec)) {
@@ -1314,7 +1560,7 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-groove', 'section-cymbals']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose']) $(key).disabled = busy;
     $('add-variety').disabled = busy || !ready || song.sections.length < 3;
     $('clear-variety').hidden = !song.sections.some(s => s.bpm || s.transpose || s.groove || s.feel?.drums);
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
@@ -1419,6 +1665,18 @@
 
   // ── Mòbil: un pas per pantalla, amb pestanyes ──────────────────────
   const mobile = window.matchMedia('(max-width: 899px)');
+  // Seccions plegables: a l'ordinador totes obertes; al mòbil només l'essencial,
+  // perquè cada pestanya càpiga en poques pantalles.
+  function applyFolds() {
+    const open = { 'section-base-panel': false, 'fold-layers': true, 'fold-volumes': false, 'fold-examples': false };
+    for (const [id, onMobile] of Object.entries(open)) $(id).open = mobile.matches ? onMobile : true;
+  }
+  // Alçada real del reproductor i les pestanyes fixos: el contingut i els botons
+  // d'edició de la línia es col·loquen just per sobre.
+  function measureDock() {
+    const height = ['.transport', '.tabbar'].reduce((total, selector) => { const el = document.querySelector(selector); return total + (el && getComputedStyle(el).display !== 'none' ? el.offsetHeight : 0); }, 0);
+    document.documentElement.style.setProperty('--dock', `${height}px`);
+  }
   function setTab(name, scroll = true) {
     document.body.dataset.tab = name;
     for (const tab of document.querySelectorAll('.tab')) tab.setAttribute('aria-selected', String(tab.dataset.tab === name));
@@ -1462,6 +1720,13 @@
     .forEach(key => $(key).addEventListener('change', changeSettings));
   $('song-humanize').addEventListener('input', event => { const v = Number(event.target.value); $('song-humanize-value').textContent = v ? `${v} %` : 'quantitzat'; });
   $('song-swing').addEventListener('input', event => { $('song-swing-value').textContent = `${event.target.value} %`; });
+  $('zoom-in').addEventListener('click', () => stepZoom(1));
+  $('zoom-out').addEventListener('click', () => stepZoom(-1));
+  $('zoom-fit').addEventListener('click', () => setZoom('fit'));
+  window.addEventListener('resize', () => { applyZoom(); measureDock(); });
+  mobile.addEventListener('change', applyFolds);
+  if (typeof ResizeObserver === 'function') { const observer = new ResizeObserver(measureDock); for (const selector of ['.transport', '.tabbar']) observer.observe(document.querySelector(selector)); }
+  applyFolds(); measureDock();
   $('song-title').addEventListener('input', event => { song.title = event.target.value; $('transport-title').textContent = song.title || 'Nova cançó'; save(); });
   $('generate-base').addEventListener('click', generateBase);
   $('play-base').addEventListener('click', () => play('base'));
@@ -1484,12 +1749,7 @@
   $('section-transpose').addEventListener('change', event => changeSectionValue(sec => {
     const t = Number(event.target.value); if (t) sec.transpose = t; else delete sec.transpose;
   }));
-  $('section-groove').addEventListener('change', event => changeSectionValue(sec => {
-    if (event.target.value === 'inherit') delete sec.groove; else sec.groove = { drums: Number(event.target.value) };
-  }));
-  $('section-cymbals').addEventListener('change', event => changeSectionValue(sec => {
-    if (event.target.value === 'inherit') delete sec.cymbals; else sec.cymbals = event.target.value;
-  }));
+
   // ── Varietat: canvis de tempo, de to i de ritme ────────────────────
   function addVariety() {
     if (busy || !song.base.generated) return;
@@ -1589,7 +1849,7 @@
   });
   $('export-project').addEventListener('click', () => { download(new Blob([JSON.stringify(song, null, 2)], { type: 'application/json' }), `${fileName()}.json`); notify(song.voice ? 'Projecte desat. La veu es queda en aquest navegador: descarrega-la a part si la vols portar a un altre lloc.' : 'Projecte desat amb la base, les seccions i els instruments.'); });
   function openSong(imported, message) {
-    stop(); song = imported; selected = song.sections[0]?.id || null; selectedClip = null; voiceData = null; cache.clear(); cachedFrames = 0;
+    stop(); song = imported; selected = song.sections[0]?.id || null; selectedClip = null; selectedBase = null; voiceData = null; cache.clear(); cachedFrames = 0;
     updateSettingsUI(); save(); render(); loadVoice(); notify(message);
   }
   // Cançons d'exemple (exemples/*.json, publicades amb la web).

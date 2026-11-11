@@ -21,6 +21,25 @@ A la primera pantalla hi ha **10 cançons fetes amb el taller** (5 de ska i 5 de
 
 Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques).
 
+## La línia al mòbil i la base editable
+
+- **Lliscar sense moure res**: amb el dit, la línia es llisca per sobre de les seccions i els instruments. Un toc tria l’element; només l’element triat es pot arrossegar o estirar (amb vores més amples), i un segon toc l’obre per editar-lo.
+- **Zoom**: botons − ＋ i «Tota la cançó». Al mòbil, per defecte cada compàs fa 24 px; l’elecció es recorda.
+- **Botons d’edició** sota la línia per a l’element triat, sense haver d’encertar vores petites:
+  - secció: posar-la abans o després de la veïna, escurçar-la o allargar-la un compàs, duplicar-la just després, editar-la o eliminar-la;
+  - instrument: moure’l un compàs, escurçar-lo o allargar-lo, editar-lo o eliminar-lo;
+  - tros de la base: silenciar-lo o tornar-lo a fer sonar, i obrir-ne el patró i el so.
+- **La base també s’edita per seccions**: cada instrument de la base té la seva pista a la línia, partida per seccions. A cada secció es pot silenciar (p. ex. una intro només de guitarra), canviar-ne el patró (bateria, baix, guitarra, orgue i coixí) o el so (bateria, baix i guitarra), i triar els platets. «Com la cançó» torna al valor general. Si una secció es queda sense cap instrument, sona en silenci.
+- Així les cançons automàtiques es poden editar del tot, base inclosa. El pop-punk i el punk del 77 de vegades comencen amb una intro només de guitarra.
+
+### Pantalles pensades per al mòbil
+
+- **Reproductor compacte**: una sola fila (reproduir, títol i tempo, temps, aturar, exportar) amb el progrés en una barra fina; deixa més espai al contingut.
+- **Botons d’edició de la línia sempre a la vista**: en triar un element, la barra de botons queda fixada just sobre el reproductor.
+- **Seccions plegables**: a la pestanya «Secció», la base, els volums i l’equalitzador es despleguen quan calen (la pestanya passa de més de 5.600 px a uns 2.200); les cançons d’exemple també es pleguen. A l’ordinador tot continua obert.
+- **«Escolta la secció»** és a dalt de tot de la pestanya, i les etiquetes de la línia fan servir noms curts.
+- Controls de 44 px com a mínim (estrelles, selectors, botons d’esborrar) i cap desbordament horitzontal a 360 px d’amplada.
+
 ## Bateria: platets, afinació i humanització
 
 Al panell de la base hi ha tres controls nous per a la bateria i el ritme:

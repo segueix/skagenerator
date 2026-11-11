@@ -69,7 +69,8 @@ test('els nou instruments generen àudio propi i trompeta i trombó són diferen
     samples.push(audio);
   }
   for (let i = 0; i < samples.length; i++) for (let j = i + 1; j < samples.length; j++) assert.notDeepEqual(samples[i], samples[j]);
-  assert.throws(() => engine.composeSongPart({ ...settings, instruments: [] }, part('intro')));
+  // Una secció pot quedar en silenci (tota la base silenciada): llista buida vàlida.
+  assert.equal(engine.composeSongPart({ ...settings, instruments: [] }, part('intro')).instruments.length, 0);
   assert.throws(() => engine.composeSongPart({ ...settings, instruments: ['piano'] }, part('intro')));
 });
 
@@ -85,7 +86,7 @@ test('cada part admet una combinació instrumental pròpia independent de la for
   assert.deepEqual(base.instruments, ['guitar', 'drums', 'bass']);
   assert.deepEqual(engine.composeSongPart(base, JSON.parse(JSON.stringify(intro))).instruments, intro.instruments);
   assert.deepEqual(engine.composeSongPart({ ...base, instruments: ['drums'] }, intro).instruments, intro.instruments);
-  for (const instruments of [[], ['piano'], ['bass', 'bass'], null, 'bass']) {
+  for (const instruments of [['piano'], ['bass', 'bass'], null, 'bass']) {
     assert.throws(() => engine.composeSongPart(base, { ...intro, instruments }));
   }
 });
