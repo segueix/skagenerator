@@ -28,6 +28,22 @@
     ['break', 'Cop i silenci (la banda calla)'], ['silence', 'Últim compàs en silenci']];
   // Final de la cançó (seccions de tipus final).
   const CLOSINGS = [['hit', 'Cop final de tota la banda'], ['fade', 'Sense cop: el ritme continua (per a un fos)'], ['cold', 'Tall en sec'], ['ring', 'Redoble i acord llarg']];
+  const COLOR_ICONS = { radio: '📻', megaphone: '📢', telephone: '☎', gramophone: '💿' };
+  const OFFBEAT = [['', 'Una bateria'], ['yes', 'Dues bateries: la segona a contratemps']];
+  // Recursos d'una secció, en text curt per a la línia.
+  function sectionMarks(sec) {
+    const out = [];
+    if (sec.fade === 'in') out.push('◢ fos d’entrada');
+    if (sec.fade === 'out') out.push('◣ fos de sortida');
+    if (sec.ending === 'stop') out.push('⏸ aturada');
+    if (sec.ending === 'break') out.push('∅ cop i silenci');
+    if (sec.ending === 'silence') out.push('∅ silenci');
+    if (sec.type === 'outro' && sec.closing) out.push({ fade: '∿ sense cop', cold: '✂ tall en sec', ring: '🥁 redoble final' }[sec.closing]);
+    if (sec.entrance && Object.keys(sec.entrance).length) out.push('≡ entrada per capes');
+    if (sec.exit && Object.keys(sec.exit).length) out.push('≡ sortida per capes');
+    if (sec.offbeat) out.push('🥁🥁 dues bateries');
+    return out;
+  }
   const FADES = [['', 'Sense fos'], ['in', 'Fos d’entrada (puja des del silenci)'], ['out', 'Fos de sortida (baixa fins al silenci)']];
   const DRUM_TUNES = [['2', 'Aguda (+2)'], ['0', 'Natural'], ['-2', 'Greu (−2)'], ['-4', 'Molt greu (−4)'], ['-6', 'Profunda (−6)']];
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
@@ -171,7 +187,7 @@
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
         || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.ending !== undefined && !['stop', 'none', 'break', 'silence'].includes(s.ending))
-        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
+        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
         || ['entrance', 'exit'].some(f => s[f] !== undefined && (!s[f] || typeof s[f] !== 'object' || Array.isArray(s[f]) || Object.entries(s[f]).some(([n, b]) => !Object.hasOwn(INSTRUMENTS, n) || !Number.isInteger(b) || b < 0 || b > MAX_SECTION))) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
         || !validBaseEdits(s) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
@@ -268,6 +284,10 @@
       part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: harmony, groove: s.settings.groove };
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
       if (sec.volumes && Object.keys(sec.volumes).length) part.volumes = sec.volumes;
+      if (sec.offbeat) part.offbeat = true;
+      // Si en aquesta secció falten instruments (sobretot guitarres fortes), la resta puja una mica.
+      const boost = options.baseOnly ? 0 : builder.densityBoost(s, sec);
+      if (boost) part.volumes = { ...(part.volumes || {}), master: Math.max(-24, Math.min(12, (part.volumes?.master || 0) + boost)) };
       if (sec.bpm) part.bpm = sec.bpm;
       if (sec.transpose) part.transpose = sec.transpose;
       if (sec.groove) part.groove = { ...s.settings.groove, ...sec.groove };
@@ -1441,9 +1461,20 @@
       block.setAttribute('aria-label', `${sectionLabel(sec)}, compassos ${sec.start + 1} a ${endOf(sec)}. Arrossega per moure-la o reordenar-la; fletxes per allargar-la, Maj+fletxes per moure-la.`);
       const name = document.createElement('strong'); name.textContent = sectionLabel(sec);
       const count = song.clips.filter(c => c.generated && overlaps(c, sec)).length;
-      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.${sec.bpm ? ` · ♩${sec.bpm}` : ''}${sec.transpose ? ` · ${sec.transpose > 0 ? '↑' : '↓'}${Math.abs(sec.transpose)}` : ''}${sec.ending === 'stop' ? ' · ⏸' : ['break', 'silence'].includes(sec.ending) ? ' · ∅' : ''}${sec.fade === 'in' ? ' · ◢' : sec.fade === 'out' ? ' · ◣' : ''}${sec.entrance || sec.exit ? ' · ≡' : ''}`;
+      const info = document.createElement('small'); info.textContent = `${sec.bars} c. · ${count} instr.${sec.bpm ? ` · ♩${sec.bpm}` : ''}${sec.transpose ? ` · ${sec.transpose > 0 ? '↑' : '↓'}${Math.abs(sec.transpose)}` : ''}`;
       if (sec.bpm) block.classList.add('tempo-change');
-      block.append(name, info); handles(block); bindDrag(block, 'section', sec);
+      block.append(name, info);
+      // Recursos de la secció visibles a la línia: fosos, silencis, final de la cançó, capes i segona bateria.
+      // A la línia d'informació, només les icones; el text sencer, en passar-hi per sobre.
+      const marks = sectionMarks(sec);
+      if (marks.length) { info.textContent += ` · ${marks.map(m => m.split(' ')[0]).join(' ')}`; block.title = `${sectionLabel(sec)}: ${marks.join(' · ')}`; }
+      if (sec.fade) { const ramp = document.createElement('span'); ramp.className = `line-fade ${sec.fade}`; ramp.setAttribute('aria-hidden', 'true'); block.append(ramp); }
+      if (['break', 'silence'].includes(sec.ending)) {
+        const gap = document.createElement('span'); gap.className = 'line-silence'; gap.setAttribute('aria-hidden', 'true');
+        gap.style.width = `${(sec.ending === 'silence' ? 1 : .75) / sec.bars * 100}%`; block.append(gap);
+      }
+      block.setAttribute('aria-label', `${block.getAttribute('aria-label')}${marks.length ? ` Recursos: ${marks.join(', ')}.` : ''}`);
+      handles(block); bindDrag(block, 'section', sec);
       block.addEventListener('keydown', event => {
         if (busy) return;
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selected = sec.id; selectedClip = null; selectedBase = null; render(); return; }
@@ -1481,7 +1512,9 @@
         const element = document.createElement('div'); element.tabIndex = 0; element.setAttribute('role', 'button');
         element.className = `line-clip${clip.generated ? ' ready' : ''}${clip.id === selectedClip ? ' selected' : ''}`;
         element.style.left = pct(clip.start); element.style.width = pct(clip.bars);
-        element.title = `${clipLabel(clip)}${clip.generated ? '' : ' · pendent de generar'}`;
+        element.title = `${clipLabel(clip)}${clip.color ? ` · so de ${engine.COLOR_FX[clip.color].toLowerCase()}` : ''}${clip.generated ? '' : ' · pendent de generar'}`;
+        // Efecte de color (ràdio, megàfon, telèfon, gramòfon): icona i nom dins del clip.
+        if (clip.color) { element.classList.add('colored'); const tag = document.createElement('span'); tag.className = 'line-clip-tag'; tag.textContent = `${COLOR_ICONS[clip.color]} ${engine.COLOR_FX[clip.color]}`; element.append(tag); }
         element.setAttribute('aria-label', `${element.title}. Arrossega per moure’l o estira’l per les vores.`);
         handles(element); bindDrag(element, 'clip', clip);
         lane.append(element);
@@ -1539,6 +1572,7 @@
     if (closingMode) fillSelect($('section-ending'), CLOSINGS, sec.closing || 'hit');
     else fillSelect($('section-ending'), ENDINGS, sec.ending || 'fill');
     fillSelect($('section-fade'), FADES, sec.fade || '');
+    fillSelect($('section-offbeat'), OFFBEAT, sec.offbeat ? 'yes' : '');
     const layered = [sec.entrance && 'entrada per capes', sec.exit && 'sortida per capes'].filter(Boolean);
     $('section-edges-info').textContent = layered.length ? `Aquesta secció té ${layered.join(' i ')} (de «Inici i final nous»).` : '';
     $('section-bpm').value = sec.bpm ?? ''; $('section-bpm').placeholder = String(song.settings.bpm);
@@ -1884,7 +1918,7 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-ending', 'section-fade', 'design-edges']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-ending', 'section-fade', 'section-offbeat', 'design-edges']) $(key).disabled = busy;
     $('add-variety').disabled = busy || !ready || song.sections.length < 3;
     $('clear-variety').hidden = !song.sections.some(s => s.bpm || s.transpose || s.groove || s.feel?.drums);
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
@@ -2201,6 +2235,9 @@
     if (sec.type === 'outro') { if (value === 'hit') delete sec.closing; else sec.closing = value; }
     else if (value === 'fill') delete sec.ending; else sec.ending = value;
   }));
+  $('section-offbeat').addEventListener('change', event => changeSectionValue(sec => {
+    if (event.target.value) sec.offbeat = true; else delete sec.offbeat;
+  }));
   $('section-fade').addEventListener('change', event => changeSectionValue(sec => {
     if (event.target.value) sec.fade = event.target.value; else delete sec.fade;
   }));
@@ -2221,19 +2258,20 @@
       if (bpm === base || songSecondsWith({ section: sec, sectionBpm: bpm }) > MAX_SECONDS) return false;
       sec.bpm = bpm; used.add(sec); done.push(`${sectionLabel(sec)} a ${bpm} BPM (${label})`); return true;
     };
-    // Idees ordenades a l'atzar; se n'apliquen 2 o 3.
+    // Idees ordenades a l'atzar; se n'apliquen 2 o 3. Els canvis són suaus (com a molt un 8 %):
+    // els salts grans de tempo sonaven bruscos.
     const ideas = [
-      () => secs[0].type === 'intro' && tempo(secs[0], .75 + pick(3) * .05, 'intro lenta'),
-      () => tempo(of('bridge')[0] || of('solo')[0], .78 + pick(3) * .04, 'pont més lent'),
-      () => of('chorus').length > 1 && tempo(of('chorus').at(-1), 1.06 + pick(3) * .02, 'última tornada més ràpida'),
-      () => tempo(of('outro').at(-1), .82 + pick(3) * .04, 'final que s’alenteix'),
-      () => tempo(of('prechorus')[0], 1.04 + pick(2) * .02, 'pretornada que empeny'),
-      () => tempo(of('verse')[1], .92, 'segona estrofa més tranquil·la')
+      () => secs[0].type === 'intro' && tempo(secs[0], .92 + pick(3) * .02, 'intro una mica més lenta'),
+      () => tempo(of('bridge')[0] || of('solo')[0], .92 + pick(3) * .02, 'pont més lent'),
+      () => of('chorus').length > 1 && tempo(of('chorus').at(-1), 1.03 + pick(3) * .015, 'última tornada més ràpida'),
+      () => tempo(of('outro').at(-1), .92 + pick(3) * .02, 'final que s’alenteix'),
+      () => tempo(of('prechorus')[0], 1.03 + pick(2) * .02, 'pretornada que empeny'),
+      () => tempo(of('verse')[1], .95, 'segona estrofa més tranquil·la')
     ].sort(() => random32() / 4294967296 - .5);
     const wanted = 2 + pick(2);
     for (const idea of ideas) { if (done.length >= wanted) break; idea(); }
     // Si l'estructura no té prou seccions típiques, s'alternen les del mig.
-    for (const sec of secs.slice(1)) { if (done.length >= 2) break; tempo(sec, used.size % 2 ? 1.08 : .88, 'contrast'); }
+    for (const sec of secs.slice(1)) { if (done.length >= 2) break; tempo(sec, used.size % 2 ? 1.05 : .94, 'contrast'); }
     // Pont a mig temps: bateria i baix a la meitat (si no ha canviat de tempo).
     const bridge = of('bridge')[0];
     if (bridge && !used.has(bridge)) { bridge.feel = { ...(bridge.feel || {}), drums: .5 }; done.push(`${sectionLabel(bridge)} amb la bateria a mig temps`); }
@@ -2248,6 +2286,8 @@
     const drums = engine.SONG_GROOVES[song.settings.style].drums.length;
     const target = of('verse')[1] || bridge || of('verse')[0];
     if (target) { target.groove = { drums: (song.settings.groove.drums + 1 + pick(drums - 1)) % drums }; done.push(`${sectionLabel(target)} amb un altre ritme de bateria`); }
+    // On la cançó s'alenteix, un instrument nou sosté el so perquè no perdi força.
+    for (const { section, instrument } of builder.reinforceSlowdowns(song)) done.push(`${INSTRUMENTS[instrument].toLowerCase()} a ${sectionLabel(section)} per sostenir el canvi de tempo`);
     save(); render();
     notify(`Varietat: ${done.join('; ')}.`);
   }
@@ -2255,6 +2295,8 @@
     if (busy) return;
     stop();
     for (const sec of song.sections) { delete sec.bpm; delete sec.transpose; delete sec.groove; if (sec.feel) { delete sec.feel.drums; if (!Object.keys(sec.feel).length) delete sec.feel; } }
+    // També els instruments afegits per sostenir els canvis de tempo.
+    song.clips = song.clips.filter(c => !c.id.startsWith('slow-'));
     save(); render(); notify('S’han tret els canvis de tempo, de to i de ritme de bateria.');
   }
   $('add-variety').addEventListener('click', addVariety);

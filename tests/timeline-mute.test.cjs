@@ -13,7 +13,8 @@ test('la composició respecta els silencis de les capes i de la base a cada secc
   const song = { settings: { bars: 4, groove: {} }, base: { instruments: ['drums', 'bass'], revision: 1 },
     harmony: { verse: 1 }, sections: [section],
     clips: [{ id: 'horn', instrument: 'trumpet', start: 0, bars: 4, revision: 7, generated: true }] };
-  const scope = { song, TYPES: { verse: { energy: 55 } }, segmentsOf: s => [{ start: 0, bars: 4, section: s.sections[0] }], lyricSyllables: () => [] };
+  const scope = { song, TYPES: { verse: { energy: 55 } }, segmentsOf: s => [{ start: 0, bars: 4, section: s.sections[0] }], lyricSyllables: () => [],
+    builder: require('../song-builder.js'), engine: require('../radioambient.js') };
   vm.createContext(scope);
   vm.runInContext(app.slice(from, to) + '\nthis.compose = () => partFor(song, segmentsOf(song)[0]);', scope);
   assert.deepEqual(Array.from(scope.compose().instruments), ['drums', 'bass'], 'la trompeta està silenciada');
