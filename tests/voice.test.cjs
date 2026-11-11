@@ -94,3 +94,14 @@ test('la presa s’anivella sense saturar i el remostreig conserva la durada', (
   assert(Math.max(...hot.map(Math.abs)) <= .9001);
   assert.equal(resampleLinear(new Float32Array(48000), 48000, 44100).length, 44100);
 });
+
+test('fos d’entrada i de sortida d’un tram, sense tocar l’original', () => {
+  const { applyFade } = require('../audio-utils.js');
+  const part = [new Float32Array(1500).fill(.5), new Float32Array(1500).fill(.5)];
+  const fadeIn = applyFade(part, 1000, 'in'), fadeOut = applyFade(part, 1000, 'out');
+  assert.equal(part[0][0], .5, 'l’original no canvia');
+  assert.equal(fadeIn[0][0], 0); assert(Math.abs(fadeIn[1][500] - .25) < .01); assert.equal(fadeIn[0][1200], .5);
+  assert.equal(fadeOut[0][0], .5); assert(Math.abs(fadeOut[0][500] - .25) < .01); assert.equal(fadeOut[1][1200], 0);
+  for (let k = 1; k < 1000; k++) assert(fadeOut[0][k] <= fadeOut[0][k - 1] && fadeIn[0][k] >= fadeIn[0][k - 1]);
+  assert.throws(() => applyFade(part, 1000, 'x'), /Fos/); assert.throws(() => applyFade(part, 2000, 'in'), /Durada/);
+});

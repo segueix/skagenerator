@@ -360,3 +360,26 @@ test('la veu canta igual els versos repetits i posa les síl·labes tòniques a 
   for (const bad of [{ stress: [[30]] }, { stress: 'x' }, { repeats: [0] }, { repeats: [-1, 3] }])
     assert.throws(() => engine.composeSongPart({ ...settings, instruments: ['vocal'] }, { ...part('verse', 8), layers: { vocal: 2 }, ...bad }), /Accents|Versos/);
 });
+
+test('silencis al mig, tancaments de la cançó i entrades per capes', () => {
+  const { createPerformance } = require('../audio/performance.cjs');
+  const st = { seed: 5, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, ins = ['drums', 'bass', 'guitar', 'organ'], bar = 4 * 60 / 140;
+  const notes = p => createPerformance(engine.composeSongPart(st, { type: 'verse', bars: 4, energy: 70, revision: 1, instruments: ins, ...p })).events.filter(e => e.type === 'on');
+  // Cop i silenci: després del cop no sona res; compàs de silenci: l'últim compàs és mut.
+  assert(notes({ ending: 'break' }).every(e => e.time < 3 * bar + .2));
+  assert(notes({ ending: 'silence' }).every(e => e.time < 3 * bar + .02));
+  assert(notes({}).some(e => e.time > 3 * bar + .5));
+  // Entrada per capes: el baix entra al compàs 2, la guitarra al 3 i l'orgue al 4.
+  const built = notes({ entrance: { bass: 1, guitar: 2, organ: 3 } });
+  for (const [channel, at] of [[2, 1], [0, 2], [11, 3]]) assert(built.filter(e => e.channel === channel).every(e => e.time >= at * bar - .05), `canal ${channel}`);
+  assert(built.some(e => e.channel === 9 && e.time < bar));
+  // Sortida per capes: el baix calla al compàs 2.
+  assert(notes({ exit: { bass: 2 } }).filter(e => e.channel === 2).every(e => e.time < 2 * bar));
+  const outro = closing => createPerformance(engine.composeSongPart(st, { type: 'outro', bars: 4, energy: 60, revision: 1, instruments: ins, closing })).events.filter(e => e.type === 'on');
+  // Fos: el ritme continua fins al final (sense cop final); tall en sec: la banda calla de seguida i sense plats.
+  assert(outro('fade').filter(e => e.time > 3 * bar + .5).length > 10);
+  assert(outro('cold').every(e => e.time < 3 * bar + .3) && !outro('cold').some(e => e.channel === 9 && e.time > 3 * bar - .05 && [49, 57].includes(e.note)));
+  assert(outro('ring').filter(e => e.channel === 9 && e.time > 2 * bar && e.time < 3 * bar).length >= 16, 'redoble llarg');
+  for (const bad of [{ ending: 'x' }, { closing: 'x' }, { entrance: { bass: 4 } }, { exit: { bass: 0 } }, { entrance: { bass: 2 }, exit: { bass: 2 } }, { entrance: { kazoo: 1 } }])
+    assert.throws(() => notes(bad), /no vàlid/);
+});

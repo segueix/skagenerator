@@ -57,6 +57,8 @@ function createPerformance(spec) {
   const misfits = isHorror(spec.fx?.guitar?.type);
   const realBrass = { 3: !chosen('trumpet'), 4: spec.timbres?.trombone === 'vsco' };
   const guitarTakes = Array.isArray(spec.guitarTakes) ? spec.guitarTakes : [];
+  // L'últim compàs de l'outro és el final de la cançó, tret que s'esvaeixi (el groove continua).
+  const finale = spec.type === 'outro' && spec.closing !== 'fade';
   const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
     patch(0, chosen('guitar') ?? (punk && !amped('guitar') ? [0, 30] : [2, 27]), 42, 94),
@@ -218,7 +220,7 @@ function createPerformance(spec) {
     return result;
   };
   for (let b = 0; b < spec.chords.length; b++) {
-    const chord = spec.chords[b], t0 = b * bar, ending = spec.type === 'outro' && b === spec.chords.length - 1;
+    const chord = spec.chords[b], t0 = b * bar, ending = finale && b === spec.chords.length - 1;
     const soft = spec.type === 'intro' || spec.type === 'bridge';
     const guitarPatterns = punk
       ? [[0, .5, 1, 1.5, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 3, 3.5], [0, .5, 1.5, 2, 2.5, 3.5], [0, .5, 1, 1.5, 2.5, 3], [0, 1, 2, 2.5, 3, 3.5]]
@@ -337,7 +339,7 @@ function createPerformance(spec) {
   const drumBars = new Map();
   for (const [b, t, drum] of spec.drumLine || []) { if (!drumBars.has(b)) drumBars.set(b, new Set()); drumBars.get(b).add(`${t}:${drum}`); }
   if (has('drums') && spec.style !== 'urban' && spec.energy >= 40) for (const [b, hits] of drumBars) {
-    if (hits.size < 6 || spec.type === 'outro' && b === spec.chords.length - 1) continue;
+    if (hits.size < 6 || finale && b === spec.chords.length - 1) continue;
     for (const t of [.75, 1.75, 2.25, 3.25]) if (!hits.has(`${t}:38`) && !hits.has(`${t}:37`) && random() < .4)
       note(9, 38, (b * 4 + t) * beat + snareFeel, .05, 22 + random() * 10, .004);
   }
@@ -381,7 +383,7 @@ function createPerformance(spec) {
     const own = Array.isArray(spec.lines?.[instrument]), line = own ? spec.lines[instrument] : spec.melody;
     const channel = { synthLead: 5, trumpet: 3, trombone: 4, sax: 8 }[instrument];
     for (const [b, t, pitch, duration] of line) {
-      const at = b * bar + t * beat, last = spec.type === 'outro' && b === spec.chords.length - 1;
+      const at = b * bar + t * beat, last = finale && b === spec.chords.length - 1;
       if (last) continue;
       // Sense capa pròpia, els metalls esperen a la segona meitat de la intro.
       if (!own && instrument !== 'synthLead' && spec.type === 'intro' && b < 2) continue;

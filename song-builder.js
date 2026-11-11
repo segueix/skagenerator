@@ -92,7 +92,118 @@
     horror: [['Tombes', 'Lluna', 'Vampirs', 'Difunts', 'Calaveres', 'Espectres', 'Corbs'], ['a mitjanit', 'de cementiri', 'sense ànima', 'de Tots Sants', 'i ossos', 'al soterrani']]
   };
 
-  function createAutoSong(engine, key, options = {}) {
+  // ── Inicis i finals de cançó, i silencis al mig ────────────────────
+  // Catàleg de maneres d'entrar i de sortir. designEdges en tria una de cada
+  // (diferent de l'anterior), de vegades hi afegeix un silenci abans d'una
+  // tornada i ho aplica a la primera i a l'última secció amb les eines del
+  // motor: instruments silenciats, entrada i sortida per capes, fos d'entrada
+  // o de sortida, compte de baquetes, tempo i tancaments de l'outro.
+  const OPENINGS = { band: 'tota la banda de cop', drums: 'bateria sola', buildup: 'entrada per capes', countin: 'compte de baquetes',
+    fadein: 'fos d’entrada', riff: 'el riff sol', voice: 'veu i guitarra', riddim: 'baix i bateria', halftime: 'a mig temps i més lenta' };
+  const CLOSINGS = { hit: 'cop final de tota la banda', fadeout: 'fos de sortida', cold: 'tall en sec', ritard: 'final que s’alenteix',
+    ring: 'redoble i acord llarg', breakdown: 'la banda calla per capes', riff: 'acaba amb el riff sol' };
+  const MIDDLES = { none: 'sense silenci', break: 'cop i silenci', silence: 'un compàs de silenci' };
+  const LAYER_ORDER = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad', 'guitar2', 'guitar3', 'trumpet', 'trombone', 'sax', 'synthLead', 'vocal'];
+  function shuffle(list, r) {
+    const out = list.slice();
+    for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+    return out;
+  }
+  function designEdges(engine, song, options = {}) {
+    const r = rng((options.seed >>> 0) || 1), st = song.settings, previous = song.edges || {};
+    const sections = [...song.sections].sort((a, b) => a.start - b.start);
+    if (sections.length < 2) throw new Error('Calen com a mínim dues seccions per fer l’inici i el final');
+    const first = sections[0], last = sections.at(-1), base = song.base.instruments, punk = st.style === 'punk';
+    // Es desfà el disseny anterior (només el que havia fet aquest algorisme).
+    for (const sec of [first, last]) for (const field of ['mute', 'entrance', 'exit', 'fade', 'closing']) delete sec[field];
+    if (previous.opening === 'halftime') { delete first.bpm; delete first.feel; }
+    if (previous.closing === 'ritard') delete last.bpm;
+    if (previous.opening === 'countin') delete st.countIn;
+    const marked = sections.find(sec => sec.id === previous.middleId);
+    if (marked && ['break', 'silence'].includes(marked.ending)) delete marked.ending;
+    song.clips = song.clips.filter(c => !c.edge);
+
+    const inside = (c, sec) => c.start < sec.start + sec.bars && sec.start < c.start + c.bars;
+    const playing = sec => [...new Set([...base, ...song.clips.filter(c => c.generated && inside(c, sec)).map(c => c.instrument)])]
+      .sort((a, b) => LAYER_ORDER.indexOf(a) - LAYER_ORDER.indexOf(b));
+    const drums = base.find(name => name === 'drums' || name === 'electronicDrums');
+    const riffer = punk ? 'guitar3' : 'trumpet', voice = options.vocal ?? song.clips.some(c => c.instrument === 'vocal');
+    const only = (sec, keep) => { const mute = playing(sec).filter(name => !keep.includes(name)); if (mute.length) sec.mute = mute; return true; };
+    // Un instrument que ha de sonar a tota la secció: si no hi és, s'hi afegeix un clip (marcat per poder-lo desfer).
+    const ensure = (sec, instrument, extra = {}) => {
+      const same = song.clips.filter(c => c.instrument === instrument && inside(c, sec));
+      if (same.some(c => c.generated && c.start <= sec.start && c.start + c.bars >= sec.start + sec.bars)) return true;
+      if (same.length) return false;
+      song.clips.push({ id: `edge-${instrument}-${sec.id}`.slice(0, 64), instrument, start: sec.start, bars: sec.bars,
+        revision: options.revisions?.[instrument] || 1, generated: true, edge: true, ...extra });
+      return true;
+    };
+    const outro = last.type === 'outro';
+    const openings = {
+      band: () => true,
+      drums: () => !!drums && only(first, [drums]),
+      buildup: () => {
+        const list = playing(first);
+        if (first.bars < 2 || list.length < 2) return false;
+        first.entrance = {};
+        list.forEach((name, i) => { const at = Math.min(first.bars - 1, Math.floor(i * first.bars / list.length)); if (at > 0) first.entrance[name] = at; });
+        return true;
+      },
+      countin: () => !st.countIn && first.start === 0 && (st.countIn = true),
+      fadein: () => first.bars >= 2 && (first.fade = 'in', true),
+      riff: () => ensure(first, riffer, { line: 'riff' }) && only(first, [riffer]),
+      voice: () => voice && base.includes('guitar') && ensure(first, 'vocal') && only(first, ['vocal', 'guitar']),
+      riddim: () => base.includes('bass') && !!drums && only(first, ['bass', drums]),
+      halftime: () => {
+        if (first.feel || first.bpm) return false;
+        first.feel = { drums: .5, bass: .5 }; first.bpm = Math.max(40, Math.round(st.bpm * .85));
+        return true;
+      }
+    };
+    const closings = {
+      hit: () => true,
+      fadeout: () => { last.fade = 'out'; if (outro) last.closing = 'fade'; return true; },
+      cold: () => outro && (last.closing = 'cold', true),
+      ritard: () => !last.bpm && (last.bpm = Math.max(40, Math.round(st.bpm * .78)), true),
+      ring: () => outro && last.bars >= 2 && (last.closing = 'ring', true),
+      breakdown: () => {
+        // Primer callen les capes de dalt, després la guitarra i el baix; la bateria fa el cop final.
+        const list = playing(last).filter(name => name !== drums).reverse();
+        if (last.bars < 2 || !list.length || !drums) return false;
+        last.exit = {};
+        list.forEach((name, i) => { last.exit[name] = Math.max(1, Math.min(last.bars, Math.round((i + 1) * last.bars / (list.length + 1)))); });
+        return true;
+      },
+      riff: () => {
+        if (!outro || last.bars < 2 || !ensure(last, riffer, { line: 'riff' })) return false;
+        const at = Math.max(1, Math.floor(last.bars / 2));
+        last.exit = Object.fromEntries(playing(last).filter(name => name !== riffer).map(name => [name, at]));
+        last.closing = 'fade';
+        return true;
+      }
+    };
+    const choose = (table, wanted, avoid) => {
+      const order = wanted && table[wanted] ? [wanted] : shuffle(Object.keys(table).filter(key => key !== avoid), r);
+      for (const key of order) if (table[key]()) return key;
+      return Object.keys(table)[0];
+    };
+    const opening = choose(openings, options.opening, previous.opening);
+    const closing = choose(closings, options.closing, previous.closing);
+    // Silenci al mig: la secció que porta a una tornada (preferiblement l'última) acaba
+    // amb un cop i silenci, o amb un compàs sencer de silenci; la tornada entra amb més força.
+    let middle = options.middle ?? (r() < .6 ? (r() < .5 ? 'break' : 'silence') : 'none'), middleId;
+    if (middle !== 'none') {
+      const before = sections.map((sec, i) => sections[i + 1]?.type === 'chorus' ? sec : null).filter(sec => sec && sec !== first && sec.bars >= 2 && !sec.ending);
+      const target = before.at(-1);
+      if (target) { target.ending = middle; middleId = target.id; } else middle = 'none';
+    }
+    song.edges = { opening, closing, middle, ...(middleId ? { middleId } : {}) };
+    const where = middleId ? ` abans de la tornada del compàs ${sections[sections.findIndex(sec => sec.id === middleId) + 1].start + 1}` : '';
+    return { opening, closing, middle, middleId,
+      text: `Inici: ${OPENINGS[opening]}. Final: ${CLOSINGS[closing]}.${middle !== 'none' ? ` Al mig: ${MIDDLES[middle]}${where}.` : ''}` };
+  }
+
+  function composeAuto(engine, key, options = {}) {
     const sg = engine.SUBGENRES[key];
     if (!sg) throw new Error('Subgènere desconegut');
     const seed = (options.seed >>> 0) || 1, r = rng(seed), pick = list => list[Math.floor(r() * list.length)];
@@ -142,8 +253,11 @@
     const id = `auto-${seed.toString(36)}`, sections = [];
     let at = 0;
     const energy = { intro: 55, verse: 62, prechorus: 76, chorus: 90, bridge: 55, solo: 82, outro: 60 };
+    // Corba d'energia: cada estrofa i cada tornada una mica més plenes que l'anterior.
+    const seen = {};
     plan.forEach(([type, bars], i) => {
-      sections.push({ id: `${id}-s${i + 1}`, type, start: at, bars, lyrics: '', energy: Math.min(100, energy[type] + (type === 'chorus' && i > plan.length - 4 ? 8 : 0)) });
+      const n = seen[type] = (seen[type] || 0) + 1, grow = type === 'verse' ? (n - 1) * 6 : type === 'chorus' ? (n - 1) * 3 : 0;
+      sections.push({ id: `${id}-s${i + 1}`, type, start: at, bars, lyrics: '', energy: Math.min(100, energy[type] + grow + (type === 'chorus' && i > plan.length - 4 ? 6 : 0)) });
       at += bars;
     });
     settings.bars = at;
@@ -159,8 +273,9 @@
     const intoChorus = sections.filter((sec, i) => i > 0 && sections[i + 1]?.type === 'chorus' && sec.type !== 'chorus');
     const stops = intoChorus.filter(() => r() < (punk ? .5 : .35)).slice(0, 2);
     for (const sec of stops) sec.ending = 'stop';
-    // Pop-punk i punk del 77: de vegades la intro és només guitarra (la base calla) i la banda entra a l'estrofa.
-    if ((key === 'poppunk' || key === 'punk77') && r() < .5) sections[0].mute = ['drums', 'bass'];
+    // Un altre ritme de bateria a la segona estrofa (de vegades), com fa «Dona-li varietat».
+    const drumCount = engine.SONG_GROOVES[sg.style].drums.length;
+    if (of('verse').length > 1 && key !== 'hardcore' && r() < .5) of('verse')[1].groove = { drums: (groove.drums + 1 + Math.floor(r() * (drumCount - 1))) % drumCount };
     if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });
     if (key === 'twotone' || key === 'punk77') sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     if (key === 'skapunk') { const b = of('bridge')[0] || of('solo')[0]; if (b) b.feel = { drums: .5 }; tempo(lastChorus, 1.04); sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 1; }); }
@@ -230,6 +345,7 @@
     // línies que ja hi sonen (riffs i línies triades abans), per evitar xocs.
     // La veu de la tornada, a més, ha de quedar per sobre de la de l'estrofa.
     const chosen = new Map(), clips = [], revisions = [], voiceMean = {};
+    let quality = 0, judged = 0;
     layersOf.forEach((layer, i) => {
       let revision = layer.revision;
       if (revision === undefined && MELODIC.includes(layer.instrument) && !layer.line) {
@@ -250,7 +366,7 @@
             if (layer.instrument === 'vocal' && layer.sec.type === 'chorus' && voiceMean.verse !== undefined) score += mean(line) >= voiceMean.verse + 2 ? 1.5 : -1.5;
             if (score > best) { best = score; revision = rev; bestLine = line; }
           }
-          chosen.set(memo, revision);
+          chosen.set(memo, revision); quality += best; judged++;
           if (layer.instrument === 'vocal' && bestLine) voiceMean[layer.sec.type] = mean(bestLine);
         }
       }
@@ -261,7 +377,24 @@
     });
     const words = TITLES[key === 'horrorpunk' ? 'horror' : punk ? 'punk' : 'ska'];
     const title = `${pick(words[0])} ${pick(words[1])}`;
-    return { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
+    const song = { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
+    // ── Inici, final i silencis: una manera diferent a cada cançó ──
+    const revisionsOf = Object.fromEntries(MELODIC.map(name => [name, chosen.get(`${name}:intro`) || chosen.get(`${name}:verse`) || chosen.get(`${name}:chorus`) || 1]));
+    const edges = designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf });
+    // Puntuació de la cançó: forma harmònica, qualitat mitjana de les línies i varietat d'inici, final i silencis.
+    const rating = bestForm + quality / Math.max(1, judged) + (edges.opening !== 'band' ? .3 : 0) + (edges.closing !== 'hit' ? .3 : 0) + (edges.middle !== 'none' ? .2 : 0);
+    return { song, score: rating };
   }
-  return { createAutoSong, lineScore, harmonyScore };
+  // Cançó automàtica: es componen tres candidates (amb tot el que sap fer el
+  // taller) i es queda la que puntua millor.
+  function createAutoSong(engine, key, options = {}) {
+    const seed = (options.seed >>> 0) || 1, candidates = Math.max(1, Math.min(6, options.candidates ?? 3));
+    let best = null;
+    for (let k = 0; k < candidates; k++) {
+      const attempt = composeAuto(engine, key, { ...options, seed: k ? (Math.imul(seed, 2246822519) + Math.imul(k, 3266489917)) >>> 0 || 1 : seed });
+      if (!best || attempt.score > best.score) best = attempt;
+    }
+    return best.song;
+  }
+  return { createAutoSong, designEdges, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

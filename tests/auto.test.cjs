@@ -77,7 +77,8 @@ test('la cançó automàtica compon cançons senceres de 2 a 4 minuts per a cada
       const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: h, groove: { ...song.settings.groove, ...(sec.groove || {}) },
         instruments: [...song.base.instruments.filter(n => !(sec.mute || []).includes(n)), ...active.map(c => c.instrument)], layers: Object.fromEntries(active.map(c => [c.instrument, c.revision])) };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
-      for (const f of ['bpm', 'transpose', 'feel', 'cymbals', 'ending']) if (sec[f] !== undefined) part[f] = sec[f];
+      for (const f of ['bpm', 'transpose', 'feel', 'cymbals', 'ending', 'entrance', 'exit']) if (sec[f] !== undefined) part[f] = sec[f];
+      if (sec.closing && sec.type === 'outro') part.closing = sec.closing;
       if (Object.keys(lineModes).length) part.lineModes = lineModes;
       const spec = engine.composeSongPart(song.settings, part);
       if (spec.instruments.length) assert(createPerformance(spec).events.length > 0);
@@ -126,5 +127,55 @@ test('la cançó automàtica tria versions sense xocs i amb la veu de la tornada
       return line.reduce((t, n) => t + n[2], 0) / line.length;
     };
     assert(voice('chorus') > voice('verse') + 1, `${key}: tornada més aguda que l’estrofa`);
+  }
+});
+
+test('inicis, finals i silencis: cada clic en tria uns altres i la cançó continua sent vàlida', () => {
+  const song = builder.createAutoSong(engine, 'twotone', { seed: 77 });
+  assert(song.edges && builder.OPENINGS[song.edges.opening] && builder.CLOSINGS[song.edges.closing], 'la cançó automàtica en porta');
+  const seen = { opening: new Set(), closing: new Set(), middle: new Set() };
+  let previous = song.edges;
+  for (let seed = 1; seed <= 30; seed++) {
+    const result = builder.designEdges(engine, song, { seed });
+    assert.notEqual(result.opening, previous.opening, 'no repeteix l’inici');
+    assert.notEqual(result.closing, previous.closing, 'no repeteix el final');
+    for (const k of ['opening', 'closing', 'middle']) seen[k].add(result[k]);
+    previous = song.edges;
+    // Només hi ha un silenci al mig, just abans d'una tornada, i els clips afegits no es dupliquen.
+    const silent = song.sections.filter(s => ['break', 'silence'].includes(s.ending));
+    assert(silent.length <= 1);
+    for (const sec of silent) assert.equal(song.sections[song.sections.indexOf(sec) + 1].type, 'chorus');
+    assert(song.clips.filter(c => c.edge).length <= 2);
+    for (const sec of song.sections) {
+      const active = song.clips.filter(c => c.start < sec.start + sec.bars && sec.start < c.start + c.bars && !(sec.mute || []).includes(c.instrument));
+      const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: 1, instruments: [...song.base.instruments.filter(n => !(sec.mute || []).includes(n)), ...new Set(active.map(c => c.instrument))],
+        layers: Object.fromEntries(active.map(c => [c.instrument, c.revision])) };
+      for (const f of ['bpm', 'feel', 'ending', 'entrance', 'exit']) if (sec[f] !== undefined) part[f] = sec[f];
+      if (sec.closing) part.closing = sec.closing;
+      const spec = engine.composeSongPart(song.settings, part);
+      if (spec.instruments.length) createPerformance(spec);
+    }
+  }
+  assert(seen.opening.size >= 7, `inicis diferents: ${[...seen.opening]}`);
+  assert(seen.closing.size >= 6, `finals diferents: ${[...seen.closing]}`);
+  assert(seen.middle.has('break') && seen.middle.has('silence') && seen.middle.has('none'));
+  // Triats a mà: bateria sola a l'inici i la banda que calla per capes al final.
+  builder.designEdges(engine, song, { seed: 3, opening: 'drums', closing: 'breakdown', middle: 'none' });
+  const first = song.sections[0], last = song.sections.at(-1);
+  assert.deepEqual(first.mute, song.base.instruments.filter(n => n !== 'drums').concat(first.mute.filter(n => !song.base.instruments.includes(n))));
+  assert(!('drums' in last.exit) && Object.values(last.exit).every(b => b >= 1 && b <= last.bars));
+  // El fos d'entrada es desfà en triar-ne un altre.
+  builder.designEdges(engine, song, { seed: 4, opening: 'fadein', closing: 'fadeout', middle: 'none' });
+  assert.equal(song.sections[0].fade, 'in'); assert.equal(song.sections.at(-1).fade, 'out'); assert.equal(song.sections.at(-1).closing, 'fade');
+  builder.designEdges(engine, song, { seed: 5, opening: 'band', closing: 'hit', middle: 'none' });
+  assert.equal(song.sections[0].fade, undefined); assert.equal(song.sections.at(-1).fade, undefined); assert.equal(song.sections.at(-1).closing, undefined);
+});
+
+test('la cançó automàtica tria la millor de diverses candidates i fa créixer les estrofes', () => {
+  const one = builder.createAutoSong(engine, 'poppunk', { seed: 12, candidates: 1 }), three = builder.createAutoSong(engine, 'poppunk', { seed: 12 });
+  assert.deepEqual(builder.createAutoSong(engine, 'poppunk', { seed: 12 }), three, 'reproduïble');
+  for (const song of [one, three]) {
+    const verses = song.sections.filter(s => s.type === 'verse');
+    for (let i = 1; i < verses.length; i++) assert(verses[i].energy > verses[i - 1].energy, 'cada estrofa més plena');
   }
 });

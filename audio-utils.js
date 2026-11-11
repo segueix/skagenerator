@@ -34,6 +34,23 @@
     }
     return result;
   }
+  // Fos d'entrada o de sortida d'un tram (secció amb la seva cua). Retorna una
+  // còpia: les dades originals poden ser a la memòria cau. «in» puja de silenci
+  // al volum ple al llarg de la durada nominal; «out» baixa fins a silenci al
+  // final de la durada nominal i la cua queda muda.
+  function applyFade(part, nominal, kind) {
+    check(part);
+    if (!['in', 'out'].includes(kind)) throw new Error('Fos no vàlid');
+    if (!Number.isInteger(nominal) || nominal < 1 || nominal > part[0].length) throw new Error('Durada de fos no vàlida');
+    const out = [new Float32Array(part[0]), new Float32Array(part[1])];
+    for (let k = 0; k < out[0].length; k++) {
+      const x = Math.min(1, k / nominal);
+      // Corba de potència constant: el fos sona lineal a l'orella.
+      const gain = kind === 'in' ? Math.sin(x * Math.PI / 2) ** 2 : k >= nominal ? 0 : Math.cos(x * Math.PI / 2) ** 2;
+      out[0][k] *= gain; out[1][k] *= gain;
+    }
+    return out;
+  }
   // ── Filtres de la veu enregistrada ──────────────────────────────────
   // Els presets combinen bandes de freqüència, saturació i, quan escau,
   // modulació. El so es calcula a partir de la presa original, sense alterar-la.
@@ -178,5 +195,5 @@
     }
     return wav;
   }
-  return { joinStereo, mixSections, mixVoice, processVoice, VOICE_EFFECTS, VOICE_EQ_KEYS, placeTake, levelTake, resampleLinear, encodeWav };
+  return { joinStereo, mixSections, applyFade, mixVoice, processVoice, VOICE_EFFECTS, VOICE_EQ_KEYS, placeTake, levelTake, resampleLinear, encodeWav };
 });

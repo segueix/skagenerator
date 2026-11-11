@@ -114,6 +114,7 @@
       </div></div>
       <div class="line-actions" id="line-actions" role="toolbar" aria-label="Accions de l’element triat a la línia" hidden></div>
       <div class="variety-bar"><button type="button" id="add-variety" class="button primary">✦ Dona-li varietat</button><span>Canvis de tempo, pujada de to a l’última tornada i un altre ritme de bateria en alguna secció.</span><button type="button" id="clear-variety" class="text-button" hidden>↶ Treu la varietat</button></div>
+      <div class="variety-bar"><button type="button" id="design-edges" class="button primary">✦ Inici i final nous</button><span>Cada clic tria una altra manera d’entrar i de sortir (bateria sola, entrada per capes, fos, tall en sec, acord llarg…) i de vegades un silenci abans d’una tornada.</span></div>
       <div class="step-actions"><button id="add-section" class="button">＋ Afegeix una secció al final</button><button type="button" class="button primary next-step mobile-only" data-go="section" id="next-section">Edita la secció →</button><span class="hint" id="line-hint"></span></div>
     </section>
 
@@ -128,9 +129,11 @@
           <label><span class="field-label">DURADA <span id="section-time"></span></span><div class="tempo-control"><input id="section-bars" type="number" min="1" max="32" step="1" aria-label="Durada de la secció en compassos"><span>COMPASSOS</span></div></label>
           <label class="bpm-field"><span class="field-label">TEMPO DE LA SECCIÓ <span id="section-bpm-hint"></span></span><div class="tempo-control"><input id="section-bpm" type="number" min="40" max="240" step="1" inputmode="numeric" aria-label="Tempo d’aquesta secció en BPM; buit per seguir el de la cançó"><span>BPM</span></div></label>
           <label><span class="field-label">TO DE LA SECCIÓ <span id="section-key-name"></span></span><select id="section-transpose" aria-label="Canvi de to d’aquesta secció"></select></label>
-          <label><span class="field-label">FINAL DE LA SECCIÓ</span><select id="section-ending" aria-label="Com acaba aquesta secció"></select></label>
+          <label><span class="field-label" id="section-ending-label">FINAL DE LA SECCIÓ</span><select id="section-ending" aria-label="Com acaba aquesta secció"></select></label>
+          <label><span class="field-label">FOS</span><select id="section-fade" aria-label="Fos d’entrada o de sortida de la secció"></select></label>
           <label class="energy-field"><span class="field-label">INTENSITAT <output id="section-energy-value">55 %</output></span><input id="section-energy" type="range" min="10" max="100" step="5" aria-label="Intensitat de la secció"><small class="slider-hint"><span>Suau</span><span>Força de tots els instruments</span><span>Enèrgica</span></small></label>
         </div>
+        <p class="hint" id="section-edges-info"></p>
         <p class="chords-line"><span id="section-chords" class="chords"></span><button type="button" id="section-reharmonize" class="text-button">↻ Altres acords</button></p>
         <div class="step-actions section-play"><button type="button" id="play-section" class="button listen">▷ Escolta la secció</button><button type="button" id="play-song-inline" class="button listen">▷ Escolta tota la cançó</button></div>
         <details class="fold base-panel" id="section-base-panel">

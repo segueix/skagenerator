@@ -1739,6 +1739,9 @@
     // ── Cançons per seccions ────────────────────────────────────────────
     // Comparteix els instruments del motor original. Tempo i tonalitat són
     // globals; cada secció pot sobrescriure els instruments base sense canviar el motiu.
+    // Finals de secció i tancaments de cançó (vegeu composeDrumLine).
+    const SECTION_ENDINGS = ['fill', 'stop', 'none', 'break', 'silence'];
+    const SONG_CLOSINGS = ['hit', 'fade', 'cold', 'ring'];
     const SONG_PARTS = {
         intro: { name: 'Intro', bars: 4, energy: 35, description: 'Presenta el ritme i el caràcter de la cançó.' },
         verse: { name: 'Estrofa', bars: 8, energy: 55, description: 'Desenvolupa la història i deixa espai per a la veu.' },
@@ -1863,18 +1866,37 @@
         const g = DRUM_GROOVES[styleName][index], line = [];
         // Mida del redoble final segons el que ve després.
         const next = options.next, ending = options.ending || 'fill';
+        // Tancament de la cançó (només a l'outro): 'hit' cop final, 'fade' el groove continua
+        // (la cançó s'esvaeix), 'cold' tall en sec sense plats, 'ring' redoble llarg i acord final.
+        const closing = type === 'outro' ? options.closing || 'hit' : 'hit', fading = closing === 'fade';
         const size = next === 'chorus' || next === 'solo' || next === 'end' ? 'big' : next === undefined ? null : next === type ? 'small' : 'medium';
         const pickFill = (wanted, salt = 0) => { const list = FILLS[wanted]; return list[((options.fill || 0) * 7 + salt * 3 + index) % list.length]; };
         const hit = (b, t, note, force) => line.push([b, t, note, force]);
         const big = energy >= 70, quiet = energy < 45, half = Math.max(1, Math.floor(bars / 2));
         const buildBars = type === 'intro' ? Math.min(2, half) : 0;
         for (let b = 0; b < bars; b++) {
-            const final = type === 'outro' && b === bars - 1;
+            const final = type === 'outro' && b === bars - 1 && !fading;
             // Final: redoble gran al penúltim compàs i cop final de tota la banda.
-            const last = b === bars - 1 || (type === 'outro' && b === bars - 2 && bars > 1);
+            const last = !fading && (b === bars - 1 || (type === 'outro' && b === bars - 2 && bars > 1));
+            if (final && closing === 'cold') { hit(b, 0, 36, 120); hit(b, 0, 38, 112); continue; }
+            if (final && closing === 'ring') {
+                // Acord llarg: cop, redoble de ride que creix i últim cop a la quarta part.
+                hit(b, 0, 36, 118); hit(b, 0, 49, 112);
+                for (let t = .5; t < 3; t += .25) hit(b, t, 51, 50 + Math.round(t * 18));
+                hit(b, 3, 36, 122); hit(b, 3, 38, 110); hit(b, 3, 49, 118); hit(b, 3, 57, 104); continue;
+            }
             if (final) { hit(b, 0, 36, 118); hit(b, 0, 38, 104); hit(b, 0, 49, 112); hit(b, 0, 57, 100); continue; }
+            if (closing === 'ring' && type === 'outro' && b === bars - 2) {
+                // Penúltim compàs: caixa en semicorxeres que creix i baixa pels toms.
+                for (let k = 0; k < 16; k++) hit(b, k / 4, k < 8 ? 38 : [50, 48, 47, 45, 43, 41][Math.floor((k - 8) * 6 / 8)], 60 + k * 4);
+                hit(b, 0, 36, 108); hit(b, 0, 49, 100); continue;
+            }
             // Compte d'entrada: quatre cops de baqueta i comença la banda.
             if (options.countIn && b === 0) { [0, 1, 2, 3].forEach((t, k) => hit(b, t, 37, k < 3 ? 92 : 108)); continue; }
+            // Silenci al mig de la cançó: 'break' un cop de tota la banda i silenci
+            // fins a la secció següent; 'silence' l'últim compàs sencer en silenci.
+            if (ending === 'break' && b === bars - 1) { hit(b, 0, 36, 118); hit(b, 0, 38, 108); hit(b, 0, 49, 110); continue; }
+            if (ending === 'silence' && b === bars - 1) continue;
             // Aturada de la banda: un cop junts i silenci fins al redoble que entra.
             if (ending === 'stop' && b === bars - 1 && bars > 1) {
                 hit(b, 0, 36, 116); hit(b, 0, 38, 106); hit(b, 0, 49, 108);
@@ -2296,7 +2318,15 @@
         // secció ('fill' redoble, 'stop' aturada de la banda, 'none' sense redoble) i compte d'entrada.
         if (part.next !== undefined && part.next !== 'end' && !Object.hasOwn(SONG_PARTS, part.next)) throw new Error('Secció següent no vàlida');
         if (part.fill !== undefined && (!Number.isInteger(part.fill) || part.fill < 0 || part.fill > 1000)) throw new Error('Redoble no vàlid');
-        if (part.ending !== undefined && !['fill', 'stop', 'none'].includes(part.ending)) throw new Error('Final de secció no vàlid');
+        if (part.ending !== undefined && !SECTION_ENDINGS.includes(part.ending)) throw new Error('Final de secció no vàlid');
+        if (part.closing !== undefined && !SONG_CLOSINGS.includes(part.closing)) throw new Error('Final de la cançó no vàlid');
+        // Entrada i sortida per capes: compàs (dins de la secció) on cada instrument entra o calla.
+        for (const [field, min, max] of [['entrance', 0, bars - 1], ['exit', 1, bars]]) {
+            const value = part[field];
+            if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value) || Object.entries(value).some(([name, bar]) =>
+                !Object.hasOwn(SONG_INSTRUMENTS, name) || !Number.isInteger(bar) || bar < min || bar > max))) throw new Error('Entrades o sortides d’instruments no vàlides');
+        }
+        if (part.entrance && part.exit && Object.entries(part.exit).some(([name, bar]) => bar <= (part.entrance[name] ?? 0))) throw new Error('Entrades o sortides d’instruments no vàlides');
         if (part.countIn !== undefined && typeof part.countIn !== 'boolean') throw new Error('Compte d’entrada no vàlid');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
             || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name) || !['riff', 'answer'].includes(mode))))
@@ -2485,7 +2515,7 @@
             const tones = { root, third: nearestTone(root+4,chord.pcs,root,root+12),
                 fifth: nearestTone(root+7,chord.pcs,root,root+12), octave: root+12,
                 approach: next===root ? root+7 : next+(next>root ? -1 : 1) };
-            const pattern = part.type==='outro' && b===bars-1
+            const pattern = part.type==='outro' && b===bars-1 && part.closing !== 'fade'
                 ? [[0,'root',3.3,1.18]] : groove.bass>=0 ? bassPatterns[groove.bass] : classic;
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
@@ -2507,11 +2537,23 @@
         // La resta de la banda calla durant el compte d'entrada i després del cop de l'aturada.
         if (part.countIn) drumOptions.countIn = true;
         if (part.ending === 'stop' && bars > 1) drumOptions.stopAt = ((bars - 1) * 4 + .75) * 60 / tempo;
+        // Silenci al mig de la cançó: després del cop (o des del principi de l'últim compàs) no sona res.
+        if (part.ending === 'break') drumOptions.stopAt = ((bars - 1) * 4 + .25) * 60 / tempo;
+        if (part.ending === 'silence') drumOptions.stopAt = Math.max(.02, (bars - 1) * 4 * 60 / tempo);
+        // Tall en sec: la banda dona l'últim cop curt i calla.
+        if (part.type === 'outro' && part.closing === 'cold') drumOptions.stopAt = ((bars - 1) * 4 + .5) * 60 / tempo;
+        if (part.type === 'outro' && part.closing && part.closing !== 'hit') drumOptions.closing = part.closing;
+        // Entrades i sortides per capes: cada instrument sona només a partir del seu compàs d'entrada i fins al de sortida.
+        const audibleRanges = JSON.parse(JSON.stringify(ranges));
+        for (const name of new Set([...Object.keys(part.entrance || {}), ...Object.keys(part.exit || {})])) {
+            const from = part.entrance?.[name] ?? 0, to = part.exit?.[name] ?? bars;
+            audibleRanges[name] = (audibleRanges[name] || [[0, bars]]).map(([a, b]) => [Math.max(a, from), Math.min(b, to)]).filter(([a, b]) => a < b);
+        }
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
-            ranges: JSON.parse(JSON.stringify(ranges)), guitarTakes: guitarTakes.map(take => ({ ...take })),
+            ranges: audibleRanges, guitarTakes: guitarTakes.map(take => ({ ...take })),
             guitarBase: part.guitarBase !== false,
-            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn }),
+            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn, closing: part.type === 'outro' ? part.closing : undefined }),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: { ...(settings.mix || {}), ...(part.mix || {}) },
             baseVolume: { ...baseVolume },
@@ -2608,7 +2650,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

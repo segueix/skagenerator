@@ -107,6 +107,40 @@ El subgènere també es pot triar al panell de la base, juntament amb el **balan
 
 **La cançó sencera.** La cançó automàtica prova 8 combinacions d’harmonia i es queda la que dona més forma: estrofa i tornada amb acords diferents, tornada que comença a la tònica, arribada a la tornada des de la dominant i pont diferent de tots dos. La veu de la tornada es tria perquè quedi per sobre de la de l’estrofa.
 
+### Inicis, finals i silencis
+
+El botó **«✦ Inici i final nous»** (pas 2, amb dues seccions o més) tria una manera d’entrar a la cançó i una de sortir-ne, cada vegada diferent de l’anterior, i de vegades hi afegeix un silenci al mig. Ho aplica a la primera i a l’última secció, i cada clic desfà el que havia fet el clic anterior.
+
+| Inicis | Finals | Silenci al mig (abans d’una tornada) |
+|---|---|---|
+| Tota la banda de cop | Cop final de tota la banda | Cop i silenci: la banda dona un cop i calla |
+| Bateria sola | Fos de sortida (el ritme continua i s’esvaeix) | Un compàs sencer de silenci |
+| Entrada per capes (bateria, baix, guitarra…) | Tall en sec (sense plats) | Sense silenci |
+| Compte de baquetes | Final que s’alenteix | |
+| Fos d’entrada | Redoble llarg i acord final | |
+| El riff sol | La banda calla per capes i la bateria tanca | |
+| Veu i guitarra | Acaba amb el riff sol | |
+| Baix i bateria | | |
+| A mig temps i més lenta | | |
+
+Tot també es pot triar a mà a l’editor de la secció:
+- **Final de la secció**: s’hi afegeixen «Cop i silenci» i «Últim compàs en silenci». A la secció de tipus final, el selector passa a ser **«Final de la cançó»** (cop final, ritme que continua per a un fos, tall en sec, o redoble i acord llarg).
+- **Fos**: fos d’entrada (puja des del silenci) o de sortida (baixa fins al silenci, i la cua queda muda). S’aplica a l’escolta, a la secció i al WAV.
+
+A la línia, les seccions mostren ∅ (silenci), ◢ / ◣ (fos d’entrada o de sortida) i ≡ (entrada o sortida per capes).
+
+### La cançó automàtica ho fa servir tot
+
+- Fa servir totes les eines anteriors: motius desenvolupats, veu amb accents, selector de qualitat, harmonia amb forma, riff i respostes, aturades, canvis de tempo i de to.
+- Tria un **inici, un final i, de vegades, un silenci** amb l’algorisme anterior.
+- **Corba d’energia**: cada estrofa i cada tornada són una mica més plenes que l’anterior.
+- De vegades la segona estrofa té **un altre ritme de bateria**.
+- Compon **tres cançons candidates** i es queda la que puntua millor (forma harmònica, qualitat de les línies i varietat d’inici, final i silencis).
+
+### «Genera» i «Genera’n una altra» amb selector de qualitat
+
+En generar a mà la trompeta, el trombó, el saxo, el sintetitzador o la melodia de veu (amb línia pròpia), el taller prova **24 versions** i es queda la que fa la millor línia dins de les seves seccions: acords, clímax, cadències, ritme i cap xoc amb les altres línies que sonen. «Genera’n una altra» sempre en dona una de diferent.
+
 ## Flux de treball
 
 Hi ha una sola vista, que es treballa de baix cap amunt:
