@@ -614,6 +614,55 @@
     return Math.min(3, Math.round(5 * Math.log10(full / weight)));
   }
 
+  // ── Esquema per escriure la lletra ───────────────────────────────────
+  // A partir de la melodia de veu de cada secció: quants versos, quantes síl·labes té cada
+  // vers (una nota per síl·laba) i on cauen les tòniques (notes a temps). Les frases se
+  // separen pels silencis de la melodia (respiracions de com a mínim un temps).
+  function phrasesOf(notes) {
+    const sorted = [...notes].sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1])), out = [];
+    let current = [], end = -Infinity;
+    for (const note of sorted) {
+      const at = note[0] * 4 + note[1];
+      if (current.length && at - end >= .9) { out.push(current); current = []; }
+      current.push(note); end = at + note[3];
+    }
+    if (current.length) out.push(current);
+    return out;
+  }
+  // Patró rítmic d'un vers: «TA» a les síl·labes que cauen a temps (tòniques), «ta» a la resta.
+  const stressPattern = phrase => phrase.map(([, t]) => (t % 1 === 0 ? 'TA' : 'ta')).join('-');
+  const phraseKey = phrase => phrase.map(([b, t, p, d]) => `${(b % 2) * 4 + t}:${p}:${d}`).join();
+  function lyricsTemplate(info) {
+    const lines = [`Esquema de la lletra · «${info.title}»`, `${info.style} · ${info.key} · ${info.bpm} BPM · ${info.duration}`, '',
+      'Escriu un vers per línia, amb el nombre de síl·labes indicat (una nota per síl·laba).',
+      'Al patró, TA és una síl·laba que cau a temps: hi va bé una síl·laba tònica.',
+      'Les tornades es canten igual: fes-ne servir la mateixa lletra. Cada estrofa porta lletra nova amb el mateix patró.', ''];
+    const seen = new Map(), silent = [];
+    for (const sec of info.sections) {
+      if (!sec.notes || !sec.notes.length) { silent.push(sec.label); continue; }
+      const phrases = phrasesOf(sec.notes), shape = phrases.map(p => p.length).join('-'), pattern = phrases.map(stressPattern).join('|');
+      const twin = seen.get(`${sec.type}:${pattern}`);
+      lines.push(`${sec.label} (compassos ${sec.start + 1}–${sec.start + sec.bars}) · ${phrases.length} vers${phrases.length === 1 ? '' : 'os'}${sec.hasLyrics ? ' · ja té lletra' : ''}${sec.guess ? ' · sense melodia de veu (esquema orientatiu)' : ''}`);
+      // Tornades iguals: la mateixa lletra. Estrofes amb el mateix patró: lletra nova amb les mateixes síl·labes.
+      if (twin) {
+        lines.push(sec.type === 'chorus' ? `  Igual que ${twin}: repeteix-ne la lletra.` : `  Mateix patró que ${twin} (${shape} síl·labes): escriu-hi lletra nova.`, '');
+        continue;
+      }
+      seen.set(`${sec.type}:${pattern}`, sec.label);
+      const keys = phrases.map(phraseKey);
+      phrases.forEach((phrase, i) => {
+        const same = keys.indexOf(keys[i]);
+        lines.push(`  ${i + 1}. ${String(phrase.length).padStart(2)} síl·labes  ${stressPattern(phrase)}${same < i ? `  (melodia igual que el vers ${same + 1}: pot repetir el text)` : ''}`);
+      });
+      lines.push('');
+    }
+    if (silent.length) lines.push(`Sense veu: ${silent.join(', ')}.`, '');
+    const total = info.sections.filter(s => s.notes?.length).reduce((t, s) => t + phrasesOf(s.notes).length, 0);
+    lines.push(`Total: ${total} versos.`, '',
+      'Per demanar la lletra a una IA: «Escriu en català la lletra d’una cançó de ' + info.style.toLowerCase() + ' que segueixi exactament aquest esquema: el mateix nombre de versos per secció i de síl·labes per vers, amb rima (AABB o ABAB) i una tornada fàcil de recordar.»');
+    return lines.join('\n');
+  }
+
   // ── Comentaris de les cançons i informe per analitzar-les ─────────
   // Cada comentari és de tota la cançó (bar null) o d'un compàs concret, amb
   // un tema i una valoració. L'informe exportat recull, per a cada cançó, la
@@ -692,5 +741,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, GUITAR_SETUPS, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

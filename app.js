@@ -1919,7 +1919,7 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-ending', 'section-fade', 'section-offbeat', 'design-edges']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-ending', 'section-fade', 'section-offbeat', 'design-edges', 'copy-lyrics-scheme', 'download-lyrics-scheme']) $(key).disabled = busy;
     $('add-variety').disabled = busy || !ready || song.sections.length < 3;
     $('clear-variety').hidden = !song.sections.some(s => s.bpm || s.transpose || s.groove || s.feel?.drums);
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
@@ -2338,6 +2338,52 @@
     } catch (error) { console.error(error); notify(`No s’ha pogut canviar l’inici i el final: ${reasonOf(error)}`); }
   }
   $('design-edges').addEventListener('click', designEdges);
+  // ── Esquema de la lletra ───────────────────────────────────────────
+  // Per a cada secció, les frases de la melodia de veu (una nota per síl·laba). Les estrofes,
+  // pretornades i tornades sense melodia de veu reben un esquema orientatiu (la melodia que hi faria).
+  function lyricsInfo() {
+    const sections = [...song.sections].sort((a, b) => a.start - b.start).map(sec => {
+      const part = partFor(song, segmentOf(sec)), muted = (sec.mute || []).includes('vocal');
+      const voice = song.clips.some(c => c.instrument === 'vocal' && c.generated && overlaps(c, sec));
+      let notes = null, guess = false;
+      if (voice && !muted) {
+        notes = engine.composeSongPart(song.settings, part).lines.vocal || [];
+        const ranges = part.ranges?.vocal;
+        if (ranges) notes = notes.filter(n => ranges.some(([a, b]) => n[0] >= a && n[0] < b));
+      } else if (!voice && ['verse', 'prechorus', 'chorus'].includes(sec.type)) {
+        const lyric = engine.analyzeLyrics(sec.lyrics || '');
+        notes = engine.composeSongPart(song.settings, { ...part, instruments: [...new Set([...part.instruments, 'vocal'])],
+          layers: { ...(part.layers || {}), vocal: song.harmony[sec.type] || 1 }, ...(lyric.syllables.length ? lyric : {}) }).lines.vocal;
+        guess = true;
+      }
+      return { label: sectionLabel(sec), type: sec.type, start: sec.start, bars: sec.bars, notes, guess, hasLyrics: !!sec.lyrics?.trim() };
+    });
+    const st = song.settings;
+    return { title: song.title, style: engine.SUBGENRES[st.subgenre]?.name || STYLES[st.style].name, key: `${noteNames[st.tonic]} ${st.mode === 'major' ? 'major' : 'menor'}`,
+      bpm: st.bpm, duration: time(songSecondsOf(song)), sections };
+  }
+  function lyricsScheme() {
+    if (!song.base.generated || !song.sections.length) { notify('Primer crea la cançó (o marca les seccions a la línia).'); return null; }
+    try { return builder.lyricsTemplate(lyricsInfo()); }
+    catch (error) { console.error(error); notify(`No s’ha pogut preparar l’esquema: ${reasonOf(error)}`); return null; }
+  }
+  const schemeSummary = text => { const total = text.match(/Total: (\d+) versos/)?.[1] || '0'; return `${total} versos`; };
+  $('copy-lyrics-scheme').addEventListener('click', async () => {
+    const text = lyricsScheme(); if (!text) return;
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      // Navegadors sense accés al porta-retalls: es copia des d'un quadre de text temporal.
+      const area = document.createElement('textarea'); area.value = text; area.setAttribute('readonly', ''); area.style.position = 'fixed'; area.style.opacity = '0';
+      document.body.append(area); area.select(); const ok = document.execCommand('copy'); area.remove();
+      if (!ok) { download(new Blob([text], { type: 'text/plain;charset=utf-8' }), `${fileName()}-lletra.txt`); notify('No s’ha pogut copiar: s’ha baixat l’esquema en .txt.'); return; }
+    }
+    notify(`Esquema de la lletra copiat (${schemeSummary(text)}). Enganxa’l on vulguis per escriure-la.`);
+  });
+  $('download-lyrics-scheme').addEventListener('click', () => {
+    const text = lyricsScheme(); if (!text) return;
+    download(new Blob([text], { type: 'text/plain;charset=utf-8' }), `${fileName()}-lletra.txt`);
+    notify(`Esquema de la lletra baixat (${schemeSummary(text)}).`);
+  });
   $('clear-variety').addEventListener('click', clearVariety);
   $('section-bpm').addEventListener('change', event => {
     const sec = current(); if (!sec || busy) return;
