@@ -142,6 +142,33 @@ test('tres guitarres poden sonar a la mateixa secció amb sons i efectes propis'
     assert.throws(() => engine.composeSongPart({ ...config, fx }, part), /Efecte/);
 });
 
+test('dues guitarres 1 i dues guitarres 2 toquen alhora sense perdre cap presa', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['guitar', 'guitar2', 'bass'], humanize: 0 },
+    { ...part, guitarBase: true, guitarTakes: [
+      { id: 'g1a', instrument: 'guitar', revision: 2, from: 0, to: 4, sound: 'clean' },
+      { id: 'g1b', instrument: 'guitar', revision: 3, from: 1, to: 3, sound: 'muted' },
+      { id: 'g2a', instrument: 'guitar2', revision: 1, from: 0, to: 4, sound: 'distortion' },
+      { id: 'g2b', instrument: 'guitar2', revision: 4, from: 2, to: 4, fx: { type: 'fuzz', drive: 45, tone: 55 } }
+    ] });
+  const music = createPerformance(spec);
+  const events = channel => music.events.filter(e => e.type === 'on' && e.channel === channel);
+  for (const channel of [0, 17, 18, 19, 20]) assert(events(channel).length > 0, `la guitarra ${channel} ha de sonar`);
+  assert.equal(music.channels.find(c => c.channel === 17).program, 27);
+  assert.equal(music.channels.find(c => c.channel === 18).program, 28);
+  assert.equal(music.channels.find(c => c.channel === 19).program, 30);
+  assert(music.channels.find(c => c.channel === 20).clipFx?.type === 'fuzz');
+  const bar = spec.beat * 4;
+  assert(events(18).every(e => e.time >= bar && e.time < 3 * bar), 'la presa curta sona només al seu interval');
+  assert(events(20).every(e => e.time >= 2 * bar), 'les preses simultànies mantenen intervals independents');
+  assert.equal(events(14).length, 0, 'la guitarra 2 no es duplica al canal antic');
+  assert(events(17).some(e => spec.chords[Math.floor(e.time / bar)].pcs.includes(e.note % 12)), 'les notes segueixen els acords');
+  const onlyClip = createPerformance(engine.composeSongPart({ ...config, instruments: ['guitar'], humanize: 0 },
+    { ...part, guitarBase: false, guitarTakes: [{ id: 'sole', instrument: 'guitar', revision: 2, from: 0, to: 4 }] }));
+  assert.equal(onlyClip.events.filter(e => e.type === 'on' && (e.channel === 0 || e.channel === 1)).length, 0,
+    'sense guitarra a la base només s’escolta la guitarra afegida');
+  assert(onlyClip.events.some(e => e.type === 'on' && e.channel === 17));
+});
+
 test('guitarra 3: arpegis, riffs i respostes sempre harmonitzen amb els acords', () => {
   // Els acords prestats de diversos estils són especialment importants:
   // la melodia de l'escala no sempre encaixa en el tercer grau de l'acord.

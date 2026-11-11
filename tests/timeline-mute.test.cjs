@@ -32,6 +32,13 @@ test('hi ha dos reguladors visibles, persistents i independents dels de secció'
   assert.match(app, /function changeBaseVolume\(name, db\)/);
   assert.match(app, /settings\.baseVolume/);
 });
+test('la línia separa guitarres superposades i les deixa afegir encara que hi hagi guitarra a la base', () => {
+  assert.match(app, /const STACKABLE_GUITARS = \['guitar', 'guitar2'\]/);
+  assert.match(app, /part\.guitarTakes = extra\.guitarTakes/);
+  assert.match(app, /if \(STACKABLE_GUITARS\.includes\(instrument\)\) return \[0, song\.settings\.bars\]/);
+  assert.match(app, /stacks\.findIndex\(takes => endOf\(takes\[takes\.length - 1\]\) <= clip\.start\)/);
+});
+
 test('la línia té capçal desplaçable i controls M amb les dues vies de reproducció', () => {
   const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
   assert.match(html, /id="playhead"[^>]*role="slider"/);

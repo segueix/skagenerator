@@ -152,7 +152,7 @@ export function createGuitarFx(fx, sampleRate) {
 
 // Efecte d'un canal: el de l'instrument, amb el retoc propi de la segona presa d'una guitarra doblada.
 function fxFor(score, patch) {
-  const fx = score.fx?.[patch.instrument];
+  const fx = patch.clipFx ?? score.fx?.[patch.instrument];
   if (!fx || !patch.fxTweak) return fx;
   const clampPct = v => Math.max(0, Math.min(100, v));
   return { ...fx, drive: clampPct(fx.drive + patch.fxTweak.drive), tone: clampPct(fx.tone + patch.fxTweak.tone) };
