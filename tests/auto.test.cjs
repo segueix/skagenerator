@@ -325,3 +325,24 @@ test('estructures variades: es penalitza repetir la forma de les últimes canço
   }
   assert(breakdown && riff);
 });
+
+test('punk: es tria quantes guitarres té la cançó (1, 2 o 3)', () => {
+  const guitarsOf = song => new Set(song.clips.map(c => c.instrument).filter(n => n.startsWith('guitar')));
+  for (const key of ['punk77', 'hardcore', 'horrorpunk', 'poppunk']) for (let seed = 1; seed <= 6; seed++) {
+    const one = builder.createAutoSong(engine, key, { seed, guitars: 1 }), two = builder.createAutoSong(engine, key, { seed, guitars: 2 });
+    const three = builder.createAutoSong(engine, key, { seed, guitars: 3 });
+    assert.equal(one.settings.guitars, 1); assert.equal(guitarsOf(one).size, 0, `${key}: només la rítmica de la base`);
+    assert(!guitarsOf(two).has('guitar2'), `${key}: sense segona rítmica`);
+    assert(three.clips.some(c => c.instrument === 'guitar2') && three.clips.some(c => c.instrument === 'guitar3'));
+    // Sense solista, no hi ha inici ni final amb el riff sol.
+    assert(one.edges.opening !== 'riff' && one.edges.closing !== 'riff');
+    // «Inici i final nous» i el reforç de tempo també ho respecten.
+    builder.designEdges(engine, one, { seed: seed + 9, opening: 'riff', closing: 'riff' });
+    assert.equal(guitarsOf(one).size, 0);
+    one.sections[2].bpm = Math.round(one.settings.bpm * .9);
+    assert.equal(builder.reinforceSlowdowns(one).length, 0);
+  }
+  // Per defecte, tres guitarres; a l'ska l'opció no s'aplica.
+  assert.equal(builder.createAutoSong(engine, 'punk77', { seed: 4 }).settings.guitars, 3);
+  assert.equal(builder.createAutoSong(engine, 'twotone', { seed: 4, guitars: 1 }).settings.guitars, undefined);
+});
