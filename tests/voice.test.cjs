@@ -40,6 +40,13 @@ test('els filtres de megàfon, telèfon, ràdio i similars processen només la v
     if (effect !== 'clean') assert(Math.abs(strength(out) - strength(clean)) > .002,
       `el preset ${effect} modifica efectivament el so`);
   }
+  // Els filtres shelving són recursius: un signe erroni pot fer divergir
+  // els greus/aguts al llarg d'una gravació encara que un clip curt funcioni.
+  for (const eq of [{ low: 12 }, { low: -12 }, { high: 12 }, { high: -12 }, { low: 6, mid: -4, high: 5 }])
+    for (const effect of ['clean', 'warm', 'megaphone']) {
+      const output = processVoice(source, { effect, eq });
+      assert(output.every(Number.isFinite), `EQ estable per a ${effect}: ${JSON.stringify(eq)}`);
+    }
   assert.deepEqual(source, before, 'la gravació original no queda modificada');
 });
 
