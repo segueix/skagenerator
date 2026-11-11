@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseSoundBank, renderSampledPart, TAIL_SECONDS } from '../audio/render.mjs';
+import { parseSoundBank, renderSampledPart, createEqualizer, INSTRUMENT_GAIN_DB, REVERB, TAIL_SECONDS } from '../audio/render.mjs';
 import { createPerformance } from '../audio/performance.cjs';
 import engine from '../radioambient.js';
 import audioUtils from '../audio-utils.js';
@@ -42,6 +42,15 @@ test('la interpretació és reproduïble, només activa els instruments seleccio
   assert.equal(notes[1] - notes[0], 7); assert.equal(notes[2] - notes[0], 12);
   assert(ska.events.every(e => e.time >= 0 && e.time < spec.seconds));
   assert(ska.events.every((e,i,a) => !i || a[i-1].time <= e.time));
+});
+test('trompeta: més presència i reverberació general sense alterar altres instruments', () => {
+  assert.equal(INSTRUMENT_GAIN_DB.trumpet, 3, 'guany general de 3 dB');
+  assert.equal(REVERB.trumpet, 58, 'més enviament a sala, tant en legato com en staccato');
+  const boosted = createEqualizer('trumpet', { volume: 0 }, 44100);
+  assert(Math.abs(boosted.gain - 10 ** (3 / 20)) < 1e-10);
+  assert.equal(createEqualizer('trumpet', { volume: -3 }, 44100).gain, 1, 'el volum de l’usuari encara compensa el guany');
+  for (const name of ['trombone', 'sax', 'guitar', 'bass'])
+    assert.equal(createEqualizer(name, { volume: 0 }, 44100).gain, 1, name);
 });
 test('els nou instruments produeixen àudio estèreo finit a partir del banc real', async () => {
   const renders = [];
