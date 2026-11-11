@@ -215,7 +215,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 14px 24px; display: grid
 .playhead::before { content: ''; position: absolute; top: 0; bottom: 0; left: 9px; width: 3px; border-radius: 2px; background: var(--pink); box-shadow: 0 0 10px var(--pink); }
 .playhead::after { content: ''; position: absolute; top: 0; left: 4px; width: 13px; height: 13px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 0 2px var(--surface); }
 .playhead:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-.track-mute { position: absolute; z-index: 5; right: 2px; top: 50%; transform: translateY(-50%); width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--text); font: 800 12px/1 inherit; cursor: pointer; }
+.track-mute { position: absolute; z-index: 5; right: 2px; top: 50%; transform: translateY(-50%); width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--text); font-size: 12px; font-weight: 800; line-height: 1; font-family: inherit; cursor: pointer; }
 .track-mute:hover, .track-mute:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
 .track-mute.is-muted { background: #ad2447; color: #fff; border-color: #ad2447; }
 .track-mute:disabled { opacity: .5; cursor: not-allowed; }
@@ -478,6 +478,7 @@ body.recording .transport-play { background: #ef4444; }
 .line-base.piece.muted { background: repeating-linear-gradient(-45deg, var(--surface) 0 5px, var(--surface-3) 5px 10px); color: var(--faint); border: 1.5px dashed var(--line-strong); font-style: italic; }
 .line-base.piece.selected { box-shadow: 0 0 0 3px var(--text); z-index: 2; }
 .line-base.piece.disabled { pointer-events: none; opacity: .6; }
+.line-base.piece:has(.track-mute) { padding-right: 30px; }
 .base-lane .line-label { font-weight: 600; }
 .line-actions { position: sticky; bottom: calc(var(--dock, 150px) + 8px); z-index: 8; scroll-margin-bottom: calc(var(--dock, 150px) + 16px); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding: 10px;
   border-radius: 14px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: 0 8px 24px #00000026; }

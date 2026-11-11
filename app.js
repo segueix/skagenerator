@@ -493,6 +493,7 @@
     const head = $('playhead');
     head.style.setProperty('--pos', String(bounded / song.settings.bars));
     head.hidden = !song.base.generated;
+    head.setAttribute('aria-valuemax', String(Math.round(songSeconds())));
     head.setAttribute('aria-valuenow', String(Math.round(secondsAt(bounded))));
     head.setAttribute('aria-valuetext', time(secondsAt(bounded)));
   }
@@ -504,7 +505,7 @@
   }
   function barFromPointer(event) {
     const rect = $('line-ruler').getBoundingClientRect();
-    return barAt(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * songSeconds());
+    return Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * song.settings.bars;
   }
   // Quan ja sona, reutilitza el buffer perquè arrossegar el capçal sigui instantani.
   // Si sortim d'una secció reproduïda individualment, passem a la cançó completa.
@@ -546,6 +547,7 @@
     button.title = `${muted ? 'Torna a activar' : 'Silencia'} ${INSTRUMENTS[name]} només a ${sectionLabel(sec)}`;
     button.disabled = busy || !!recording;
     button.addEventListener('pointerdown', event => event.stopPropagation());
+    button.addEventListener('keydown', event => event.stopPropagation());
     button.addEventListener('click', event => {
       event.stopPropagation();
       if (busy || recording) return;
