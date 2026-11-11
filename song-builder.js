@@ -303,7 +303,10 @@
     const sg = engine.SUBGENRES[key];
     if (!sg) throw new Error('Subgènere desconegut');
     const seed = (options.seed >>> 0) || 1, r = rng(seed), pick = list => list[Math.floor(r() * list.length)];
-    const minutes = Math.max(2, Math.min(4, Number(options.minutes) || 3)), vocal = options.vocal !== false;
+    const minutes = Math.max(2, Math.min(4, Number(options.minutes) || 3));
+    // Amb lletra enganxada, la cançó la canta (melodia de veu sempre) i en surt la forma.
+    const sheet = Array.isArray(options.lyrics) ? options.lyrics.filter(s => s && engine.SONG_PARTS[s.type] && String(s.text || '').trim()) : [];
+    const vocal = sheet.length ? true : options.vocal !== false;
     const punk = sg.style === 'punk', TYPES = engine.SONG_PARTS;
     // Preferències: de vegades parteix d'una cançó d'aquest subgènere que t'ha agradat (★4 o més).
     const liked = (options.liked || []).filter(Boolean), model = liked.length && r() < .5 ? pick(liked).settings : null;
@@ -329,7 +332,8 @@
     // Es proven moltes formes (catàleg de plantilles i llargades variables) i es tria la que
     // s'acosta a la durada demanada i s'assembla menys a les estructures de les últimes cançons.
     const target = minutes * 60;
-    const form = chooseForm({ key, style: sg.style, bpm, target, r, recent: options.recent || [], vary: options.vary !== false });
+    const form = sheet.length ? { plan: lyricsPlan(engine, sheet, { bpm, target, punk }), penalty: 0 }
+      : chooseForm({ key, style: sg.style, bpm, target, r, recent: options.recent || [], vary: options.vary !== false });
     let plan = form.plan;
     const formPenalty = form.penalty;
 
@@ -338,13 +342,15 @@
     const energy = { intro: 55, verse: 62, prechorus: 76, chorus: 90, bridge: 55, solo: 82, outro: 60 };
     // Corba d'energia: cada estrofa i cada tornada una mica més plenes que l'anterior.
     const seen = {}, roles = new Map();
-    plan.forEach(([type, bars, role], i) => {
+    plan.forEach(([type, bars, role, words, phraseBars], i) => {
       const n = seen[type] = (seen[type] || 0) + 1, grow = type === 'verse' ? (n - 1) * 6 : type === 'chorus' ? (n - 1) * 3 : 0;
       const sec = { id: `${id}-s${i + 1}`, type, start: at, bars, lyrics: '', energy: Math.min(100, energy[type] + grow + (type === 'chorus' && i > plan.length - 4 ? 6 : 0)) };
       // Pont trencat («breakdown»): bateria i baix a mig temps, pesant. Riff: interludi curt amb el riff de la cançó.
       if (role === 'breakdown') { sec.feel = { drums: .5, bass: .5 }; sec.energy = 80; }
       if (role === 'riff') sec.energy = 85;
       if (role) roles.set(sec, role);
+      if (words) sec.lyrics = words;
+      if (phraseBars) sec.phraseBars = phraseBars;
       sections.push(sec);
       at += bars;
     });
@@ -381,7 +387,8 @@
     const add = (sec, instrument, extra = {}) => { if (!base.includes(instrument) && !excluded.has(instrument)) layersOf.push({ sec, instrument, ...extra }); };
     let verses = 0;
     for (const sec of sections) {
-      const sing = vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
+      // Amb lletra, canten les seccions que en tenen; sense, les estrofes, pretornades i tornades.
+      const sing = sheet.length ? !!sec.lyrics : vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
       const role = roles.get(sec);
       if (role === 'riff') {
         if (punk) { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
@@ -426,6 +433,9 @@
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
       for (const field of ['bpm', 'transpose', 'feel']) if (sec[field] !== undefined) part[field] = sec[field];
       if (extra?.register) part.register = extra.register;
+      // La melodia de veu segueix la lletra de la secció (síl·labes, tòniques i versos repetits).
+      if (layers.vocal !== undefined && sec.lyrics) { const info = engine.analyzeLyrics(sec.lyrics); if (info.syllables.length) Object.assign(part, info); }
+      if (sec.phraseBars) part.phraseBars = sec.phraseBars;
       return part;
     };
     // ── Harmonia: es proven diverses combinacions i es queda la que dona més forma a la cançó ──
@@ -478,7 +488,9 @@
       clips.push(clip);
     });
     const words = TITLES[key === 'horrorpunk' ? 'horror' : punk ? 'punk' : 'ska'];
-    const title = `${pick(words[0])} ${pick(words[1])}`;
+    // Amb lletra, el títol és el primer vers de la tornada (o de la cançó).
+    const hook = (sections.find(s => s.type === 'chorus' && s.lyrics) || sections.find(s => s.lyrics))?.lyrics.split('\n')[0].replace(/[.,;:!?¡¿«»"]+$/g, '').trim();
+    const title = hook ? (hook[0].toUpperCase() + hook.slice(1)).slice(0, 60) : `${pick(words[0])} ${pick(words[1])}`;
     const song = { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
     // Si alguna secció s'alenteix, s'hi afegeix un instrument que sosté el so.
     reinforceSlowdowns(song);
@@ -614,6 +626,126 @@
     return Math.min(3, Math.round(5 * Math.log10(full / weight)));
   }
 
+  // ── Lletra enganxada abans de crear la cançó ─────────────────────────
+  // Reconeix les seccions d'una lletra: per títols («Tornada:», «[Chorus]», «Estrofa 2»,
+  // «Pont»…) o, si no n'hi ha, per la forma: l'estrofa que es repeteix és la tornada, una
+  // estrofa curta just abans de la tornada és la pretornada i una estrofa única entre les
+  // últimes tornades és el pont. Un títol de tornada sense text repeteix l'última tornada.
+  const HEADINGS = [
+    ['prechorus', /^(pre[\s-]*tornada|pre[\s-]*chorus|pre[\s-]*coro|pre[\s-]*estribillo)/],
+    ['chorus', /^(tornada|refrany|chorus|coro|estribillo|hook)/],
+    ['verse', /^(estrofa|verse|verso|vers|strophe)/],
+    ['bridge', /^(pont|bridge|puente)/],
+    ['intro', /^(intro|introducció|introduccion)/],
+    ['outro', /^(final|outro|coda|cierre|tancament)/],
+    ['solo', /^(solo|instrumental)/]
+  ];
+  function headingOf(line) {
+    const clean = line.trim().toLowerCase().replace(/^[\[\(\*#\s]+|[\]\)\*:\s.]+$/g, '').replace(/\s*(\d+|x\s*\d+|\d+\s*x)$/, '').trim();
+    if (!clean || clean.length > 24) return null;
+    for (const [type, re] of HEADINGS) if (re.test(clean) && clean.replace(re, '').trim().length <= 3) return type;
+    return null;
+  }
+  const normalLine = line => line.toLowerCase().replace(/[^a-zàèéíïòóúüç\s]/g, '').replace(/\s+/g, ' ').trim();
+  function stanzaSimilarity(a, b) {
+    const x = a.split('\n').map(normalLine).filter(Boolean), y = b.split('\n').map(normalLine).filter(Boolean);
+    if (!x.length || !y.length) return 0;
+    return x.filter(line => y.includes(line)).length / Math.max(x.length, y.length);
+  }
+  function parseLyricsSheet(text) {
+    const blocks = [];
+    let current = null;
+    const close = () => { if (current && (current.lines.length || current.type)) blocks.push(current); current = null; };
+    for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
+      const line = raw.trim(), heading = line ? headingOf(line) : null;
+      if (!line) { if (current?.lines.length) close(); continue; }
+      // «Tornada x2»: la secció es repeteix.
+      if (heading) { close(); current = { type: heading, lines: [], labelled: true, repeat: Math.min(4, Number(line.toLowerCase().match(/x\s*(\d)|(\d)\s*x/)?.slice(1).find(Boolean) || 1)) }; continue; }
+      if (!current) current = { type: null, lines: [], labelled: false };
+      current.lines.push(line);
+    }
+    close();
+    // Títol de tornada sense text: es repeteix l'última tornada.
+    let lastChorus = null;
+    for (const block of blocks) {
+      if (block.type === 'chorus' && !block.lines.length && lastChorus) block.lines = lastChorus.lines.slice();
+      if (block.type === 'chorus' && block.lines.length) lastChorus = block;
+    }
+    const stanzas = blocks.filter(b => b.lines.length).flatMap(b => Array.from({ length: b.repeat || 1 }, () => ({ type: b.type, text: b.lines.join('\n'), labelled: b.labelled })));
+    // Sense títols: la forma ho diu.
+    const lines = st => st.text.split('\n').length;
+    if (stanzas.some(st => !st.type)) {
+      // Grups d'estrofes que es repeteixen (el mateix text, o gairebé).
+      const groups = [];
+      stanzas.forEach((st, i) => {
+        if (st.type) return;
+        const group = groups.find(g => stanzaSimilarity(stanzas[g[0]].text, st.text) >= .6);
+        if (group) group.push(i); else groups.push([i]);
+      });
+      const repeated = groups.filter(g => g.length >= 2);
+      if (repeated.length) {
+        // La tornada és el grup repetit que tanca la cançó o, si no, el de més versos.
+        const lastIndex = stanzas.length - 1;
+        const chorus = repeated.find(g => g.includes(lastIndex)) || [...repeated].sort((a, b) => lines(stanzas[b[0]]) - lines(stanzas[a[0]]))[0];
+        chorus.forEach(i => { stanzas[i].type = 'chorus'; });
+        // Un altre grup repetit que sempre va just abans de la tornada és la pretornada.
+        for (const group of repeated) if (group !== chorus && group.every(i => chorus.includes(i + 1))) group.forEach(i => { stanzas[i].type = 'prechorus'; });
+      } else if (!stanzas.some(st => st.type === 'chorus')) {
+        // Cap estrofa repetida: estrofa i tornada alternades (la segona estrofa fa de tornada).
+        let k = 0; stanzas.forEach(st => { if (!st.type) st.type = k++ % 2 ? 'chorus' : 'verse'; });
+      }
+      const verseLines = stanzas.filter(st => !st.type).map(lines).sort((a, b) => b - a)[0] || 4;
+      const choruses = stanzas.map((st, i) => st.type === 'chorus' ? i : -1).filter(i => i >= 0);
+      stanzas.forEach((st, i) => {
+        if (st.type) return;
+        // Única entre les dues últimes tornades: pont (si hi ha tres tornades o més, o si no fa
+        // la mateixa llargada que les estrofes; si no, és una estrofa més).
+        const firstVerse = stanzas.find((o, j) => j < i && (o.type === 'verse' || !o.type) && o !== st);
+        if (choruses.length >= 2 && i > choruses.at(-2) && i < choruses.at(-1) && (choruses.length >= 3 || !firstVerse || lines(firstVerse) !== lines(st))) st.type = 'bridge';
+        // Curta i just abans d'una tornada: pretornada (si les estrofes són més llargues).
+        else if (stanzas[i + 1]?.type === 'chorus' && lines(st) <= 2 && verseLines > 2) st.type = 'prechorus';
+        else st.type = 'verse';
+      });
+    }
+    return stanzas.map(({ type, text, labelled }) => ({ type, text, labelled }));
+  }
+  // Forma de la cançó a partir de la lletra: cada estrofa és una secció i cada vers una frase de
+  // 2 compassos (4 si algun vers passa d'11 síl·labes), com fa la melodia de veu. Les seccions
+  // d'una mateixa mena tenen la mateixa llargada. S'hi afegeix intro, final i, si la cançó queda
+  // curta, un instrumental abans de l'última tornada.
+  function lyricsPlan(engine, stanzas, { bpm, target, punk }) {
+    const seconds = list => list.reduce((t, [, bars]) => t + bars * 240 / bpm, 0);
+    const build = wide => {
+      const phrase = text => wide || Math.max(...engine.analyzeLyrics(text).syllables, 0) > 11 ? 4 : 2;
+      const barsOf = text => { const n = engine.analyzeLyrics(text).syllables.length; return Math.max(4, Math.min(32, Math.ceil(n * phrase(text) / 4) * 4)); };
+      const size = {};
+      for (const s of stanzas) size[s.type] = Math.max(size[s.type] || 0, barsOf(s.text));
+      const plan = [];
+      if (stanzas[0]?.type !== 'intro') plan.push(['intro', bpm >= 160 ? 4 : 8]);
+      for (const s of stanzas) {
+        // Més versos dels que caben en 32 compassos: es parteix en seccions iguals.
+        const lines = s.text.split('\n'), per = Math.max(1, Math.floor(32 / phrase(s.text)));
+        for (let k = 0; k < lines.length; k += per) {
+          const chunk = lines.slice(k, k + per).join('\n');
+          plan.push([s.type, lines.length > per ? barsOf(chunk) : size[s.type], undefined, chunk, wide ? 4 : undefined]);
+        }
+      }
+      return plan;
+    };
+    // Lletra curta per a la durada triada: cada vers ocupa 4 compassos (frases amples).
+    let plan = build(false);
+    if (seconds(plan) < target * .7) plan = build(true);
+    // Encara curta: instrumental abans de l'última tornada, tornada final repetida i intro llarga.
+    const short = () => seconds(plan) < target - 25;
+    const lastChorus = () => plan.map(([t]) => t).lastIndexOf('chorus');
+    if (short() && lastChorus() > 0 && !plan.some(([t]) => t === 'solo')) plan.splice(lastChorus(), 0, ['solo', bpm >= 160 ? 16 : 8]);
+    if (short() && lastChorus() > 0) plan.splice(lastChorus() + 1, 0, [...plan[lastChorus()]]);
+    if (short() && plan[0][0] === 'intro' && plan[0][1] < 8) plan[0] = ['intro', 8];
+    if (plan.at(-1)[0] !== 'outro') plan.push(['outro', punk ? 4 : 8]);
+    return plan.slice(0, 24);
+  }
+
+
   // ── Esquema per escriure la lletra ───────────────────────────────────
   // A partir de la melodia de veu de cada secció: quants versos, quantes síl·labes té cada
   // vers (una nota per síl·laba) i on cauen les tòniques (notes a temps). Les frases se
@@ -741,5 +873,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

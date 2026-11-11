@@ -188,7 +188,7 @@
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
         || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.ending !== undefined && !['stop', 'none', 'break', 'silence'].includes(s.ending))
-        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
+        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
         || ['entrance', 'exit'].some(f => s[f] !== undefined && (!s[f] || typeof s[f] !== 'object' || Array.isArray(s[f]) || Object.entries(s[f]).some(([n, b]) => !Object.hasOwn(INSTRUMENTS, n) || !Number.isInteger(b) || b < 0 || b > MAX_SECTION))) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
         || !validBaseEdits(s) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
@@ -286,6 +286,7 @@
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
       if (sec.volumes && Object.keys(sec.volumes).length) part.volumes = sec.volumes;
       if (sec.offbeat) part.offbeat = true;
+      if (sec.phraseBars) part.phraseBars = sec.phraseBars; // frases de la veu de 4 compassos (lletra curta)
       // Si en aquesta secció falten instruments (sobretot guitarres fortes), la resta puja una mica.
       const boost = options.baseOnly ? 0 : builder.densityBoost(s, sec);
       if (boost) part.volumes = { ...(part.volumes || {}), master: Math.max(-24, Math.min(12, (part.volumes?.master || 0) + boost)) };
@@ -2083,6 +2084,25 @@
     const rated = readLibrary().filter(e => e.subgenre === key && e.rating), mean = rated.reduce((t, e) => t + e.rating, 0) / (rated.length || 1);
     $('auto-description').textContent = `${sg.description} ${sg.bpm[0]}–${sg.bpm[1]} BPM.${rated.length ? ` Les teves cançons d’aquest subgènere: ★ ${mean.toFixed(1).replace('.', ',')} de mitjana (${rated.length}).` : ''}`;
   }
+  // ── Lletra enganxada abans de crear la cançó ─────────────────────
+  // Es reconeixen les seccions (es poden corregir) i la cançó es fa a la mida dels versos.
+  let lyricSheet = [];
+  const LYRIC_TYPES = ['intro', 'verse', 'prechorus', 'chorus', 'bridge', 'outro'].map(type => [type, TYPES[type].name]);
+  function renderLyricSheet() {
+    const list = $('auto-lyrics-preview'); list.replaceChildren();
+    lyricSheet.forEach((stanza, i) => {
+      const info = engine.analyzeLyrics(stanza.text), item = document.createElement('li');
+      const select = document.createElement('select'); select.setAttribute('aria-label', `Tipus de la secció ${i + 1} de la lletra`);
+      fillSelect(select, LYRIC_TYPES, stanza.type);
+      select.addEventListener('change', () => { stanza.type = select.value; stanza.labelled = true; renderLyricSheet(); });
+      const text = document.createElement('span');
+      text.textContent = `${info.syllables.length} vers${info.syllables.length === 1 ? '' : 'os'} · ${info.syllables.join('-')} síl·labes · «${stanza.text.split('\n')[0].slice(0, 40)}${stanza.text.split('\n')[0].length > 40 ? '…' : ''}»`;
+      item.append(select, text); list.append(item);
+    });
+    $('auto-lyrics-panel').classList.toggle('filled', lyricSheet.length > 0);
+    $('auto-vocal').disabled = lyricSheet.length > 0;
+  }
+  $('auto-lyrics').addEventListener('input', () => { lyricSheet = builder.parseLyricsSheet($('auto-lyrics').value); renderLyricSheet(); });
   // Forma de la cançó en text curt: «intro › estrofa › tornada ×2 › …».
   function formText(s) {
     const names = [...s.sections].sort((a, b) => a.start - b.start).map(sec => TYPES[sec.type].name.toLowerCase()), out = [];
@@ -2113,7 +2133,7 @@
       const recent = readLibrary().filter(e => Array.isArray(e.song?.sections)).sort((a, b) => b.created - a.created).slice(0, 12)
         .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
       const vary = $('auto-vary').checked, punkSong = engine.SUBGENRES[key].style === 'punk';
-      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
+      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(lyricSheet.length ? { lyrics: lyricSheet.map(({ type, text }) => ({ type, text })) } : {}), ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
         ...(mode ? { key: [Number(tonic), mode] } : {}) });
       migrated = false;
       openSong(validateSong(project), '');
@@ -2124,7 +2144,7 @@
         song.edges?.middle && song.edges.middle !== 'none' && builder.MIDDLES[song.edges.middle],
         song.sections.some(s => s.ending === 'stop') && 'una aturada de la banda',
         ...song.clips.filter(c => c.color).map(c => `${INSTRUMENTS[c.instrument].toLowerCase()} amb so de ${engine.COLOR_FX[c.color].toLowerCase()}`)].filter(Boolean);
-      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${noteNames[song.settings.tonic]} ${song.settings.mode === 'major' ? 'major' : 'menor'}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions (${formText(song)})${song.settings.guitars ? `, ${builder.GUITAR_SETUPS[song.settings.guitars]}` : ''}${extras.length ? `. Recursos: ${extras.join('; ')}` : ''}. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
+      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${noteNames[song.settings.tonic]} ${song.settings.mode === 'major' ? 'major' : 'menor'}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions${lyricSheet.length ? ' a partir de la lletra' : ''} (${formText(song)})${song.settings.guitars ? `, ${builder.GUITAR_SETUPS[song.settings.guitars]}` : ''}${extras.length ? `. Recursos: ${extras.join('; ')}` : ''}. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
       if (mobile.matches) setTab('line');
     } catch (error) { console.error(error); notify(`No s’ha pogut crear la cançó: ${reasonOf(error)}`); }
   });
