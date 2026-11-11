@@ -346,3 +346,30 @@ test('punk: es tria quantes guitarres té la cançó (1, 2 o 3)', () => {
   assert.equal(builder.createAutoSong(engine, 'punk77', { seed: 4 }).settings.guitars, 3);
   assert.equal(builder.createAutoSong(engine, 'twotone', { seed: 4, guitars: 1 }).settings.guitars, undefined);
 });
+
+test('esquema de la lletra: versos, síl·labes i tòniques de cada secció a partir de la melodia de veu', () => {
+  const song = builder.createAutoSong(engine, 'punk77', { seed: 12 });
+  const sections = song.sections.map(sec => {
+    const voice = song.clips.find(c => c.instrument === 'vocal' && c.start === sec.start);
+    let notes = null;
+    if (voice) {
+      const h = song.harmony[sec.type] || 1, p = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: h, instruments: ['vocal'], layers: { vocal: voice.revision } };
+      if (['intro', 'verse', 'chorus'].includes(sec.type)) p.variantIndex = (h - 1) % 5;
+      notes = engine.composeSongPart(song.settings, p).lines.vocal;
+    }
+    return { label: engine.SONG_PARTS[sec.type].name, type: sec.type, start: sec.start, bars: sec.bars, notes };
+  });
+  const text = builder.lyricsTemplate({ title: song.title, style: 'Punk del 77', key: 'La major', bpm: song.settings.bpm, duration: '3:00', sections });
+  // Cada vers té tantes síl·labes com notes té la frase de la melodia.
+  const first = sections.find(s => s.notes?.length), phrases = builder.phrasesOf(first.notes);
+  assert(phrases.length >= 2 && phrases.reduce((t, p) => t + p.length, 0) === first.notes.length);
+  phrases.forEach((p, i) => assert(text.includes(`  ${i + 1}. ${String(p.length).padStart(2)} síl·labes`), `vers ${i + 1}`));
+  // Les tornades repetides remeten a la primera; les seccions sense veu es llisten.
+  const choruses = sections.filter(s => s.type === 'chorus' && s.notes?.length).length;
+  assert.equal((text.match(/Igual que Tornada: repeteix-ne la lletra/g) || []).length, choruses - 1);
+  assert.match(text, /Sense veu: .*Intro/);
+  assert.match(text, /Total: \d+ versos/);
+  assert.match(text, /TA/);
+  // Les frases es tallen pels silencis de la melodia.
+  assert.deepEqual(builder.phrasesOf([[0, 0, 60, 1], [0, 1, 62, 1], [0, 3, 64, 1], [1, 0, 65, 1]]).map(p => p.length), [2, 2]);
+});

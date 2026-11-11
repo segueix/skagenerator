@@ -295,6 +295,15 @@ L’efecte **«Horror punk (estil Misfits)»** imita el so de guitarra dels prim
 
 Amb aquest efecte, la guitarra principal també toca a la manera del grup: acords de quinta (fonamental, quinta i octava) **tot a cops avall en corxeres**, **apagats amb el palmell a les estrofes** i **oberts a les tornades**, amb **dues guitarres iguals a esquerra i dreta**. La guitarra entra neta a l’«amplificador» perquè no es distorsioni dues vegades. Per sonar com ells: estil Punk, 160–200 BPM.
 
+## Esquema per escriure la lletra
+
+Amb la cançó generada, **«📋 Copia l’esquema de la lletra»** (pas 2) copia al porta-retalls quants versos ha de tenir cada secció i quantes síl·labes cada vers. **«Baixa’l en .txt»** en baixa el mateix text. Com es calcula:
+- Surt de la **melodia de veu**: una nota per síl·laba i un vers per frase (les frases se separen per les respiracions de la melodia).
+- Cada vers porta el **patró rítmic** (TA = síl·laba que cau a temps, ideal per a una tònica; ta = la resta).
+- Les **tornades** iguals remeten a la primera («repeteix-ne la lletra»). Les **estrofes** amb el mateix patró en donen les síl·labes en una línia i demanen lletra nova. Dins d’una tornada s’indiquen els versos amb la mateixa melodia (el ganxo), que poden repetir el text.
+- Les estrofes, pretornades i tornades **sense melodia de veu** reben un esquema orientatiu. Les seccions sense veu (intro, solo, final…) es llisten al final.
+- Acaba amb el total de versos i una frase preparada per demanar la lletra a una IA.
+
 ## Grava la teva veu
 
 Al pas **4 · La teva veu** (pestanya «Veu» al mòbil) pots cantar mentre sona la cançó:
