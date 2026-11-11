@@ -176,7 +176,7 @@ Al pas 2 hi ha el panell **«💬 Comentaris de la cançó»**. Cada comentari t
 
 Els comentaris es desen amb la cançó i al projecte JSON. Si la cançó encara no era a «Les meves cançons», s’hi desa sola en afegir el primer comentari. A la biblioteca, cada cançó mostra quants comentaris té (💬).
 
-**«⇩ Exporta les cançons amb comentaris»** (a «Les meves cançons») baixa un fitxer `skagenerator-comentaris-AAAA-MM-DD.json` amb totes les cançons de la biblioteca. Per a cada una inclou:
+**«⇩ Baixa les cançons amb comentaris (N)»** (a «Les meves cançons») baixa **en un sol fitxer** totes les cançons que tenen comentaris: `skagenerator-comentaris-AAAA-MM-DD.json`. El botó mostra quantes n’hi ha i queda desactivat si encara no n’hi ha cap. «Baixa-les totes» inclou també les que no tenen comentaris (`skagenerator-totes-AAAA-MM-DD.json`). Per a cada una inclou:
 - la puntuació;
 - els comentaris situats (secció, compàs i minut:segon);
 - un resum de les decisions del taller: estructura, intensitats, tempo i to de cada secció, i recursos especials (inici, final, aturades, silencis, fosos, efectes de color);
