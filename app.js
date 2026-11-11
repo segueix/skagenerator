@@ -2082,6 +2082,12 @@
     const rated = readLibrary().filter(e => e.subgenre === key && e.rating), mean = rated.reduce((t, e) => t + e.rating, 0) / (rated.length || 1);
     $('auto-description').textContent = `${sg.description} ${sg.bpm[0]}–${sg.bpm[1]} BPM.${rated.length ? ` Les teves cançons d’aquest subgènere: ★ ${mean.toFixed(1).replace('.', ',')} de mitjana (${rated.length}).` : ''}`;
   }
+  // Forma de la cançó en text curt: «intro › estrofa › tornada ×2 › …».
+  function formText(s) {
+    const names = [...s.sections].sort((a, b) => a.start - b.start).map(sec => TYPES[sec.type].name.toLowerCase()), out = [];
+    for (const name of names) { const last = out.at(-1); if (last && last[0] === name) last[1]++; else out.push([name, 1]); }
+    return out.map(([name, n]) => n > 1 ? `${name} ×${n}` : name).join(' › ');
+  }
   // Tonalitats de cada subgènere: les pròpies de l'estil (p. ex. bemolls per als vents a l'ska jamaicà).
   function fillAutoKeys() {
     const sg = engine.SUBGENRES[$('auto-subgenre').value], keep = $('auto-key').value;
@@ -2098,7 +2104,11 @@
     try {
       const liked = readLibrary().filter(e => e.subgenre === key && e.rating >= 4).map(e => e.song);
       const [tonic, mode] = $('auto-key').value ? $('auto-key').value.split(':') : [];
-      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked,
+      // Estructures de les últimes cançons de la biblioteca (la més recent primer): la nova se n'allunya.
+      const recent = readLibrary().filter(e => Array.isArray(e.song?.sections)).sort((a, b) => b.created - a.created).slice(0, 12)
+        .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
+      const vary = $('auto-vary').checked;
+      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked, vary, recent: vary ? recent : [],
         ...(mode ? { key: [Number(tonic), mode] } : {}) });
       migrated = false;
       openSong(validateSong(project), '');
@@ -2109,7 +2119,7 @@
         song.edges?.middle && song.edges.middle !== 'none' && builder.MIDDLES[song.edges.middle],
         song.sections.some(s => s.ending === 'stop') && 'una aturada de la banda',
         ...song.clips.filter(c => c.color).map(c => `${INSTRUMENTS[c.instrument].toLowerCase()} amb so de ${engine.COLOR_FX[c.color].toLowerCase()}`)].filter(Boolean);
-      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${noteNames[song.settings.tonic]} ${song.settings.mode === 'major' ? 'major' : 'menor'}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions${extras.length ? `. Recursos: ${extras.join('; ')}` : ''}. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
+      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${noteNames[song.settings.tonic]} ${song.settings.mode === 'major' ? 'major' : 'menor'}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions (${formText(song)})${extras.length ? `. Recursos: ${extras.join('; ')}` : ''}. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
       if (mobile.matches) setTab('line');
     } catch (error) { console.error(error); notify(`No s’ha pogut crear la cançó: ${reasonOf(error)}`); }
   });
