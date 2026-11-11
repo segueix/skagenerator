@@ -1999,14 +1999,14 @@
     // ── Subgèneres: cadascun té el seu llenguatge ───────────────────────
     // Tempo, tonalitats, ritmes, balanceig, sons, efectes i progressions pròpies.
     const SUBGENRES = {
-        jamaican: { name: 'Ska jamaicà (anys 60)', style: 'ska', bpm: [110, 128], swing: .45, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major']],
+        jamaican: { name: 'Ska jamaicà (anys 60)', style: 'ska', bpm: [110, 128], swing: .45, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major'], [7, 'major']],
             groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'growly', trombone: 'vsco' }, humanize: .65,
             description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de club de jazz, baix de dits greu, acords de setena i secció de vents fent el tema.',
             harmony: { major: {
                 verse: [['I', 'vi', 'ii7', 'V7'], ['I', 'IV', 'I', 'V7'], ['Imaj7', 'vi7', 'ii7', 'V7'], ['I', 'I7', 'IV', 'iv']],
                 chorus: [['IV', 'V7', 'I', 'vi'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'IV', 'V7', 'IV']],
                 prechorus: [['ii7', 'V7', 'ii7', 'V7']], bridge: [['IV', 'iv', 'I', 'VI7'], ['ii7', 'V7', 'iii7', 'VI7']] } } },
-        rocksteady: { name: 'Rocksteady', style: 'ska', bpm: [100, 108], swing: .15, keys: [[9, 'minor'], [2, 'minor'], [7, 'minor'], [0, 'major']],
+        rocksteady: { name: 'Rocksteady', style: 'ska', bpm: [100, 108], swing: .15, keys: [[9, 'minor'], [2, 'minor'], [7, 'minor'], [0, 'minor'], [0, 'major'], [5, 'major']],
             groove: { drums: [1, 3], bass: [1, 3], guitar: [2] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { trumpet: 'muted', bass: 'finger', drums: 'lofi' }, humanize: .7,
             description: 'Més lent i greu que l’ska: one drop, baix dub en primer pla, orgue de fons i vents amb sordina.',
             harmony: { minor: {
@@ -2014,7 +2014,7 @@
                 chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'bVII', 'bIII', 'bVI'], ['i', 'bVI', 'bIII', 'bVII']],
                 bridge: [['iv', 'i', 'bVI', 'V7']] },
               major: { verse: [['I', 'vi', 'IV', 'V'], ['I', 'iii', 'IV', 'V']], chorus: [['IV', 'I', 'V', 'vi']], bridge: [['vi', 'IV', 'ii', 'V7']] } } },
-        twotone: { name: 'Ska 2-tone', style: 'ska', bpm: [132, 156], swing: 0, keys: [[0, 'major'], [7, 'major'], [9, 'minor'], [2, 'minor']],
+        twotone: { name: 'Ska 2-tone', style: 'ska', bpm: [132, 156], swing: 0, keys: [[0, 'major'], [7, 'major'], [5, 'major'], [10, 'major'], [9, 'minor'], [2, 'minor'], [7, 'minor']],
             groove: { drums: [0, 4], bass: [0, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar'], timbres: {}, humanize: .5,
             description: 'L’ska britànic de finals dels 70: més ràpid i nerviós, guitarra a contratemps, orgue i metalls amb riffs.',
             harmony: { major: {
@@ -2022,7 +2022,7 @@
                 chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'V', 'iii', 'vi'], ['vi', 'IV', 'I', 'V']],
                 prechorus: [['ii', 'V', 'ii', 'V']], bridge: [['ii', 'V', 'I', 'vi'], ['IV', 'iv', 'I', 'I']] },
               minor: { verse: [['i', 'bVII', 'bVI', 'V7'], ['i', 'iv', 'bVII', 'i']], chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'bIII', 'bVII', 'iv']], bridge: [['iv', 'V7', 'i', 'bVI']] } } },
-        skapunk: { name: 'Ska-punk', style: 'ska', bpm: [160, 180], swing: 0, keys: [[7, 'major'], [0, 'major'], [10, 'major'], [9, 'minor']],
+        skapunk: { name: 'Ska-punk', style: 'ska', bpm: [160, 180], swing: 0, keys: [[7, 'major'], [0, 'major'], [10, 'major'], [5, 'major'], [3, 'major'], [9, 'minor'], [2, 'minor']],
             groove: { drums: [4, 5], bass: [2, 4], guitar: [3, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'real', bass: 'pick' }, humanize: .45, countIn: true,
             description: 'Estrofes a contratemps i tornades amb guitarres distorsionades i metalls a l’uníson, a tota velocitat.',
             harmony: { major: {
@@ -2046,7 +2046,7 @@
             harmony: { minor: {
                 verse: [['i', 'bVI', 'bVII', 'i'], ['i', 'i', 'bII', 'i'], ['i', 'iv', 'bVI', 'bVII']],
                 chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'bIII', 'bVII', 'bVI']], bridge: [['i', 'bII', 'i', 'bII']] } } },
-        poppunk: { name: 'Pop-punk', style: 'punk', bpm: [165, 185], swing: 0, keys: [[2, 'major'], [7, 'major'], [4, 'major'], [9, 'major']],
+        poppunk: { name: 'Pop-punk', style: 'punk', bpm: [165, 185], swing: 0, keys: [[2, 'major'], [7, 'major'], [4, 'major'], [9, 'major'], [0, 'major']],
             groove: { drums: [0, 3], bass: [1, 4], guitar: [1, 0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'real', bass: 'finger', guitar: 'clean' }, humanize: .3, countIn: true,
             fx: { type: 'overdrive', drive: 55, tone: 60 },
             description: 'Melòdic i lluminós: tornades enganxoses, guitarres amb overdrive, arpegis i pujada de to final.',
@@ -2054,7 +2054,7 @@
                 verse: [['I', 'V', 'vi', 'IV'], ['vi', 'IV', 'I', 'V'], ['I', 'iii', 'IV', 'V']],
                 chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'I', 'V', 'vi'], ['vi', 'IV', 'I', 'V']],
                 prechorus: [['IV', 'V', 'vi', 'V']], bridge: [['ii', 'IV', 'vi', 'V'], ['IV', 'V', 'iii', 'vi']] } } },
-        horrorpunk: { name: 'Horror punk', style: 'punk', bpm: [170, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [4, 'minor'], [9, 'minor']],
+        horrorpunk: { name: 'Horror punk', style: 'punk', bpm: [170, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [7, 'major'], [4, 'minor'], [9, 'minor'], [11, 'minor'], [2, 'minor']],
             groove: { drums: [0, 2, 4], bass: [0, 1], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, drumTune: -3, humanize: .65, countIn: true,
             fx: { type: 'horrorpunk', drive: 70, tone: 60 },
             description: 'A l’estil dels Misfits: guitarres «serra mecànica» doblades, acords prestats foscos, veu greu i «whoa-oh».',
