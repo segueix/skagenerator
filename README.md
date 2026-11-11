@@ -167,6 +167,23 @@ L’avís de la cançó nova diu quins recursos ha triat.
 
 En generar a mà la trompeta, el trombó, el saxo, el sintetitzador o la melodia de veu (amb línia pròpia), el taller prova **24 versions** i es queda la que fa la millor línia dins de les seves seccions: acords, clímax, cadències, ritme i cap xoc amb les altres línies que sonen. «Genera’n una altra» sempre en dona una de diferent.
 
+### Comentaris i exportació per analitzar les cançons
+
+Al pas 2 hi ha el panell **«💬 Comentaris de la cançó»**. Cada comentari té:
+- **On**: tota la cançó, una secció o el punt on és el capçal (es pot aturar la reproducció on passa alguna cosa i comentar-ho);
+- **Tema**: inici, final, silencis, fosos, efectes de so, melodia, veu, acords, ritme, baix, guitarres, vents, mescla, estructura…;
+- **Valoració**: 👍 m’agrada, 👎 cal millorar o 💡 idea.
+
+Els comentaris es desen amb la cançó i al projecte JSON. Si la cançó encara no era a «Les meves cançons», s’hi desa sola en afegir el primer comentari. A la biblioteca, cada cançó mostra quants comentaris té (💬).
+
+**«⇩ Exporta les cançons amb comentaris»** (a «Les meves cançons») baixa un fitxer `skagenerator-comentaris-AAAA-MM-DD.json` amb totes les cançons de la biblioteca. Per a cada una inclou:
+- la puntuació;
+- els comentaris situats (secció, compàs i minut:segon);
+- un resum de les decisions del taller: estructura, intensitats, tempo i to de cada secció, i recursos especials (inici, final, aturades, silencis, fosos, efectes de color);
+- el projecte complet, per poder-la reproduir exactament.
+
+Amb aquest fitxer es pot veure quins recursos funcionen i quins no, i ajustar-ne l’algorisme. La veu gravada no s’hi inclou.
+
 ## Flux de treball
 
 Hi ha una sola vista, que es treballa de baix cap amunt:

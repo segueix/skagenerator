@@ -35,6 +35,7 @@
       <p class="step-copy">Les cançons automàtiques es desen aquí soles. Puntua-les amb les estrelles: quan en tinguis de ★4 o més d’un subgènere, les noves cançons d’aquest subgènere s’hi inspiraran sovint.</p>
       <div id="library-list" class="library-list"></div>
       <button type="button" id="library-save" class="button">☆ Desa la cançó actual a la biblioteca</button>
+      <button type="button" id="library-export" class="button">⇩ Exporta les cançons amb comentaris</button>
     </section>
     <section class="song-settings" data-panel="song" aria-label="Configuració de la cançó">
       <label class="title-field"><span class="field-label">NOM DEL PROJECTE</span><input id="song-title" maxlength="100" value="Nova cançó" aria-label="Nom de la cançó"></label>
@@ -115,6 +116,18 @@
       <div class="line-actions" id="line-actions" role="toolbar" aria-label="Accions de l’element triat a la línia" hidden></div>
       <div class="variety-bar"><button type="button" id="add-variety" class="button primary">✦ Dona-li varietat</button><span>Canvis de tempo, pujada de to a l’última tornada i un altre ritme de bateria en alguna secció.</span><button type="button" id="clear-variety" class="text-button" hidden>↶ Treu la varietat</button></div>
       <div class="variety-bar"><button type="button" id="design-edges" class="button primary">✦ Inici i final nous</button><span>Cada clic tria una altra manera d’entrar i de sortir (bateria sola, entrada per capes, fos, tall en sec, acord llarg…) i de vegades un silenci abans d’una tornada.</span></div>
+      <div class="comments" id="comments-panel">
+        <h3>💬 Comentaris de la cançó</h3>
+        <p class="hint">Apunta què t’agrada i què milloraries, de tota la cançó o d’un moment concret. Després exporta-les des de «Les meves cançons» per analitzar-les.</p>
+        <div class="comment-form">
+          <label><span class="field-label">ON</span><select id="comment-where" aria-label="On fa referència el comentari"></select></label>
+          <label><span class="field-label">TEMA</span><select id="comment-tag" aria-label="Tema del comentari"></select></label>
+          <label><span class="field-label">VALORACIÓ</span><select id="comment-mood" aria-label="Valoració"></select></label>
+          <label class="comment-text"><span class="field-label">COMENTARI</span><textarea id="comment-text" rows="2" maxlength="1000" placeholder="P. ex.: el silenci abans de l’última tornada funciona molt bé"></textarea></label>
+          <button type="button" id="comment-add" class="button primary">＋ Afegeix el comentari</button>
+        </div>
+        <ul id="comment-list" class="comment-list" aria-label="Comentaris de la cançó"></ul>
+      </div>
       <div class="step-actions"><button id="add-section" class="button">＋ Afegeix una secció al final</button><button type="button" class="button primary next-step mobile-only" data-go="section" id="next-section">Edita la secció →</button><span class="hint" id="line-hint"></span></div>
     </section>
 

@@ -206,6 +206,8 @@
     const edges = value.edges;
     if (edges !== undefined && (!edges || typeof edges !== 'object' || !Object.hasOwn(builder.OPENINGS, edges.opening)
       || !Object.hasOwn(builder.CLOSINGS, edges.closing) || !Object.hasOwn(builder.MIDDLES, edges.middle))) delete value.edges;
+    // Comentaris: els que no són vàlids es descarten (no impedeixen obrir la cançó).
+    if (value.comments !== undefined) value.comments = builder.cleanComments(value.comments, st.bars);
     for (const seg of segmentsOf(value)) engine.composeSongPart(value.settings, partFor(value, seg));
     return value;
   }
@@ -543,8 +545,10 @@
 
 
   // La barra vertical i el regulador inferior comparteixen la mateixa posició.
+  let playheadBar = null; // On és el capçal (per situar-hi un comentari).
   function updatePlayhead(bar) {
     const bounded = Math.max(0, Math.min(song.settings.bars, bar));
+    playheadBar = bounded;
     const head = $('playhead');
     head.style.setProperty('--pos', String(bounded / song.settings.bars));
     head.hidden = !song.base.generated;
@@ -1784,7 +1788,7 @@
     if (replay) play(replay);
   }
   function render() {
-    renderLine(); renderSection();
+    renderLine(); renderSection(); renderComments();
     renderEq($('song-eq'), null);
     if (current()) renderEq($('section-eq'), current());
     const generatedLayers = song.clips.filter(c => c.generated).length;
@@ -1872,7 +1876,8 @@
       const info = document.createElement('div'); info.className = 'library-info';
       const title = document.createElement('strong'); title.textContent = entry.title;
       const meta = document.createElement('small');
-      meta.textContent = `${engine.SUBGENRES[entry.subgenre]?.name || (entry.style === 'punk' ? 'Punk' : entry.style === 'urban' ? 'Urban' : 'Ska')} · ${time(entry.seconds)} · ${new Date(entry.created).toLocaleDateString('ca')}`;
+      const notes = entry.song?.comments?.length || 0;
+      meta.textContent = `${engine.SUBGENRES[entry.subgenre]?.name || (entry.style === 'punk' ? 'Punk' : entry.style === 'urban' ? 'Urban' : 'Ska')} · ${time(entry.seconds)} · ${new Date(entry.created).toLocaleDateString('ca')}${notes ? ` · 💬 ${notes}` : ''}`;
       info.append(title, meta);
       const stars = document.createElement('div'); stars.className = 'stars'; stars.setAttribute('role', 'group'); stars.setAttribute('aria-label', `Puntuació de ${entry.title}`);
       for (let n = 1; n <= 5; n++) {
@@ -1888,6 +1893,66 @@
     }
     $('library-save').hidden = !!song.libraryId; $('library-save').disabled = busy || !song.base.generated;
   }
+  // ── Comentaris de la cançó ─────────────────────────────────────────
+  // De tota la cançó, d'una secció o del punt on és el capçal. Es desen amb la
+  // cançó (i a la biblioteca) i s'exporten amb «Exporta les cançons amb comentaris».
+  fillSelect($('comment-tag'), Object.entries(builder.COMMENT_TAGS), 'general');
+  fillSelect($('comment-mood'), Object.entries(builder.COMMENT_MOODS), 'good');
+  const commentPlace = bar => bar === null ? 'Tota la cançó' : `${sectionAt(bar) ? sectionLabel(sectionAt(bar)) : 'Base sola'} · compàs ${bar + 1}`;
+  function commentOptions() {
+    const where = $('comment-where'), keep = where.value;
+    const entries = [['song', 'Tota la cançó'],
+      ...(playheadBar !== null && song.base.generated ? [['now', `On és el capçal (compàs ${Math.min(song.settings.bars, Math.floor(playheadBar) + 1)})`]] : []),
+      ...[...song.sections].sort((a, b) => a.start - b.start).map(sec => [`sec:${sec.id}`, `${sectionLabel(sec)} · compassos ${sec.start + 1}–${endOf(sec)}`])];
+    fillSelect(where, entries, entries.some(([key]) => key === keep) ? keep : 'song');
+  }
+  // Desa ara mateix la cançó oberta a la biblioteca (sense esperar el desament diferit).
+  function flushLibrary() { if (song.libraryId) { clearTimeout(libraryTimer); syncLibrary(); } }
+  function renderComments() {
+    commentOptions();
+    const list = $('comment-list'); list.replaceChildren();
+    const comments = [...(song.comments || [])].sort((a, b) => (a.bar ?? -1) - (b.bar ?? -1) || a.created - b.created);
+    for (const comment of comments) {
+      const item = document.createElement('li'); item.className = `comment ${comment.mood}`;
+      const head = document.createElement('small');
+      head.textContent = `${builder.COMMENT_MOODS[comment.mood]} · ${builder.COMMENT_TAGS[comment.tag]} · ${commentPlace(comment.bar)}`;
+      const text = document.createElement('p'); text.textContent = comment.text;
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-button'; remove.textContent = '×';
+      remove.setAttribute('aria-label', 'Esborra el comentari'); remove.title = 'Esborra el comentari';
+      remove.addEventListener('click', () => { song.comments = song.comments.filter(c => c.id !== comment.id); save(); flushLibrary(); renderComments(); });
+      item.append(head, text, remove); list.append(item);
+    }
+  }
+  function addComment() {
+    const text = $('comment-text').value.trim();
+    if (!text) { notify('Escriu el comentari abans d’afegir-lo.'); $('comment-text').focus(); return; }
+    const where = $('comment-where').value;
+    const bar = where === 'now' && playheadBar !== null ? Math.min(song.settings.bars - 1, Math.floor(playheadBar))
+      : where.startsWith('sec:') ? song.sections.find(sec => `sec:${sec.id}` === where)?.start ?? null : null;
+    song.comments = [...(song.comments || []), { id: uid(), text: text.slice(0, 1000), bar, tag: $('comment-tag').value, mood: $('comment-mood').value, created: Date.now() }].slice(-200);
+    $('comment-text').value = '';
+    const stored = !song.libraryId && song.base.generated;
+    save();
+    if (stored) addToLibrary(); else flushLibrary();
+    renderComments();
+    notify(stored ? 'Comentari afegit. La cançó s’ha desat a «Les meves cançons» perquè es pugui exportar.' : `Comentari afegit (${commentPlace(bar)}).`);
+  }
+  $('comment-add').addEventListener('click', addComment);
+  $('comment-text').addEventListener('keydown', event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) addComment(); });
+  // El capçal es mou mentre sona: l'opció «On és el capçal» s'actualitza en obrir el selector.
+  for (const type of ['focus', 'pointerdown']) $('comment-where').addEventListener(type, commentOptions);
+  $('library-export').addEventListener('click', () => {
+    flushLibrary();
+    const list = readLibrary();
+    if (song.comments?.length && !song.libraryId) list.unshift({ title: song.title, rating: 0, created: Date.now(), song });
+    if (!list.length) { notify('Encara no hi ha cap cançó per exportar. Crea’n una o desa la cançó actual.'); return; }
+    try {
+      const report = builder.feedbackReport(engine, list);
+      download(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }), `skagenerator-comentaris-${new Date().toISOString().slice(0, 10)}.json`);
+      notify(`Exportades ${report.totals.songs} cançons (${report.totals.rated} puntuades i ${report.totals.comments} comentaris).`);
+    } catch (error) { console.error(error); notify(`No s’han pogut exportar les cançons: ${reasonOf(error)}`); }
+  });
+
   // ── Cançó automàtica ───────────────────────────────────────────────
   fillSelect($('auto-subgenre'), Object.entries(engine.SUBGENRES).map(([key, sg]) => [key, `${sg.style === 'punk' ? 'Punk' : 'Ska'} · ${sg.name}`]), 'twotone');
   function renderAutoDescription() {
