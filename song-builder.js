@@ -50,7 +50,7 @@
     const settings = { style: sg.style, subgenre: key, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
     if (sg.fx) settings.fx = { guitar: { ...sg.fx }, guitar2: { ...sg.fx }, guitar3: { ...sg.fx } };
-    for (const option of ['drumTune', 'humanize', 'cymbals']) if (sg[option] !== undefined) settings[option] = sg[option];
+    for (const option of ['drumTune', 'humanize', 'cymbals', 'countIn']) if (sg[option] !== undefined) settings[option] = sg[option];
     if (settings.swing === 0) delete settings.swing;
 
     // ── Estructura de 2 a 4 minuts ────────────────────────────────────
@@ -96,6 +96,11 @@
     // Rocksteady: estrofes amb cops d'aro en lloc de charles (sense platets); horror punk: intro de toms sense platets.
     if (key === 'rocksteady') { tempo(of('bridge')[0], .86); tempo(of('outro')[0], .9); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
     if (key === 'horrorpunk') sections[0].cymbals = 'none';
+    // Aturades de la banda: una o dues de les seccions que porten a una tornada acaben
+    // amb un cop de tota la banda i silenci fins al redoble (no a la primera ni al final).
+    const intoChorus = sections.filter((sec, i) => i > 0 && sections[i + 1]?.type === 'chorus' && sec.type !== 'chorus');
+    const stops = intoChorus.filter(() => r() < (punk ? .5 : .35)).slice(0, 2);
+    for (const sec of stops) sec.ending = 'stop';
     // Pop-punk i punk del 77: de vegades la intro és només guitarra (la base calla) i la banda entra a l'estrofa.
     if ((key === 'poppunk' || key === 'punk77') && r() < .5) sections[0].mute = ['drums', 'bass'];
     if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });

@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BasicInstrument, BasicPreset, BasicSoundBank, GeneratorTypes, SpessaLog } from 'spessasynth_core';
+import ROUND_ROBIN from '../round-robin.json' with { type: 'json' };
 import { download, loadBank, makeSample, readWav, resample, timecents, trim } from './real-instruments.mjs';
 
 const CACHE = '.cache/real', RATE = 32000;
@@ -51,9 +52,18 @@ function louden(a, targetDb, rate, window = .03) {
 // reparteix en capes de força. Cada peça s'iguala a la sonoritat de referència
 // amb el mateix guany per a totes les seves capes (conserva la dinàmica); si el
 // cop sobrepassa el límit, l'atac es limita suaument (com un compressor de bateria).
+// Les gravacions alternades (round-robin.json) són peces més, a les tecles lliures
+// 88-103, igualades a la sonoritat de la peça original.
+export function withAlternates(pieces) {
+  const all = { ...pieces };
+  for (const [gm, piece] of Object.entries(pieces)) if (piece.rr) piece.rr.forEach((layers, k) => {
+    all[ROUND_ROBIN.keys[gm][k]] = { seconds: piece.seconds, ...(piece.choke ? { choke: piece.choke } : {}), layers, of: gm };
+  });
+  return all;
+}
 async function buildKit(bank, kit, log) {
-  const cache = new Map(), done = new Set();
-  for (const [gm, piece] of Object.entries(kit.pieces)) {
+  const cache = new Map(), done = new Set(), pieces = withAlternates(kit.pieces);
+  for (const [gm, piece] of Object.entries(pieces)) {
     // Les tecles que comparteixen gravacions (p. ex. 35 i 36) es processen un sol cop.
     const group = JSON.stringify(piece.layers) + piece.seconds;
     if (done.has(group)) continue;
@@ -70,11 +80,11 @@ async function buildKit(bank, kit, log) {
     }
     // La capa més forta a la sonoritat de referència i cada capa inferior 3,5 dB per
     // sota: el timbre canvia amb la força, però sense els salts de 20 dB de la gravació.
-    audio.forEach((a, i) => louden(a, (TARGET[gm] ?? -18) - (audio.length - 1 - i) * 3.5, RATE, .4));
+    audio.forEach((a, i) => louden(a, (TARGET[piece.of ?? gm] ?? -18) - (audio.length - 1 - i) * 3.5, RATE, .4));
   }
   const instrument = new BasicInstrument(); instrument.name = kit.name.slice(0, 19);
   const made = new Map();
-  for (const [gm, piece] of Object.entries(kit.pieces)) {
+  for (const [gm, piece] of Object.entries(pieces)) {
     const n = piece.layers.length;
     piece.layers.forEach((layer, li) => {
       const id = JSON.stringify(layer) + piece.seconds;
@@ -90,7 +100,7 @@ async function buildKit(bank, kit, log) {
   bank.addInstruments(instrument);
   const preset = new BasicPreset(bank); preset.name = kit.name.slice(0, 19); preset.program = kit.program; preset.bankMSB = 0; preset.isGMGSDrum = true;
   preset.createZone(instrument); bank.addPresets(preset);
-  log(`${kit.name}: ${made.size} mostres, ${Object.keys(kit.pieces).length} cops`);
+  log(`${kit.name}: ${made.size} mostres, ${Object.keys(kit.pieces).length} cops i ${Object.keys(pieces).length - Object.keys(kit.pieces).length} alternatives`);
 }
 
 // Un baix: notes gravades amb dues dinàmiques, igualades nota a nota.
@@ -119,7 +129,7 @@ async function buildBass(bank, spec, log) {
 export async function buildExtraInstruments(config, log = console.log) {
   SpessaLog.setLogLevel(false, false, false);
   await mkdir(CACHE, { recursive: true });
-  const fingerprint = sha(JSON.stringify(config) + await readFile(new URL(import.meta.url)));
+  const fingerprint = sha(JSON.stringify(config) + JSON.stringify(ROUND_ROBIN) + await readFile(new URL(import.meta.url)));
   const cached = join(CACHE, `extra-${fingerprint.slice(0, 16)}.sf2`);
   try { return new Uint8Array(await readFile(cached)); } catch { /* Es construeix. */ }
   const bank = new BasicSoundBank();

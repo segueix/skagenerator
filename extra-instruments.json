@@ -96,6 +96,92 @@
         0.45
        ]
       ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl4_rr2.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl4_rr2.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl7_rr2.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl7_rr2.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl11_rr2.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl11_rr2.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl14_rr2.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl14_rr2.flac",
+         0.45
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl4_rr3.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl4_rr3.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl7_rr3.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl7_rr3.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl11_rr3.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl11_rr3.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/kick_24/kick/kick/k_vl14_rr3.flac",
+         1
+        ],
+        [
+         "Samples/kick_24/kick/oh/k_vl14_rr3.flac",
+         0.45
+        ]
+       ]
+      ]
      ]
     },
     "37": {
@@ -119,6 +205,52 @@
        [
         "Samples/snare_14/sidestick/oh/sn_ss_vl4_rr1.flac",
         0.5
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/snare_14/sidestick/top/sn_ss_vl2_rr2.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/sidestick/oh/sn_ss_vl2_rr2.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/sidestick/top/sn_ss_vl4_rr2.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/sidestick/oh/sn_ss_vl4_rr2.flac",
+         0.5
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/snare_14/sidestick/top/sn_ss_vl2_rr3.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/sidestick/oh/sn_ss_vl2_rr3.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/sidestick/top/sn_ss_vl4_rr3.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/sidestick/oh/sn_ss_vl4_rr3.flac",
+         0.5
+        ]
        ]
       ]
      ]
@@ -180,6 +312,124 @@
        [
         "Samples/snare_14/center/oh/sn_center_vl10_rr1.flac",
         0.5
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl3_rr2.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl3_rr2.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl3_rr2.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl5_rr2.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl5_rr2.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl5_rr2.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl8_rr2.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl8_rr2.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl8_rr2.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl10_rr2.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl10_rr2.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl10_rr2.flac",
+         0.5
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl3_rr3.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl3_rr3.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl3_rr3.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl5_rr3.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl5_rr3.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl5_rr3.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl8_rr3.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl8_rr3.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl8_rr3.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/snare_14/center/top/sn_center_vl10_rr3.flac",
+         1
+        ],
+        [
+         "Samples/snare_14/center/btm/sn_center_vl10_rr3.flac",
+         0.35
+        ],
+        [
+         "Samples/snare_14/center/oh/sn_center_vl10_rr3.flac",
+         0.5
+        ]
        ]
       ]
      ]
@@ -276,6 +526,72 @@
         0.5
        ]
       ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/hihat_14/tc/cl/ht_tc_vl3_rr2.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/tc/oh/ht_tc_vl3_rr2.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/hihat_14/tc/cl/ht_tc_vl5_rr2.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/tc/oh/ht_tc_vl5_rr2.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/hihat_14/tc/cl/ht_tc_vl8_rr2.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/tc/oh/ht_tc_vl8_rr2.flac",
+         0.5
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/hihat_14/tc/cl/ht_tc_vl3_rr3.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/tc/oh/ht_tc_vl3_rr3.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/hihat_14/tc/cl/ht_tc_vl5_rr3.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/tc/oh/ht_tc_vl5_rr3.flac",
+         0.5
+        ]
+       ],
+       [
+        [
+         "Samples/hihat_14/tc/cl/ht_tc_vl8_rr3.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/tc/oh/ht_tc_vl8_rr3.flac",
+         0.5
+        ]
+       ]
+      ]
      ]
     },
     "43": {
@@ -315,6 +631,32 @@
        [
         "Samples/hihat_14/phit/oh/ht_phit_rr1.flac",
         0.5
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/hihat_14/phit/cl/ht_phit_rr2.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/phit/oh/ht_phit_rr2.flac",
+         0.5
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/hihat_14/phit/cl/ht_phit_rr3.flac",
+         1
+        ],
+        [
+         "Samples/hihat_14/phit/oh/ht_phit_rr3.flac",
+         0.5
+        ]
        ]
       ]
      ]
@@ -711,6 +1053,96 @@
         0.35
        ]
       ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/kickmic/kick/kickmic_kick_snon_vl1_rr2.flac",
+         1
+        ],
+        [
+         "Samples/oh/kick/oh_kick_snon_vl1_rr2.flac",
+         0.4
+        ],
+        [
+         "Samples/room/kick/room_kick_snon_vl1_rr2.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/kickmic/kick/kickmic_kick_snon_vl3_rr2.flac",
+         1
+        ],
+        [
+         "Samples/oh/kick/oh_kick_snon_vl3_rr2.flac",
+         0.4
+        ],
+        [
+         "Samples/room/kick/room_kick_snon_vl3_rr2.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/kickmic/kick/kickmic_kick_snon_vl4_rr2.flac",
+         1
+        ],
+        [
+         "Samples/oh/kick/oh_kick_snon_vl4_rr2.flac",
+         0.4
+        ],
+        [
+         "Samples/room/kick/room_kick_snon_vl4_rr2.flac",
+         0.35
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/kickmic/kick/kickmic_kick_snon_vl1_rr3.flac",
+         1
+        ],
+        [
+         "Samples/oh/kick/oh_kick_snon_vl1_rr3.flac",
+         0.4
+        ],
+        [
+         "Samples/room/kick/room_kick_snon_vl1_rr3.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/kickmic/kick/kickmic_kick_snon_vl3_rr3.flac",
+         1
+        ],
+        [
+         "Samples/oh/kick/oh_kick_snon_vl3_rr3.flac",
+         0.4
+        ],
+        [
+         "Samples/room/kick/room_kick_snon_vl3_rr3.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/kickmic/kick/kickmic_kick_snon_vl4_rr3.flac",
+         1
+        ],
+        [
+         "Samples/oh/kick/oh_kick_snon_vl4_rr3.flac",
+         0.4
+        ],
+        [
+         "Samples/room/kick/room_kick_snon_vl4_rr3.flac",
+         0.35
+        ]
+       ]
+      ]
      ]
     },
     "37": {
@@ -742,6 +1174,68 @@
        [
         "Samples/room/snare/room_snare_crossstick_vl16.flac",
         0.35
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_crossstick_vl7.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_crossstick_vl7.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_crossstick_vl7.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_crossstick_vl15.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_crossstick_vl15.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_crossstick_vl15.flac",
+         0.35
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_crossstick_vl9.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_crossstick_vl9.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_crossstick_vl9.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_crossstick_vl15.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_crossstick_vl15.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_crossstick_vl15.flac",
+         0.35
+        ]
        ]
       ]
      ]
@@ -803,6 +1297,124 @@
        [
         "Samples/room/snare/room_snare_center_vl36.flac",
         0.35
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl8.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl8.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl8.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl17.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl17.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl17.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl26.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl26.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl26.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl35.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl35.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl35.flac",
+         0.35
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl10.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl10.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl10.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl19.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl19.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl19.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl28.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl28.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl28.flac",
+         0.35
+        ]
+       ],
+       [
+        [
+         "Samples/snaremic/snare/snaremic_snare_center_vl35.flac",
+         1
+        ],
+        [
+         "Samples/oh/snare/oh_snare_center_vl35.flac",
+         0.45
+        ],
+        [
+         "Samples/room/snare/room_snare_center_vl35.flac",
+         0.35
+        ]
        ]
       ]
      ]
@@ -899,6 +1511,72 @@
         0.45
        ]
       ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/oh/hh/oh_hh_closed_vl1_rr2.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_closed_vl1_rr2.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/oh/hh/oh_hh_closed_vl3_rr2.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_closed_vl3_rr2.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/oh/hh/oh_hh_closed_vl4_rr2.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_closed_vl4_rr2.flac",
+         0.45
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/oh/hh/oh_hh_closed_vl1_rr3.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_closed_vl1_rr3.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/oh/hh/oh_hh_closed_vl3_rr3.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_closed_vl3_rr3.flac",
+         0.45
+        ]
+       ],
+       [
+        [
+         "Samples/oh/hh/oh_hh_closed_vl4_rr3.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_closed_vl4_rr3.flac",
+         0.45
+        ]
+       ]
+      ]
      ]
     },
     "43": {
@@ -938,6 +1616,32 @@
        [
         "Samples/room/hh/room_hh_pedal_vl3_rr1.flac",
         0.45
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/oh/hh/oh_hh_pedal_vl3_rr2.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_pedal_vl3_rr2.flac",
+         0.45
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/oh/hh/oh_hh_pedal_vl3_rr3.flac",
+         1
+        ],
+        [
+         "Samples/room/hh/room_hh_pedal_vl3_rr3.flac",
+         0.45
+        ]
        ]
       ]
      ]
@@ -1286,6 +1990,48 @@
         1
        ]
       ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/lofi/kick/lofi_kick_snon_vl1_rr2.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/kick/lofi_kick_snon_vl3_rr2.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/kick/lofi_kick_snon_vl4_rr2.flac",
+         1
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/lofi/kick/lofi_kick_snon_vl1_rr3.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/kick/lofi_kick_snon_vl3_rr3.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/kick/lofi_kick_snon_vl4_rr3.flac",
+         1
+        ]
+       ]
+      ]
      ]
     },
     "37": {
@@ -1301,6 +2047,36 @@
        [
         "Samples/lofi/snare/lofi_snare_crossstick_vl16.flac",
         1
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_crossstick_vl7.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_crossstick_vl15.flac",
+         1
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_crossstick_vl9.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_crossstick_vl15.flac",
+         1
+        ]
        ]
       ]
      ]
@@ -1330,6 +2106,60 @@
        [
         "Samples/lofi/snare/lofi_snare_center_vl36.flac",
         1
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl8.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl17.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl26.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl35.flac",
+         1
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl10.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl19.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl28.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/snare/lofi_snare_center_vl35.flac",
+         1
+        ]
        ]
       ]
      ]
@@ -1390,6 +2220,48 @@
         1
        ]
       ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_closed_vl1_rr2.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_closed_vl3_rr2.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_closed_vl4_rr2.flac",
+         1
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_closed_vl1_rr3.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_closed_vl3_rr3.flac",
+         1
+        ]
+       ],
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_closed_vl4_rr3.flac",
+         1
+        ]
+       ]
+      ]
      ]
     },
     "43": {
@@ -1417,6 +2289,24 @@
        [
         "Samples/lofi/hh/lofi_hh_pedal_vl3_rr1.flac",
         1
+       ]
+      ]
+     ],
+     "rr": [
+      [
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_pedal_vl3_rr2.flac",
+         1
+        ]
+       ]
+      ],
+      [
+       [
+        [
+         "Samples/lofi/hh/lofi_hh_pedal_vl3_rr3.flac",
+         1
+        ]
        ]
       ]
      ]

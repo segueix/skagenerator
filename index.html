@@ -62,6 +62,7 @@
         <div class="timbre-picker drum-picker" role="group" aria-label="Bateria i humanització">
           <label><span class="field-label">PLATETS DE LA BATERIA</span><select id="song-cymbals" aria-label="Platets de la bateria"></select></label>
           <label><span class="field-label">AFINACIÓ DE LA BATERIA</span><select id="song-drum-tune" aria-label="Afinació de la bateria"></select></label>
+          <label class="check-row count-in"><input type="checkbox" id="song-count-in"> <span><strong>Compte d’entrada</strong> · quatre cops de baqueta al primer compàs</span></label>
           <label><span class="field-label">HUMANITZACIÓ DEL RITME <output id="song-humanize-value">50 %</output></span><input type="range" id="song-humanize" min="0" max="100" step="5" value="50" aria-label="Humanització del ritme dels instruments"><small class="slider-hint"><span>Màquina</span><span>Músics relaxats</span></small></label>
         </div>
         <div class="timbre-picker groove-picker" role="group" aria-label="Patrons de la base">
@@ -120,6 +121,7 @@
           <label><span class="field-label">DURADA <span id="section-time"></span></span><div class="tempo-control"><input id="section-bars" type="number" min="1" max="32" step="1" aria-label="Durada de la secció en compassos"><span>COMPASSOS</span></div></label>
           <label class="bpm-field"><span class="field-label">TEMPO DE LA SECCIÓ <span id="section-bpm-hint"></span></span><div class="tempo-control"><input id="section-bpm" type="number" min="40" max="240" step="1" inputmode="numeric" aria-label="Tempo d’aquesta secció en BPM; buit per seguir el de la cançó"><span>BPM</span></div></label>
           <label><span class="field-label">TO DE LA SECCIÓ <span id="section-key-name"></span></span><select id="section-transpose" aria-label="Canvi de to d’aquesta secció"></select></label>
+          <label><span class="field-label">FINAL DE LA SECCIÓ</span><select id="section-ending" aria-label="Com acaba aquesta secció"></select></label>
           <label class="energy-field"><span class="field-label">INTENSITAT <output id="section-energy-value">55 %</output></span><input id="section-energy" type="range" min="10" max="100" step="5" aria-label="Intensitat de la secció"><small class="slider-hint"><span>Suau</span><span>Força de tots els instruments</span><span>Enèrgica</span></small></label>
         </div>
         <p class="chords-line"><span id="section-chords" class="chords"></span><button type="button" id="section-reharmonize" class="text-button">↻ Altres acords</button></p>

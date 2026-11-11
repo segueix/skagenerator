@@ -15,6 +15,21 @@ function layers(files, re, n) {
   const pick = n >= vls.length ? vls : Array.from({ length: n }, (_, i) => vls[Math.round((i + 1) * vls.length / n) - 1]);
   return [...new Set(pick)].map(v => found.get(v));
 }
+// Gravacions alternades d'una capa: rr2 i rr3 si existeixen; si no, les capes de força veïnes.
+// Només les peces que tenen alternatives en algun kit addicional (vegeu round-robin.json).
+const rrKeys = [...new Set(['66', '67', '68'].flatMap(p => require('../round-robin.json').kits[p]))];
+function alternates(files, layerList) {
+  return [2, 3].map(n => layerList.map(layer => layer.map(([file, gain]) => {
+    let other = file.replace(/_rr1\./, `_rr${n}.`);
+    if (other === file || !files.includes(other)) {
+      const m = file.match(/_vl(\d+)/), vl = Number(m[1]), step = n === 2 ? -1 : 1;
+      other = file.replace(/_vl\d+/, `_vl${vl + step}`);
+      if (!files.includes(other)) other = file.replace(/_vl\d+/, `_vl${vl - step}`);
+      if (!files.includes(other)) other = file;
+    }
+    return [other, gain];
+  })));
+}
 function kit(repo, def) {
   const files = read(repo), pieces = {};
   for (const [keys, spec] of Object.entries(def.pieces)) {
@@ -25,7 +40,7 @@ function kit(repo, def) {
       if (!files.includes(file)) throw new Error('falta ' + file);
       return [file, gain];
     }));
-    for (const key of keys.split(',')) pieces[key] = { seconds: spec.seconds, ...(spec.choke ? { choke: spec.choke } : {}), layers: layerList };
+    for (const key of keys.split(',')) pieces[key] = { seconds: spec.seconds, ...(spec.choke ? { choke: spec.choke } : {}), layers: layerList, ...(rrKeys.includes(key) ? { rr: alternates(files, layerList) } : {}) };
   }
   return { name: def.name, author: def.author, license: 'CC0 1.0', program: def.program,
     base: `https://raw.githubusercontent.com/sfzinstruments/${repo}/${commit(repo)}/`, ...(def.levelDb ? { levelDb: def.levelDb } : {}), pieces };
@@ -66,7 +81,7 @@ function vdKit(name, program, mix, levelDb) {
       const file = f.replace(`Samples/${first}/`, `Samples/${mic}/`).replace(`/${first}_`, `/${mic}_`);
       if (!files.includes(file)) throw new Error('falta ' + file); return [file, gain];
     }));
-    for (const key of keys.split(',')) out[key] = { seconds, ...(choke ? { choke } : {}), layers: list };
+    for (const key of keys.split(',')) out[key] = { seconds, ...(choke ? { choke } : {}), layers: list, ...(rrKeys.includes(key) ? { rr: alternates(files, list) } : {}) };
   }
   return { name, author: 'Virtuosity Musical Instruments', license: 'CC0 1.0', program,
     base: `https://raw.githubusercontent.com/sfzinstruments/virtuosity_drums/${commit('virtuosity_drums')}/`, ...(levelDb ? { levelDb } : {}), pieces: out };

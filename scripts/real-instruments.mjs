@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, readdir, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
+import ROUND_ROBIN from '../round-robin.json' with { type: 'json' };
 import {
   BasicInstrument, BasicPreset, BasicSoundBank, EmptySample, GeneratorTypes, SampleTypes, SoundBankLoader, SpessaLog
 } from 'spessasynth_core';
@@ -275,21 +276,28 @@ async function buildDrums(bank, config, log) {
     const out = trim(data, RATE, seconds, 1);
     cache.set(id, out); pieces.push(out); return out;
   };
-  const velocities = config.velocities, entries = Object.entries(config.map);
+  const velocities = config.velocities;
+  // Gravacions alternades (round-robin.json): el kit original té una gravació per a
+  // cada força, així que les alternatives són les de força veïna (±3).
+  const entries = Object.entries(config.map).map(([gm, spec]) => [gm, spec, 0]);
+  for (const gm of ROUND_ROBIN.kits[String(config.program)] || []) {
+    const spec = config.map[gm];
+    if (spec) ROUND_ROBIN.keys[gm].forEach((key, k) => entries.push([String(key), spec, k ? 3 : -3]));
+  }
   // 1) Àudio de cada cop i capa; 2) normalització del kit sencer (conserva
   // l'equilibri entre peces i capes); 3) mostres i zones.
-  for (const [, [key, seconds]] of entries) for (const velocity of velocities) mono(key, velocity, seconds);
+  for (const [, [key, seconds], shift] of entries) for (const velocity of velocities) mono(key, Math.min(127, velocity + shift), seconds);
   let peak = 0; for (const p of pieces) for (const x of p) peak = Math.max(peak, Math.abs(x));
   for (const p of pieces) for (let i = 0; i < p.length; i++) p[i] *= .9 / peak;
   const instrument = new BasicInstrument(); instrument.name = 'Muldjord Kit';
   const made = new Map();
-  for (const [gm, [key, seconds, choke]] of entries) {
-    velocities.forEach((velocity, li) => {
-      const id = `${key}:${velocity}:${seconds}`;
-      if (!made.has(id)) made.set(id, makeSample(bank, `MK${key}v${li}`, cache.get(id), RATE, Number(gm)));
+  for (const [gm, [key, seconds, choke], shift] of entries) {
+    velocities.forEach((layerVelocity, li) => {
+      const velocity = Math.min(127, layerVelocity + shift), id = `${key}:${velocity}:${seconds}`;
+      if (!made.has(id)) made.set(id, makeSample(bank, `MK${key}v${li}${shift ? (shift > 0 ? 'b' : 'a') : ''}`, cache.get(id), RATE, Number(gm)));
       const zone = instrument.createZone(made.get(id));
       zone.keyRange = { min: Number(gm), max: Number(gm) };
-      zone.velRange = { min: li ? Math.round((velocities[li - 1] + velocity) / 2) + 1 : 0, max: li === velocities.length - 1 ? 127 : Math.round((velocity + velocities[li + 1]) / 2) };
+      zone.velRange = { min: li ? Math.round((velocities[li - 1] + layerVelocity) / 2) + 1 : 0, max: li === velocities.length - 1 ? 127 : Math.round((layerVelocity + velocities[li + 1]) / 2) };
       zone.setGenerator(GeneratorTypes.overridingRootKey, Number(gm));
       // La bateria sona fins al final encara que la nota s'aturi abans.
       zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(Math.max(1, seconds)));
@@ -305,7 +313,7 @@ async function buildDrums(bank, config, log) {
 export async function buildRealInstruments(config, log = console.log) {
   SpessaLog.setLogLevel(false, false, false);
   await mkdir(CACHE, { recursive: true });
-  const fingerprint = sha(JSON.stringify(config) + await readFile(new URL(import.meta.url)));
+  const fingerprint = sha(JSON.stringify(config) + JSON.stringify(ROUND_ROBIN) + await readFile(new URL(import.meta.url)));
   const cached = join(CACHE, `real-${fingerprint.slice(0, 16)}.sf2`);
   try { return loadBank(await readFile(cached)); } catch { /* Es construeix. */ }
   const own = new BasicSoundBank();

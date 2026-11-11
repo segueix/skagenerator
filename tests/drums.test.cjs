@@ -59,3 +59,47 @@ test('humanització: 0 és quantitzat; si no, cada músic té el seu lloc respec
   assert(mean(diffs) < spread * .6);
   assert.throws(() => part({ humanize: 2 }), /Humanització/);
 });
+
+test('arranjament: redobles variats, aturades de banda, compte d’entrada i final', () => {
+  const settings = { seed: 4, style: 'punk', bpm: 180, tonic: 9, mode: 'major' };
+  const verse = extra => engine.composeSongPart(settings, { type: 'verse', bars: 4, energy: 80, revision: 1, instruments: ['drums', 'bass', 'guitar'], ...extra });
+  const lastBar = spec => JSON.stringify(spec.drumLine.filter(h => h[0] === 3 && h[1] >= 2));
+  // Cada secció pot triar un redoble diferent, i el que porta a una tornada és més gran que el que porta a una estrofa.
+  assert(new Set([0, 1, 2, 3, 4].map(fill => lastBar(verse({ next: 'chorus', fill })))).size >= 4);
+  const size = spec => spec.drumLine.filter(h => h[0] === 3 && h[1] >= 2 && h[2] !== 42 && h[2] !== 46).length;
+  assert(size(verse({ next: 'chorus', fill: 0 })) > size(verse({ next: 'verse', fill: 0 })));
+  // Aturada: la banda calla després del cop i només la bateria fa el redoble d'entrada.
+  const stop = verse({ ending: 'stop', next: 'chorus' }), perf = createPerformance(stop);
+  assert(stop.stopAt > stop.beat * 12 && stop.stopAt < stop.seconds);
+  assert.equal(perf.events.filter(e => e.type === 'on' && e.channel !== 9 && e.time >= stop.stopAt).length, 0);
+  assert(perf.events.some(e => e.type === 'on' && e.channel === 9 && e.time >= stop.stopAt));
+  assert(perf.events.filter(e => e.type === 'off' && e.channel !== 9).every(e => e.time <= stop.stopAt + .01 || e.time < stop.beat * 12));
+  // Compte d'entrada: quatre cops de baqueta i res més al primer compàs.
+  const count = verse({ countIn: true }), cp = createPerformance(count);
+  assert.deepEqual(cp.events.filter(e => e.type === 'on' && e.time < count.beat * 4 - .02).map(e => e.note), [37, 37, 37, 37]);
+  assert.throws(() => verse({ ending: 'pausa' }), /Final de secció/);
+  assert.throws(() => verse({ next: 'tornada' }), /Secció següent/);
+});
+
+test('gravacions alternades a la bateria i guitarres doblades amb preses diferents', () => {
+  const ROUND_ROBIN = require('../round-robin.json');
+  const settings = { seed: 4, style: 'punk', bpm: 180, tonic: 9, mode: 'major' };
+  const drums = timbre => createPerformance(engine.composeSongPart({ ...settings, timbres: { drums: timbre } }, { type: 'verse', bars: 8, energy: 80, revision: 1, instruments: ['drums'] }));
+  for (const kit of ['rusty', 'real']) {
+    const hitsOf = piece => drums(kit).events.filter(e => e.type === 'on' && e.channel === 9 && [piece, ...ROUND_ROBIN.keys[piece]].includes(e.note)).map(e => e.note);
+    for (const piece of [36, 38]) {
+      const list = hitsOf(piece);
+      assert(new Set(list).size === 3, `${kit} ${piece}: tres gravacions`);
+      assert(list.every((note, i) => i === 0 || note !== list[i - 1]), `${kit} ${piece}: mai la mateixa dues vegades seguides`);
+    }
+  }
+  assert(drums('standard').events.every(e => e.type !== 'on' || e.note < 88), 'els kits GM no fan servir alternatives');
+  // Guitarres doblades: dues preses desafinades una mica entre elles, amb el pedal en un punt diferent.
+  const horror = createPerformance(engine.composeSongPart({ ...settings, fx: { guitar: { type: 'horrorpunkFidel', drive: 70, tone: 60 } } },
+    { type: 'verse', bars: 2, energy: 80, revision: 1, instruments: ['guitar'] }));
+  const bends = Object.fromEntries(horror.events.filter(e => e.type === 'pitch' && e.time === 0).map(e => [e.channel, e.value]));
+  assert(bends[0] < 8192 && bends[1] > 8192);
+  assert.deepEqual(horror.channels.find(c => c.channel === 1).fxTweak, { drive: -10, tone: 8 });
+  const takes = channel => horror.events.filter(e => e.type === 'on' && e.channel === channel).map(e => e.time);
+  assert(takes(0).some((t, i) => Math.abs(takes(1)[i] - t - .009) > .002), 'cada presa té el seu ritme humà');
+});

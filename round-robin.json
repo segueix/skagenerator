@@ -1,0 +1,65 @@
+{
+  "about": "Gravacions alternades de bateria: cada peça té dues gravacions més en tecles MIDI lliures (88-103). L'intèrpret n'alterna una de diferent a cada cop perquè els cops repetits no sonin idèntics.",
+  "keys": {
+    "36": [
+      88,
+      89
+    ],
+    "38": [
+      90,
+      91
+    ],
+    "37": [
+      92,
+      93
+    ],
+    "40": [
+      94,
+      95
+    ],
+    "42": [
+      96,
+      97
+    ],
+    "44": [
+      98,
+      99
+    ],
+    "46": [
+      100,
+      101
+    ],
+    "51": [
+      102,
+      103
+    ]
+  },
+  "kits": {
+    "69": [
+      "36",
+      "38",
+      "42"
+    ],
+    "66": [
+      "36",
+      "38",
+      "37",
+      "42",
+      "44"
+    ],
+    "67": [
+      "36",
+      "38",
+      "37",
+      "42",
+      "44"
+    ],
+    "68": [
+      "36",
+      "38",
+      "37",
+      "42",
+      "44"
+    ]
+  }
+}
