@@ -6,7 +6,7 @@
   const engine = window.ElTaulerRadioAmbient, sampleAudio = window.SkaSampleAudio, audioUtils = window.SkaAudioUtils;
   const $ = id => document.getElementById(id);
   const KEY = 'skagenerator.song.v2', OLD_KEY = 'skagenerator.song.v1', RATE = 44100;
-  const MIN_BARS = 8, MAX_BARS = 128, MAX_SECONDS = 360, MAX_SECTION = 32, MAX_SECTIONS = 32, MAX_CLIPS = 96, GAP_CHUNK = 8, MAX_REV = 1000000;
+  const MIN_BARS = 8, MAX_BARS = 256, MAX_SECONDS = 360, MAX_SECTION = 32, MAX_SECTIONS = 32, MAX_CLIPS = 96, GAP_CHUNK = 8, MAX_REV = 1000000;
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
   // Colors vius que funcionen en mode clar i fosc (la interfície els barreja amb el fons).
   const colors = { intro: '#14b8a6', verse: '#8b5cf6', prechorus: '#f97316', chorus: '#ec4899', bridge: '#3b82f6', solo: '#84cc16', outro: '#10b981' };
@@ -14,15 +14,19 @@
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const GUITARS = ['guitar', 'guitar2', 'guitar3'];
+  const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
+  const LINES = [['own', 'Pròpia'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu']];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
   const FEELS = [['1', 'Normal'], ['0.5', 'Mig temps (½)'], ['2', 'Doble temps (×2)']];
+  const CYMBAL_MODES = [['all', 'Amb platets'], ['hats', 'Sense plats (només charles)'], ['none', 'Sense platets'], ['rim', 'Sense platets, pols a l’aro']];
+  const DRUM_TUNES = [['2', 'Aguda (+2)'], ['0', 'Natural'], ['-2', 'Greu (−2)'], ['-4', 'Molt greu (−4)'], ['-6', 'Profunda (−6)']];
   const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
     // «gravat»: mostres nota a nota de VSCO 2 CE, FreePats o el kit Muldjord.
     guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta · gravada'], ['cleanGm', 'Guitarra neta GM'], ['muted', 'Guitarra apagada GM'], ['overdrive', 'Guitarra saturada GM'], ['distortion', 'Guitarra distorsionada GM']],
-    bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
-    drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
+    bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['upright', 'Contrabaix pizzicato · gravat (Meatbass)'], ['growly', 'Jazz Bass directe · gravat (Growlybass)'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
+    drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['rusty', 'Big Rusty · gravada, greu (bombo de 24")'], ['club', 'Kit de club de jazz · gravat (Virtuosity)'], ['lofi', 'Kit lo-fi, so de disc antic · gravat'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
     trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
     trombone: [['auto', 'Saxo tenor · gravat (recomanat)'], ['vsco', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
     vocal: [['auto', 'Clarinet · gravat (recomanat)'], ['oohs', 'Veu «uh» GM'], ['flute', 'Flauta GM'], ['ocarina', 'Ocarina GM'], ['clarinetGm', 'Clarinet GM']]
@@ -139,7 +143,7 @@
       if (typeof s.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) || ids.has(s.id) || !Object.hasOwn(TYPES, s.type)
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
-        || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
+        || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals)) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
@@ -154,6 +158,7 @@
       if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
       if (c.feel !== undefined && ![.5, 2].includes(c.feel)) fail('Ritme no vàlid');
       if (c.register !== undefined && (c.instrument !== 'vocal' || ![-1, 1].includes(c.register))) fail('Registre no vàlid');
+      if (c.line !== undefined && (!LINE_INSTRUMENTS.includes(c.instrument) || !['riff', 'answer'].includes(c.line))) fail('Línia no vàlida');
       ids.add(c.id);
     }
     if (value.voice !== undefined) {
@@ -181,11 +186,12 @@
     if (options.baseOnly) return null;
     const active = s.clips.filter(c => c.generated && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
-    const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {};
+    const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {}, lineModes = {};
     let register;
     for (const c of active) {
       if (!(c.instrument in layers)) {
         if (c.feel) feel[c.instrument] = c.feel;
+        if (c.line) lineModes[c.instrument] = c.line;
         if (c.instrument === 'vocal' && c.register) register = c.register;
         if (c.sound && c.sound !== 'auto') timbres[c.instrument] = c.sound;
         if (c.fx) fx[c.instrument] = c.fx;
@@ -194,7 +200,7 @@
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
     }
     for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
-    return { layers, ranges, timbres, fx, feel, register };
+    return { layers, ranges, timbres, fx, feel, register, lineModes };
   }
   function partFor(s, seg, options = {}) {
     const base = s.base.instruments, extra = layersFor(s, seg, options);
@@ -210,6 +216,7 @@
       if (sec.bpm) part.bpm = sec.bpm;
       if (sec.transpose) part.transpose = sec.transpose;
       if (sec.groove) part.groove = { ...s.settings.groove, ...sec.groove };
+      if (sec.cymbals) part.cymbals = sec.cymbals;
       if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
@@ -219,6 +226,7 @@
       if (Object.keys(extra.timbres).length) part.timbres = extra.timbres;
       if (Object.keys(extra.fx).length) part.fx = extra.fx;
       if (Object.keys(extra.feel).length) part.feel = { ...(part.feel || {}), ...extra.feel };
+      if (Object.keys(extra.lineModes).length) part.lineModes = extra.lineModes;
       // La melodia de veu segueix la lletra de la secció: una frase per vers.
       if ('vocal' in extra.layers) {
         if (extra.register) part.register = extra.register;
@@ -230,8 +238,9 @@
   }
   const specFor = (seg, options) => engine.composeSongPart(song.settings, partFor(song, seg, options));
   const chordName = chord => {
-    const third = (chord.pcs[1] - chord.pcs[0] + 12) % 12, fifth = (chord.pcs[2] - chord.pcs[0] + 12) % 12;
-    return noteNames[chord.pcs[0]] + (fifth === 6 ? ' dim' : third === 3 ? 'm' : '');
+    const rel = chord.pcs.map(p => (p - chord.pcs[0] + 12) % 12), name = noteNames[chord.pcs[0]];
+    if (rel[1] === 5) return `${name}sus4`;
+    return name + (rel[2] === 6 ? ' dim' : rel[1] === 3 ? 'm' : '') + (rel[3] === 10 ? '7' : rel[3] === 11 ? 'maj7' : '');
   };
   function chordsOf(seg) {
     const chords = specFor(seg, { baseOnly: true }).chords.map(chordName);
@@ -291,7 +300,9 @@
     $('notice').textContent = message; $('notice').classList.add('visible');
     clearTimeout(noticeTimer); noticeTimer = setTimeout(() => $('notice').classList.remove('visible'), 5000);
   }
+  let libraryTimer;
   function save() {
+    if (song.libraryId) { clearTimeout(libraryTimer); libraryTimer = setTimeout(syncLibrary, 400); }
     try { localStorage.setItem(KEY, JSON.stringify(song)); storageAvailable = true; $('save-state').textContent = 'Esborrany desat'; }
     catch { storageAvailable = false; $('save-state').textContent = 'Desament no disponible'; notify('No s’ha pogut desar al navegador. Desa el projecte per conservar-lo.'); }
   }
@@ -923,6 +934,12 @@
     $('groove-guitar-field').hidden = !song.base.instruments.includes('guitar');
     for (const family of timbreFamilies) $(`timbre-${family}`).value = st.timbres[family];
     $('song-guitar-fx').value = st.fx?.guitar?.type || 'none';
+    fillSelect($('song-subgenre'), [['', '— Cap (estil general)'], ...Object.entries(engine.SUBGENRES).filter(([, sg]) => sg.style === st.style).map(([key, sg]) => [key, sg.name])], st.subgenre || '');
+    $('song-swing').value = Math.round((st.swing || 0) * 100); $('song-swing-value').textContent = `${Math.round((st.swing || 0) * 100)} %`;
+    fillSelect($('song-cymbals'), CYMBAL_MODES, st.cymbals || 'all');
+    fillSelect($('song-drum-tune'), DRUM_TUNES, String(st.drumTune || 0));
+    const human = Math.round((st.humanize ?? .5) * 100);
+    $('song-humanize').value = human; $('song-humanize-value').textContent = human ? `${human} %` : 'quantitzat';
   }
   async function changeSettings(event) {
     if (busy) return;
@@ -930,6 +947,7 @@
     const style = $('song-style').value, profile = STYLES[style];
     if (id === 'song-style') {
       song.settings = { ...st, style, bpm: profile.bpm.default, groove: defaultGroove() };
+      delete song.settings.subgenre; delete song.settings.swing;
       if (!profile.keys.some(([k, m]) => k === st.tonic && m === st.mode)) [song.settings.tonic, song.settings.mode] = profile.keys[0];
       applyBase(baseDefaults(style));
       song.settings.bars = Math.min(song.settings.bars, Math.floor(MAX_SECONDS / barSeconds()));
@@ -951,6 +969,27 @@
       }
     } else if (id.startsWith('groove-')) st.groove = { ...st.groove, [id.slice(7)]: Number(event.target.value) };
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
+    else if (id === 'song-subgenre') {
+      const key = event.target.value, sg = engine.SUBGENRES[key];
+      if (!sg) { delete st.subgenre; delete st.swing; }
+      else {
+        // El subgènere decideix d'un cop harmonia, ritmes, balanceig, sons i efectes.
+        st.subgenre = key;
+        if (sg.swing) st.swing = sg.swing; else delete st.swing;
+        st.groove = { drums: sg.groove.drums[0], bass: sg.groove.bass[0], guitar: sg.groove.guitar[0] };
+        st.timbres = { ...defaultTimbres(), ...(sg.timbres || {}) };
+        for (const key of ['drumTune', 'humanize', 'cymbals']) if (sg[key] !== undefined) st[key] = sg[key]; else delete st[key];
+        if (sg.fx) st.fx = { guitar: { ...sg.fx }, guitar2: { ...sg.fx }, guitar3: { ...sg.fx } }; else delete st.fx;
+        if (st.bpm < sg.bpm[0] || st.bpm > sg.bpm[1]) st.bpm = Math.min(profile.bpm.max, Math.round((sg.bpm[0] + sg.bpm[1]) / 2));
+        if (!sg.keys.some(([t, m]) => t === st.tonic && m === st.mode)) [st.tonic, st.mode] = sg.keys[0];
+        applyBase(sg.base);
+        notify(`${sg.name}: ${sg.description}`);
+      }
+    }
+    else if (id === 'song-swing') { const v = Number(event.target.value) / 100; if (v) st.swing = v; else delete st.swing; }
+    else if (id === 'song-cymbals') { if (event.target.value === 'all') delete st.cymbals; else st.cymbals = event.target.value; }
+    else if (id === 'song-drum-tune') { const v = Number(event.target.value); if (v) st.drumTune = v; else delete st.drumTune; }
+    else if (id === 'song-humanize') { const v = Number(event.target.value) / 100; if (v === .5) delete st.humanize; else st.humanize = v; }
     else if (id === 'song-guitar-fx') {
       const type = event.target.value;
       if (type === 'none') delete st.fx;
@@ -958,7 +997,7 @@
       if (type === 'horrorpunk') notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
         : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
     }
-    const replay = id.startsWith('groove-') || id.startsWith('timbre-') || id === 'song-guitar-fx' ? playing?.kind : null;
+    const replay = id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize'].includes(id) ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   }
@@ -1068,6 +1107,7 @@
     const drums = engine.SONG_GROOVES[song.settings.style].drums;
     fillSelect($('section-groove'), [['inherit', `Com la cançó (${drums[song.settings.groove.drums]})`], ...drums.map((name, i) => [String(i), name])],
       sec.groove?.drums === undefined ? 'inherit' : String(sec.groove.drums));
+    fillSelect($('section-cymbals'), [['inherit', `Com la cançó (${CYMBAL_MODES.find(([k]) => k === (song.settings.cymbals || 'all'))[1].toLowerCase()})`], ...CYMBAL_MODES], sec.cymbals || 'inherit');
     $('section-bpm').value = sec.bpm ?? ''; $('section-bpm').placeholder = String(song.settings.bpm);
     $('section-bpm-hint').textContent = sec.bpm ? (sec.bpm > song.settings.bpm ? 'més ràpida que la cançó' : sec.bpm < song.settings.bpm ? 'més lenta que la cançó' : 'igual que la cançó') : `buit = ${song.settings.bpm} (cançó)`;
     const energy = sec.energy ?? TYPES[sec.type].energy;
@@ -1141,13 +1181,16 @@
       wrap.append(caption, input, hint); return wrap;
     };
     const feelSelect = select('RITME', FEELS, String(clip.feel ?? 1), value => changeClipTone(clip, { feel: Number(value) }));
+    const lineSelect = LINE_INSTRUMENTS.includes(clip.instrument)
+      ? select('LÍNIA', LINES, clip.line || 'own', value => changeClipTone(clip, { line: value })) : null;
     if (clip.instrument === 'vocal') {
       box.classList.add('only-feel');
       box.append(feelSelect, select('REGISTRE', [['-1', 'Greu (veu d’home)'], ['0', 'Mitjà'], ['1', 'Agut (veu de dona)']], String(clip.register ?? 0),
         value => changeClipTone(clip, { register: Number(value) })));
       return box;
     }
-    if (!GUITARS.includes(clip.instrument)) { box.classList.add('only-feel'); box.append(feelSelect); return box; }
+    if (!GUITARS.includes(clip.instrument)) { box.classList.add('only-feel'); box.append(feelSelect); if (lineSelect) box.append(lineSelect); return box; }
+    if (lineSelect) box.append(lineSelect);
     box.append(feelSelect,
       select('SO', timbreOptions.guitar.map(([k, v]) => [k, k === 'auto' ? 'Com la guitarra de la cançó' : v]), clip.sound || 'auto', value => changeClipTone(clip, { sound: value })),
       select('EFECTE', [['inherit', `Com la cançó (${engine.GUITAR_FX[song.settings.fx?.guitar?.type || 'none']})`], ...Object.entries(engine.GUITAR_FX)], clip.fx?.type ?? 'inherit',
@@ -1158,6 +1201,7 @@
   function changeClipTone(clip, change) {
     if (busy) return;
     if ('sound' in change) { if (change.sound === 'auto') delete clip.sound; else clip.sound = change.sound; }
+    if ('line' in change) { if (change.line === 'own') delete clip.line; else clip.line = change.line; }
     if ('register' in change) { if (change.register === 0) delete clip.register; else clip.register = change.register; }
     if ('feel' in change) { if (change.feel === 1) delete clip.feel; else clip.feel = change.feel; }
     if ('fx' in change) { if (change.fx === null) delete clip.fx; else clip.fx = change.fx; }
@@ -1270,7 +1314,7 @@
     const ready = song.base.generated;
     for (const key of ['new-song', 'song-title', 'song-style', 'song-bpm', 'song-key', 'song-bars', 'generate-base', 'add-section', 'import-project', 'export-project',
       'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'section-type', 'section-start', 'section-bars',
-      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-groove']) $(key).disabled = busy;
+      'section-reharmonize', 'remove-section', 'copy-previous', 'section-energy', 'section-bpm', 'section-transpose', 'section-groove', 'section-cymbals']) $(key).disabled = busy;
     $('add-variety').disabled = busy || !ready || song.sections.length < 3;
     $('clear-variety').hidden = !song.sections.some(s => s.bpm || s.transpose || s.groove || s.feel?.drums);
     for (const name of BASE_CHOICES) $(`base-${name}`).disabled = busy;
@@ -1279,7 +1323,99 @@
     $('stop-playback').disabled = !playing;
     document.body.classList.toggle('busy', busy);
     renderTabs(); renderVoice();
+    if ($('library-list').childElementCount || readLibrary().length) renderLibrary();
   }
+
+  // ── Biblioteca de cançons amb puntuacions ──────────────────────────
+  const LIBRARY_KEY = 'skagenerator.library', LIBRARY_MAX = 200;
+  function readLibrary() { try { const list = JSON.parse(localStorage.getItem(LIBRARY_KEY)); return Array.isArray(list) ? list : []; } catch { return []; } }
+  function writeLibrary(list) {
+    try { localStorage.setItem(LIBRARY_KEY, JSON.stringify(list.slice(0, LIBRARY_MAX))); return true; }
+    catch { notify('No hi ha prou espai al navegador per a la biblioteca. Esborra o exporta alguna cançó.'); return false; }
+  }
+  const songSecondsOf = s => s.sections.reduce((t, x) => t + x.bars * 240 / (x.bpm || s.settings.bpm), 0)
+    + Math.max(0, s.settings.bars - s.sections.reduce((n, x) => n + x.bars, 0)) * 240 / s.settings.bpm;
+  function addToLibrary() {
+    const list = readLibrary(), id = uid();
+    song.libraryId = id;
+    list.unshift({ id, title: song.title, subgenre: song.settings.subgenre || '', style: song.settings.style, seconds: Math.round(songSecondsOf(song)), created: Date.now(), rating: 0, song: JSON.parse(JSON.stringify(song)) });
+    writeLibrary(list); save(); renderLibrary();
+  }
+  function syncLibrary() {
+    const list = readLibrary(), entry = list.find(e => e.id === song.libraryId);
+    if (!entry) { delete song.libraryId; return; }
+    Object.assign(entry, { title: song.title, subgenre: song.settings.subgenre || '', style: song.settings.style, seconds: Math.round(songSecondsOf(song)), song: JSON.parse(JSON.stringify(song)) });
+    writeLibrary(list); renderLibrary();
+  }
+  function rate(id, stars) {
+    const list = readLibrary(), entry = list.find(e => e.id === id); if (!entry) return;
+    entry.rating = entry.rating === stars ? 0 : stars; writeLibrary(list); renderLibrary(); renderAutoDescription();
+  }
+  async function openFromLibrary(entry) {
+    if (busy) return;
+    if (song.libraryId !== entry.id && (song.base.generated || song.sections.length) && !song.libraryId
+      && !await ask(`Obrir «${entry.title}»?`, 'La cançó actual no és a la biblioteca: desa-la abans si la vols conservar.')) return;
+    try { migrated = false; const opened = validateSong(JSON.parse(JSON.stringify(entry.song))); opened.libraryId = entry.id; openSong(opened, `«${entry.title}» oberta.`); if (mobile.matches) setTab('line'); }
+    catch (error) { console.error(error); notify('Aquesta cançó de la biblioteca no s’ha pogut obrir.'); }
+  }
+  async function removeFromLibrary(entry) {
+    if (!await ask(`Esborrar «${entry.title}» de la biblioteca?`, 'No es pot desfer. Si la vols conservar, exporta-la abans.')) return;
+    writeLibrary(readLibrary().filter(e => e.id !== entry.id));
+    if (song.libraryId === entry.id) { delete song.libraryId; save(); }
+    renderLibrary(); renderAutoDescription();
+  }
+  function renderLibrary() {
+    const list = readLibrary(), box = $('library-list'), order = $('library-sort').value;
+    if (order === 'rating') list.sort((a, b) => b.rating - a.rating || b.created - a.created);
+    else if (order === 'subgenre') list.sort((a, b) => (a.subgenre || a.style).localeCompare(b.subgenre || b.style) || b.rating - a.rating);
+    box.replaceChildren();
+    if (!list.length) { const empty = document.createElement('p'); empty.className = 'empty-state'; empty.textContent = 'Encara no hi ha cap cançó. Crea’n una d’automàtica o desa la cançó actual.'; box.append(empty); }
+    for (const entry of list) {
+      const row = document.createElement('div'); row.className = `library-row ${entry.style}${entry.id === song.libraryId ? ' current' : ''}`;
+      const info = document.createElement('div'); info.className = 'library-info';
+      const title = document.createElement('strong'); title.textContent = entry.title;
+      const meta = document.createElement('small');
+      meta.textContent = `${engine.SUBGENRES[entry.subgenre]?.name || (entry.style === 'punk' ? 'Punk' : entry.style === 'urban' ? 'Urban' : 'Ska')} · ${time(entry.seconds)} · ${new Date(entry.created).toLocaleDateString('ca')}`;
+      info.append(title, meta);
+      const stars = document.createElement('div'); stars.className = 'stars'; stars.setAttribute('role', 'group'); stars.setAttribute('aria-label', `Puntuació de ${entry.title}`);
+      for (let n = 1; n <= 5; n++) {
+        const star = document.createElement('button'); star.type = 'button'; star.className = `star${n <= entry.rating ? ' on' : ''}`; star.textContent = n <= entry.rating ? '★' : '☆';
+        star.setAttribute('aria-label', `${n} estrella${n > 1 ? 's' : ''}`); star.setAttribute('aria-pressed', String(n <= entry.rating));
+        star.addEventListener('click', () => rate(entry.id, n)); stars.append(star);
+      }
+      const open = document.createElement('button'); open.type = 'button'; open.className = 'button'; open.textContent = entry.id === song.libraryId ? '✓ Oberta' : '▷ Obre';
+      open.disabled = busy || entry.id === song.libraryId; open.addEventListener('click', () => openFromLibrary(entry));
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-button'; remove.textContent = '×';
+      remove.setAttribute('aria-label', `Esborrar ${entry.title}`); remove.addEventListener('click', () => removeFromLibrary(entry));
+      row.append(info, stars, open, remove); box.append(row);
+    }
+    $('library-save').hidden = !!song.libraryId; $('library-save').disabled = busy || !song.base.generated;
+  }
+  // ── Cançó automàtica ───────────────────────────────────────────────
+  fillSelect($('auto-subgenre'), Object.entries(engine.SUBGENRES).map(([key, sg]) => [key, `${sg.style === 'punk' ? 'Punk' : 'Ska'} · ${sg.name}`]), 'twotone');
+  function renderAutoDescription() {
+    const key = $('auto-subgenre').value, sg = engine.SUBGENRES[key];
+    const rated = readLibrary().filter(e => e.subgenre === key && e.rating), mean = rated.reduce((t, e) => t + e.rating, 0) / (rated.length || 1);
+    $('auto-description').textContent = `${sg.description} ${sg.bpm[0]}–${sg.bpm[1]} BPM.${rated.length ? ` Les teves cançons d’aquest subgènere: ★ ${mean.toFixed(1).replace('.', ',')} de mitjana (${rated.length}).` : ''}`;
+  }
+  $('auto-subgenre').addEventListener('change', renderAutoDescription);
+  $('auto-minutes').addEventListener('input', event => { const m = Number(event.target.value); $('auto-minutes-value').textContent = `${Math.floor(m)}:${String(Math.round(m % 1 * 60)).padStart(2, '0')}`; });
+  $('auto-create').addEventListener('click', async () => {
+    if (busy) return;
+    if ((song.base.generated || song.sections.length) && !song.libraryId && !await ask('Crear una cançó nova?', 'La cançó actual no és a la biblioteca: desa-la abans si la vols conservar.')) return;
+    const key = $('auto-subgenre').value;
+    try {
+      const liked = readLibrary().filter(e => e.subgenre === key && e.rating >= 4).map(e => e.song);
+      const project = window.SkaSongBuilder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked });
+      migrated = false;
+      openSong(validateSong(project), '');
+      addToLibrary();
+      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
+      if (mobile.matches) setTab('line');
+    } catch (error) { console.error(error); notify(`No s’ha pogut crear la cançó: ${reasonOf(error)}`); }
+  });
+  $('library-sort').addEventListener('change', renderLibrary);
+  $('library-save').addEventListener('click', () => { if (!song.libraryId && song.base.generated) { addToLibrary(); notify('Cançó desada a la biblioteca.'); } });
 
   // ── Mòbil: un pas per pantalla, amb pestanyes ──────────────────────
   const mobile = window.matchMedia('(max-width: 899px)');
@@ -1322,8 +1458,10 @@
   paintTheme();
 
   // ── Esdeveniments ───────────────────────────────────────────────────
-  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx']
+  ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize']
     .forEach(key => $(key).addEventListener('change', changeSettings));
+  $('song-humanize').addEventListener('input', event => { const v = Number(event.target.value); $('song-humanize-value').textContent = v ? `${v} %` : 'quantitzat'; });
+  $('song-swing').addEventListener('input', event => { $('song-swing-value').textContent = `${event.target.value} %`; });
   $('song-title').addEventListener('input', event => { song.title = event.target.value; $('transport-title').textContent = song.title || 'Nova cançó'; save(); });
   $('generate-base').addEventListener('click', generateBase);
   $('play-base').addEventListener('click', () => play('base'));
@@ -1348,6 +1486,9 @@
   }));
   $('section-groove').addEventListener('change', event => changeSectionValue(sec => {
     if (event.target.value === 'inherit') delete sec.groove; else sec.groove = { drums: Number(event.target.value) };
+  }));
+  $('section-cymbals').addEventListener('change', event => changeSectionValue(sec => {
+    if (event.target.value === 'inherit') delete sec.cymbals; else sec.cymbals = event.target.value;
   }));
   // ── Varietat: canvis de tempo, de to i de ritme ────────────────────
   function addVariety() {
@@ -1514,7 +1655,7 @@
   let firstTab = song.base.generated ? (song.sections.length ? 'line' : 'line') : 'song';
   try { firstTab = sessionStorage.getItem('skagenerator.tab') || firstTab; } catch {}
   setTab(firstTab, false);
-  updateSettingsUI(); render(); loadVoice(); loadExamples();
+  updateSettingsUI(); render(); loadVoice(); loadExamples(); renderLibrary(); renderAutoDescription();
   if (migrated && storageAvailable) { save(); notify('Projecte anterior convertit al nou flux: cada part és ara una secció de la línia.'); }
   if (!storageAvailable) notify('No s’ha pogut recuperar l’esborrany. Obre un projecte desat o comença una cançó nova.');
 })();

@@ -3,7 +3,7 @@ import { mkdir, copyFile, cp, readFile, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { prepareSoundBank } from './prepare-soundbank.mjs';
 await mkdir('dist', { recursive: true });
-for (const file of ['index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js']) await copyFile(file, `dist/${file}`);
+for (const file of ['index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'song-builder.js']) await copyFile(file, `dist/${file}`);
 await cp('licenses', 'dist/licenses', { recursive: true });
 await cp('exemples', 'dist/exemples', { recursive: true });
 await build({ entryPoints: ['audio/worker.mjs'], bundle: true, outfile: 'dist/sample-worker.js',
@@ -16,8 +16,9 @@ const hash = async file => createHash('sha256').update(await readFile(`dist/${fi
 let client = await readFile('dist/sample-audio.js', 'utf8');
 client = client.replace(/sample-worker\.js\?v=[^']+/, `sample-worker.js?v=${await hash('sample-worker.js')}`);
 client = client.replace(/generaluser-ska-punk\.sf2\?v=[^']+/, `generaluser-ska-punk.sf2?v=${await hash('assets/generaluser-ska-punk.sf2')}`);
+client = client.replace(/extra-instruments\.sf2\?v=[^']+/, `extra-instruments.sf2?v=${await hash('assets/extra-instruments.sf2')}`);
 await writeFile('dist/sample-audio.js', client);
 let html = await readFile('dist/index.html', 'utf8');
-for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js'])
+for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'song-builder.js'])
   html = html.replaceAll(`"${file}"`, `"${file}?v=${await hash(file)}` + '"');
 await writeFile('dist/index.html', html);

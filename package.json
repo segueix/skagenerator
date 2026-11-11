@@ -6,13 +6,14 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.cjs tests/*.test.mjs",
-    "check": "node --check app.js && node --check radioambient.js && node --check sample-audio.js && node --check audio-utils.js && node --check audio/worker.mjs && node --check audio/render.mjs",
+    "check": "node --check app.js && node --check radioambient.js && node --check sample-audio.js && node --check audio-utils.js && node --check song-builder.js && node --check audio/worker.mjs && node --check audio/render.mjs",
     "pretest": "node scripts/prepare-soundbank.mjs"
   },
   "dependencies": {
     "spessasynth_core": "4.4.9"
   },
   "devDependencies": {
+    "@wasm-audio-decoders/flac": "0.2.11",
     "7zip-bin": "5.2.0",
     "esbuild": "0.25.12"
   }

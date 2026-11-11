@@ -9,7 +9,7 @@
   <title>Ska Generator · Nova cançó</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23172c28'/%3E%3Cpath d='M12 28V15l16-4v13M12 19l16-4' stroke='%23d5f28b' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="song-builder.js"></script><script defer src="app.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -20,6 +20,22 @@
   </header>
   <main>
     <div class="page-heading" data-panel="song"><div><p class="eyebrow">ESTUDI DE COMPOSICIÓ <span>/</span> CAPA A CAPA</p><h1>Primer la base, després la banda<span>.</span></h1><p class="intro-copy">Genera la base, marca les seccions a la línia i fes entrar els instruments un a un.</p></div><span class="draft-badge" id="save-state">Esborrany local</span></div>
+    <section class="auto-panel" data-panel="song" aria-labelledby="auto-title">
+      <div class="section-heading"><h2 id="auto-title"><span class="step auto-step" aria-hidden="true">✦</span>Cançó automàtica</h2><span>Tria un subgènere i el taller compon una cançó sencera</span></div>
+      <div class="auto-grid">
+        <label><span class="field-label">SUBGÈNERE</span><select id="auto-subgenre" aria-label="Subgènere de la cançó automàtica"></select></label>
+        <label><span class="field-label">DURADA <output id="auto-minutes-value">3:00</output></span><input type="range" id="auto-minutes" min="2" max="4" step="0.25" value="3" aria-label="Durada aproximada en minuts"><small class="slider-hint"><span>2 min</span><span>4 min</span></small></label>
+        <label class="check-row"><input type="checkbox" id="auto-vocal" checked> <span>Amb melodia de veu</span></label>
+      </div>
+      <p class="step-copy" id="auto-description"></p>
+      <button type="button" id="auto-create" class="button primary">✦ Crea la cançó</button>
+    </section>
+    <section class="library" data-panel="song" aria-labelledby="library-title">
+      <div class="section-heading"><h2 id="library-title">Les meves cançons</h2><label class="library-sort"><span class="field-label">ORDRE</span><select id="library-sort" aria-label="Ordre de la biblioteca"><option value="recent">Més recents</option><option value="rating">Millor puntuades</option><option value="subgenre">Per subgènere</option></select></label></div>
+      <p class="step-copy">Les cançons automàtiques es desen aquí soles. Puntua-les amb les estrelles: quan en tinguis de ★4 o més d’un subgènere, les noves cançons d’aquest subgènere s’hi inspiraran sovint.</p>
+      <div id="library-list" class="library-list"></div>
+      <button type="button" id="library-save" class="button">☆ Desa la cançó actual a la biblioteca</button>
+    </section>
     <section class="song-settings" data-panel="song" aria-label="Configuració de la cançó">
       <label class="title-field"><span class="field-label">NOM DEL PROJECTE</span><input id="song-title" maxlength="100" value="Nova cançó" aria-label="Nom de la cançó"></label>
       <label><span class="field-label">ESTIL</span><select id="song-style"><option value="ska">Ska</option><option value="punk">Punk</option><option value="urban">Urban</option></select></label>
@@ -37,7 +53,16 @@
       <div class="section-heading"><h2 id="base-title"><span class="step" aria-hidden="true">1</span>La base musical</h2><span id="base-state" class="state-pill">Pendent de generar</span></div>
       <p class="step-copy" id="style-description"></p>
       <div class="base-grid">
+        <div class="timbre-picker" role="group" aria-label="Subgènere i balanceig">
+          <label><span class="field-label">SUBGÈNERE</span><select id="song-subgenre" aria-label="Subgènere de la cançó"></select></label>
+          <label><span class="field-label">BALANCEIG (SHUFFLE) <output id="song-swing-value">0 %</output></span><input type="range" id="song-swing" min="0" max="70" step="5" value="0" aria-label="Balanceig de les corxeres"><small class="slider-hint"><span>Recte</span><span>Tresets</span></small></label>
+        </div>
         <fieldset class="instrument-picker"><legend>INSTRUMENTS DE LA BASE · SONEN TOTA LA CANÇÓ</legend><div id="base-instruments"></div></fieldset>
+        <div class="timbre-picker drum-picker" role="group" aria-label="Bateria i humanització">
+          <label><span class="field-label">PLATETS DE LA BATERIA</span><select id="song-cymbals" aria-label="Platets de la bateria"></select></label>
+          <label><span class="field-label">AFINACIÓ DE LA BATERIA</span><select id="song-drum-tune" aria-label="Afinació de la bateria"></select></label>
+          <label><span class="field-label">HUMANITZACIÓ DEL RITME <output id="song-humanize-value">50 %</output></span><input type="range" id="song-humanize" min="0" max="100" step="5" value="50" aria-label="Humanització del ritme dels instruments"><small class="slider-hint"><span>Màquina</span><span>Músics relaxats</span></small></label>
+        </div>
         <div class="timbre-picker groove-picker" role="group" aria-label="Patrons de la base">
           <label><span class="field-label">PATRÓ DE BATERIA</span><select id="groove-drums" aria-label="Patró de bateria"></select></label>
           <label><span class="field-label">LÍNIA DE BAIX</span><select id="groove-bass" aria-label="Línia de baix"></select></label>
@@ -88,6 +113,7 @@
           <label class="bpm-field"><span class="field-label">TEMPO DE LA SECCIÓ <span id="section-bpm-hint"></span></span><div class="tempo-control"><input id="section-bpm" type="number" min="40" max="240" step="1" inputmode="numeric" aria-label="Tempo d’aquesta secció en BPM; buit per seguir el de la cançó"><span>BPM</span></div></label>
           <label><span class="field-label">TO DE LA SECCIÓ <span id="section-key-name"></span></span><select id="section-transpose" aria-label="Canvi de to d’aquesta secció"></select></label>
           <label><span class="field-label">PATRÓ DE BATERIA</span><select id="section-groove" aria-label="Patró de bateria d’aquesta secció"></select></label>
+          <label><span class="field-label">PLATETS</span><select id="section-cymbals" aria-label="Platets de la bateria en aquesta secció"></select></label>
           <label class="energy-field"><span class="field-label">INTENSITAT <output id="section-energy-value">55 %</output></span><input id="section-energy" type="range" min="10" max="100" step="5" aria-label="Intensitat de la secció"><small class="slider-hint"><span>Suau</span><span>Força de tots els instruments</span><span>Enèrgica</span></small></label>
         </div>
         <p class="chords-line"><span id="section-chords" class="chords"></span><button type="button" id="section-reharmonize" class="text-button">↻ Altres acords</button></p>

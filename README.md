@@ -21,6 +21,43 @@ A la primera pantalla hi ha **10 cançons fetes amb el taller** (5 de ska i 5 de
 
 Es generen amb `node scripts/make-examples.mjs`: cada cançó està dissenyada a mà (estructura, arranjament que creix, dinàmica, tempo, to, efectes i lletra) i, per a cada instrument melòdic, el script prova 60 versions i tria la que té millor línia (graus conjunts, salts compensats, registre equilibrat i poques repeticions mecàniques).
 
+## Bateria: platets, afinació i humanització
+
+Al panell de la base hi ha tres controls nous per a la bateria i el ritme:
+
+- **Platets**: amb platets, sense plats (només charles), sense platets (només bombo, caixa i toms) o sense platets amb el pols del charles fet amb cops d’aro. Els plats d’accent passen al bombo. Cada secció ho pot canviar (selector «Platets» de la secció): per exemple, estrofes amb aro i tornades amb plats.
+- **Afinació de la bateria**: de +2 a −6 semitons. «Greu» i «Molt greu» afinen totes les peces cap avall (bombo i toms més profunds, caixa més grossa). Combinat amb el kit Big Rusty (bombo de 24") dona el so més greu.
+- **Humanització del ritme** (0–100 %): a 0 % tot va quantitzat, com una caixa de ritmes. Amb humanització, cada músic té el seu lloc respecte del temps: a l’ska el baix i els metalls van una mica endarrerits (relaxats) i la caixa arrossega; al punk la guitarra i la bateria empenyen. A més, una deriva lenta fa que cada músic s’avanci o s’endarrereixi uns mil·lisegons durant uns compassos (com una persona, no a l’atzar nota a nota), la força varia, el charles accentua els temps i el bombo és el més regular. Als tempos ràpids les desviacions es redueixen.
+
+Kits i baixos gravats nous: **Big Rusty** (greu), **kit de club de jazz** i **kit lo-fi** (so de disc antic), **contrabaix pizzicato** i **Jazz Bass directe**. Cada subgènere en tria uns per defecte: l’ska jamaicà sona amb kit de club i contrabaix, el rocksteady amb el kit lo-fi i estrofes amb aro, el punk del 77 i l’horror punk amb Big Rusty (l’horror punk afinat −3 i amb la intro sense platets), el hardcore amb Big Rusty −2 i Jazz Bass.
+
+## Cançó automàtica, biblioteca i puntuacions
+
+Al panell **Cançó automàtica** tries un subgènere, la durada (de 2 a 4 minuts) i si vols melodia de veu, i el taller compon una cançó sencera: introducció, estrofes, pretornades, tornades, pont o solo i final, amb els canvis de tempo propis del subgènere (introduccions lentes, ponts a mig temps, última tornada pujada de to…). Cada cançó es desa sola a **Les meves cançons**, al navegador, i s’hi pot posar de 1 a 5 estrelles. Quan d’un subgènere tens cançons de ★4 o més, les noves cançons d’aquest subgènere s’inspiren sovint en el seu tempo, tonalitat i groove. També pots desar-hi la cançó que estàs fent a mà.
+
+### Subgèneres amb personalitat
+
+| Subgènere | BPM | Trets |
+|---|---|---|
+| Ska jamaicà (anys 60) | 110–128 | Swing marcat, bateria jazz, baix de dits, acords amb setena i ii–V |
+| Rocksteady | 100–108 | Més lent i greu, trompeta amb sordina, tonalitats menors |
+| Ska 2-tone | 132–156 | Nerviós, orgue i metalls amb riffs |
+| Ska-punk | 160–180 | Guitarres distorsionades, ponts a mig temps |
+| Punk 77 | 180–205 | Tres acords amb bVII, distorsió clàssica |
+| Hardcore | 200–220 | Fuzz, acord bII i breakdown a mig temps |
+| Pop punk | 165–185 | Overdrive, vi–IV–I–V, pretornada que accelera |
+| Horror punk | 170–192 | Distorsió Misfits, acords prestats foscos (bVI, iv) |
+
+El subgènere també es pot triar al panell de la base, juntament amb el **balanceig** (swing), que endarrereix les corxeres a contratemps.
+
+### Harmonia i riffs
+
+- Cada subgènere té paletes d’acords per secció amb acords prestats (bVII, bVI, iv), dominants secundàries (V7/vi, V7/IV) i setenes.
+- Cada cançó té un **riff** propi (ritme de dos compassos i contorn melòdic) que es repeteix a la intro, les tornades i el final, adaptat als acords de cada secció.
+- El trombó toca el riff harmonitzat una tercera per sota de la trompeta.
+- Amb la línia **Respon a la veu**, els metalls o la guitarra solista toquen fragments del riff als silencis de la melodia de veu (pregunta i resposta).
+- A cada instrument melòdic (trompeta, trombó, saxo, sintetitzador i guitarra 3) l’opció **LÍNIA** tria entre línia pròpia, riff de la cançó o resposta a la veu.
+
 ## Flux de treball
 
 Hi ha una sola vista, que es treballa de baix cap amunt:
@@ -108,6 +145,10 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 | Baix amb dits i amb pua | FreePats, Yamaha RBX d’Andrea Biasior | CC0 |
 | Guitarra neta | FreePats FSBS (pont) | CC0 |
 | Bateria | Muldjord Kit, de Lars Muldjord (via FreePats) | CC BY 4.0 |
+| Bateria greu (bombo de 24", toms de 14–22") | Big Rusty Drums, Karoryfer | CC0 |
+| Kit de club de jazz i kit lo-fi | Virtuosity Drums | CC0 |
+| Contrabaix pizzicato | Meatbass, Karoryfer | CC0 |
+| Jazz Bass directe | Growlybass, Karoryfer | CC0 |
 
 - VSCO només publica els WAV: el build llegeix el nom de cada fitxer (nota i dinàmica), en mesura l’afinació, el remostreja i en crea les zones de tecla i de força. Les notes curtes de trompeta i trombó fan servir les mostres d’staccato, que donen els cops secs típics de l’ska.
 - Les gravacions de VSCO tenen nivells molt desiguals (més de 20 dB entre notes). El build iguala la sonoritat de cada mostra: totes les notes d’una dinàmica sonen igual, la dinàmica suau queda 4 dB per sota de la forta i l’staccato 5 dB per sota del sostingut. La força dels metalls s’allunya del canvi de dinàmica perquè no saltin de mostra nota a nota.
@@ -119,7 +160,9 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 - El kit Muldjord original ocupa 209 MB i té un mapa de tecles propi: se’n construeix un kit GM nou (bombo, caixa, cop de vora, charleston, plats, ride i timbals) amb tres capes de força.
 - El banc final ocupa uns 30 MB i es carrega una sola vegada. Les descàrregues i el banc convertit es guarden a `.cache/` i a la memòria cau de GitHub Actions.
 - Els sons de GeneralUser GS continuen disponibles com a alternatives («… GM») als selectors de so. L’orgue continua sent el de GeneralUser: l’orgue de FreePats és una emulació sintetitzada, no una gravació.
-- No s’han fet servir les biblioteques de Karoryfer: només es distribueixen en SFZ amb FLAC/OGG i caldria un descodificador més; FreePats ja cobreix baix, guitarra i bateria amb mostres reals i llicències lliures.
+- **Banc addicional** (`assets/extra-instruments.sf2`, uns 10 MB): les bateries Big Rusty i Virtuosity i els baixos Meatbass i Growlybass. Es publiquen en SFZ amb FLAC/WAV: el build tria unes quantes capes de força, barreja els micròfons (p. ex. bombo + ambient, caixa a sobre i a sota + ambient) i ho converteix a SF2 (FLAC descodificat amb `@wasm-audio-decoders/flac`). La web només el baixa quan una cançó fa servir algun d’aquests sons, així el banc principal no creix.
+- Cada peça de cada kit s’iguala a la sonoritat de la mateixa peça del kit Muldjord (bombo amb bombo, charles amb charles…) i les capes més suaus queden 3,5 dB per sota cada una; els baixos s’igualen al baix amb dits. Un guany calibrat amb parts reals fa que canviar de kit o de baix no canviï el volum de la mescla.
+- **Correcció**: el kit Muldjord era al programa 64, que al sintetitzador (SpessaSynth 4) és un «User Drum Set» GS: en realitat sonava el kit GM estàndard. Ara és al programa 69 i se sent el kit gravat de debò.
 
 ## So més autèntic i equalitzadors
 

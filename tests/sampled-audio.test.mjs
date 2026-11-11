@@ -21,7 +21,7 @@ test('el banc conté les mostres enregistrades dels instruments i els tres kits 
   // Instruments gravats: VSCO 2 CE (banc 2 i staccato al 3), FreePats (banc 2) i el kit Muldjord (64).
   for (const [bankMSB, program] of [[2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57]])
     assert(bank.presets.some(p => p.bankMSB === bankMSB && p.program === program && !p.isGMGSDrum), `${bankMSB}:${program}`);
-  assert(bank.presets.some(p => p.program === 64 && p.isGMGSDrum));
+  assert(bank.presets.some(p => p.program === 69 && p.isGMGSDrum));
   for (const program of [16, 27, 28, 29, 30, 33, 34, 38, 56, 57, 59, 66, 81, 89]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));
   for (const [bankMSB, program] of [[1, 56], [1, 57]]) assert(bank.presets.some(p => p.bankMSB === bankMSB && p.program === program));
   for (const program of [0, 8, 16, 24, 32, 40]) assert(bank.presets.some(p => p.program === program && p.isGMGSDrum));
@@ -37,7 +37,7 @@ test('la interpretació és reproduïble, només activa els instruments seleccio
   const punkSpec = engine.composeSongPart({ ...settings, style: 'punk', bpm: 180 }, part);
   const punk = createPerformance(punkSpec);
   assert.equal(punk.channels.find(c => c.channel === 0).program, 30);
-  assert.equal(punk.channels.find(c => c.channel === 9).program, 64);
+  assert.equal(punk.channels.find(c => c.channel === 9).program, 69);
   const notes = punk.events.filter(e => e.type === 'on' && e.channel === 0).slice(0, 3).map(e => e.note).sort((a,b) => a-b);
   assert.equal(notes[1] - notes[0], 7); assert.equal(notes[2] - notes[0], 12);
   assert(ska.events.every(e => e.time >= 0 && e.time < spec.seconds));
@@ -194,4 +194,30 @@ test('el trombó i el clarinet gravats sonen de seguida (atac curt) per a les no
   const stac = bank.presets.find(p => p.bankMSB === 3 && p.program === 57);
   const keys = [...new Set(stac.zones[0].instrument.zones.map(z => z.sample.originalKey))].sort((a, b) => a - b);
   for (let k = 40; k <= 65; k++) assert(Math.min(...keys.map(n => Math.abs(n - k))) <= 2, `nota ${k}`);
+});
+
+test('banc addicional: bateries i baixos gravats al mateix nivell, Muldjord real i afinació greu', async () => {
+  const extraRaw = await readFile(new URL('../dist/assets/extra-instruments.sf2', import.meta.url));
+  assert(extraRaw.byteLength > 1000000 && extraRaw.byteLength < 20 * 1024 * 1024);
+  const extra = parseSoundBank(extraRaw.buffer.slice(extraRaw.byteOffset, extraRaw.byteOffset + extraRaw.byteLength));
+  for (const program of [66, 67, 68]) assert(extra.presets.some(p => p.isGMGSDrum && p.program === program), `kit ${program}`);
+  for (const [bankMSB, program] of [[2, 32], [4, 33]]) assert(extra.presets.some(p => !p.isGMGSDrum && p.bankMSB === bankMSB && p.program === program));
+  const db = channels => { let s = 0, n = 0; for (const c of channels) for (const x of c) { s += x * x; n++; } return 10 * Math.log10(s / n); };
+  const crossings = channels => { let z = 0; const c = channels[0]; for (let i = 1; i < c.length; i++) if ((c[i] >= 0) !== (c[i - 1] >= 0)) z++; return z; };
+  const drums = engine.composeSongPart({ seed: 3, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'verse', bars: 2, energy: 70, revision: 1, instruments: ['drums'] });
+  const render = (timbres, more = {}) => renderSampledPart(bank, { ...drums, timbres, ...more }, 16000, { extra, raw: true });
+  const reference = db(await render({ drums: 'standard' }));
+  const levels = {};
+  for (const kit of ['real', 'rusty', 'club', 'lofi']) levels[kit] = db(await render({ drums: kit }));
+  for (const [kit, level] of Object.entries(levels)) assert(Math.abs(level - reference) < 2.5, `${kit}: ${(level - reference).toFixed(1)} dB`);
+  // El kit Muldjord sona amb les seves mostres, no amb el kit GM estàndard.
+  assert.notEqual(crossings(await render({ drums: 'real' })), crossings(await render({ drums: 'standard' })));
+  // Afinació greu: menys passos per zero (so més greu).
+  assert(crossings(await render({ drums: 'rusty' }, { drumTune: -4 })) < crossings(await render({ drums: 'rusty' })) * .9);
+  const bassPart = engine.composeSongPart({ seed: 3, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'verse', bars: 2, energy: 70, revision: 1, instruments: ['bass'] });
+  const finger = db(await renderSampledPart(bank, { ...bassPart, timbres: { bass: 'finger' } }, 16000, { extra, raw: true }));
+  for (const bass of ['upright', 'growly']) {
+    const level = db(await renderSampledPart(bank, { ...bassPart, timbres: { bass } }, 16000, { extra, raw: true }));
+    assert(Math.abs(level - finger) < 3, `${bass}: ${(level - finger).toFixed(1)} dB`);
+  }
 });

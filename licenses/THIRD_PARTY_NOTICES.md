@@ -14,6 +14,17 @@ El build descarrega aquestes fonts (versions fixades a `real-instruments.json`, 
 - **Saxo tenor (versió reduïda)** — roberto@zenvoid.org per a FreePats, amb mostres de VSCO. CC0 1.0. https://freepats.zenvoid.org/Reed/saxophone.html
 - **Muldjord Kit** — © Lars Muldjord (www.muldjord.com, www.drumgizmo.org); versió SF2 de FreePats preparada per roberto@zenvoid.org. Llicència **Creative Commons Reconeixement 4.0 Internacional (CC BY 4.0)**: https://creativecommons.org/licenses/by/4.0/. Modificacions: s’ha construït un kit GM nou amb tres capes de força per cop, barrejant els dos canals en mono, remostrejant a 32 kHz i escurçant les cues dels plats. Llicència completa a MuldjordKit-LICENSE.txt.
 
+## Bateries i baixos addicionals (banc `extra-instruments.sf2`)
+
+Es baixen a part, només quan una cançó els fa servir. Tots són CC0 1.0 (domini públic); se citen igualment.
+
+- **Big Rusty Drums** — Karoryfer Lecolds. CC0 1.0. https://github.com/sfzinstruments/karoryfer.big-rusty-drums
+- **Virtuosity Drums** (kit de club i micròfon lo-fi) — Virtuosity Musical Instruments, bateria d’Austin McMahon. CC0 1.0. https://github.com/sfzinstruments/virtuosity_drums
+- **Meatbass** (contrabaix de 1958 en pizzicato) — Karoryfer Lecolds. CC0 1.0. https://github.com/sfzinstruments/karoryfer.meatbass
+- **Growlybass** (Squier Jazz Bass, directe) — Karoryfer Lecolds. CC0 1.0. https://github.com/sfzinstruments/karoryfer.growlybass
+
+Modificacions: selecció d’unes quantes capes de força per cop o nota (una sola gravació per capa), barreja dels micròfons en mono, remostreig (32 kHz bateries, 22 kHz baixos), retall de cues i igualació de sonoritat amb el kit Muldjord i el baix amb dits. Els FLAC es descodifiquen amb @wasm-audio-decoders/flac (MIT, només al build).
+
 ## Motor i biblioteques
 
 - SpessaSynth Core 4.4.9, Spessasus: https://github.com/spessasus/spessasynth_core
