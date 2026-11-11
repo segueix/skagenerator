@@ -123,6 +123,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
   const synth = new SpessaSynthProcessor(sampleRate, { eventsEnabled: false });
   try {
     synth.soundBankManager.addSoundBank(bank, 'generaluser');
+    // Banc addicional (bateries i baixos gravats que es baixen a part).
+    if (options.extra) synth.soundBankManager.addSoundBank(options.extra, 'extra');
     await synth.ready;
     // La melodia de veu fa servir un canal més enllà dels 16 del MIDI.
     while (synth.midiChannels.length <= Math.max(...score.channels.map(c => c.channel))) synth.createMIDIChannel();
@@ -130,6 +132,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       if (patch.drums) synth.midiChannels[patch.channel].setDrums(true);
       if (patch.bank) synth.controllerChange(patch.channel, 0, patch.bank);
       synth.programChange(patch.channel, patch.program);
+      // Bateria més greu: s'afina cada peça del kit (paràmetres de bateria GS/XG).
+      if (patch.drums && patch.tune) for (const param of synth.midiChannels[patch.channel].drumParams) param.pitchCoarse = patch.tune;
       synth.controllerChange(patch.channel, 7, patch.volume);
       synth.controllerChange(patch.channel, 10, patch.pan);
       // L'enviament a la reverberació segueix el volum de l'instrument.
@@ -147,7 +151,9 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     const BLOCK = 128, eqs = new Map(), dummy = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
     for (const patch of score.channels) {
       // La segona veu de vent amb saxo fa servir la corba del saxo.
-      const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, score.mix[patch.instrument], sampleRate);
+      // gainDb: guany fix del so triat (calibrat perquè tots els kits i baixos sonin al mateix nivell).
+      const user = patch.gainDb ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + patch.gainDb } : score.mix[patch.instrument];
+      const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, user, sampleRate);
       const fx = createGuitarFx(score.fx?.[patch.instrument], sampleRate);
       if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);
     }
@@ -211,6 +217,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // destroy() també buida els bancs que encara pertanyen al processador.
     // Desvincula el banc compartit perquè la secció següent conservi les mostres.
     synth.soundBankManager.deleteSoundBank('generaluser', false);
+    if (options.extra) synth.soundBankManager.deleteSoundBank('extra', false);
     synth.destroy();
   }
 }

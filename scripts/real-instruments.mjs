@@ -14,7 +14,7 @@ import {
 const CACHE = '.cache/real', RATE = 32000;
 const sha = data => createHash('sha256').update(data).digest('hex');
 
-async function download(url, expected) {
+export async function download(url, expected) {
   const file = join(CACHE, decodeURIComponent(url.split('/').pop()).replace(/[^\w.#+-]/g, '_'));
   try { const data = await readFile(file); if (!expected || sha(data) === expected) return file; } catch { /* Es descarrega. */ }
   for (let attempt = 1; ; attempt++) {
@@ -51,10 +51,10 @@ async function extractSf2(archive) {
   if (!file) throw new Error(`${archive} no conté cap SF2`);
   return file;
 }
-const loadBank = data => SoundBankLoader.fromArrayBuffer(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+export const loadBank = data => SoundBankLoader.fromArrayBuffer(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
 
 // ── Àudio ────────────────────────────────────────────────────────────
-function readWav(data) {
+export function readWav(data) {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   if (data.toString('ascii', 0, 4) !== 'RIFF' || data.toString('ascii', 8, 12) !== 'WAVE') throw new Error('WAV no vàlid');
   let offset = 12, format, channels, rate, bits, body, bodyLength;
@@ -113,7 +113,7 @@ function tightenAttack(data, rate) {
   for (let i = 0; i < Math.min(fade, out.length); i++) out[i] *= i / fade;
   return out;
 }
-function trim(data, rate, maxSeconds, keepFrom = 0) {
+export function trim(data, rate, maxSeconds, keepFrom = 0) {
   let peak = 0; for (const x of data) peak = Math.max(peak, Math.abs(x));
   let start = keepFrom;
   if (!keepFrom) { const gate = peak * .02; while (start < data.length && Math.abs(data[start]) < gate) start++; start = Math.max(0, start - Math.round(rate * .004)); }
@@ -137,7 +137,7 @@ function detectMidi(data, rate) {
   if (best < .5 || !bestLag) return null;
   return 69 + 12 * Math.log2(rate / bestLag / 440);
 }
-function makeSample(bank, name, data, rate, key, cents = 0, loop = null) {
+export function makeSample(bank, name, data, rate, key, cents = 0, loop = null) {
   const sample = new EmptySample();
   sample.name = name.slice(0, 19); sample.originalKey = key; sample.pitchCorrection = cents;
   sample.sampleType = SampleTypes.monoSample;
@@ -146,7 +146,7 @@ function makeSample(bank, name, data, rate, key, cents = 0, loop = null) {
   bank.addSamples(sample);
   return sample;
 }
-const timecents = seconds => Math.round(1200 * Math.log2(seconds));
+export const timecents = seconds => Math.round(1200 * Math.log2(seconds));
 // Sonoritat d'una mostra: la RMS més alta en finestres de 30 ms (val igual
 // per a una nota llarga que per a un cop d'staccato).
 function loudness(data, rate) {
@@ -159,7 +159,7 @@ function loudness(data, rate) {
 }
 // Iguala totes les notes: cada dinàmica té el mateix nivell a tota la tessitura
 // (les gravacions originals varien més de 20 dB d'una nota a l'altra).
-function level(data, rate, targetDb) {
+export function level(data, rate, targetDb) {
   const now = loudness(data, rate); if (!now) return;
   let peak = 0; for (const x of data) peak = Math.max(peak, Math.abs(x));
   const gain = Math.min(10 ** (targetDb / 20) / now, .95 / peak);

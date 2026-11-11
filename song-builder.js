@@ -50,6 +50,7 @@
     const settings = { style: sg.style, subgenre: key, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
     if (sg.fx) settings.fx = { guitar: { ...sg.fx }, guitar2: { ...sg.fx }, guitar3: { ...sg.fx } };
+    for (const option of ['drumTune', 'humanize', 'cymbals']) if (sg[option] !== undefined) settings[option] = sg[option];
     if (settings.swing === 0) delete settings.swing;
 
     // ── Estructura de 2 a 4 minuts ────────────────────────────────────
@@ -92,7 +93,10 @@
     // ── Moviments propis del subgènere (tempo, to, ritme) ─────────────
     const tempo = (sec, factor) => { if (sec) sec.bpm = Math.max(40, Math.min(240, Math.round(bpm * factor))); };
     if (key === 'jamaican') { tempo(sections[0], .88); }
-    if (key === 'rocksteady') { tempo(of('bridge')[0], .86); tempo(of('outro')[0], .9); }
+    // Rocksteady: estrofes amb cops d'aro en lloc de charles (sense platets); horror punk: intro de toms sense platets.
+    if (key === 'rocksteady') { tempo(of('bridge')[0], .86); tempo(of('outro')[0], .9); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
+    if (key === 'horrorpunk') sections[0].cymbals = 'none';
+    if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });
     if (key === 'twotone' || key === 'punk77') sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     if (key === 'skapunk') { const b = of('bridge')[0] || of('solo')[0]; if (b) b.feel = { drums: .5 }; tempo(lastChorus, 1.04); sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 1; }); }
     if (key === 'hardcore') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); tempo(of('bridge')[0], .5); }

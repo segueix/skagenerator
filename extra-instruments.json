@@ -1,0 +1,1858 @@
+{
+ "about": "Bateries i baixos gravats addicionals (CC0). Es carreguen a part, només quan una cançó els fa servir.",
+ "kits": [
+  {
+   "name": "Big Rusty Drums",
+   "author": "Karoryfer Lecolds",
+   "license": "CC0 1.0",
+   "program": 68,
+   "base": "https://raw.githubusercontent.com/sfzinstruments/karoryfer.big-rusty-drums/f07ce00df34a46b6b08375be56fe116cf15782bc/",
+   "pieces": {
+    "35": {
+     "seconds": 1.1,
+     "layers": [
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl4_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl7_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl7_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl11_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl11_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl14_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl14_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "36": {
+     "seconds": 1.1,
+     "layers": [
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl4_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl7_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl7_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl11_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl11_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/kick_24/kick/kick/k_vl14_rr1.flac",
+        1
+       ],
+       [
+        "Samples/kick_24/kick/oh/k_vl14_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "37": {
+     "seconds": 0.45,
+     "layers": [
+      [
+       [
+        "Samples/snare_14/sidestick/top/sn_ss_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/sidestick/oh/sn_ss_vl2_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/snare_14/sidestick/top/sn_ss_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/sidestick/oh/sn_ss_vl4_rr1.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "38": {
+     "seconds": 0.9,
+     "layers": [
+      [
+       [
+        "Samples/snare_14/center/top/sn_center_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/center/btm/sn_center_vl3_rr1.flac",
+        0.35
+       ],
+       [
+        "Samples/snare_14/center/oh/sn_center_vl3_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/snare_14/center/top/sn_center_vl5_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/center/btm/sn_center_vl5_rr1.flac",
+        0.35
+       ],
+       [
+        "Samples/snare_14/center/oh/sn_center_vl5_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/snare_14/center/top/sn_center_vl8_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/center/btm/sn_center_vl8_rr1.flac",
+        0.35
+       ],
+       [
+        "Samples/snare_14/center/oh/sn_center_vl8_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/snare_14/center/top/sn_center_vl10_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/center/btm/sn_center_vl10_rr1.flac",
+        0.35
+       ],
+       [
+        "Samples/snare_14/center/oh/sn_center_vl10_rr1.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "40": {
+     "seconds": 1,
+     "layers": [
+      [
+       [
+        "Samples/snare_14/rimshot/top/sn_rims_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/rimshot/btm/sn_rims_vl3_rr1.flac",
+        0.3
+       ],
+       [
+        "Samples/snare_14/rimshot/oh/sn_rims_vl3_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/snare_14/rimshot/top/sn_rims_vl6_rr1.flac",
+        1
+       ],
+       [
+        "Samples/snare_14/rimshot/btm/sn_rims_vl6_rr1.flac",
+        0.3
+       ],
+       [
+        "Samples/snare_14/rimshot/oh/sn_rims_vl6_rr1.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "41": {
+     "seconds": 1.8,
+     "layers": [
+      [
+       [
+        "Samples/tom_22/center/cl/t22_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_22/center/oh/t22_vl4_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/tom_22/center/cl/t22_vl7_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_22/center/oh/t22_vl7_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "42": {
+     "seconds": 0.4,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/hihat_14/tc/cl/ht_tc_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/hihat_14/tc/oh/ht_tc_vl3_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/hihat_14/tc/cl/ht_tc_vl5_rr1.flac",
+        1
+       ],
+       [
+        "Samples/hihat_14/tc/oh/ht_tc_vl5_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/hihat_14/tc/cl/ht_tc_vl8_rr1.flac",
+        1
+       ],
+       [
+        "Samples/hihat_14/tc/oh/ht_tc_vl8_rr1.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "43": {
+     "seconds": 1.8,
+     "layers": [
+      [
+       [
+        "Samples/tom_22/center/cl/t22_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_22/center/oh/t22_vl4_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/tom_22/center/cl/t22_vl7_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_22/center/oh/t22_vl7_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "44": {
+     "seconds": 0.35,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/hihat_14/phit/cl/ht_phit_rr1.flac",
+        1
+       ],
+       [
+        "Samples/hihat_14/phit/oh/ht_phit_rr1.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "45": {
+     "seconds": 1.5,
+     "layers": [
+      [
+       [
+        "Samples/tom_18/center/cl/t18_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_18/center/oh/t18_vl4_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/tom_18/center/cl/t18_vl8_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_18/center/oh/t18_vl8_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "46": {
+     "seconds": 1.4,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/hihat_14/open/cl/ht_open_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/hihat_14/open/oh/ht_open_vl3_rr1.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/hihat_14/open/cl/ht_open_vl6_rr1.flac",
+        1
+       ],
+       [
+        "Samples/hihat_14/open/oh/ht_open_vl6_rr1.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "47": {
+     "seconds": 1.5,
+     "layers": [
+      [
+       [
+        "Samples/tom_18/center/cl/t18_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_18/center/oh/t18_vl4_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/tom_18/center/cl/t18_vl8_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_18/center/oh/t18_vl8_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "48": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/tom_14/center/cl/t14_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_14/center/oh/t14_vl3_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/tom_14/center/cl/t14_vl6_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_14/center/oh/t14_vl6_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "49": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl3_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl3_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl5_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl5_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "50": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/tom_14/center/cl/t14_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_14/center/oh/t14_vl3_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/tom_14/center/cl/t14_vl6_rr1.flac",
+        1
+       ],
+       [
+        "Samples/tom_14/center/oh/t14_vl6_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "51": {
+     "seconds": 2.2,
+     "layers": [
+      [
+       [
+        "Samples/ride_22/rd/cl/rd_vl5_rr1.flac",
+        0.8
+       ],
+       [
+        "Samples/ride_22/rd/oh/rd_vl5_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/ride_22/rd/cl/rd_vl10_rr1.flac",
+        0.8
+       ],
+       [
+        "Samples/ride_22/rd/oh/rd_vl10_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "52": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl3_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl3_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl5_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl5_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "53": {
+     "seconds": 2,
+     "layers": [
+      [
+       [
+        "Samples/ride_22/bl/cl/rd_bl_vl4_rr1.flac",
+        0.8
+       ],
+       [
+        "Samples/ride_22/bl/oh/rd_bl_vl4_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "55": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl3_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl3_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl5_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl5_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "57": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl3_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl3_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/crash_17/cr/cl/cr_vl5_rr1.flac",
+        0.7
+       ],
+       [
+        "Samples/crash_17/cr/oh/cr_vl5_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "59": {
+     "seconds": 2.2,
+     "layers": [
+      [
+       [
+        "Samples/ride_22/rd/cl/rd_vl5_rr1.flac",
+        0.8
+       ],
+       [
+        "Samples/ride_22/rd/oh/rd_vl5_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/ride_22/rd/cl/rd_vl10_rr1.flac",
+        0.8
+       ],
+       [
+        "Samples/ride_22/rd/oh/rd_vl10_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "name": "Virtuosity Club",
+   "author": "Virtuosity Musical Instruments",
+   "license": "CC0 1.0",
+   "program": 66,
+   "base": "https://raw.githubusercontent.com/sfzinstruments/virtuosity_drums/9f04cf9a734527edfbb0a4eee1f674e45bbf71bc/",
+   "pieces": {
+    "35": {
+     "seconds": 1,
+     "layers": [
+      [
+       [
+        "Samples/kickmic/kick/kickmic_kick_snon_vl1_rr1.flac",
+        1
+       ],
+       [
+        "Samples/oh/kick/oh_kick_snon_vl1_rr1.flac",
+        0.4
+       ],
+       [
+        "Samples/room/kick/room_kick_snon_vl1_rr1.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/kickmic/kick/kickmic_kick_snon_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/oh/kick/oh_kick_snon_vl3_rr1.flac",
+        0.4
+       ],
+       [
+        "Samples/room/kick/room_kick_snon_vl3_rr1.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/kickmic/kick/kickmic_kick_snon_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/oh/kick/oh_kick_snon_vl4_rr1.flac",
+        0.4
+       ],
+       [
+        "Samples/room/kick/room_kick_snon_vl4_rr1.flac",
+        0.35
+       ]
+      ]
+     ]
+    },
+    "36": {
+     "seconds": 1,
+     "layers": [
+      [
+       [
+        "Samples/kickmic/kick/kickmic_kick_snon_vl1_rr1.flac",
+        1
+       ],
+       [
+        "Samples/oh/kick/oh_kick_snon_vl1_rr1.flac",
+        0.4
+       ],
+       [
+        "Samples/room/kick/room_kick_snon_vl1_rr1.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/kickmic/kick/kickmic_kick_snon_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/oh/kick/oh_kick_snon_vl3_rr1.flac",
+        0.4
+       ],
+       [
+        "Samples/room/kick/room_kick_snon_vl3_rr1.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/kickmic/kick/kickmic_kick_snon_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/oh/kick/oh_kick_snon_vl4_rr1.flac",
+        0.4
+       ],
+       [
+        "Samples/room/kick/room_kick_snon_vl4_rr1.flac",
+        0.35
+       ]
+      ]
+     ]
+    },
+    "37": {
+     "seconds": 0.45,
+     "layers": [
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_crossstick_vl8.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_crossstick_vl8.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_crossstick_vl8.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_crossstick_vl16.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_crossstick_vl16.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_crossstick_vl16.flac",
+        0.35
+       ]
+      ]
+     ]
+    },
+    "38": {
+     "seconds": 0.9,
+     "layers": [
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_center_vl9.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_center_vl9.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_center_vl9.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_center_vl18.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_center_vl18.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_center_vl18.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_center_vl27.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_center_vl27.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_center_vl27.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_center_vl36.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_center_vl36.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_center_vl36.flac",
+        0.35
+       ]
+      ]
+     ]
+    },
+    "40": {
+     "seconds": 1,
+     "layers": [
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_rimshot_vl6.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_rimshot_vl6.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_rimshot_vl6.flac",
+        0.35
+       ]
+      ],
+      [
+       [
+        "Samples/snaremic/snare/snaremic_snare_rimshot_vl12.flac",
+        1
+       ],
+       [
+        "Samples/oh/snare/oh_snare_rimshot_vl12.flac",
+        0.45
+       ],
+       [
+        "Samples/room/snare/room_snare_rimshot_vl12.flac",
+        0.35
+       ]
+      ]
+     ]
+    },
+    "41": {
+     "seconds": 1.6,
+     "layers": [
+      [
+       [
+        "Samples/oh/ltom/oh_ltom_center_vl8.flac",
+        1
+       ],
+       [
+        "Samples/room/ltom/room_ltom_center_vl8.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/oh/ltom/oh_ltom_center_vl16.flac",
+        1
+       ],
+       [
+        "Samples/room/ltom/room_ltom_center_vl16.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "42": {
+     "seconds": 0.4,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/oh/hh/oh_hh_closed_vl1_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/hh/room_hh_closed_vl1_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/hh/oh_hh_closed_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/hh/room_hh_closed_vl3_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/hh/oh_hh_closed_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/hh/room_hh_closed_vl4_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "43": {
+     "seconds": 1.6,
+     "layers": [
+      [
+       [
+        "Samples/oh/ltom/oh_ltom_center_vl8.flac",
+        1
+       ],
+       [
+        "Samples/room/ltom/room_ltom_center_vl8.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/oh/ltom/oh_ltom_center_vl16.flac",
+        1
+       ],
+       [
+        "Samples/room/ltom/room_ltom_center_vl16.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "44": {
+     "seconds": 0.35,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/oh/hh/oh_hh_pedal_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/hh/room_hh_pedal_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "45": {
+     "seconds": 1.6,
+     "layers": [
+      [
+       [
+        "Samples/oh/ltom/oh_ltom_center_vl8.flac",
+        1
+       ],
+       [
+        "Samples/room/ltom/room_ltom_center_vl8.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/oh/ltom/oh_ltom_center_vl16.flac",
+        1
+       ],
+       [
+        "Samples/room/ltom/room_ltom_center_vl16.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "46": {
+     "seconds": 1.4,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/oh/hh/oh_hh_open_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/hh/room_hh_open_vl2_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/hh/oh_hh_open_vl4_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/hh/room_hh_open_vl4_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "47": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/oh/htom/oh_htom_center_vl8.flac",
+        1
+       ],
+       [
+        "Samples/room/htom/room_htom_center_vl8.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/oh/htom/oh_htom_center_vl16.flac",
+        1
+       ],
+       [
+        "Samples/room/htom/room_htom_center_vl16.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "48": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/oh/htom/oh_htom_center_vl8.flac",
+        1
+       ],
+       [
+        "Samples/room/htom/room_htom_center_vl8.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/oh/htom/oh_htom_center_vl16.flac",
+        1
+       ],
+       [
+        "Samples/room/htom/room_htom_center_vl16.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "49": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl2_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "50": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/oh/htom/oh_htom_center_vl8.flac",
+        1
+       ],
+       [
+        "Samples/room/htom/room_htom_center_vl8.flac",
+        0.5
+       ]
+      ],
+      [
+       [
+        "Samples/oh/htom/oh_htom_center_vl16.flac",
+        1
+       ],
+       [
+        "Samples/room/htom/room_htom_center_vl16.flac",
+        0.5
+       ]
+      ]
+     ]
+    },
+    "51": {
+     "seconds": 2.2,
+     "layers": [
+      [
+       [
+        "Samples/oh/ride/oh_ride_ride_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/ride/room_ride_ride_vl2_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/ride/oh_ride_ride_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/ride/room_ride_ride_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "52": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl2_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "53": {
+     "seconds": 2,
+     "layers": [
+      [
+       [
+        "Samples/oh/ride/oh_ride_bell_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/ride/room_ride_bell_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "55": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl2_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "57": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl2_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/crash/oh_crash_crash_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/crash/room_crash_crash_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    },
+    "59": {
+     "seconds": 2.2,
+     "layers": [
+      [
+       [
+        "Samples/oh/ride/oh_ride_ride_vl2_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/ride/room_ride_ride_vl2_rr1.flac",
+        0.45
+       ]
+      ],
+      [
+       [
+        "Samples/oh/ride/oh_ride_ride_vl3_rr1.flac",
+        1
+       ],
+       [
+        "Samples/room/ride/room_ride_ride_vl3_rr1.flac",
+        0.45
+       ]
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "name": "Virtuosity Lo-fi",
+   "author": "Virtuosity Musical Instruments",
+   "license": "CC0 1.0",
+   "program": 67,
+   "base": "https://raw.githubusercontent.com/sfzinstruments/virtuosity_drums/9f04cf9a734527edfbb0a4eee1f674e45bbf71bc/",
+   "pieces": {
+    "35": {
+     "seconds": 1,
+     "layers": [
+      [
+       [
+        "Samples/lofi/kick/lofi_kick_snon_vl1_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/kick/lofi_kick_snon_vl3_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/kick/lofi_kick_snon_vl4_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "36": {
+     "seconds": 1,
+     "layers": [
+      [
+       [
+        "Samples/lofi/kick/lofi_kick_snon_vl1_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/kick/lofi_kick_snon_vl3_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/kick/lofi_kick_snon_vl4_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "37": {
+     "seconds": 0.45,
+     "layers": [
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_crossstick_vl8.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_crossstick_vl16.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "38": {
+     "seconds": 0.9,
+     "layers": [
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_center_vl9.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_center_vl18.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_center_vl27.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_center_vl36.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "40": {
+     "seconds": 1,
+     "layers": [
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_rimshot_vl6.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/snare/lofi_snare_rimshot_vl12.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "41": {
+     "seconds": 1.6,
+     "layers": [
+      [
+       [
+        "Samples/lofi/ltom/lofi_ltom_center_vl8.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/ltom/lofi_ltom_center_vl16.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "42": {
+     "seconds": 0.4,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/lofi/hh/lofi_hh_closed_vl1_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/hh/lofi_hh_closed_vl3_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/hh/lofi_hh_closed_vl4_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "43": {
+     "seconds": 1.6,
+     "layers": [
+      [
+       [
+        "Samples/lofi/ltom/lofi_ltom_center_vl8.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/ltom/lofi_ltom_center_vl16.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "44": {
+     "seconds": 0.35,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/lofi/hh/lofi_hh_pedal_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "45": {
+     "seconds": 1.6,
+     "layers": [
+      [
+       [
+        "Samples/lofi/ltom/lofi_ltom_center_vl8.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/ltom/lofi_ltom_center_vl16.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "46": {
+     "seconds": 1.4,
+     "choke": 1,
+     "layers": [
+      [
+       [
+        "Samples/lofi/hh/lofi_hh_open_vl2_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/hh/lofi_hh_open_vl4_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "47": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/lofi/htom/lofi_htom_center_vl8.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/htom/lofi_htom_center_vl16.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "48": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/lofi/htom/lofi_htom_center_vl8.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/htom/lofi_htom_center_vl16.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "49": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl2_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "50": {
+     "seconds": 1.3,
+     "layers": [
+      [
+       [
+        "Samples/lofi/htom/lofi_htom_center_vl8.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/htom/lofi_htom_center_vl16.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "51": {
+     "seconds": 2.2,
+     "layers": [
+      [
+       [
+        "Samples/lofi/ride/lofi_ride_ride_vl2_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/ride/lofi_ride_ride_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "52": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl2_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "53": {
+     "seconds": 2,
+     "layers": [
+      [
+       [
+        "Samples/lofi/ride/lofi_ride_bell_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "55": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl2_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "57": {
+     "seconds": 2.4,
+     "layers": [
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl2_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/crash/lofi_crash_crash_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    },
+    "59": {
+     "seconds": 2.2,
+     "layers": [
+      [
+       [
+        "Samples/lofi/ride/lofi_ride_ride_vl2_rr1.flac",
+        1
+       ]
+      ],
+      [
+       [
+        "Samples/lofi/ride/lofi_ride_ride_vl3_rr1.flac",
+        1
+       ]
+      ]
+     ]
+    }
+   }
+  }
+ ],
+ "basses": [
+  {
+   "name": "Contrabaix Meatbass",
+   "author": "Karoryfer Lecolds",
+   "license": "CC0 1.0",
+   "bank": 2,
+   "program": 32,
+   "rate": 22050,
+   "maxSeconds": 1.8,
+   "release": 0.12,
+   "levelDb": [
+    -9,
+    -13
+   ],
+   "base": "https://raw.githubusercontent.com/sfzinstruments/karoryfer.meatbass/ac9e859564bda286ab5ec672d00ff1aa2fef2895/",
+   "notes": [
+    {
+     "key": 21,
+     "layers": [
+      "Samples/pizz/a0_vl2_rr1.wav",
+      "Samples/pizz/a0_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 24,
+     "layers": [
+      "Samples/pizz/c1_vl2_rr1.wav",
+      "Samples/pizz/c1_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 27,
+     "layers": [
+      "Samples/pizz/eb1_vl2_rr1.wav",
+      "Samples/pizz/eb1_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 30,
+     "layers": [
+      "Samples/pizz/gb1_vl2_rr1.wav",
+      "Samples/pizz/gb1_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 33,
+     "layers": [
+      "Samples/pizz/a1_vl2_rr1.wav",
+      "Samples/pizz/a1_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 36,
+     "layers": [
+      "Samples/pizz/c2_vl2_rr1.wav",
+      "Samples/pizz/c2_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 39,
+     "layers": [
+      "Samples/pizz/eb2_vl2_rr1.wav",
+      "Samples/pizz/eb2_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 42,
+     "layers": [
+      "Samples/pizz/gb2_vl2_rr1.wav",
+      "Samples/pizz/gb2_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 45,
+     "layers": [
+      "Samples/pizz/a2_vl2_rr1.wav",
+      "Samples/pizz/a2_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 48,
+     "layers": [
+      "Samples/pizz/c3_vl2_rr1.wav",
+      "Samples/pizz/c3_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 51,
+     "layers": [
+      "Samples/pizz/eb3_vl2_rr1.wav",
+      "Samples/pizz/eb3_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 54,
+     "layers": [
+      "Samples/pizz/gb3_vl2_rr1.wav",
+      "Samples/pizz/gb3_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 57,
+     "layers": [
+      "Samples/pizz/a3_vl2_rr1.wav",
+      "Samples/pizz/a3_vl4_rr1.wav"
+     ]
+    },
+    {
+     "key": 60,
+     "layers": [
+      "Samples/pizz/c4_vl2_rr1.wav",
+      "Samples/pizz/c4_vl4_rr1.wav"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Baix Growlybass",
+   "author": "Karoryfer Lecolds",
+   "license": "CC0 1.0",
+   "bank": 4,
+   "program": 33,
+   "rate": 22050,
+   "maxSeconds": 2,
+   "release": 0.1,
+   "levelDb": [
+    -9,
+    -13
+   ],
+   "base": "https://raw.githubusercontent.com/sfzinstruments/karoryfer.growlybass/4f483268fc66b5a6d5781d421c0d11b8d08d3fc6/",
+   "notes": [
+    {
+     "key": 25,
+     "layers": [
+      "sustain/db2_p_rr1.wav",
+      "sustain/db2_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 28,
+     "layers": [
+      "sustain/e2_p_rr1.wav",
+      "sustain/e2_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 30,
+     "layers": [
+      "sustain/gb2_p_rr1.wav",
+      "sustain/gb2_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 33,
+     "layers": [
+      "sustain/a2_p_rr1.wav",
+      "sustain/a2_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 36,
+     "layers": [
+      "sustain/c3_p_rr1.wav",
+      "sustain/c3_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 39,
+     "layers": [
+      "sustain/eb3_p_rr1.wav",
+      "sustain/eb3_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 42,
+     "layers": [
+      "sustain/gb3_p_rr1.wav",
+      "sustain/gb3_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 45,
+     "layers": [
+      "sustain/a3_p_rr1.wav",
+      "sustain/a3_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 48,
+     "layers": [
+      "sustain/c4_p_rr1.wav",
+      "sustain/c4_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 51,
+     "layers": [
+      "sustain/eb4_p_rr1.wav",
+      "sustain/eb4_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 54,
+     "layers": [
+      "sustain/gb4_p_rr1.wav",
+      "sustain/gb4_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 57,
+     "layers": [
+      "sustain/a4_p_rr1.wav",
+      "sustain/a4_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 60,
+     "layers": [
+      "sustain/c5_p_rr1.wav",
+      "sustain/c5_ff_rr1.wav"
+     ]
+    },
+    {
+     "key": 63,
+     "layers": [
+      "sustain/eb5_p_rr1.wav",
+      "sustain/eb5_ff_rr1.wav"
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -77,7 +77,7 @@ test('la cançó automàtica compon cançons senceres de 2 a 4 minuts per a cada
       const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: h, groove: { ...song.settings.groove, ...(sec.groove || {}) },
         instruments: [...song.base.instruments, ...active.map(c => c.instrument)], layers: Object.fromEntries(active.map(c => [c.instrument, c.revision])) };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
-      for (const f of ['bpm', 'transpose', 'feel']) if (sec[f] !== undefined) part[f] = sec[f];
+      for (const f of ['bpm', 'transpose', 'feel', 'cymbals']) if (sec[f] !== undefined) part[f] = sec[f];
       if (Object.keys(lineModes).length) part.lineModes = lineModes;
       const spec = engine.composeSongPart(song.settings, part);
       assert(createPerformance(spec).events.length > 0);

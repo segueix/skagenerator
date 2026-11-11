@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache
-          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs') }}
+          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs', 'extra-instruments.json', 'scripts/extra-instruments.mjs') }}
           restore-keys: soundbanks-
       - name: Passar els tests
         run: npm test
@@ -41,6 +41,7 @@ jobs:
           test -s dist/index.html
           test -s dist/sample-worker.js
           test -s dist/assets/generaluser-ska-punk.sf2
+          test -s dist/assets/extra-instruments.sf2
       - name: Configurar Pages
         uses: actions/configure-pages@v5
       - name: Pujar els fitxers compilats

@@ -11,11 +11,13 @@ function createPerformance(spec) {
     || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ', 'guitar2', 'guitar3', 'vocal'].includes(i))) throw new Error('Partitura no vàlida');
   // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
   // FreePats); banc 3: staccato de VSCO; banc 1: variacions GS; banc 0: GM.
-  // Kit 64: Muldjord (gravat). La resta són sons de GeneralUser GS.
+  // Kit 69: Muldjord (gravat; els programes 64 i 65 són els «User Drum Set» GS del sintetitzador). Banc addicional (CC0, es baixa a part): kits 68 Big Rusty,
+  // 66 Virtuosity club i 67 Virtuosity lo-fi; contrabaix [2,32] Meatbass i baix [4,33]
+  // Growlybass. La resta són sons de GeneralUser GS.
   const presets = {
     guitar: { auto: null, clean: [2, 27], cleanGm: [0, 27], muted: [0, 28], overdrive: [0, 29], distortion: [0, 30] },
-    bass: { auto: null, finger: [2, 33], pick: [2, 34], fingerGm: [0, 33], pickGm: [0, 34] },
-    drums: { auto: null, real: [0, 64], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
+    bass: { auto: null, finger: [2, 33], pick: [2, 34], upright: [2, 32], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
+    drums: { auto: null, real: [0, 69], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
     // La segona veu de vent sona per defecte amb saxo tenor gravat: articulació més
     // clara que la vara del trombó. El trombó gravat (VSCO) queda com a opció.
@@ -29,6 +31,14 @@ function createPerformance(spec) {
     || Object.entries(spec.timbres).some(([family, preset]) => !Object.hasOwn(presets, family) || !Object.hasOwn(presets[family], preset))))
     throw new Error('Timbres no vàlids');
   const chosen = family => presets[family][spec.timbres?.[family] || 'auto'];
+  // Platets: 'all' (tots), 'hats' (només el charles, sense plats), 'none' (sense
+  // cap platet) o 'rim' (sense platets i el pols del charles fet amb l'aro).
+  const CYMBALS = ['all', 'hats', 'none', 'rim'];
+  if (spec.cymbals !== undefined && !CYMBALS.includes(spec.cymbals)) throw new Error('Opció de platets no vàlida');
+  // Afinació de la bateria en semitons (negatiu = més greu).
+  if (spec.drumTune !== undefined && (!Number.isInteger(spec.drumTune) || spec.drumTune < -6 || spec.drumTune > 3)) throw new Error('Afinació de bateria no vàlida');
+  // Humanització: 0 = quantitzat (màquina), 1 = músics amb força personalitat.
+  if (spec.humanize !== undefined && (!Number.isFinite(spec.humanize) || spec.humanize < 0 || spec.humanize > 1)) throw new Error('Humanització no vàlida');
   const random = rng(spec.seed), punk = spec.style === 'punk', beat = spec.beat, bar = beat * 4;
   const has = name => spec.instruments.includes(name), energy = .55 + spec.energy / 200;
   const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
@@ -55,8 +65,8 @@ function createPerformance(spec) {
     { channel: 5, program: 81, pan: 58, volume: 106 },
     { channel: 6, program: 89, pan: 76, volume: 90 },
     { channel: 7, program: 38, pan: 64, volume: 110 },
-    { channel: 10, program: 24, pan: 64, volume: 106, drums: true },
-    { ...patch(9, chosen('drums') ?? [0, 64], 64, 106), drums: true }
+    { channel: 10, program: 24, pan: 64, volume: 106, drums: true, ...(spec.drumTune ? { tune: spec.drumTune } : {}) },
+    { ...patch(9, chosen('drums') ?? [0, 69], 64, 106), drums: true, ...(spec.drumTune ? { tune: spec.drumTune } : {}) }
   ];
   // Un instrument amb trams només sona dins d'aquests compassos.
   function audible(channel, start) {
@@ -90,12 +100,58 @@ function createPerformance(spec) {
   function note(channel, pitch, start, duration, velocity, jitter = .004, exact = false) {
     for (const [at, length, tone] of feel(channel, swung(start), duration, pitch)) play(channel, tone, at, length, velocity, jitter, exact);
   }
+  // ── Humanització del ritme ────────────────────────────────────────
+  // Cada músic té la seva manera de tocar respecte del temps (ms):
+  // [desplaçament fix (+ = darrere del temps), deriva lenta, variació nota a nota, variació de força (%)].
+  // A l'ska el baix i els metalls van una mica endarrerits (relaxats) i la caixa
+  // arrossega; al punk la guitarra i la bateria empenyen endavant.
+  const human = spec.humanize ?? .5;
+  const FEEL = {
+    drums: [0, 3, 2.6, 8], electronicDrums: [0, 0, .4, 3],
+    bass: [spec.style === 'ska' ? 9 : punk ? -1 : 4, 4, 3.5, 8], synthBass: [0, .5, .5, 2],
+    guitar: [punk ? -4 : 3, 4, 3.5, 9], guitar2: [punk ? -3 : 5, 4, 4.5, 9], guitar3: [2, 5, 6, 10], organ: [5, 4, 5, 8],
+    trumpet: [punk ? 3 : 9, 7, 8, 9], trombone: [punk ? 4 : 11, 7, 8, 9], sax: [punk ? 4 : 10, 7, 8, 9], vocal: [12, 8, 9, 9],
+    synthLead: [0, 1, 1, 3], synthPad: [0, 0, 0, 0]
+  };
+  // Als tempos ràpids els músics han de ser més justos: les desviacions s'escalen amb el temps de negra.
+  const tempoScale = Math.max(.55, Math.min(1.15, beat / .43));
+  // Membres de la bateria: peu (bombo i pedal del charles), mà de la caixa, mà dels platets i toms.
+  const limb = (channel, pitch) => channel !== 9 && channel !== 10 ? 0 : [35, 36, 44].includes(pitch) ? 1 : [37, 38, 39, 40].includes(pitch) ? 2 : [42, 46, 51, 53, 59].includes(pitch) ? 3 : 4;
+  // Deriva lenta i contínua (suma de sinusoides amb fases pròpies de cada músic):
+  // un humà s'avança o s'endarrereix uns quants mil·lisegons durant uns compassos.
+  const phases = new Map(), seedBase = (spec.seed >>> 0) || 1;
+  function drift(key, t) {
+    if (!phases.has(key)) { const r = rng(seedBase * 31 + key * 977); phases.set(key, [r(), r(), r()].map(x => x * Math.PI * 2)); }
+    const [a, b, c] = phases.get(key);
+    return (.55 * Math.sin(2 * Math.PI * .09 * t + a) + .3 * Math.sin(2 * Math.PI * .23 * t + b) + .15 * Math.sin(2 * Math.PI * .51 * t + c));
+  }
+  const gauss = () => (random() + random() + random() - 1.5) / .5; // aproximadament normal, σ ≈ 1
+  function humanTime(channel, pitch, start) {
+    const name = instrumentOf[channel], [offset, slow, jitter] = FEEL[name] || [0, 0, 0], member = limb(channel, pitch);
+    // El bombo és el més regular; la mà del charles és la que més respira.
+    const limbScale = member === 1 ? .6 : member === 3 ? 1.2 : 1;
+    return human * tempoScale * limbScale * (offset + slow * drift(channel * 8 + member, start) + jitter * gauss()) / 1000;
+  }
+  function humanVelocity(channel, pitch, start, velocity) {
+    const name = instrumentOf[channel], spread = (FEEL[name] || [0, 0, 0, 0])[3] / 100;
+    let v = velocity * (1 + human * (spread * gauss() + .05 * drift(channel * 8 + 7, start)));
+    // Accents mètrics al charles i al ride: més fort a la parte del temps, més suau a les semicorxeres.
+    if ((channel === 9 || channel === 10) && [42, 44, 46, 51, 59].includes(pitch)) {
+      const frac = (start / beat) % 1;
+      v *= 1 + human * (frac < .08 || frac > .92 ? .1 : Math.abs(frac - .5) < .08 ? -.02 : -.14);
+    }
+    return v;
+  }
   function play(channel, pitch, start, duration, velocity, jitter, exact) {
     if (start >= spec.seconds || !audible(channel, start)) return;
-    const at = Math.max(0, Math.min(spec.seconds - .02, start + (random() - .5) * jitter));
+    // jitter 0 = instrument electrònic, a temps exacte.
+    // Humanització 0 = quantitzat: temps i força exactes, com una caixa de ritmes.
+    const shift = jitter === 0 || !human ? 0 : humanTime(channel, pitch, start);
+    const at = Math.max(0, Math.min(spec.seconds - .02, start + shift));
     const end = Math.min(spec.seconds - .005, at + Math.max(.025, duration));
     const midi = Math.max(0, Math.min(127, Math.round(pitch)));
-    const vel = Math.max(1, Math.min(127, Math.round(exact ? velocity : velocity * energy + (random() - .5) * 9)));
+    const vel = Math.max(1, Math.min(127, Math.round(exact ? velocity
+      : !human ? velocity * energy : humanVelocity(channel, midi, start, velocity * energy))));
     events.push({ time: at, type: 'on', channel, note: midi, velocity: vel });
     events.push({ time: end, type: 'off', channel, note: midi });
   }
@@ -213,7 +269,19 @@ function createPerformance(spec) {
     for (const t of [.75, 1.75, 2.25, 3.25]) if (!hits.has(`${t}:38`) && !hits.has(`${t}:37`) && random() < .4)
       note(9, 38, (b * 4 + t) * beat + snareFeel, .05, 22 + random() * 10, .004);
   }
-  for (const [b, t, drum, force] of spec.drumLine || []) {
+  // Sense platets: els plats desapareixen; amb 'none' o 'rim' també el charles
+  // ('rim' en manté el pols amb cops d'aro suaus).
+  const cymbalMode = spec.cymbals || 'all', CYMBAL_NOTES = [49, 51, 52, 53, 55, 57, 59], HAT_NOTES = [42, 44, 46];
+  for (const [b, t, rawDrum, rawForce] of spec.drumLine || []) {
+    let drum = rawDrum, force = rawForce;
+    if (cymbalMode !== 'all' && CYMBAL_NOTES.includes(drum)) {
+      // L'accent del plat passa al bombo (si no n'hi ha ja un).
+      if (drum === 49 || drum === 57 || drum === 52 || drum === 55) { if (!drumBars.get(b)?.has(`${t}:36`)) { drum = 36; force = Math.min(force, 100); } else continue; }
+      else if (cymbalMode === 'rim') { drum = 37; force *= .6; } else if (cymbalMode === 'hats') { drum = 42; } else continue;
+    } else if ((cymbalMode === 'none' || cymbalMode === 'rim') && HAT_NOTES.includes(drum)) {
+      if (cymbalMode === 'none' || drum === 44 || drumBars.get(b)?.has(`${t}:38`)) continue;
+      force *= drum === 46 ? .75 : .55; drum = 37;
+    }
     const at = (b * 4 + t) * beat + (drum === 38 || drum === 37 ? snareFeel : 0), length = drum === 49 ? 1.4 : drum === 46 || drum === 51 ? beat * .45 : .09;
     if (has('drums')) note(9, drum, at, length, force, .003);
     if (has('electronicDrums')) {
@@ -268,7 +336,11 @@ function createPerformance(spec) {
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
   const level = { '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
+  // Guany fix (dB) dels kits i baixos gravats addicionals: calibrat amb parts reals
+  // perquè sonin al mateix nivell que el kit GM i el baix amb dits.
+  const boost = { '0:69': 7.4, '0:68': 7.2, '0:66': 6.8, '0:67': 8.1, '2:32': 1.2, '4:33': 5.5 };
   channels.forEach(entry => { entry.instrument = instrumentOf[entry.channel]; entry.bank ??= 0; entry.volume = level[`${entry.bank}:${entry.program}`] ?? entry.volume;
+    if (boost[`${entry.bank}:${entry.program}`] && (entry.channel === 9 || entry.channel === 2)) entry.gainDb = boost[`${entry.bank}:${entry.program}`];
     // Saxo fent de segona veu: registre més greu, necessita més volum per sentir-se.
     if (entry.channel === 4 && entry.bank === 2 && entry.program === 66) entry.volume = 110; });
   // Estil Misfits: les dues guitarres igual de fortes i obertes a banda i banda.

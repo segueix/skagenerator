@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BasicSoundBank, SoundBankLoader, SpessaLog } from 'spessasynth_core';
 import { buildRealInstruments } from './real-instruments.mjs';
+import { buildExtraInstruments, loadBank } from './extra-instruments.mjs';
+import extra from '../extra-instruments.json' with { type: 'json' };
 import real from '../real-instruments.json' with { type: 'json' };
 import source from '../soundbank-source.json' with { type: 'json' };
 
@@ -40,8 +42,14 @@ export async function prepareSoundBank() {
   const info = { name: source.name, version: source.version, bytes: subset.byteLength,
     sha256: createHash('sha256').update(new Uint8Array(subset)).digest('hex'),
     sourceCommit: source.commit, presets: merged.presets.map(({ name, program, isGMGSDrum }) => ({ name, program, drums: isGMGSDrum })) };
+  // Bateries i baixos addicionals: fitxer a part, carregat només si la cançó els fa servir.
+  const extraBinary = await buildExtraInstruments(structuredClone(extra));
+  if (extraBinary.byteLength >= 20 * 1024 * 1024) throw new Error('El banc addicional supera el límit');
+  await writeFile('dist/assets/extra-instruments.sf2', extraBinary);
+  info.extra = { bytes: extraBinary.byteLength, sha256: createHash('sha256').update(extraBinary).digest('hex'),
+    presets: loadBank(Buffer.from(extraBinary)).presets.map(({ name, program, bankMSB, isGMGSDrum }) => ({ name, program, bank: bankMSB, drums: isGMGSDrum })) };
   await writeFile('dist/assets/soundbank.json', JSON.stringify(info, null, 2));
-  console.log(`Mostres preparades: ${(subset.byteLength / 1024 / 1024).toFixed(1)} MB, ${merged.presets.length} instruments i kits.`);
+  console.log(`Mostres preparades: ${(subset.byteLength / 1024 / 1024).toFixed(1)} MB, ${merged.presets.length} instruments i kits; banc addicional ${(extraBinary.byteLength / 1024 / 1024).toFixed(1)} MB.`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) await prepareSoundBank();
