@@ -150,6 +150,46 @@ export function createGuitarFx(fx, sampleRate) {
   };
 }
 
+// ── Efectes de color (vents i guitarres) ──────────────────────────────
+// El so de l'instrument passa per un aparell: filtres de banda (pas alt i pas
+// baix de 12 dB/oct), la ressonància de l'altaveu o de la botzina i una
+// saturació pròpia. El nivell es compensa com als efectes de guitarra i la
+// reverberació es redueix (l'aparell sona sec i a prop).
+const COLORS = {
+  // Ràdio de vàlvules: banda de 320 Hz a 3,4 kHz i saturació suau.
+  radio: { hp: 320, lp: 3400, peak: [1400, 5, 1.1], drive: 2.2, curve: x => Math.tanh(x), reverb: .35 },
+  // Megàfon: molt estret, botzina a 2 kHz i saturació dura.
+  megaphone: { hp: 650, lp: 4200, peak: [2000, 9, 1.4], drive: 4, curve: x => Math.max(-.7, Math.min(.7, x)) * 1.2, reverb: .25 },
+  // Telèfon: de 420 Hz a 2,9 kHz, prim i sec.
+  telephone: { hp: 420, lp: 2900, peak: [1800, 3, 1], drive: 1.6, curve: x => Math.tanh(x), reverb: .15 },
+  // Gramòfon (disc antic): sense greus ni aguts, botzina a 1 kHz.
+  gramophone: { hp: 220, lp: 4800, peak: [1000, 6, .8], drive: 1.8, curve: x => x / (1 + Math.abs(x)), reverb: .5 }
+};
+export const COLOR_TYPES = Object.keys(COLORS);
+export function createColorFx(type, sampleRate) {
+  const def = COLORS[type];
+  if (!def) return null;
+  const lp = Math.min(sampleRate * .45, def.lp);
+  const side = () => ({
+    hp1: biquad('highpass', def.hp, 0, sampleRate, .7), hp2: biquad('highpass', def.hp, 0, sampleRate, .7),
+    lp1: biquad('lowpass', lp, 0, sampleRate, .7), lp2: biquad('lowpass', lp, 0, sampleRate, .7),
+    peak: biquad('peak', def.peak[0], def.peak[1], sampleRate, def.peak[2]), inLevel: 1e-6, outLevel: 1e-6
+  });
+  const sides = [side(), side()], smooth = Math.exp(-1 / (.06 * sampleRate));
+  return {
+    reverb: def.reverb,
+    process(index, x) {
+      const s = sides[index];
+      let y = run(s.peak, run(s.hp2, run(s.hp1, x)));
+      y = run(s.lp2, run(s.lp1, def.curve(y * def.drive)));
+      s.inLevel = smooth * s.inLevel + (1 - smooth) * x * x;
+      s.outLevel = smooth * s.outLevel + (1 - smooth) * y * y;
+      return y * Math.min(8, Math.sqrt(s.inLevel / s.outLevel));
+    }
+  };
+}
+const colorFor = (score, patch) => patch.clipColor ?? score.colors?.[patch.instrument];
+
 // Efecte d'un canal: el de l'instrument, amb el retoc propi de la segona presa d'una guitarra doblada.
 function fxFor(score, patch) {
   const fx = patch.clipFx ?? score.fx?.[patch.instrument];
@@ -179,7 +219,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       // L'enviament a la reverberació segueix el volum de l'instrument.
       const level = Math.min(1, 10 ** (((score.mix[patch.instrument]?.volume || 0) + baseVolumeDb(score, patch.instrument)) / 20));
       // Amb distorsió, menys sala: la reverberació surt de la guitarra neta.
-      const wet = createGuitarFx(fxFor(score, patch), sampleRate)?.reverb ?? 1;
+      const wet = (createGuitarFx(fxFor(score, patch), sampleRate)?.reverb ?? 1) * (createColorFx(colorFor(score, patch), sampleRate)?.reverb ?? 1);
       synth.controllerChange(patch.channel, 91, Math.round((REVERB[patch.instrument] ?? 20) * level * wet));
       synth.controllerChange(patch.channel, 93, 0);
     }
@@ -195,8 +235,9 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       const totalTrim = (patch.gainDb || 0) + baseVolumeDb(score, patch.instrument);
       const user = totalTrim ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + totalTrim } : score.mix[patch.instrument];
       const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, user, sampleRate);
-      const fx = createGuitarFx(fxFor(score, patch), sampleRate);
-      if (fx || eq) eqs.set(patch.channel, fx && eq ? { process: (side, x) => eq.process(side, fx.process(side, x)) } : fx || eq);
+      // Cadena: efecte de guitarra → efecte de color → equalitzador.
+      const chain = [createGuitarFx(fxFor(score, patch), sampleRate), createColorFx(colorFor(score, patch), sampleRate), eq].filter(Boolean);
+      if (chain.length) eqs.set(patch.channel, chain.length === 1 ? chain[0] : { process: (side, x) => chain.reduce((y, stage) => stage.process(side, y), x) });
     }
     const outputs = Array.from({ length: synth.midiChannels.length }, (_, channel) => eqs.has(channel) ? [new Float32Array(BLOCK), new Float32Array(BLOCK)] : dummy);
     const blockL = new Float32Array(BLOCK), blockR = new Float32Array(BLOCK);

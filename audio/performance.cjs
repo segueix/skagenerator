@@ -17,11 +17,11 @@ function createPerformance(spec) {
   // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
   // FreePats); banc 3: staccato de VSCO; banc 1: variacions GS; banc 0: GM.
   // Kit 69: Muldjord (gravat; els programes 64 i 65 són els «User Drum Set» GS del sintetitzador). Banc addicional (CC0, es baixa a part): kits 68 Big Rusty,
-  // 66 Virtuosity club i 67 Virtuosity lo-fi; contrabaix [2,32] Meatbass i baix [4,33]
+  // 66 Virtuosity club i 67 Virtuosity lo-fi; baix [4,33]
   // Growlybass. La resta són sons de GeneralUser GS.
   const presets = {
     guitar: { auto: null, clean: [2, 27], cleanGm: [0, 27], muted: [0, 28], overdrive: [0, 29], distortion: [0, 30] },
-    bass: { auto: null, finger: [2, 33], pick: [2, 34], upright: [2, 32], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
+    bass: { auto: null, finger: [2, 33], pick: [2, 34], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
     drums: { auto: null, real: [0, 69], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
     // La segona veu de vent sona per defecte amb saxo tenor gravat: articulació més
@@ -91,6 +91,7 @@ function createPerformance(spec) {
     const preset = presets[family][chosenSound] ?? fallback;
     const entry = patch(channel, preset, index % 2 ? 93 : 35, 84);
     if (take.fx) entry.clipFx = take.fx;
+    if (take.color) entry.clipColor = take.color;
     channels.push(entry);
     instrumentOf[channel] = family;
     takeChannels.set(channel, take);
@@ -434,6 +435,6 @@ function createPerformance(spec) {
     channels.find(c => c.channel === 1).fxTweak = { drive: -10, tone: 8 };
   }
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type,
-    mix: spec.mix || {}, baseVolume: spec.baseVolume || {}, fx: spec.fx || {} };
+    mix: spec.mix || {}, baseVolume: spec.baseVolume || {}, fx: spec.fx || {}, colors: spec.colors || {} };
 }
 module.exports = { createPerformance };

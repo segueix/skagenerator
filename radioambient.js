@@ -1755,6 +1755,10 @@
     const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Segona veu de vent (saxo / trombó)', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue',
         guitar2: 'Guitarra 2 (aguda)', guitar3: 'Guitarra 3 (arpegis)', vocal: 'Melodia de veu (guia)' };
     // Efectes de guitarra que aplica el motor de mostres (vegeu audio/render.mjs).
+    // Efectes de color per a vents i guitarres: el so passa per un aparell
+    // (ràdio, megàfon, telèfon o gramòfon). Es combinen amb l'efecte de guitarra.
+    const COLOR_FX = { radio: 'Ràdio antiga', megaphone: 'Megàfon', telephone: 'Telèfon', gramophone: 'Gramòfon (disc antic)' };
+    const COLOR_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'guitar', 'guitar2', 'guitar3'];
     const GUITAR_FX = { none: 'Net, sense efecte', boost: 'Boost net', tape: 'Saturació de cinta', crunch: 'Crunch',
         overdrive: 'Overdrive (pedal verd)', distortion: 'Distorsió', metal: 'Metal (guany alt)', fuzz: 'Fuzz', lofi: 'Lo-fi (8 bits)',
         horrorpunk: 'Horror punk (estil Misfits)', horrorpunkFidel: 'Horror punk A · fidel a la gravació', horrorpunkFuzz: 'Horror punk B · fuzz brunzidor',
@@ -1967,8 +1971,8 @@
     // Tempo, tonalitats, ritmes, balanceig, sons, efectes i progressions pròpies.
     const SUBGENRES = {
         jamaican: { name: 'Ska jamaicà (anys 60)', style: 'ska', bpm: [110, 128], swing: .45, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major']],
-            groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'upright', trombone: 'vsco' }, humanize: .65,
-            description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de club de jazz, contrabaix, acords de setena i secció de vents fent el tema.',
+            groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'growly', trombone: 'vsco' }, humanize: .65,
+            description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de club de jazz, baix de dits greu, acords de setena i secció de vents fent el tema.',
             harmony: { major: {
                 verse: [['I', 'vi', 'ii7', 'V7'], ['I', 'IV', 'I', 'V7'], ['Imaj7', 'vi7', 'ii7', 'V7'], ['I', 'I7', 'IV', 'iv']],
                 chorus: [['IV', 'V7', 'I', 'vi'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'IV', 'V7', 'IV']],
@@ -2460,9 +2464,13 @@
             || !Number.isInteger(take.revision) || take.revision < 1 || take.revision > 1000000
             || !Number.isInteger(take.from) || !Number.isInteger(take.to) || take.from < 0 || take.from >= take.to || take.to > bars
             || (take.feel !== undefined && ![.5, 2].includes(take.feel))
-            || (take.sound !== undefined && !['auto', 'clean', 'cleanGm', 'muted', 'overdrive', 'distortion'].includes(take.sound))))
+            || (take.sound !== undefined && !['auto', 'clean', 'cleanGm', 'muted', 'overdrive', 'distortion'].includes(take.sound))
+            || (take.color !== undefined && !Object.hasOwn(COLOR_FX, take.color))))
             throw new Error('Preses de guitarra no vàlides');
         if (part.guitarBase !== undefined && typeof part.guitarBase !== 'boolean') throw new Error('Guitarra base no vàlida');
+        if (part.colors !== undefined && (!part.colors || typeof part.colors !== 'object' || Array.isArray(part.colors)
+            || Object.entries(part.colors).some(([name, color]) => !COLOR_INSTRUMENTS.includes(name) || !Object.hasOwn(COLOR_FX, color))))
+            throw new Error('Efecte de color no vàlid');
         const lines = {}, layerIndex = {};
         const rhythmPool = [RHYTHMS.r1, RHYTHMS.r2, RHYTHMS.r3, RHYTHMS.r4, RHYTHMS.r5, RHYTHMS.r6, RHYTHMS.r7, RHYTHMS.r9];
         Object.keys(layers).forEach(name => {
@@ -2558,6 +2566,7 @@
             mix: { ...(settings.mix || {}), ...(part.mix || {}) },
             baseVolume: { ...baseVolume },
             fx: { ...(settings.fx || {}), ...(part.fx || {}) },
+            colors: { ...(part.colors || {}) },
             feel: { ...(part.feel || {}) } };
     }
     function songPartScore(syn, spec) {
@@ -2650,7 +2659,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

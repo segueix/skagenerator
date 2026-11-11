@@ -35,7 +35,7 @@
   const timbreOptions = {
     // «gravat»: mostres nota a nota de VSCO 2 CE, FreePats o el kit Muldjord.
     guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta · gravada'], ['cleanGm', 'Guitarra neta GM'], ['muted', 'Guitarra apagada GM'], ['overdrive', 'Guitarra saturada GM'], ['distortion', 'Guitarra distorsionada GM']],
-    bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['upright', 'Contrabaix pizzicato · gravat (Meatbass)'], ['growly', 'Jazz Bass directe · gravat (Growlybass)'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
+    bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['growly', 'Jazz Bass directe · gravat (Growlybass)'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
     drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['rusty', 'Big Rusty · gravada, greu (bombo de 24")'], ['club', 'Kit de club de jazz · gravat (Virtuosity)'], ['lofi', 'Kit lo-fi, so de disc antic · gravat'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
     trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
     trombone: [['auto', 'Saxo tenor · gravat (recomanat)'], ['vsco', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
@@ -148,6 +148,8 @@
     if (!st || !Object.hasOwn(STYLES, st.style) || !Number.isInteger(st.bpm) || st.bpm < profile.bpm.min || st.bpm > profile.bpm.max
       || !profile.keys.some(([k, m]) => k === st.tonic && m === st.mode) || !Number.isInteger(st.seed) || st.seed < 1 || st.seed > 4294967295
       || !Number.isInteger(st.bars) || st.bars < MIN_BARS || st.bars > MAX_BARS) fail('Configuració no vàlida');
+    // El contrabaix Meatbass ja no existeix: les cançons que el feien servir passen al Jazz Bass gravat.
+    for (const owner of [st, ...(Array.isArray(value.sections) ? value.sections : [])]) if (owner?.timbres?.bass === 'upright') owner.timbres.bass = 'growly';
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
     st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
@@ -187,6 +189,7 @@
       if (c.register !== undefined && (c.instrument !== 'vocal' || ![-1, 1].includes(c.register))) fail('Registre no vàlid');
       if (c.line !== undefined && (!LINE_INSTRUMENTS.includes(c.instrument) || !['riff', 'answer'].includes(c.line))) fail('Línia no vàlida');
       if (c.edge !== undefined && typeof c.edge !== 'boolean') fail('Instrument no vàlid');
+      if (c.color !== undefined && (!engine.COLOR_INSTRUMENTS.includes(c.instrument) || !Object.hasOwn(engine.COLOR_FX, c.color))) fail('Efecte de color no vàlid');
       ids.add(c.id);
     }
     if (value.voice !== undefined) {
@@ -223,7 +226,7 @@
     if (options.baseOnly) return null;
     const active = s.clips.filter(c => c.generated && !(seg.section?.mute || []).includes(c.instrument) && c.start < seg.start + seg.bars && seg.start < c.start + c.bars);
     if (!active.length) return null;
-    const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {}, lineModes = {}, guitarTakes = [];
+    const layers = {}, ranges = {}, timbres = {}, fx = {}, feel = {}, lineModes = {}, colors = {}, guitarTakes = [];
     let register;
     for (const c of active) {
       // Cada guitarra és una presa separada, encara que una altra del mateix
@@ -232,7 +235,7 @@
         guitarTakes.push({ id: c.id, instrument: c.instrument, revision: c.revision,
           from: Math.max(0, c.start - seg.start), to: Math.min(seg.bars, c.start + c.bars - seg.start),
           ...(c.sound ? { sound: c.sound } : {}), ...(c.fx ? { fx: c.fx } : {}),
-          ...(c.feel ? { feel: c.feel } : {}) });
+          ...(c.feel ? { feel: c.feel } : {}), ...(c.color ? { color: c.color } : {}) });
         continue;
       }
       if (!(c.instrument in layers)) {
@@ -241,12 +244,13 @@
         if (c.instrument === 'vocal' && c.register) register = c.register;
         if (c.sound && c.sound !== 'auto') timbres[c.instrument] = c.sound;
         if (c.fx) fx[c.instrument] = c.fx;
+        if (c.color) colors[c.instrument] = c.color;
       }
       layers[c.instrument] ??= c.revision;
       (ranges[c.instrument] ||= []).push([Math.max(0, c.start - seg.start), Math.min(seg.bars, c.start + c.bars - seg.start)]);
     }
     for (const [name, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === seg.bars) delete ranges[name];
-    return { layers, ranges, timbres, fx, feel, register, lineModes, guitarTakes };
+    return { layers, ranges, timbres, fx, feel, register, lineModes, colors, guitarTakes };
   }
   function partFor(s, seg, options = {}) {
     // Els instruments de la base silenciats en aquesta secció no sonen.
@@ -298,6 +302,7 @@
       if (Object.keys(extra.fx).length) part.fx = extra.fx;
       if (Object.keys(extra.feel).length) part.feel = { ...(part.feel || {}), ...extra.feel };
       if (Object.keys(extra.lineModes).length) part.lineModes = extra.lineModes;
+      if (Object.keys(extra.colors).length) part.colors = extra.colors;
       // La melodia de veu segueix la lletra de la secció: una frase per vers.
       if ('vocal' in extra.layers) {
         if (extra.register) part.register = extra.register;
@@ -1611,8 +1616,12 @@
         value => changeClipTone(clip, { register: Number(value) })));
       return box;
     }
-    if (!GUITARS.includes(clip.instrument)) { box.classList.add('only-feel'); box.append(feelSelect); if (lineSelect) box.append(lineSelect); return box; }
+    // Efecte de color: el so passa per una ràdio, un megàfon, un telèfon o un gramòfon.
+    const colorSelect = engine.COLOR_INSTRUMENTS.includes(clip.instrument)
+      ? select('COLOR DEL SO', [['none', 'Directe (sense aparell)'], ...Object.entries(engine.COLOR_FX)], clip.color || 'none', value => changeClipTone(clip, { color: value })) : null;
+    if (!GUITARS.includes(clip.instrument)) { box.classList.add('only-feel'); box.append(feelSelect); if (lineSelect) box.append(lineSelect); if (colorSelect) box.append(colorSelect); return box; }
     if (lineSelect) box.append(lineSelect);
+    box.append(colorSelect);
     box.append(feelSelect,
       select('SO', timbreOptions.guitar.map(([k, v]) => [k, k === 'auto' ? 'Com la guitarra de la cançó' : v]), clip.sound || 'auto', value => changeClipTone(clip, { sound: value })),
       select('EFECTE', [['inherit', `Com la cançó (${engine.GUITAR_FX[song.settings.fx?.guitar?.type || 'none']})`], ...Object.entries(engine.GUITAR_FX)], clip.fx?.type ?? 'inherit',
@@ -1627,6 +1636,7 @@
     if ('register' in change) { if (change.register === 0) delete clip.register; else clip.register = change.register; }
     if ('feel' in change) { if (change.feel === 1) delete clip.feel; else clip.feel = change.feel; }
     if ('fx' in change) { if (change.fx === null) delete clip.fx; else clip.fx = change.fx; }
+    if ('color' in change) { if (change.color === 'none') delete clip.color; else clip.color = change.color; }
     const replay = playing?.kind; stop(); save(); render();
     if (replay === 'song' || replay === 'section') play(replay);
   }
@@ -1897,7 +1907,13 @@
       migrated = false;
       openSong(validateSong(project), '');
       addToLibrary();
-      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
+      // Recursos especials que ha triat (només els que aporten alguna cosa en aquesta cançó).
+      const extras = [song.edges?.opening && song.edges.opening !== 'band' && `inici: ${builder.OPENINGS[song.edges.opening]}`,
+        song.edges?.closing && song.edges.closing !== 'hit' && `final: ${builder.CLOSINGS[song.edges.closing]}`,
+        song.edges?.middle && song.edges.middle !== 'none' && builder.MIDDLES[song.edges.middle],
+        song.sections.some(s => s.ending === 'stop') && 'una aturada de la banda',
+        ...song.clips.filter(c => c.color).map(c => `${INSTRUMENTS[c.instrument].toLowerCase()} amb so de ${engine.COLOR_FX[c.color].toLowerCase()}`)].filter(Boolean);
+      notify(`«${song.title}»: ${engine.SUBGENRES[key].name}, ${time(songSecondsOf(song))}, ${song.sections.length} seccions${extras.length ? `. Recursos: ${extras.join('; ')}` : ''}. Prem ▶ per escoltar-la i puntua-la a «Les meves cançons».`);
       if (mobile.matches) setTab('line');
     } catch (error) { console.error(error); notify(`No s’ha pogut crear la cançó: ${reasonOf(error)}`); }
   });

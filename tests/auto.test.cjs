@@ -179,3 +179,29 @@ test('la cançó automàtica tria la millor de diverses candidates i fa créixer
     for (let i = 1; i < verses.length; i++) assert(verses[i].energy > verses[i - 1].energy, 'cada estrofa més plena');
   }
 });
+
+test('la cançó automàtica fa servir els recursos especials amb mesura i als millors moments', () => {
+  const counts = {};
+  for (const key of Object.keys(engine.SUBGENRES)) for (let seed = 1; seed <= 6; seed++) for (const minutes of [2, 4]) {
+    const song = builder.createAutoSong(engine, key, { seed: seed * 13 + minutes, minutes });
+    const seconds = song.sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || song.settings.bpm), 0);
+    const stops = song.sections.filter(s => s.ending === 'stop'), silent = song.sections.filter(s => ['break', 'silence'].includes(s.ending));
+    const fades = song.sections.filter(s => s.fade), colors = song.clips.filter(c => c.color);
+    const used = (song.edges.opening !== 'band') + (song.edges.closing !== 'hit') + stops.length + silent.length + colors.length;
+    assert(used <= (seconds < 150 ? 2 : seconds < 210 ? 3 : 4), `${key} ${seed}: ${used} recursos en ${seconds.toFixed(0)} s`);
+    assert(stops.length <= 1 && silent.length <= 1 && fades.length <= 1 && colors.length <= 1, `${key} ${seed}: sense abusar`);
+    // Silencis i aturades només abans d'una tornada, i mai seguits.
+    for (const sec of [...stops, ...silent]) assert.equal(song.sections[song.sections.indexOf(sec) + 1].type, 'chorus');
+    if (stops.length && silent.length) assert(Math.abs(song.sections.indexOf(stops[0]) - song.sections.indexOf(silent[0])) >= 2);
+    // El fos de sortida només en un final prou llarg; el color, a la intro o al pont.
+    if (song.sections.at(-1).fade === 'out') assert(song.sections.at(-1).bars >= 4);
+    for (const c of colors) assert(['intro', 'bridge', 'solo'].includes(song.sections.find(s => s.start === c.start).type));
+    counts[used] = (counts[used] || 0) + 1;
+  }
+  assert(Object.keys(counts).length >= 3, `quantitats variades: ${JSON.stringify(counts)}`);
+  // Els subgèneres lents tendeixen al fos; el hardcore, al tall en sec.
+  const closings = key => Array.from({ length: 8 }, (_, i) => builder.createAutoSong(engine, key, { seed: 100 + i, candidates: 1 }).edges.closing);
+  assert(closings('rocksteady').filter(c => c === 'fadeout').length >= 5);
+  assert(closings('hardcore').filter(c => c === 'cold').length >= 5);
+  assert(!closings('hardcore').includes('fadeout'));
+});

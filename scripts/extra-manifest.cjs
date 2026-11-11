@@ -1,5 +1,5 @@
 // Genera extra-instruments.json a partir dels llistats de fitxers dels repositoris de
-// sfzinstruments (Big Rusty, Virtuosity, Meatbass, Growlybass). Ús: clona cada repositori
+// sfzinstruments (Big Rusty, Virtuosity, Growlybass). Ús: clona cada repositori
 // amb --filter=blob:none --no-checkout a <dir>/repos/, desa `git rev-parse HEAD` a
 // <dir>/repos/<nom>.commit i `git ls-tree -r --name-only HEAD` a <dir>/repos/<nom>.files, i:
 //   node scripts/extra-manifest.cjs <dir> > extra-instruments.json
@@ -102,11 +102,9 @@ function bass(repo, def) {
     base: `https://raw.githubusercontent.com/sfzinstruments/${repo}/${commit(repo)}/`,
     notes: [...notes].sort((a, b) => a[0] - b[0]).map(([key, list]) => ({ key, layers: def.layers.map(l => list.find(([li]) => li === l)?.[1]).filter(Boolean) })) };
 }
-const upright = bass('karoryfer.meatbass', { name: 'Contrabaix Meatbass', bank: 2, program: 32, maxSeconds: 1.8, release: .12, levelDb: [-9, -13],
-  re: /^Samples\/pizz\/([a-g]b?)(\d)_vl(\d)_rr1\.wav$/, layerIndex: Number, layers: [2, 4] });
 const growl = bass('karoryfer.growlybass', { name: 'Baix Growlybass', bank: 4, program: 33, maxSeconds: 2, release: .1, levelDb: [-9, -13],
   octave: -1, re: /^sustain\/([a-g]b?)(\d)_(pp|p|f|ff)_rr1\.wav$/, layerIndex: v => ['pp', 'p', 'f', 'ff'].indexOf(v) + 1, layers: [2, 4] });
-const extra = { about: 'Bateries i baixos gravats addicionals (CC0). Es carreguen a part, només quan una cançó els fa servir.', kits: [rusty, club, lofi], basses: [upright, growl] };
+const extra = { about: 'Bateries i baixos gravats addicionals (CC0). Es carreguen a part, només quan una cançó els fa servir.', kits: [rusty, club, lofi], basses: [growl] };
 const count = extra.kits.reduce((t, k) => t + new Set(Object.values(k.pieces).flatMap(p => p.layers.flat().map(([f]) => f))).size, 0)
   + extra.basses.reduce((t, b) => t + b.notes.reduce((s, n) => s + n.layers.length, 0), 0);
 console.error('fitxers', count, 'notes', extra.basses.map(b => b.notes.length + ':' + b.notes.map(n => n.layers.length).join('')));

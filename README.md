@@ -60,7 +60,7 @@ Al panell de la base hi ha tres controls nous per a la bateria i el ritme:
 - **Afinació de la bateria**: de +2 a −6 semitons. «Greu» i «Molt greu» afinen totes les peces cap avall (bombo i toms més profunds, caixa més grossa). Combinat amb el kit Big Rusty (bombo de 24") dona el so més greu.
 - **Humanització del ritme** (0–100 %): a 0 % tot va quantitzat, com una caixa de ritmes. Amb humanització, cada músic té el seu lloc respecte del temps: a l’ska el baix i els metalls van una mica endarrerits (relaxats) i la caixa arrossega; al punk la guitarra i la bateria empenyen. A més, una deriva lenta fa que cada músic s’avanci o s’endarrereixi uns mil·lisegons durant uns compassos (com una persona, no a l’atzar nota a nota), la força varia, el charles accentua els temps i el bombo és el més regular. Als tempos ràpids les desviacions es redueixen.
 
-Kits i baixos gravats nous: **Big Rusty** (greu), **kit de club de jazz** i **kit lo-fi** (so de disc antic), **contrabaix pizzicato** i **Jazz Bass directe**. Cada subgènere en tria uns per defecte: l’ska jamaicà sona amb kit de club i contrabaix, el rocksteady amb el kit lo-fi i estrofes amb aro, el punk del 77 i l’horror punk amb Big Rusty (l’horror punk afinat −3 i amb la intro sense platets), el hardcore amb Big Rusty −2 i Jazz Bass.
+Kits i baixos gravats nous: **Big Rusty** (greu), **kit de club de jazz**, **kit lo-fi** (so de disc antic) i **Jazz Bass directe**. Cada subgènere en tria uns per defecte: l’ska jamaicà sona amb kit de club i Jazz Bass, el rocksteady amb el kit lo-fi i estrofes amb aro, el punk del 77 i l’horror punk amb Big Rusty (l’horror punk afinat −3 i amb la intro sense platets), el hardcore amb Big Rusty −2 i Jazz Bass.
 
 ## Cançó automàtica, biblioteca i puntuacions
 
@@ -129,13 +129,39 @@ Tot també es pot triar a mà a l’editor de la secció:
 
 A la línia, les seccions mostren ∅ (silenci), ◢ / ◣ (fos d’entrada o de sortida) i ≡ (entrada o sortida per capes).
 
-### La cançó automàtica ho fa servir tot
+### Efectes de color per a vents i guitarres
 
-- Fa servir totes les eines anteriors: motius desenvolupats, veu amb accents, selector de qualitat, harmonia amb forma, riff i respostes, aturades, canvis de tempo i de to.
-- Tria un **inici, un final i, de vegades, un silenci** amb l’algorisme anterior.
-- **Corba d’energia**: cada estrofa i cada tornada són una mica més plenes que l’anterior.
-- De vegades la segona estrofa té **un altre ritme de bateria**.
-- Compon **tres cançons candidates** i es queda la que puntua millor (forma harmònica, qualitat de les línies i varietat d’inici, final i silencis).
+Cada clip de trompeta, segona veu de vent, saxo o guitarra té un selector **«Color del so»**: el so passa per un aparell i es pot combinar amb l’efecte de guitarra.
+
+| Efecte | Com sona |
+|---|---|
+| Ràdio antiga | Banda de 320 Hz a 3,4 kHz i saturació suau de vàlvules |
+| Megàfon | Molt estret, botzina a 2 kHz i saturació dura |
+| Telèfon | De 420 Hz a 2,9 kHz, prim i sec |
+| Gramòfon (disc antic) | Sense greus ni aguts i botzina a 1 kHz |
+
+El nivell es compensa (l’instrument sona igual de fort) i la reverberació es redueix, perquè l’aparell sona sec i a prop.
+
+### La cançó automàtica ho fa servir tot, però amb mesura
+
+- Fa servir totes les eines anteriors: motius desenvolupats, veu amb accents, selector de qualitat, harmonia amb forma, riff i respostes, canvis de tempo i de to.
+- **Corba d’energia**: cada estrofa i cada tornada són una mica més plenes que l’anterior. De vegades la segona estrofa té **un altre ritme de bateria**.
+- Compon **tres cançons candidates** i es queda la que puntua millor (forma harmònica, qualitat de les línies i com encaixen els recursos especials).
+
+**Recursos especials només quan aporten.** L’algorisme té a l’abast tots els recursos: inicis i finals especials, aturades de la banda, silencis al mig, fosos d’entrada i de sortida, i efectes de ràdio, megàfon, telèfon o gramòfon. Cadascun rep un valor segons:
+- **el subgènere**: el rocksteady i l’ska jamaicà tendeixen al fos i a l’inici de baix i bateria; el hardcore, al compte de baquetes i al tall en sec, i mai fa un fos;
+- **el moment**:
+  - un fos d’entrada només amb una intro llarga o un tempo lent;
+  - un fos de sortida només amb un final de 8 compassos o més;
+  - el silenci, sobretot abans de l’última tornada quan ve d’un pont o d’un solo;
+  - el color, a la intro (millor encara si comença amb el riff sol, que sona com un disc antic abans que entri la banda) o al pont.
+
+Només s’apliquen els que superen un llindar, de més valuós a menys, fins a un **pressupost segons la durada**: 2 recursos per sota de 2:30, 3 fins a 3:30 i 4 per sobre. A més:
+- com a molt un fos, un efecte de color, una aturada i un silenci per cançó;
+- l’aturada i el silenci mai van seguits;
+- el cop final només es canvia si el final especial encaixa millor.
+
+L’avís de la cançó nova diu quins recursos ha triat.
 
 ### «Genera» i «Genera’n una altra» amb selector de qualitat
 
@@ -230,7 +256,6 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 | Bateria | Muldjord Kit, de Lars Muldjord (via FreePats) | CC BY 4.0 |
 | Bateria greu (bombo de 24", toms de 14–22") | Big Rusty Drums, Karoryfer | CC0 |
 | Kit de club de jazz i kit lo-fi | Virtuosity Drums | CC0 |
-| Contrabaix pizzicato | Meatbass, Karoryfer | CC0 |
 | Jazz Bass directe | Growlybass, Karoryfer | CC0 |
 
 - VSCO només publica els WAV: el build llegeix el nom de cada fitxer (nota i dinàmica), en mesura l’afinació, el remostreja i en crea les zones de tecla i de força. Les notes curtes de trompeta i trombó fan servir les mostres d’staccato, que donen els cops secs típics de l’ska.
@@ -243,7 +268,7 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 - El kit Muldjord original ocupa 209 MB i té un mapa de tecles propi: se’n construeix un kit GM nou (bombo, caixa, cop de vora, charleston, plats, ride i timbals) amb tres capes de força.
 - El banc final ocupa uns 30 MB i es carrega una sola vegada. Les descàrregues i el banc convertit es guarden a `.cache/` i a la memòria cau de GitHub Actions.
 - Els sons de GeneralUser GS continuen disponibles com a alternatives («… GM») als selectors de so. L’orgue continua sent el de GeneralUser: l’orgue de FreePats és una emulació sintetitzada, no una gravació.
-- **Banc addicional** (`assets/extra-instruments.sf2`, uns 10 MB): les bateries Big Rusty i Virtuosity i els baixos Meatbass i Growlybass. Es publiquen en SFZ amb FLAC/WAV: el build tria unes quantes capes de força, barreja els micròfons (p. ex. bombo + ambient, caixa a sobre i a sota + ambient) i ho converteix a SF2 (FLAC descodificat amb `@wasm-audio-decoders/flac`). La web només el baixa quan una cançó fa servir algun d’aquests sons, així el banc principal no creix.
+- **Banc addicional** (`assets/extra-instruments.sf2`, uns 10 MB): les bateries Big Rusty i Virtuosity i el baix Growlybass. Es publiquen en SFZ amb FLAC/WAV: el build tria unes quantes capes de força, barreja els micròfons (p. ex. bombo + ambient, caixa a sobre i a sota + ambient) i ho converteix a SF2 (FLAC descodificat amb `@wasm-audio-decoders/flac`). La web només el baixa quan una cançó fa servir algun d’aquests sons, així el banc principal no creix.
 - Cada peça de cada kit s’iguala a la sonoritat de la mateixa peça del kit Muldjord (bombo amb bombo, charles amb charles…) i les capes més suaus queden 3,5 dB per sota cada una; els baixos s’igualen al baix amb dits. Un guany calibrat amb parts reals fa que canviar de kit o de baix no canviï el volum de la mescla.
 - **Correcció**: el kit Muldjord era al programa 64, que al sintetitzador (SpessaSynth 4) és un «User Drum Set» GS: en realitat sonava el kit GM estàndard. Ara és al programa 69 i se sent el kit gravat de debò.
 

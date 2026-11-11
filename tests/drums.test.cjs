@@ -26,9 +26,9 @@ test('opcions de platets: amb, sense plats, sense platets i pols a l’aro', () 
 });
 
 test('afinació greu de la bateria i sons gravats nous', () => {
-  const perf = createPerformance(part({ drumTune: -4, timbres: { drums: 'rusty', bass: 'upright' } }));
+  const perf = createPerformance(part({ drumTune: -4, timbres: { drums: 'rusty', bass: 'growly' } }));
   const drums = perf.channels.find(c => c.channel === 9), bass = perf.channels.find(c => c.channel === 2);
-  assert.equal(drums.tune, -4); assert.deepEqual([drums.bank, drums.program], [0, 68]); assert.deepEqual([bass.bank, bass.program], [2, 32]);
+  assert.equal(drums.tune, -4); assert.deepEqual([drums.bank, drums.program], [0, 68]); assert.deepEqual([bass.bank, bass.program], [4, 33]);
   assert(drums.gainDb > 0, 'nivell calibrat');
   for (const [drumsTimbre, program] of [['real', 69], ['club', 66], ['lofi', 67]])
     assert.equal(createPerformance(part({ timbres: { drums: drumsTimbre } })).channels.find(c => c.channel === 9).program, program);

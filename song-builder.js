@@ -93,6 +93,77 @@
   };
 
   // ── Inicis i finals de cançó, i silencis al mig ────────────────────
+  // ── Recursos especials, amb mesura ─────────────────────────────────
+  // La cançó automàtica té tots els recursos a l'abast (inicis i finals
+  // especials, aturades, silencis, fosos i efectes de color), però cadascun té
+  // un valor segons el subgènere i el moment. Només s'apliquen els que
+  // superen un llindar, de més valuós a menys, fins a un pressupost que depèn
+  // de la durada: un recurs llueix quan és escàs. Regles extres: com a molt un
+  // fos per cançó, un sol efecte de color, i aturada i silenci mai seguits.
+  const FIT = {
+    jamaican: { open: { riff: .8, riddim: .7, fadein: .65, buildup: .55, drums: .3 }, close: { fadeout: .8, riff: .7, ritard: .6, hit: .5, breakdown: .4 }, silence: .35, stop: .5, color: .7 },
+    rocksteady: { open: { riddim: .85, fadein: .8, riff: .6, buildup: .6, voice: .4 }, close: { fadeout: .9, ritard: .55, riff: .6, breakdown: .45 }, silence: .3, stop: .35, color: .65 },
+    twotone: { open: { riff: .8, buildup: .7, drums: .6, countin: .45, halftime: .35 }, close: { hit: .8, cold: .65, riff: .6, ring: .5, ritard: .4 }, silence: .55, stop: .65, color: .55 },
+    skapunk: { open: { drums: .7, halftime: .65, buildup: .6, riff: .6, countin: .5 }, close: { cold: .8, ring: .7, hit: .7, breakdown: .35 }, silence: .7, stop: .7, color: .45 },
+    punk77: { open: { countin: .8, drums: .7, riff: .7, voice: .45, buildup: .4 }, close: { hit: .8, cold: .8, ring: .6 }, silence: .6, stop: .7, color: .45 },
+    hardcore: { open: { countin: .8, drums: .7, riff: .5 }, close: { cold: .9, hit: .7, ring: .4 }, silence: .8, stop: .75, color: .25 },
+    poppunk: { open: { riff: .8, voice: .7, buildup: .6, drums: .6, countin: .4 }, close: { ring: .8, hit: .7, cold: .55, riff: .5, ritard: .4 }, silence: .7, stop: .6, color: .55 },
+    horrorpunk: { open: { drums: .7, riff: .7, voice: .6, buildup: .6, fadein: .5 }, close: { ring: .8, cold: .7, ritard: .6, breakdown: .5 }, silence: .6, stop: .55, color: .65 }
+  };
+  const THRESHOLD = .55;
+  function planHighlights(song, key, r, options = {}) {
+    const fit = FIT[key] || FIT.twotone, sections = song.sections, st = song.settings;
+    const first = sections[0], last = sections.at(-1), outro = last.type === 'outro', punk = st.style === 'punk';
+    const seconds = sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || st.bpm), 0);
+    const budget = seconds < 150 ? 2 : seconds < 210 ? 3 : 4;
+    const vary = () => .8 + r() * .4; // una mica d’atzar perquè no sigui sempre el mateix
+    const best = (table, context) => Object.entries(table).map(([name, v]) => [name, v * context(name) * vary()]).sort((a, b) => b[1] - a[1])[0] || [null, 0];
+    const candidates = [];
+    const [opening, openValue] = best(fit.open, name => ({
+      fadein: first.bars >= 8 || st.bpm <= 125 ? 1 : .3, voice: options.vocal ? 1 : 0, countin: st.countIn ? 0 : 1,
+      halftime: first.bpm ? 0 : 1, buildup: first.bars >= 4 ? 1 : .4 })[name] ?? 1);
+    if (opening) candidates.push({ kind: 'opening', name: opening, value: openValue });
+    const [closing, closeValue] = best(Object.fromEntries(Object.entries(fit.close).filter(([name]) => name !== 'hit')), name => ({
+      fadeout: outro && last.bars >= 8 ? 1 : outro && last.bars >= 4 ? .5 : .2, cold: outro ? 1 : 0, ring: outro ? 1 : 0, riff: outro ? 1 : 0,
+      ritard: last.bpm ? 0 : 1, breakdown: last.bars >= 4 ? 1 : .3 })[name] ?? 1);
+    // El cop final és el final natural: un final especial només si val més que ell.
+    if (closing && closeValue > (fit.close.hit || 0)) candidates.push({ kind: 'closing', name: closing, value: closeValue });
+    // Silenci abans de l'última tornada (més valuós després d'un pont o un solo) i aturada abans d'una tornada anterior.
+    const before = sections.map((sec, i) => sections[i + 1]?.type === 'chorus' && sec !== first && sec.bars >= 2 ? sec : null).filter(Boolean);
+    const choruses = sections.filter(s => s.type === 'chorus').length;
+    if (before.length) {
+      const target = before.at(-1);
+      candidates.push({ kind: 'middle', name: punk || r() < .5 ? 'break' : 'silence', target,
+        value: fit.silence * (['bridge', 'solo', 'prechorus'].includes(target.type) ? 1.1 : .85) * (choruses >= 3 ? 1 : .8) * vary() });
+    }
+    if (before.length >= 2) candidates.push({ kind: 'stop', target: before.at(-2), value: fit.stop * (choruses >= 3 ? 1 : .85) * vary() });
+    const chosen = [];
+    for (const c of candidates.sort((a, b) => b.value - a.value)) {
+      if (chosen.length >= budget || c.value < THRESHOLD) break;
+      if (c.kind === 'stop' && chosen.some(o => o.kind === 'middle' && Math.abs(sections.indexOf(o.target) - sections.indexOf(c.target)) < 2)) continue;
+      if (c.kind === 'middle' && chosen.some(o => o.kind === 'stop' && Math.abs(sections.indexOf(o.target) - sections.indexOf(c.target)) < 2)) continue;
+      if ((c.name === 'fadein' || c.name === 'fadeout') && chosen.some(o => o.name === 'fadein' || o.name === 'fadeout')) continue;
+      chosen.push(c);
+    }
+    const pick = kind => chosen.find(c => c.kind === kind);
+    const plan = { opening: pick('opening')?.name || 'band', closing: pick('closing')?.name || 'hit', middle: pick('middle')?.name || 'none',
+      stop: pick('stop')?.target || null, chosen };
+    // Efecte de color: un sol moment. L'intro amb el riff sol sona com un disc antic
+    // o una ràdio i la banda entra neta; si no, un instrument del pont pel megàfon o el telèfon.
+    if (chosen.length < budget) {
+      const riffer = punk ? 'guitar3' : 'trumpet';
+      const bridge = sections.find(s => s.type === 'bridge' || s.type === 'solo');
+      const options2 = [
+        { where: first, instrument: riffer, color: punk ? (r() < .5 ? 'radio' : 'megaphone') : (r() < .6 ? 'gramophone' : 'radio'),
+          value: fit.color * (plan.opening === 'riff' ? 1.2 : first.bars >= 8 ? .8 : .6) * vary() },
+        ...(bridge ? song.clips.filter(c => c.start === bridge.start && ['trumpet', 'trombone', 'sax', 'guitar3', 'guitar2'].includes(c.instrument) && !c.line).slice(0, 1)
+          .map(c => ({ where: bridge, instrument: c.instrument, color: punk ? 'megaphone' : r() < .5 ? 'telephone' : 'radio', value: fit.color * .85 * vary() })) : [])
+      ].sort((a, b) => b.value - a.value);
+      if (options2[0] && options2[0].value >= THRESHOLD) { plan.color = options2[0]; chosen.push({ kind: 'color', ...options2[0] }); }
+    }
+    return plan;
+  }
+
   // Catàleg de maneres d'entrar i de sortir. designEdges en tria una de cada
   // (diferent de l'anterior), de vegades hi afegeix un silenci abans d'una
   // tornada i ho aplica a la primera i a l'última secció amb les eines del
@@ -268,11 +339,6 @@
     // Rocksteady: estrofes amb cops d'aro en lloc de charles (sense platets); horror punk: intro de toms sense platets.
     if (key === 'rocksteady') { tempo(of('bridge')[0], .86); tempo(of('outro')[0], .9); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
     if (key === 'horrorpunk') sections[0].cymbals = 'none';
-    // Aturades de la banda: una o dues de les seccions que porten a una tornada acaben
-    // amb un cop de tota la banda i silenci fins al redoble (no a la primera ni al final).
-    const intoChorus = sections.filter((sec, i) => i > 0 && sections[i + 1]?.type === 'chorus' && sec.type !== 'chorus');
-    const stops = intoChorus.filter(() => r() < (punk ? .5 : .35)).slice(0, 2);
-    for (const sec of stops) sec.ending = 'stop';
     // Un altre ritme de bateria a la segona estrofa (de vegades), com fa «Dona-li varietat».
     const drumCount = engine.SONG_GROOVES[sg.style].drums.length;
     if (of('verse').length > 1 && key !== 'hardcore' && r() < .5) of('verse')[1].groove = { drums: (groove.drums + 1 + Math.floor(r() * (drumCount - 1))) % drumCount };
@@ -380,9 +446,18 @@
     const song = { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
     // ── Inici, final i silencis: una manera diferent a cada cançó ──
     const revisionsOf = Object.fromEntries(MELODIC.map(name => [name, chosen.get(`${name}:intro`) || chosen.get(`${name}:verse`) || chosen.get(`${name}:chorus`) || 1]));
-    const edges = designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf });
+    // Recursos especials: només els que aporten més en aquesta cançó (vegeu planHighlights).
+    const highlights = planHighlights(song, key, r, { vocal });
+    if (highlights.stop) highlights.stop.ending = 'stop';
+    designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf, opening: highlights.opening, closing: highlights.closing, middle: highlights.middle });
+    if (highlights.color) {
+      const clip = song.clips.find(c => c.instrument === highlights.color.instrument && c.start <= highlights.color.where.start && c.start + c.bars > highlights.color.where.start);
+      if (clip) clip.color = highlights.color.color;
+    }
     // Puntuació de la cançó: forma harmònica, qualitat mitjana de les línies i varietat d'inici, final i silencis.
-    const rating = bestForm + quality / Math.max(1, judged) + (edges.opening !== 'band' ? .3 : 0) + (edges.closing !== 'hit' ? .3 : 0) + (edges.middle !== 'none' ? .2 : 0);
+    const rating = bestForm + quality / Math.max(1, judged) + 
+      // Premia que els recursos aplicats encaixin bé (no que n'hi hagi molts).
+      + (highlights.chosen.length ? .3 * highlights.chosen.reduce((t, c) => t + c.value, 0) / highlights.chosen.length : .2);
     return { song, score: rating };
   }
   // Cançó automàtica: es componen tres candidates (amb tot el que sap fer el
@@ -396,5 +471,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, designEdges, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, designEdges, planHighlights, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });
