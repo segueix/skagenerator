@@ -1739,6 +1739,9 @@
     // ── Cançons per seccions ────────────────────────────────────────────
     // Comparteix els instruments del motor original. Tempo i tonalitat són
     // globals; cada secció pot sobrescriure els instruments base sense canviar el motiu.
+    // Finals de secció i tancaments de cançó (vegeu composeDrumLine).
+    const SECTION_ENDINGS = ['fill', 'stop', 'none', 'break', 'silence'];
+    const SONG_CLOSINGS = ['hit', 'fade', 'cold', 'ring'];
     const SONG_PARTS = {
         intro: { name: 'Intro', bars: 4, energy: 35, description: 'Presenta el ritme i el caràcter de la cançó.' },
         verse: { name: 'Estrofa', bars: 8, energy: 55, description: 'Desenvolupa la història i deixa espai per a la veu.' },
@@ -1752,6 +1755,10 @@
     const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Segona veu de vent (saxo / trombó)', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue',
         guitar2: 'Guitarra 2 (aguda)', guitar3: 'Guitarra 3 (arpegis)', vocal: 'Melodia de veu (guia)' };
     // Efectes de guitarra que aplica el motor de mostres (vegeu audio/render.mjs).
+    // Efectes de color per a vents i guitarres: el so passa per un aparell
+    // (ràdio, megàfon, telèfon o gramòfon). Es combinen amb l'efecte de guitarra.
+    const COLOR_FX = { radio: 'Ràdio antiga', megaphone: 'Megàfon', telephone: 'Telèfon', gramophone: 'Gramòfon (disc antic)' };
+    const COLOR_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'guitar', 'guitar2', 'guitar3'];
     const GUITAR_FX = { none: 'Net, sense efecte', boost: 'Boost net', tape: 'Saturació de cinta', crunch: 'Crunch',
         overdrive: 'Overdrive (pedal verd)', distortion: 'Distorsió', metal: 'Metal (guany alt)', fuzz: 'Fuzz', lofi: 'Lo-fi (8 bits)',
         horrorpunk: 'Horror punk (estil Misfits)', horrorpunkFidel: 'Horror punk A · fidel a la gravació', horrorpunkFuzz: 'Horror punk B · fuzz brunzidor',
@@ -1863,18 +1870,37 @@
         const g = DRUM_GROOVES[styleName][index], line = [];
         // Mida del redoble final segons el que ve després.
         const next = options.next, ending = options.ending || 'fill';
+        // Tancament de la cançó (només a l'outro): 'hit' cop final, 'fade' el groove continua
+        // (la cançó s'esvaeix), 'cold' tall en sec sense plats, 'ring' redoble llarg i acord final.
+        const closing = type === 'outro' ? options.closing || 'hit' : 'hit', fading = closing === 'fade';
         const size = next === 'chorus' || next === 'solo' || next === 'end' ? 'big' : next === undefined ? null : next === type ? 'small' : 'medium';
         const pickFill = (wanted, salt = 0) => { const list = FILLS[wanted]; return list[((options.fill || 0) * 7 + salt * 3 + index) % list.length]; };
         const hit = (b, t, note, force) => line.push([b, t, note, force]);
         const big = energy >= 70, quiet = energy < 45, half = Math.max(1, Math.floor(bars / 2));
         const buildBars = type === 'intro' ? Math.min(2, half) : 0;
         for (let b = 0; b < bars; b++) {
-            const final = type === 'outro' && b === bars - 1;
+            const final = type === 'outro' && b === bars - 1 && !fading;
             // Final: redoble gran al penúltim compàs i cop final de tota la banda.
-            const last = b === bars - 1 || (type === 'outro' && b === bars - 2 && bars > 1);
+            const last = !fading && (b === bars - 1 || (type === 'outro' && b === bars - 2 && bars > 1));
+            if (final && closing === 'cold') { hit(b, 0, 36, 120); hit(b, 0, 38, 112); continue; }
+            if (final && closing === 'ring') {
+                // Acord llarg: cop, redoble de ride que creix i últim cop a la quarta part.
+                hit(b, 0, 36, 118); hit(b, 0, 49, 112);
+                for (let t = .5; t < 3; t += .25) hit(b, t, 51, 50 + Math.round(t * 18));
+                hit(b, 3, 36, 122); hit(b, 3, 38, 110); hit(b, 3, 49, 118); hit(b, 3, 57, 104); continue;
+            }
             if (final) { hit(b, 0, 36, 118); hit(b, 0, 38, 104); hit(b, 0, 49, 112); hit(b, 0, 57, 100); continue; }
+            if (closing === 'ring' && type === 'outro' && b === bars - 2) {
+                // Penúltim compàs: caixa en semicorxeres que creix i baixa pels toms.
+                for (let k = 0; k < 16; k++) hit(b, k / 4, k < 8 ? 38 : [50, 48, 47, 45, 43, 41][Math.floor((k - 8) * 6 / 8)], 60 + k * 4);
+                hit(b, 0, 36, 108); hit(b, 0, 49, 100); continue;
+            }
             // Compte d'entrada: quatre cops de baqueta i comença la banda.
             if (options.countIn && b === 0) { [0, 1, 2, 3].forEach((t, k) => hit(b, t, 37, k < 3 ? 92 : 108)); continue; }
+            // Silenci al mig de la cançó: 'break' un cop de tota la banda i silenci
+            // fins a la secció següent; 'silence' l'últim compàs sencer en silenci.
+            if (ending === 'break' && b === bars - 1) { hit(b, 0, 36, 118); hit(b, 0, 38, 108); hit(b, 0, 49, 110); continue; }
+            if (ending === 'silence' && b === bars - 1) continue;
             // Aturada de la banda: un cop junts i silenci fins al redoble que entra.
             if (ending === 'stop' && b === bars - 1 && bars > 1) {
                 hit(b, 0, 36, 116); hit(b, 0, 38, 106); hit(b, 0, 49, 108);
@@ -1945,8 +1971,8 @@
     // Tempo, tonalitats, ritmes, balanceig, sons, efectes i progressions pròpies.
     const SUBGENRES = {
         jamaican: { name: 'Ska jamaicà (anys 60)', style: 'ska', bpm: [110, 128], swing: .45, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major']],
-            groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'upright', trombone: 'vsco' }, humanize: .65,
-            description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de club de jazz, contrabaix, acords de setena i secció de vents fent el tema.',
+            groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'growly', trombone: 'vsco' }, humanize: .65,
+            description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de club de jazz, baix de dits greu, acords de setena i secció de vents fent el tema.',
             harmony: { major: {
                 verse: [['I', 'vi', 'ii7', 'V7'], ['I', 'IV', 'I', 'V7'], ['Imaj7', 'vi7', 'ii7', 'V7'], ['I', 'I7', 'IV', 'iv']],
                 chorus: [['IV', 'V7', 'I', 'vi'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'IV', 'V7', 'IV']],
@@ -2014,18 +2040,36 @@
     // Un motiu de dos compassos (ritme i contorn en graus de l'escala) que
     // identifica la cançó: es toca a la intro, les tornades i el final, s'adapta
     // als acords de cada compàs i varia el final de cada quarta repetició.
+    // Ritme del riff, generat (no triat d'una llista): una cèl·lula d'un compàs
+    // (a l'ska, sobretot a contratemps; al punk, sobretot a cops avall) i un
+    // segon compàs que en repeteix el principi i la contesta amb una nota llarga.
+    function riffRhythm(r, punk) {
+        let cell = [];
+        for (let k = 0; k < 8; k++) if (r() < (punk ? (k % 2 ? .55 : .8) : (k % 2 ? .75 : .4))) cell.push(k / 2);
+        if (!cell.some(t => t < 1)) cell.unshift(punk ? 0 : .5);
+        for (let guard = 0; cell.length < 3 && guard < 32; guard++) {
+            const t = Math.floor(r() * 8) / 2;
+            if (!cell.includes(t)) cell = [...cell, t].sort((a, b) => a - b);
+        }
+        while (cell.length > 6) cell.splice(1 + Math.floor(r() * (cell.length - 1)), 1);
+        const keep = cell.filter(t => t < 2), endings = punk ? [[2], [2, 3], [2.5]] : [[2.5], [2, 3], [1.5, 2.5]];
+        let ending = endings[Math.floor(r() * endings.length)].filter(t => t > Math.max(...keep));
+        if (!ending.length) ending = [Math.max(...keep) + 1];
+        let onsets = [...cell, ...keep.map(t => t + 4), ...ending.map(t => t + 4)];
+        while (onsets.length > 11) onsets.splice(cell.length + Math.floor(r() * keep.length), 1);
+        for (let guard = 0; onsets.length < 6 && guard < 32; guard++) {
+            const t = 4 + Math.floor(r() * 4) / 2;
+            if (!onsets.includes(t) && t < onsets.at(-1)) onsets = [...onsets, t].sort((a, b) => a - b);
+        }
+        return onsets.map((t, i) => {
+            const gap = (onsets[i + 1] ?? Math.min(8, t + 2)) - t;
+            // A l'ska, notes curtes i seques (com els metalls); al punk, lligades.
+            return [t, i === onsets.length - 1 ? Math.min(2, 8 - t) : punk ? gap : Math.min(gap, gap > 1 ? 1 : gap)];
+        });
+    }
     function composeRiff(seed, punk) {
         const r = seededRng((seed ^ 0x2f7a1c3) >>> 0);
-        const rhythms = punk ? [
-            [[0, .5], [.5, .5], [1, .5], [1.5, .5], [2, 1], [3, .5], [3.5, .5], [4, .5], [4.5, .5], [5, 1], [6, 2]],
-            [[0, 1], [1, .5], [1.5, .5], [2, 1], [3, 1], [4, .5], [4.5, .5], [5, .5], [5.5, .5], [6, 1.5]],
-            [[0, .5], [.5, .5], [1, 1], [2.5, .5], [3, 1], [4, .5], [4.5, .5], [5, 1], [6.5, 1]]]
-          : [
-            [[.5, .5], [1, .5], [1.5, 1], [3, .5], [3.5, .5], [4.5, .5], [5, .5], [5.5, 1.5]],
-            [[0, .5], [.5, .5], [1, .5], [1.5, 1], [3.5, .5], [4, .5], [4.5, .5], [5, .5], [5.5, 1], [7, .5]],
-            [[0, 1.5], [1.5, .5], [2, .5], [2.5, 1], [4, .5], [4.5, .5], [5, 1], [6, 1]],
-            [[.5, .5], [1, 1], [2, .5], [2.5, .5], [3, 1], [4.5, .5], [5, 1.5], [6.5, .5]]];
-        const rhythm = rhythms[Math.floor(r() * rhythms.length)], steps = [0];
+        const rhythm = riffRhythm(r, punk), steps = [0];
         const peak = Math.floor(rhythm.length * (.35 + r() * .3));
         for (let i = 1; i < rhythm.length; i++) {
             const up = i <= peak ? 1 : -1, size = r() < .65 ? 1 : r() < .7 ? 2 : 0;
@@ -2087,45 +2131,116 @@
         }
         return notes;
     }
+    // ── Lletra: síl·labes, síl·labes tòniques i versos repetits ─────────
+    // Català aproximat: grups vocàlics amb els diftongs decreixents com una sola
+    // síl·laba (el mateix recompte que fa servir l'app). La tònica és la de
+    // l'accent gràfic; si no n'hi ha, les paraules acabades en vocal, vocal + s,
+    // -en o -in són planes i la resta agudes. Articles, preposicions i pronoms
+    // febles d'una síl·laba són àtons.
+    const ATONES = new Set(['el', 'la', 'els', 'les', 'lo', 'un', 'una', 'uns', 'unes', 'de', 'del', 'dels', 'a', 'al', 'als', 'i', 'o', 'en', 'em', 'et',
+        'es', 'ens', 'us', 'li', 'hi', 'ho', 'que', 'per', 'pel', 'pels', 'amb', 'com', 'si', 'ma', 'ta', 'sa', 'mon', 'ton', 'son', 'me', 'te', 'se', 'ne', 'ni', 'can']);
+    function wordStress(word) {
+        const clean = word.replace(/(q|g)u(?=[eiéèí])/g, '$1');
+        let count = 0, accent = -1;
+        for (const group of clean.match(/[aeiouàèéíïòóúü]+/g) || []) {
+            for (let i = 0; i < group.length; i++) {
+                let text = group[i];
+                const next = group[i + 1];
+                if (next && 'iu'.includes(next) && !'iu'.includes(group[i])) { text += next; i++; }
+                if (/[àèéíòóú]/.test(text)) accent = count;
+                count++;
+            }
+        }
+        if (!count) return { count, stress: -1 };
+        const bare = word.split(/['’]/).pop();
+        if (accent >= 0) return { count, stress: accent };
+        if (count === 1) return { count, stress: ATONES.has(bare) ? -1 : 0 };
+        return { count, stress: /([aeiou]s?|[ei]n)$/.test(bare) ? count - 2 : count - 1 };
+    }
+    function analyzeLyrics(text) {
+        const lines = String(text || '').split(/\n/).map(l => l.trim()).filter(l => l && /[a-zàèéíòóúïü]/i.test(l)).slice(0, 32);
+        const keys = [], out = { syllables: [], stress: [], repeats: [] };
+        for (const line of lines) {
+            let total = 0;
+            const stress = [];
+            for (const word of line.toLowerCase().match(/[a-zàèéíïòóúüç·'’-]+/g) || []) {
+                const w = wordStress(word);
+                if (w.stress >= 0) stress.push(total + w.stress);
+                total += w.count;
+            }
+            const count = Math.max(1, Math.min(24, total));
+            out.syllables.push(count);
+            out.stress.push(stress.filter(k => k < count));
+            // Els versos iguals (sense comptar puntuació ni majúscules) es canten igual.
+            const key = line.toLowerCase().replace(/[^a-zàèéíïòóúüç\s]/g, '').replace(/\s+/g, ' ').trim();
+            out.repeats.push(keys.indexOf(key));
+            keys.push(key);
+        }
+        return out;
+    }
     // ── Melodia de veu (guia per cantar) ────────────────────────────────
     // Frases de dos compassos amb respiracions: cada línia de la lletra és una
-    // frase i té tantes notes com síl·labes. Sense lletra, frases amb pauses i
-    // una tornada amb un motiu que es repeteix. Registre cantable, salts curts,
-    // notes de l'acord als temps forts i final de frase en una nota estable.
-    function composeVocal(r, chords, bars, type, scalePcs, syllables, register) {
+    // frase i té tantes notes com síl·labes. Les síl·labes tòniques cauen a temps
+    // i els versos repetits (la tornada) es canten amb la mateixa melodia. Cada
+    // frase té el seu propi atzar: dues estrofes amb la mateixa versió tenen la
+    // mateixa melodia, adaptada a les síl·labes de cada vers. Sense lletra,
+    // frases amb pauses i una tornada amb un motiu que es repeteix. Registre
+    // cantable, salts curts, notes de l'acord als temps forts i final de frase
+    // en una nota estable.
+    function composeVocal(r, chords, bars, type, scalePcs, syllables, register, stress, repeats) {
         const shift = register * 5, lo = 57 + shift, hi = 74 + shift;
         const center = (type === 'chorus' ? 67 : type === 'prechorus' ? 66 : type === 'verse' ? 63 : 64) + shift;
         const notes = [], lyrics = Array.isArray(syllables) && syllables.length > 0;
         const longest = lyrics ? Math.max(...syllables) : 0, phraseBars = longest > 11 && bars >= 4 ? 4 : 2;
-        const rhythmFor = (count, span) => {
-            const pickup = r() < .45 ? .5 : r() < .5 ? 0 : 1, rest = type === 'chorus' ? 1 : 1.5;
+        const base = Math.floor(r() * 4294967296);
+        const rhythmFor = (count, span, accents, pr) => {
+            const firstStressed = accents && accents[0] === 0;
+            const pickup = firstStressed ? (pr() < .6 ? 0 : 1) : pr() < .45 ? .5 : pr() < .5 ? 0 : 1, rest = type === 'chorus' ? 1 : 1.5;
             const end = span - rest;
             let grid = .5;
             if ((count - 1) * grid + 1 > end - pickup) grid = .25;
             count = Math.max(1, Math.min(count, Math.floor((end - pickup - .5) / grid) + 1));
-            const last = Math.max(.5, Math.min(type === 'chorus' ? 2 : 1.5, end - pickup - (count - 1) * grid));
+            let last = Math.max(.5, Math.min(type === 'chorus' ? 2 : 1.5, end - pickup - (count - 1) * grid));
             const lengths = Array(count - 1).fill(grid);
             let extra = end - pickup - last - (count - 1) * grid;
-            for (let guard = 0; extra >= grid - 1e-9 && lengths.length && guard < 64; guard++) {
-                const k = Math.floor(r() * lengths.length); lengths[k] += grid; extra -= grid;
+            const strong = (accents || []).filter(k => k > 0 && k < count);
+            if (!strong.length) {
+                for (let guard = 0; extra >= grid - 1e-9 && lengths.length && guard < 64; guard++) {
+                    const k = Math.floor(pr() * lengths.length); lengths[k] += grid; extra -= grid;
+                }
+            } else {
+                // Les síl·labes tòniques a temps: s'allarga la síl·laba anterior.
+                const onset = k => pickup + lengths.slice(0, k).reduce((a, b) => a + b, 0);
+                for (const k of strong) {
+                    const off = onset(k) % 1;
+                    if (off > 1e-9 && 1 - off <= extra + 1e-9) { lengths[k - 1] += 1 - off; extra -= 1 - off; }
+                }
+                // El temps que sobra allarga les tòniques (de temps sencer en temps sencer, sense desquadrar-les).
+                const longer = strong.filter(k => k < lengths.length);
+                for (let guard = 0; extra >= 1 - 1e-9 && guard < 64; guard++) {
+                    const list = longer.length ? longer : lengths.map((_, k) => k);
+                    if (!list.length) break;
+                    lengths[list[Math.floor(pr() * list.length)]] += 1; extra -= 1;
+                }
+                last += Math.max(0, extra);
             }
             const out = []; let at = pickup;
             for (const length of lengths) { out.push([at, length]); at += length; }
             out.push([at, last]);
             return out;
         };
-        const pitchesFor = (rhythm, startBar) => {
-            const peak = .35 + r() * .3, out = [];
+        const pitchesFor = (rhythm, startBar, pr) => {
+            const peak = .35 + pr() * .3, out = [];
             // Comença a prop d'on va acabar la frase anterior (o del centre del registre).
-            const from = lastNote ?? center - 2 + Math.round(r() * 4);
-            let prev = nearestTone(Math.round((from * 2 + center) / 3) + (r() < .5 ? 1 : -1), chords[startBar].pcs, lo, hi);
+            const from = lastNote ?? center - 2 + Math.round(pr() * 4);
+            let prev = nearestTone(Math.round((from * 2 + center) / 3) + (pr() < .5 ? 1 : -1), chords[startBar].pcs, lo, hi);
             rhythm.forEach(([at], k) => {
                 const bar = Math.min(bars - 1, startBar + Math.floor(at / 4)), chord = chords[bar], pos = k / Math.max(1, rhythm.length - 1);
-                const target = center + (pos < peak ? 3 : -2), dir = prev === target ? (r() < .5 ? -1 : 1) : Math.sign(target - prev);
+                const target = center + (pos < peak ? 3 : -2), dir = prev === target ? (pr() < .5 ? -1 : 1) : Math.sign(target - prev);
                 let n;
                 if (k === rhythm.length - 1) n = nearestTone(prev - 1, [chord.pcs[0], chord.pcs[1]], lo, hi);
-                else if (k > 0 && r() < .18) n = prev; // síl·labes repetides a la mateixa nota
-                else if (at % 1 === 0) n = nearestTone(prev + dir * (1 + Math.floor(r() * 3)), chord.pcs, lo, hi);
+                else if (k > 0 && pr() < .18) n = prev; // síl·labes repetides a la mateixa nota
+                else if (at % 1 === 0) n = nearestTone(prev + dir * (1 + Math.floor(pr() * 3)), chord.pcs, lo, hi);
                 else n = stepScale(prev, dir, scalePcs, chord, lo, hi);
                 if (Math.abs(n - prev) > 7) n = nearestTone(prev + Math.sign(n - prev) * 4, chord.pcs, lo, hi);
                 out.push(n); prev = n;
@@ -2133,21 +2248,40 @@
             lastNote = prev;
             return out;
         };
+        // Repeteix una frase ja cantada; les notes a temps que no són de l'acord del nou lloc s'hi ajusten.
+        const reuse = (sung, startBar) => {
+            let prev = null;
+            const pitches = sung.pitches.map((p, k) => {
+                const at = sung.rhythm[k][0], chord = chords[Math.min(bars - 1, startBar + Math.floor(at / 4))];
+                let n = at % 1 === 0 && !chord.pcs.includes(p % 12) ? nearestTone(p, chord.pcs, lo, hi) : p;
+                if (prev !== null && Math.abs(n - prev) > 7) n = nearestTone(prev + Math.sign(n - prev) * 4, chord.pcs, lo, hi);
+                prev = n;
+                return n;
+            });
+            lastNote = prev;
+            return pitches;
+        };
         let hook = null, line = 0, lastNote = null;
+        const sung = [];
         for (let start = 0, phrase = 0; start < bars; start += phraseBars, phrase++) {
             const span = Math.min(phraseBars, bars - start) * 4;
             if (span < 2) break;
-            let count;
-            if (lyrics) { if (line >= syllables.length) break; count = syllables[line++]; }
+            const pr = seededRng((base + Math.imul(phrase + 1, 0x9E3779B1)) >>> 0);
+            let count, index = -1;
+            if (lyrics) { if (line >= syllables.length) break; index = line++; count = syllables[index]; }
             else {
                 // Respiracions: el pont i la intro canten frase sí, frase no.
                 if ((type === 'bridge' || type === 'intro' || type === 'outro') && phrase % 2 === 1) continue;
-                count = type === 'chorus' ? 5 + Math.floor(r() * 3) : 6 + Math.floor(r() * 4);
+                count = type === 'chorus' ? 5 + Math.floor(pr() * 3) : 6 + Math.floor(pr() * 4);
             }
             let rhythm, pitches;
+            const again = lyrics && repeats && repeats[index] >= 0 ? sung[repeats[index]] : null;
+            // Un vers repetit es canta igual que la primera vegada.
+            if (again && again.span === span) { rhythm = again.rhythm; pitches = reuse(again, start); }
             // A la tornada sense lletra, la frase 1 i la 3 són el mateix motiu.
-            if (!lyrics && type === 'chorus' && hook && phrase % 2 === 0) [rhythm, pitches] = hook;
-            else { rhythm = rhythmFor(count, span); pitches = pitchesFor(rhythm, start); }
+            else if (!lyrics && type === 'chorus' && hook && phrase % 2 === 0) [rhythm, pitches] = hook;
+            else { rhythm = rhythmFor(count, span, lyrics ? stress?.[index] : null, pr); pitches = pitchesFor(rhythm, start, pr); }
+            if (lyrics) sung[index] = { span, rhythm, pitches };
             if (!lyrics && type === 'chorus' && !hook) hook = [rhythm, pitches];
             rhythm.forEach(([at, length], k) => {
                 const absolute = start * 4 + at;
@@ -2188,13 +2322,25 @@
         // secció ('fill' redoble, 'stop' aturada de la banda, 'none' sense redoble) i compte d'entrada.
         if (part.next !== undefined && part.next !== 'end' && !Object.hasOwn(SONG_PARTS, part.next)) throw new Error('Secció següent no vàlida');
         if (part.fill !== undefined && (!Number.isInteger(part.fill) || part.fill < 0 || part.fill > 1000)) throw new Error('Redoble no vàlid');
-        if (part.ending !== undefined && !['fill', 'stop', 'none'].includes(part.ending)) throw new Error('Final de secció no vàlid');
+        if (part.ending !== undefined && !SECTION_ENDINGS.includes(part.ending)) throw new Error('Final de secció no vàlid');
+        if (part.closing !== undefined && !SONG_CLOSINGS.includes(part.closing)) throw new Error('Final de la cançó no vàlid');
+        // Entrada i sortida per capes: compàs (dins de la secció) on cada instrument entra o calla.
+        for (const [field, min, max] of [['entrance', 0, bars - 1], ['exit', 1, bars]]) {
+            const value = part[field];
+            if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value) || Object.entries(value).some(([name, bar]) =>
+                !Object.hasOwn(SONG_INSTRUMENTS, name) || !Number.isInteger(bar) || bar < min || bar > max))) throw new Error('Entrades o sortides d’instruments no vàlides');
+        }
+        if (part.entrance && part.exit && Object.entries(part.exit).some(([name, bar]) => bar <= (part.entrance[name] ?? 0))) throw new Error('Entrades o sortides d’instruments no vàlides');
         if (part.countIn !== undefined && typeof part.countIn !== 'boolean') throw new Error('Compte d’entrada no vàlid');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
             || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name) || !['riff', 'answer'].includes(mode))))
             throw new Error('Mode de línia no vàlid');
         if (part.syllables !== undefined && (!Array.isArray(part.syllables) || part.syllables.length > 32
             || part.syllables.some(n => !Number.isInteger(n) || n < 1 || n > 24))) throw new Error('Síl·labes de la lletra no vàlides');
+        if (part.stress !== undefined && (!Array.isArray(part.stress) || part.stress.length > 32 || part.stress.some(list => !Array.isArray(list)
+            || list.length > 24 || list.some(k => !Number.isInteger(k) || k < 0 || k > 23)))) throw new Error('Accents de la lletra no vàlids');
+        if (part.repeats !== undefined && (!Array.isArray(part.repeats) || part.repeats.length > 32
+            || part.repeats.some((j, i) => !Number.isInteger(j) || j < -1 || j >= i))) throw new Error('Versos repetits no vàlids');
         if (part.register !== undefined && ![-1, 0, 1].includes(part.register)) throw new Error('Registre de la veu no vàlid');
         const instruments = part.instruments === undefined ? (settings.instruments === undefined ? style.instruments : settings.instruments) : part.instruments;
         // Una secció pot quedar sense cap instrument (p. ex. tota la base silenciada): sona en silenci.
@@ -2266,7 +2412,37 @@
             for (let b = 0; b < bars; b += 4) notes.forEach(n => { if (n[0] + b < bars) out.push([n[0] + b, n[1], n[2], n[3]]); });
             return out;
         };
-        const melody = repeat(composePhrase(r, ctx, phraseBars, rhythms).notes);
+        // Desenvolupament del motiu per blocs de quatre compassos, en lloc de
+        // repetir la mateixa frase: A, A' (final obert a la terça o la quinta),
+        // B (frase nova de contrast, una mica més aguda) i A'' (final tancat a la
+        // fonamental de l'acord). Les notes a temps s'ajusten a l'acord de cada compàs.
+        const develop = (phrase, dr, lctx, rhythmSet) => {
+            const blocks = Math.ceil(bars / 4);
+            if (blocks < 2 || !phrase.length) return repeat(phrase);
+            const out = [], lo = lctx.lo, hi = lctx.hi, firstEnd = phrase[phrase.length - 1][2] % 12;
+            for (let k = 0; k < blocks; k++) {
+                const b0 = k * 4, role = k === 0 ? 'A' : k === blocks - 1 ? 'end' : k % 4 === 2 || blocks === 3 ? 'B' : 'open';
+                let block;
+                if (role === 'B') {
+                    const own = [0, 1, 2, 3].map(i => b0 + i).filter(b => b < bars);
+                    const prev = out.length ? out[out.length - 1][2] : lctx.prev;
+                    block = composePhrase(dr, { ...lctx, center: lctx.center + 3, prev }, own, own.map((_, i) => rhythmSet[(i + 1) % rhythmSet.length])).notes;
+                } else {
+                    block = phrase.filter(n => n[0] + b0 < bars).map(([b, t, p, d]) => {
+                        const chord = chords[b + b0];
+                        return [b + b0, t, t % 1 === 0 && !chord.pcs.includes(p % 12) ? nearestTone(p, chord.pcs, lo, hi) : p, d];
+                    });
+                    const last = block[block.length - 1];
+                    if (last && role !== 'A') {
+                        const pcs = chords[last[0]].pcs, open = pcs.slice(1, 3).filter(pc => pc !== firstEnd);
+                        last[2] = nearestTone(last[2], role === 'end' ? [pcs[0]] : open.length ? open : pcs.slice(1, 3), lo, hi);
+                    }
+                }
+                out.push(...block);
+            }
+            return out;
+        };
+        const melody = develop(composePhrase(r, ctx, phraseBars, rhythms).notes, seededRng((seed ^ 0x6a09e667) >>> 0), ctx, rhythms);
         // Capes: cada instrument afegit a una secció té la seva pròpia versió.
         // Els melòdics reben una frase pròpia sobre els mateixos acords; els
         // rítmics i d'acompanyament, un patró propi.
@@ -2288,9 +2464,13 @@
             || !Number.isInteger(take.revision) || take.revision < 1 || take.revision > 1000000
             || !Number.isInteger(take.from) || !Number.isInteger(take.to) || take.from < 0 || take.from >= take.to || take.to > bars
             || (take.feel !== undefined && ![.5, 2].includes(take.feel))
-            || (take.sound !== undefined && !['auto', 'clean', 'cleanGm', 'muted', 'overdrive', 'distortion'].includes(take.sound))))
+            || (take.sound !== undefined && !['auto', 'clean', 'cleanGm', 'muted', 'overdrive', 'distortion'].includes(take.sound))
+            || (take.color !== undefined && !Object.hasOwn(COLOR_FX, take.color))))
             throw new Error('Preses de guitarra no vàlides');
         if (part.guitarBase !== undefined && typeof part.guitarBase !== 'boolean') throw new Error('Guitarra base no vàlida');
+        if (part.colors !== undefined && (!part.colors || typeof part.colors !== 'object' || Array.isArray(part.colors)
+            || Object.entries(part.colors).some(([name, color]) => !COLOR_INSTRUMENTS.includes(name) || !Object.hasOwn(COLOR_FX, color))))
+            throw new Error('Efecte de color no vàlid');
         const lines = {}, layerIndex = {};
         const rhythmPool = [RHYTHMS.r1, RHYTHMS.r2, RHYTHMS.r3, RHYTHMS.r4, RHYTHMS.r5, RHYTHMS.r6, RHYTHMS.r7, RHYTHMS.r9];
         Object.keys(layers).forEach(name => {
@@ -2298,7 +2478,7 @@
             layerIndex[name] = (rev - 1) % 5;
             if (name === 'vocal') {
                 const vr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
-                lines.vocal = composeVocal(vr, chords, bars, part.type, ctx.scalePcs, part.syllables, part.register || 0);
+                lines.vocal = composeVocal(vr, chords, bars, part.type, ctx.scalePcs, part.syllables, part.register || 0, part.stress, part.repeats);
                 return;
             }
             if (!['trumpet', 'trombone', 'synthLead', 'sax'].includes(name)) return;
@@ -2306,7 +2486,7 @@
             const lctx = { ...ctx, prev: nearestTone(name === 'trombone' ? 67 : 72, chords[0].pcs, 64, 79) };
             const lrhythms = phraseBars.map(() => rhythmPool[Math.floor(lr() * rhythmPool.length)]);
             if (name === 'synthLead' && lr() < .5) lrhythms[lrhythms.length - 1] = RHYTHMS.r7;
-            lines[name] = repeat(composePhrase(lr, lctx, phraseBars, lrhythms).notes);
+            lines[name] = develop(composePhrase(lr, lctx, phraseBars, lrhythms).notes, lr, lctx, lrhythms);
         });
         // El baix té un riff propi per a cada alternativa; una única partitura
         // alimenta tant el motor de mostres com el sintetitzador de reserva.
@@ -2343,7 +2523,7 @@
             const tones = { root, third: nearestTone(root+4,chord.pcs,root,root+12),
                 fifth: nearestTone(root+7,chord.pcs,root,root+12), octave: root+12,
                 approach: next===root ? root+7 : next+(next>root ? -1 : 1) };
-            const pattern = part.type==='outro' && b===bars-1
+            const pattern = part.type==='outro' && b===bars-1 && part.closing !== 'fade'
                 ? [[0,'root',3.3,1.18]] : groove.bass>=0 ? bassPatterns[groove.bass] : classic;
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
@@ -2365,15 +2545,28 @@
         // La resta de la banda calla durant el compte d'entrada i després del cop de l'aturada.
         if (part.countIn) drumOptions.countIn = true;
         if (part.ending === 'stop' && bars > 1) drumOptions.stopAt = ((bars - 1) * 4 + .75) * 60 / tempo;
+        // Silenci al mig de la cançó: després del cop (o des del principi de l'últim compàs) no sona res.
+        if (part.ending === 'break') drumOptions.stopAt = ((bars - 1) * 4 + .25) * 60 / tempo;
+        if (part.ending === 'silence') drumOptions.stopAt = Math.max(.02, (bars - 1) * 4 * 60 / tempo);
+        // Tall en sec: la banda dona l'últim cop curt i calla.
+        if (part.type === 'outro' && part.closing === 'cold') drumOptions.stopAt = ((bars - 1) * 4 + .5) * 60 / tempo;
+        if (part.type === 'outro' && part.closing && part.closing !== 'hit') drumOptions.closing = part.closing;
+        // Entrades i sortides per capes: cada instrument sona només a partir del seu compàs d'entrada i fins al de sortida.
+        const audibleRanges = JSON.parse(JSON.stringify(ranges));
+        for (const name of new Set([...Object.keys(part.entrance || {}), ...Object.keys(part.exit || {})])) {
+            const from = part.entrance?.[name] ?? 0, to = part.exit?.[name] ?? bars;
+            audibleRanges[name] = (audibleRanges[name] || [[0, bars]]).map(([a, b]) => [Math.max(a, from), Math.min(b, to)]).filter(([a, b]) => a < b);
+        }
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
-            ranges: JSON.parse(JSON.stringify(ranges)), guitarTakes: guitarTakes.map(take => ({ ...take })),
+            ranges: audibleRanges, guitarTakes: guitarTakes.map(take => ({ ...take })),
             guitarBase: part.guitarBase !== false,
-            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn }),
+            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn, closing: part.type === 'outro' ? part.closing : undefined }),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: { ...(settings.mix || {}), ...(part.mix || {}) },
             baseVolume: { ...baseVolume },
             fx: { ...(settings.fx || {}), ...(part.fx || {}) },
+            colors: { ...(part.colors || {}) },
             feel: { ...(part.feel || {}) } };
     }
     function songPartScore(syn, spec) {
@@ -2466,7 +2659,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, composeSongPart, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

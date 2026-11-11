@@ -3,7 +3,6 @@
 // fa servir algun d'aquests sons: el banc principal no creix.
 // - Big Rusty Drums (Karoryfer): bombo de 24" i toms grans, so greu i rodó.
 // - Virtuosity Drums: kit de club de jazz (micròfons propers + sala) i el seu micròfon lo-fi.
-// - Meatbass (Karoryfer): contrabaix de 1958 en pizzicato.
 // - Growlybass (Karoryfer): Squier Jazz Bass amb dits, directe.
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';

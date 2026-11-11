@@ -217,7 +217,9 @@ test('banc addicional: bateries i baixos gravats al mateix nivell, Muldjord real
   assert(extraRaw.byteLength > 1000000 && extraRaw.byteLength < 20 * 1024 * 1024);
   const extra = parseSoundBank(extraRaw.buffer.slice(extraRaw.byteOffset, extraRaw.byteOffset + extraRaw.byteLength));
   for (const program of [66, 67, 68]) assert(extra.presets.some(p => p.isGMGSDrum && p.program === program), `kit ${program}`);
-  for (const [bankMSB, program] of [[2, 32], [4, 33]]) assert(extra.presets.some(p => !p.isGMGSDrum && p.bankMSB === bankMSB && p.program === program));
+  assert(extra.presets.some(p => !p.isGMGSDrum && p.bankMSB === 4 && p.program === 33), 'Jazz Bass Growlybass');
+  // El contrabaix Meatbass s'ha retirat del banc.
+  assert(!extra.presets.some(p => !p.isGMGSDrum && p.bankMSB === 2 && p.program === 32), 'sense contrabaix');
   const db = channels => { let s = 0, n = 0; for (const c of channels) for (const x of c) { s += x * x; n++; } return 10 * Math.log10(s / n); };
   const crossings = channels => { let z = 0; const c = channels[0]; for (let i = 1; i < c.length; i++) if ((c[i] >= 0) !== (c[i - 1] >= 0)) z++; return z; };
   const drums = engine.composeSongPart({ seed: 3, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'verse', bars: 2, energy: 70, revision: 1, instruments: ['drums'] });
@@ -232,8 +234,27 @@ test('banc addicional: bateries i baixos gravats al mateix nivell, Muldjord real
   assert(crossings(await render({ drums: 'rusty' }, { drumTune: -4 })) < crossings(await render({ drums: 'rusty' })) * .9);
   const bassPart = engine.composeSongPart({ seed: 3, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'verse', bars: 2, energy: 70, revision: 1, instruments: ['bass'] });
   const finger = db(await renderSampledPart(bank, { ...bassPart, timbres: { bass: 'finger' } }, 16000, { extra, raw: true }));
-  for (const bass of ['upright', 'growly']) {
+  for (const bass of ['growly']) {
     const level = db(await renderSampledPart(bank, { ...bassPart, timbres: { bass } }, 16000, { extra, raw: true }));
     assert(Math.abs(level - finger) < 3, `${bass}: ${(level - finger).toFixed(1)} dB`);
   }
+});
+
+test('efectes de color: ràdio, megàfon, telèfon i gramòfon treuen greus i mantenen el nivell', async () => {
+  const horn = engine.composeSongPart({ seed: 3, style: 'ska', bpm: 120, tonic: 0, mode: 'major' },
+    { type: 'verse', bars: 2, energy: 70, revision: 1, instruments: ['trumpet'], layers: { trumpet: 2 } });
+  const rms = data => Math.sqrt(data[0].reduce((t, x) => t + x * x, 0) / data[0].length);
+  // Part greu del so: filtre de pas baix d'un pol a 250 Hz.
+  const lows = data => { const a = Math.exp(-2 * Math.PI * 250 / 16000); let y = 0; return rms([data[0].map(x => (y = a * y + (1 - a) * x))]); };
+  const dry = await renderSampledPart(bank, horn, 16000, { raw: true });
+  for (const color of Object.keys(engine.COLOR_FX)) {
+    const wet = await renderSampledPart(bank, { ...horn, colors: { trumpet: color } }, 16000, { raw: true });
+    assert(wet[0].every(Number.isFinite));
+    assert(lows(wet) / rms(wet) < lows(dry) / rms(dry), `${color}: menys greus`);
+    // El so canvia de debò (la diferència és comparable al senyal), no només de volum.
+    assert(rms([wet[0].map((x, i) => x - dry[0][i])]) / rms(dry) > .5, `${color}: so diferent`);
+    assert(Math.abs(20 * Math.log10(rms(wet) / rms(dry))) < 6, `${color}: nivell semblant`);
+  }
+  assert.throws(() => engine.composeSongPart({ seed: 3, style: 'ska', bpm: 120, tonic: 0, mode: 'major' },
+    { type: 'verse', bars: 2, energy: 70, revision: 1, instruments: ['bass'], colors: { bass: 'radio' } }), /color/);
 });

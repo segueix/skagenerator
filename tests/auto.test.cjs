@@ -77,7 +77,8 @@ test('la cançó automàtica compon cançons senceres de 2 a 4 minuts per a cada
       const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: h, groove: { ...song.settings.groove, ...(sec.groove || {}) },
         instruments: [...song.base.instruments.filter(n => !(sec.mute || []).includes(n)), ...active.map(c => c.instrument)], layers: Object.fromEntries(active.map(c => [c.instrument, c.revision])) };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (h - 1) % 5;
-      for (const f of ['bpm', 'transpose', 'feel', 'cymbals', 'ending']) if (sec[f] !== undefined) part[f] = sec[f];
+      for (const f of ['bpm', 'transpose', 'feel', 'cymbals', 'ending', 'entrance', 'exit']) if (sec[f] !== undefined) part[f] = sec[f];
+      if (sec.closing && sec.type === 'outro') part.closing = sec.closing;
       if (Object.keys(lineModes).length) part.lineModes = lineModes;
       const spec = engine.composeSongPart(song.settings, part);
       if (spec.instruments.length) assert(createPerformance(spec).events.length > 0);
@@ -95,4 +96,112 @@ test('una secció pot quedar sense cap instrument (base silenciada) i continua t
   // Patró propi de l'orgue de la base en una secció.
   const organ = engine.composeSongPart({ seed: 5, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, { type: 'verse', bars: 2, energy: 50, revision: 1, instruments: ['organ'], layers: { organ: 3 } });
   assert.equal(organ.layers.organ, 2);
+});
+
+test('el selector de qualitat puntua l’harmonia, el clímax, les cadències i els xocs entre línies', () => {
+  const C = engine.chordFromSymbol(0, 'I'), chords = Array(4).fill(C);
+  // Mateix contorn: notes de l'acord a temps (do-mi-sol) contra notes de fora (re-fa-la).
+  const line = pitches => pitches.map((p, i) => [Math.floor(i / 4), i % 4, p, i === pitches.length - 1 ? 2 : 1]);
+  const inside = line([60, 62, 64, 65, 67, 65, 64, 62, 60, 62, 64, 62, 60]), outside = line([62, 64, 65, 67, 69, 67, 65, 64, 62, 64, 65, 64, 62]);
+  assert(builder.lineScore(inside, { chords }) > builder.lineScore(outside, { chords }) + 1, 'encaix amb els acords');
+  // Una segona menor sostinguda contra una altra línia resta punts.
+  const clash = inside.map(([b, t, , d]) => [b, t, 61, d]), unison = inside.map(([b, t, p, d]) => [b, t, p - 12, d]);
+  assert(builder.lineScore(inside, { chords, others: [unison] }) > builder.lineScore(inside, { chords, others: [clash] }) + 3, 'xocs');
+  // Un sol clímax per frase.
+  const one = line([60, 62, 64, 67, 72, 67, 64, 62, 60]), many = line([60, 72, 64, 72, 62, 72, 64, 72, 60]);
+  assert(builder.lineScore(one) > builder.lineScore(many));
+  // La forma de la cançó: estrofa i tornada diferents i arribada a la tornada des de la dominant.
+  const form = map => builder.harmonyScore(type => map[type] || null);
+  assert(form({ verse: ['vi', 'IV', 'ii', 'V'], chorus: ['I', 'V', 'vi', 'IV'] }) > form({ verse: ['I', 'V', 'vi', 'IV'], chorus: ['I', 'V', 'vi', 'IV'] }) + 3);
+});
+
+test('la cançó automàtica tria versions sense xocs i amb la veu de la tornada més aguda', () => {
+  for (const key of ['twotone', 'poppunk', 'rocksteady']) {
+    const song = builder.createAutoSong(engine, key, { seed: 31 });
+    const voice = type => {
+      const sec = song.sections.find(s => s.type === type), clip = song.clips.find(c => c.instrument === 'vocal' && c.start === sec.start);
+      const h = song.harmony[type] || 1, p = { type, bars: sec.bars, energy: sec.energy, revision: h, instruments: ['vocal'], layers: { vocal: clip.revision } };
+      if (['intro', 'verse', 'chorus'].includes(type)) p.variantIndex = (h - 1) % 5;
+      for (const f of ['bpm', 'transpose']) if (sec[f] !== undefined) p[f] = sec[f];
+      const line = engine.composeSongPart(song.settings, p).lines.vocal;
+      return line.reduce((t, n) => t + n[2], 0) / line.length;
+    };
+    assert(voice('chorus') > voice('verse') + 1, `${key}: tornada més aguda que l’estrofa`);
+  }
+});
+
+test('inicis, finals i silencis: cada clic en tria uns altres i la cançó continua sent vàlida', () => {
+  const song = builder.createAutoSong(engine, 'twotone', { seed: 77 });
+  assert(song.edges && builder.OPENINGS[song.edges.opening] && builder.CLOSINGS[song.edges.closing], 'la cançó automàtica en porta');
+  const seen = { opening: new Set(), closing: new Set(), middle: new Set() };
+  let previous = song.edges;
+  for (let seed = 1; seed <= 30; seed++) {
+    const result = builder.designEdges(engine, song, { seed });
+    assert.notEqual(result.opening, previous.opening, 'no repeteix l’inici');
+    assert.notEqual(result.closing, previous.closing, 'no repeteix el final');
+    for (const k of ['opening', 'closing', 'middle']) seen[k].add(result[k]);
+    previous = song.edges;
+    // Només hi ha un silenci al mig, just abans d'una tornada, i els clips afegits no es dupliquen.
+    const silent = song.sections.filter(s => ['break', 'silence'].includes(s.ending));
+    assert(silent.length <= 1);
+    for (const sec of silent) assert.equal(song.sections[song.sections.indexOf(sec) + 1].type, 'chorus');
+    assert(song.clips.filter(c => c.edge).length <= 2);
+    for (const sec of song.sections) {
+      const active = song.clips.filter(c => c.start < sec.start + sec.bars && sec.start < c.start + c.bars && !(sec.mute || []).includes(c.instrument));
+      const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: 1, instruments: [...song.base.instruments.filter(n => !(sec.mute || []).includes(n)), ...new Set(active.map(c => c.instrument))],
+        layers: Object.fromEntries(active.map(c => [c.instrument, c.revision])) };
+      for (const f of ['bpm', 'feel', 'ending', 'entrance', 'exit']) if (sec[f] !== undefined) part[f] = sec[f];
+      if (sec.closing) part.closing = sec.closing;
+      const spec = engine.composeSongPart(song.settings, part);
+      if (spec.instruments.length) createPerformance(spec);
+    }
+  }
+  assert(seen.opening.size >= 7, `inicis diferents: ${[...seen.opening]}`);
+  assert(seen.closing.size >= 6, `finals diferents: ${[...seen.closing]}`);
+  assert(seen.middle.has('break') && seen.middle.has('silence') && seen.middle.has('none'));
+  // Triats a mà: bateria sola a l'inici i la banda que calla per capes al final.
+  builder.designEdges(engine, song, { seed: 3, opening: 'drums', closing: 'breakdown', middle: 'none' });
+  const first = song.sections[0], last = song.sections.at(-1);
+  assert.deepEqual(first.mute, song.base.instruments.filter(n => n !== 'drums').concat(first.mute.filter(n => !song.base.instruments.includes(n))));
+  assert(!('drums' in last.exit) && Object.values(last.exit).every(b => b >= 1 && b <= last.bars));
+  // El fos d'entrada es desfà en triar-ne un altre.
+  builder.designEdges(engine, song, { seed: 4, opening: 'fadein', closing: 'fadeout', middle: 'none' });
+  assert.equal(song.sections[0].fade, 'in'); assert.equal(song.sections.at(-1).fade, 'out'); assert.equal(song.sections.at(-1).closing, 'fade');
+  builder.designEdges(engine, song, { seed: 5, opening: 'band', closing: 'hit', middle: 'none' });
+  assert.equal(song.sections[0].fade, undefined); assert.equal(song.sections.at(-1).fade, undefined); assert.equal(song.sections.at(-1).closing, undefined);
+});
+
+test('la cançó automàtica tria la millor de diverses candidates i fa créixer les estrofes', () => {
+  const one = builder.createAutoSong(engine, 'poppunk', { seed: 12, candidates: 1 }), three = builder.createAutoSong(engine, 'poppunk', { seed: 12 });
+  assert.deepEqual(builder.createAutoSong(engine, 'poppunk', { seed: 12 }), three, 'reproduïble');
+  for (const song of [one, three]) {
+    const verses = song.sections.filter(s => s.type === 'verse');
+    for (let i = 1; i < verses.length; i++) assert(verses[i].energy > verses[i - 1].energy, 'cada estrofa més plena');
+  }
+});
+
+test('la cançó automàtica fa servir els recursos especials amb mesura i als millors moments', () => {
+  const counts = {};
+  for (const key of Object.keys(engine.SUBGENRES)) for (let seed = 1; seed <= 6; seed++) for (const minutes of [2, 4]) {
+    const song = builder.createAutoSong(engine, key, { seed: seed * 13 + minutes, minutes });
+    const seconds = song.sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || song.settings.bpm), 0);
+    const stops = song.sections.filter(s => s.ending === 'stop'), silent = song.sections.filter(s => ['break', 'silence'].includes(s.ending));
+    const fades = song.sections.filter(s => s.fade), colors = song.clips.filter(c => c.color);
+    const used = (song.edges.opening !== 'band') + (song.edges.closing !== 'hit') + stops.length + silent.length + colors.length;
+    assert(used <= (seconds < 150 ? 2 : seconds < 210 ? 3 : 4), `${key} ${seed}: ${used} recursos en ${seconds.toFixed(0)} s`);
+    assert(stops.length <= 1 && silent.length <= 1 && fades.length <= 1 && colors.length <= 1, `${key} ${seed}: sense abusar`);
+    // Silencis i aturades només abans d'una tornada, i mai seguits.
+    for (const sec of [...stops, ...silent]) assert.equal(song.sections[song.sections.indexOf(sec) + 1].type, 'chorus');
+    if (stops.length && silent.length) assert(Math.abs(song.sections.indexOf(stops[0]) - song.sections.indexOf(silent[0])) >= 2);
+    // El fos de sortida només en un final prou llarg; el color, a la intro o al pont.
+    if (song.sections.at(-1).fade === 'out') assert(song.sections.at(-1).bars >= 4);
+    for (const c of colors) assert(['intro', 'bridge', 'solo'].includes(song.sections.find(s => s.start === c.start).type));
+    counts[used] = (counts[used] || 0) + 1;
+  }
+  assert(Object.keys(counts).length >= 3, `quantitats variades: ${JSON.stringify(counts)}`);
+  // Els subgèneres lents tendeixen al fos; el hardcore, al tall en sec.
+  const closings = key => Array.from({ length: 8 }, (_, i) => builder.createAutoSong(engine, key, { seed: 100 + i, candidates: 1 }).edges.closing);
+  assert(closings('rocksteady').filter(c => c === 'fadeout').length >= 5);
+  assert(closings('hardcore').filter(c => c === 'cold').length >= 5);
+  assert(!closings('hardcore').includes('fadeout'));
 });

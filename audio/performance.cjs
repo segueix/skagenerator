@@ -17,11 +17,11 @@ function createPerformance(spec) {
   // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
   // FreePats); banc 3: staccato de VSCO; banc 1: variacions GS; banc 0: GM.
   // Kit 69: Muldjord (gravat; els programes 64 i 65 són els «User Drum Set» GS del sintetitzador). Banc addicional (CC0, es baixa a part): kits 68 Big Rusty,
-  // 66 Virtuosity club i 67 Virtuosity lo-fi; contrabaix [2,32] Meatbass i baix [4,33]
+  // 66 Virtuosity club i 67 Virtuosity lo-fi; baix [4,33]
   // Growlybass. La resta són sons de GeneralUser GS.
   const presets = {
     guitar: { auto: null, clean: [2, 27], cleanGm: [0, 27], muted: [0, 28], overdrive: [0, 29], distortion: [0, 30] },
-    bass: { auto: null, finger: [2, 33], pick: [2, 34], upright: [2, 32], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
+    bass: { auto: null, finger: [2, 33], pick: [2, 34], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
     drums: { auto: null, real: [0, 69], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
     // La segona veu de vent sona per defecte amb saxo tenor gravat: articulació més
@@ -57,6 +57,8 @@ function createPerformance(spec) {
   const misfits = isHorror(spec.fx?.guitar?.type);
   const realBrass = { 3: !chosen('trumpet'), 4: spec.timbres?.trombone === 'vsco' };
   const guitarTakes = Array.isArray(spec.guitarTakes) ? spec.guitarTakes : [];
+  // L'últim compàs de l'outro és el final de la cançó, tret que s'esvaeixi (el groove continua).
+  const finale = spec.type === 'outro' && spec.closing !== 'fade';
   const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   const channels = [
     patch(0, chosen('guitar') ?? (punk && !amped('guitar') ? [0, 30] : [2, 27]), 42, 94),
@@ -89,6 +91,7 @@ function createPerformance(spec) {
     const preset = presets[family][chosenSound] ?? fallback;
     const entry = patch(channel, preset, index % 2 ? 93 : 35, 84);
     if (take.fx) entry.clipFx = take.fx;
+    if (take.color) entry.clipColor = take.color;
     channels.push(entry);
     instrumentOf[channel] = family;
     takeChannels.set(channel, take);
@@ -218,7 +221,7 @@ function createPerformance(spec) {
     return result;
   };
   for (let b = 0; b < spec.chords.length; b++) {
-    const chord = spec.chords[b], t0 = b * bar, ending = spec.type === 'outro' && b === spec.chords.length - 1;
+    const chord = spec.chords[b], t0 = b * bar, ending = finale && b === spec.chords.length - 1;
     const soft = spec.type === 'intro' || spec.type === 'bridge';
     const guitarPatterns = punk
       ? [[0, .5, 1, 1.5, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 3, 3.5], [0, .5, 1.5, 2, 2.5, 3.5], [0, .5, 1, 1.5, 2.5, 3], [0, 1, 2, 2.5, 3, 3.5]]
@@ -337,7 +340,7 @@ function createPerformance(spec) {
   const drumBars = new Map();
   for (const [b, t, drum] of spec.drumLine || []) { if (!drumBars.has(b)) drumBars.set(b, new Set()); drumBars.get(b).add(`${t}:${drum}`); }
   if (has('drums') && spec.style !== 'urban' && spec.energy >= 40) for (const [b, hits] of drumBars) {
-    if (hits.size < 6 || spec.type === 'outro' && b === spec.chords.length - 1) continue;
+    if (hits.size < 6 || finale && b === spec.chords.length - 1) continue;
     for (const t of [.75, 1.75, 2.25, 3.25]) if (!hits.has(`${t}:38`) && !hits.has(`${t}:37`) && random() < .4)
       note(9, 38, (b * 4 + t) * beat + snareFeel, .05, 22 + random() * 10, .004);
   }
@@ -381,7 +384,7 @@ function createPerformance(spec) {
     const own = Array.isArray(spec.lines?.[instrument]), line = own ? spec.lines[instrument] : spec.melody;
     const channel = { synthLead: 5, trumpet: 3, trombone: 4, sax: 8 }[instrument];
     for (const [b, t, pitch, duration] of line) {
-      const at = b * bar + t * beat, last = spec.type === 'outro' && b === spec.chords.length - 1;
+      const at = b * bar + t * beat, last = finale && b === spec.chords.length - 1;
       if (last) continue;
       // Sense capa pròpia, els metalls esperen a la segona meitat de la intro.
       if (!own && instrument !== 'synthLead' && spec.type === 'intro' && b < 2) continue;
@@ -432,6 +435,6 @@ function createPerformance(spec) {
     channels.find(c => c.channel === 1).fxTweak = { drive: -10, tone: 8 };
   }
   return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type,
-    mix: spec.mix || {}, baseVolume: spec.baseVolume || {}, fx: spec.fx || {} };
+    mix: spec.mix || {}, baseVolume: spec.baseVolume || {}, fx: spec.fx || {}, colors: spec.colors || {} };
 }
 module.exports = { createPerformance };

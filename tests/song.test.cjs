@@ -23,7 +23,12 @@ test('les tornades repeteixen exactament el motiu i es reprodueixen igual despr�
   const a = await engine.songPartSamples(first, 4000);
   const b = await engine.songPartSamples(restored, 4000);
   assert.deepEqual(a, b);
-  assert.deepEqual(first.melody.filter(n => n[0] < 4), first.melody.filter(n => n[0] >= 4).map(n => [n[0] - 4, ...n.slice(1)]));
+  // Vuit compassos: A i A'' (el mateix motiu, que tanca a la fonamental de l'acord).
+  const a1 = first.melody.filter(n => n[0] < 4), a2 = first.melody.filter(n => n[0] >= 4).map(n => [n[0] - 4, ...n.slice(1)]);
+  assert.deepEqual(a1.slice(0, -1), a2.slice(0, -1));
+  assert.deepEqual(a1.map(n => [n[0], n[1], n[3]]), a2.map(n => [n[0], n[1], n[3]]));
+  const end = first.melody.at(-1);
+  assert.equal(end[2] % 12, first.chords[end[0]].pcs[0]);
   const another = engine.composeSongPart(settings, part('chorus', 8, 2));
   assert.notDeepEqual(first.melody, another.melody);
 });
@@ -312,4 +317,69 @@ test('una secció pot canviar de to (modulació) i de patró de bateria', () => 
   assert.deepEqual(up.chords.map(c => c.pcs.map(p => (p + 10) % 12)), same.chords.map(c => c.pcs));
   assert.notDeepEqual(engine.composeSongPart(base, { ...part('verse'), groove: { drums: 3 } }).drumLine, engine.composeSongPart(base, part('verse')).drumLine);
   for (const transpose of [7, -7, 1.5]) assert.throws(() => engine.composeSongPart(base, { ...part('chorus'), transpose }), /to/);
+});
+
+test('el motiu es desenvolupa: A, A\' (final obert), B (contrast) i A\'\' (final tancat)', () => {
+  const spec = engine.composeSongPart({ ...settings, instruments: ['trumpet'] }, { ...part('verse', 16), layers: { trumpet: 3 } });
+  for (const line of [spec.melody, spec.lines.trumpet]) {
+    const block = k => line.filter(n => Math.floor(n[0] / 4) === k).map(n => [n[0] % 4, n[1], n[3]]);
+    assert.deepEqual(block(0), block(1), 'A\' té el ritme d’A');
+    assert.deepEqual(block(0), block(3), 'A\'\' té el ritme d’A');
+    assert.notDeepEqual(line.filter(n => n[0] >= 8 && n[0] < 12).map(n => n[2]), line.filter(n => n[0] < 4).map(n => n[2]), 'B és una frase nova');
+    const end = line.at(-1), open = line.filter(n => n[0] < 8).at(-1);
+    assert.equal(end[2] % 12, spec.chords[end[0]].pcs[0], 'final tancat a la fonamental');
+    assert(spec.chords[open[0]].pcs.slice(1, 3).includes(open[2] % 12), 'final obert a la terça o la quinta');
+  }
+});
+
+test('la veu canta igual els versos repetits i posa les síl·labes tòniques a temps', () => {
+  const lyrics = 'Rude boys del Raval\nballant a contratemps\nrude boys del Raval\nningú no ens atura avui';
+  const info = engine.analyzeLyrics(lyrics);
+  assert.deepEqual(info.syllables, [6, 6, 6, 10]); // mateix recompte que l’app
+  assert.deepEqual(info.stress.slice(0, 2), [[0, 2, 5], [1, 5]]);
+  assert.deepEqual(info.repeats, [-1, -1, 0, -1]);
+  assert.deepEqual(engine.analyzeLyrics('La ciutat fa olor de cafè').stress, [[3, 4, 6, 9]]);
+  const vocal = engine.composeSongPart({ ...settings, instruments: ['vocal'] }, { ...part('chorus', 8), layers: { vocal: 5 }, ...info }).lines.vocal;
+  const phrase = p => vocal.filter(n => Math.floor(n[0] / 2) === p);
+  assert.deepEqual(phrase(0).map(n => [n[0] % 2, n[1], n[2], n[3]]), phrase(2).map(n => [n[0] % 2, n[1], n[2], n[3]]), 'vers repetit, mateixa melodia');
+  // Les tòniques cauen a temps sempre que el vers en deixa lloc (molt més que sense accents).
+  const plain = engine.composeSongPart({ ...settings, instruments: ['vocal'] }, { ...part('chorus', 8), layers: { vocal: 5 }, syllables: info.syllables }).lines.vocal;
+  const onBeat = line => { let hit = 0, all = 0; for (let p = 0; p < 4; p++) { const notes = line.filter(n => Math.floor(n[0] / 2) === p);
+    assert.equal(notes.length, info.syllables[p]); for (const k of info.stress[p]) if (k > 0) { all++; if (notes[k][1] % 1 === 0) hit++; } } return hit / all; };
+  assert(onBeat(vocal) >= .8, `tòniques a temps: ${onBeat(vocal)}`);
+  assert(onBeat(vocal) >= onBeat(plain));
+  // De mitjana, sobre moltes versions de la melodia.
+  const average = extra => { let t = 0; for (let rev = 1; rev <= 20; rev++) t += onBeat(engine.composeSongPart({ ...settings, instruments: ['vocal'] },
+    { ...part('verse', 8), layers: { vocal: rev }, syllables: info.syllables, ...extra }).lines.vocal); return t / 20; };
+  assert(average({ stress: info.stress }) > average({}) + .1);
+  for (let p = 0; p < 3; p++) for (const k of info.stress[p]) if (k > 0) assert.equal(phrase(p)[k][1] % 1, 0, `vers ${p + 1}, síl·laba ${k + 1} a temps`);
+  // Dues estrofes amb la mateixa versió: la mateixa melodia adaptada a les síl·labes.
+  const verse = text => engine.composeSongPart({ ...settings, instruments: ['vocal'] }, { ...part('verse', 8), layers: { vocal: 2 }, ...engine.analyzeLyrics(text) }).lines.vocal;
+  const one = verse('Baixo pel carrer amb sabates\nla ciutat fa olor de mar'), two = verse('La mare em diu que torni aviat\nperò la banda no ha acabat');
+  assert.equal(one.filter(n => n[0] < 2)[0][1], two.filter(n => n[0] < 2)[0][1], 'mateixa anacrusi');
+  for (const bad of [{ stress: [[30]] }, { stress: 'x' }, { repeats: [0] }, { repeats: [-1, 3] }])
+    assert.throws(() => engine.composeSongPart({ ...settings, instruments: ['vocal'] }, { ...part('verse', 8), layers: { vocal: 2 }, ...bad }), /Accents|Versos/);
+});
+
+test('silencis al mig, tancaments de la cançó i entrades per capes', () => {
+  const { createPerformance } = require('../audio/performance.cjs');
+  const st = { seed: 5, style: 'ska', bpm: 140, tonic: 0, mode: 'major' }, ins = ['drums', 'bass', 'guitar', 'organ'], bar = 4 * 60 / 140;
+  const notes = p => createPerformance(engine.composeSongPart(st, { type: 'verse', bars: 4, energy: 70, revision: 1, instruments: ins, ...p })).events.filter(e => e.type === 'on');
+  // Cop i silenci: després del cop no sona res; compàs de silenci: l'últim compàs és mut.
+  assert(notes({ ending: 'break' }).every(e => e.time < 3 * bar + .2));
+  assert(notes({ ending: 'silence' }).every(e => e.time < 3 * bar + .02));
+  assert(notes({}).some(e => e.time > 3 * bar + .5));
+  // Entrada per capes: el baix entra al compàs 2, la guitarra al 3 i l'orgue al 4.
+  const built = notes({ entrance: { bass: 1, guitar: 2, organ: 3 } });
+  for (const [channel, at] of [[2, 1], [0, 2], [11, 3]]) assert(built.filter(e => e.channel === channel).every(e => e.time >= at * bar - .05), `canal ${channel}`);
+  assert(built.some(e => e.channel === 9 && e.time < bar));
+  // Sortida per capes: el baix calla al compàs 2.
+  assert(notes({ exit: { bass: 2 } }).filter(e => e.channel === 2).every(e => e.time < 2 * bar));
+  const outro = closing => createPerformance(engine.composeSongPart(st, { type: 'outro', bars: 4, energy: 60, revision: 1, instruments: ins, closing })).events.filter(e => e.type === 'on');
+  // Fos: el ritme continua fins al final (sense cop final); tall en sec: la banda calla de seguida i sense plats.
+  assert(outro('fade').filter(e => e.time > 3 * bar + .5).length > 10);
+  assert(outro('cold').every(e => e.time < 3 * bar + .3) && !outro('cold').some(e => e.channel === 9 && e.time > 3 * bar - .05 && [49, 57].includes(e.note)));
+  assert(outro('ring').filter(e => e.channel === 9 && e.time > 2 * bar && e.time < 3 * bar).length >= 16, 'redoble llarg');
+  for (const bad of [{ ending: 'x' }, { closing: 'x' }, { entrance: { bass: 4 } }, { exit: { bass: 0 } }, { entrance: { bass: 2 }, exit: { bass: 2 } }, { entrance: { kazoo: 1 } }])
+    assert.throws(() => notes(bad), /no vàlid/);
 });

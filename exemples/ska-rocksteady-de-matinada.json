@@ -121,7 +121,7 @@
       "instrument": "vocal",
       "start": 4,
       "bars": 8,
-      "revision": 31,
+      "revision": 16,
       "generated": true,
       "register": -1
     },
@@ -130,7 +130,7 @@
       "instrument": "vocal",
       "start": 12,
       "bars": 8,
-      "revision": 15,
+      "revision": 47,
       "generated": true,
       "register": -1
     },
@@ -147,7 +147,7 @@
       "instrument": "vocal",
       "start": 20,
       "bars": 8,
-      "revision": 31,
+      "revision": 16,
       "generated": true,
       "register": -1
     },
@@ -156,7 +156,7 @@
       "instrument": "vocal",
       "start": 28,
       "bars": 8,
-      "revision": 15,
+      "revision": 47,
       "generated": true,
       "register": -1
     },
@@ -181,7 +181,7 @@
       "instrument": "vocal",
       "start": 36,
       "bars": 8,
-      "revision": 38,
+      "revision": 12,
       "generated": true,
       "register": -1
     },
@@ -190,7 +190,7 @@
       "instrument": "vocal",
       "start": 44,
       "bars": 8,
-      "revision": 15,
+      "revision": 47,
       "generated": true,
       "register": -1
     },
@@ -207,7 +207,7 @@
       "instrument": "trombone",
       "start": 44,
       "bars": 12,
-      "revision": 60,
+      "revision": 5,
       "generated": true
     }
   ]

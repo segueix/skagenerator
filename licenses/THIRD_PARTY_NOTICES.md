@@ -20,7 +20,6 @@ Es baixen a part, només quan una cançó els fa servir. Tots són CC0 1.0 (domi
 
 - **Big Rusty Drums** — Karoryfer Lecolds. CC0 1.0. https://github.com/sfzinstruments/karoryfer.big-rusty-drums
 - **Virtuosity Drums** (kit de club i micròfon lo-fi) — Virtuosity Musical Instruments, bateria d’Austin McMahon. CC0 1.0. https://github.com/sfzinstruments/virtuosity_drums
-- **Meatbass** (contrabaix de 1958 en pizzicato) — Karoryfer Lecolds. CC0 1.0. https://github.com/sfzinstruments/karoryfer.meatbass
 - **Growlybass** (Squier Jazz Bass, directe) — Karoryfer Lecolds. CC0 1.0. https://github.com/sfzinstruments/karoryfer.growlybass
 
 Modificacions: selecció d’unes quantes capes de força per cop o nota (una sola gravació per capa), barreja dels micròfons en mono, remostreig (32 kHz bateries, 22 kHz baixos), retall de cues i igualació de sonoritat amb el kit Muldjord i el baix amb dits. Els FLAC es descodifiquen amb @wasm-audio-decoders/flac (MIT, només al build).
