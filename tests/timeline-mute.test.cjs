@@ -23,6 +23,15 @@ test('la composició respecta els silencis de les capes i de la base a cada secc
   assert.deepEqual(Array.from(scope.compose().instruments), ['drums', 'bass', 'trumpet'], 'sense M tots tornen a sonar');
 });
 
+test('hi ha dos reguladors visibles, persistents i independents dels de secció', () => {
+  const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+  for (const name of ['drums', 'bass']) {
+    assert.match(html, new RegExp(`type="range" id="base-volume-${name}"`));
+    assert.match(html, new RegExp(`id="base-volume-${name}-value"`));
+  }
+  assert.match(app, /function changeBaseVolume\(name, db\)/);
+  assert.match(app, /settings\.baseVolume/);
+});
 test('la línia té capçal desplaçable i controls M amb les dues vies de reproducció', () => {
   const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
   assert.match(html, /id="playhead"[^>]*role="slider"/);

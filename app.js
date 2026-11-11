@@ -60,6 +60,9 @@
   const EQ_KEYS = [['low', 'Greus'], ['mid', 'Mitjos'], ['high', 'Aguts'], ['volume', 'Volum']];
   const flatEq = () => ({ low: 0, mid: 0, high: 0, volume: 0 });
   const isFlat = band => EQ_KEYS.every(([key]) => band[key] === 0);
+  const defaultBaseVolume = () => ({ drums: 0, bass: 0 });
+  const validBaseVolume = values => values === undefined || !!values && typeof values === 'object' && !Array.isArray(values)
+    && Object.entries(values).every(([name, db]) => ['drums', 'bass'].includes(name) && Number.isInteger(db) && db >= -24 && db <= 6);
   const defaultGroove = () => ({ drums: 0, bass: 0, guitar: 0 });
   const validTimbres = input => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
     && Object.entries(input).every(([name, value]) => timbreOptions[name]?.some(([preset]) => preset === value));
@@ -82,7 +85,7 @@
   const pick = n => random32() % n;
 
   const newSong = () => ({ version: 3, title: 'Nova cançó', clips: [],
-    settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: newSeed(), bars: 64, timbres: defaultTimbres(), groove: defaultGroove() },
+    settings: { style: 'ska', bpm: 128, tonic: 0, mode: 'major', seed: newSeed(), bars: 64, timbres: defaultTimbres(), groove: defaultGroove(), baseVolume: defaultBaseVolume() },
     base: { instruments: baseDefaults('ska'), revision: 1, generated: false }, harmony: {}, sections: [] });
 
   // Els projectes de la versió per parts es converteixen en seccions
@@ -139,6 +142,8 @@
       || !profile.keys.some(([k, m]) => k === st.tonic && m === st.mode) || !Number.isInteger(st.seed) || st.seed < 1 || st.seed > 4294967295
       || !Number.isInteger(st.bars) || st.bars < MIN_BARS || st.bars > MAX_BARS) fail('Configuració no vàlida');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
+    if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
+    st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
     if (st.countIn !== undefined && typeof st.countIn !== 'boolean') fail('Configuració no vàlida');
     st.timbres = { ...defaultTimbres(), ...(st.timbres || {}) }; st.groove = { ...defaultGroove(), ...(st.groove || {}) };
     if (st.mix !== undefined) engine.composeSongPart({ ...st }, { type: 'verse', bars: 1, energy: 50, revision: 1 });
@@ -1055,6 +1060,11 @@
     $('song-bars').max = Math.min(MAX_BARS, Math.floor(MAX_SECONDS / barSeconds())); $('song-bars').value = st.bars;
     $('style-description').textContent = `${profile.name} · ${profile.description} La base (bateria i baix) sona durant tota la cançó: genera-la i escolta-la abans d’afegir res més. Per defecte sonen instruments gravats nota a nota.`;
     for (const name of BASE_CHOICES) $(`base-${name}`).checked = song.base.instruments.includes(name);
+    for (const name of ['drums', 'bass']) {
+      const db = st.baseVolume?.[name] ?? 0;
+      $(`base-volume-${name}`).value = db;
+      $(`base-volume-${name}-value`).textContent = `${db > 0 ? '+' : ''}${db} dB`;
+    }
     for (const family of ['drums', 'bass', 'guitar'])
       fillSelect($(`groove-${family}`), engine.SONG_GROOVES[st.style][family].map((name, index) => [String(index), name]), String(st.groove[family]));
     $('groove-guitar-field').hidden = !song.base.instruments.includes('guitar');
@@ -1592,6 +1602,16 @@
       list.append(row);
     }
   }
+  // Volums generals additius: afecten tots els trams, fins i tot les seccions
+  // amb mescla particular, i també els instruments electrònics d'urban.
+  function changeBaseVolume(name, db) {
+    if (busy || !['drums', 'bass'].includes(name) || !Number.isInteger(db) || db < -24 || db > 6) return;
+    song.settings.baseVolume = { ...defaultBaseVolume(), ...(song.settings.baseVolume || {}), [name]: db };
+    const replay = playing && playing.kind !== 'record'
+      ? { kind: playing.kind, bar: barAt(playing.startSeconds + playing.clock()) } : null;
+    stop(); save(); updateSettingsUI(); render();
+    if (replay) { cueBar = replay.bar; play(replay.kind); }
+  }
   // ── Equalitzadors ──────────────────────────────────────────────────
   function eqNames(sec) {
     const names = song.base.instruments.slice();
@@ -1831,6 +1851,13 @@
     .forEach(key => $(key).addEventListener('change', changeSettings));
   $('song-humanize').addEventListener('input', event => { const v = Number(event.target.value); $('song-humanize-value').textContent = v ? `${v} %` : 'quantitzat'; });
   $('song-swing').addEventListener('input', event => { $('song-swing-value').textContent = `${event.target.value} %`; });
+  for (const name of ['drums', 'bass']) {
+    $(`base-volume-${name}`).addEventListener('input', event => {
+      const db = Number(event.target.value);
+      $(`base-volume-${name}-value`).textContent = `${db > 0 ? '+' : ''}${db} dB`;
+    });
+    $(`base-volume-${name}`).addEventListener('change', event => changeBaseVolume(name, Number(event.target.value)));
+  }
 
   // Clic al regle, arrossegament del capçal o regulador inferior.
   $('line-ruler').addEventListener('click', event => seekToBar(barFromPointer(event)));

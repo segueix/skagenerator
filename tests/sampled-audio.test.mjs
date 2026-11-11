@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseSoundBank, renderSampledPart, createEqualizer, INSTRUMENT_GAIN_DB, REVERB, TAIL_SECONDS } from '../audio/render.mjs';
+import { parseSoundBank, renderSampledPart, baseVolumeDb, createEqualizer, INSTRUMENT_GAIN_DB, REVERB, TAIL_SECONDS } from '../audio/render.mjs';
 import { createPerformance } from '../audio/performance.cjs';
 import engine from '../radioambient.js';
 import audioUtils from '../audio-utils.js';
@@ -13,6 +13,13 @@ const settings = { seed: 71931, bpm: 128, style: 'ska', tonic: 0, mode: 'major',
 const part = { type: 'chorus', bars: 4, energy: 75, revision: 1 };
 const spec = engine.composeSongPart(settings, part);
 
+test('els reguladors generals arriben als dos tipus de bateria i baix sense afectar altres instruments', () => {
+  const score = { baseVolume: { drums: -8, bass: 4 } };
+  for (const instrument of ['drums', 'electronicDrums']) assert.equal(baseVolumeDb(score, instrument), -8);
+  for (const instrument of ['bass', 'synthBass']) assert.equal(baseVolumeDb(score, instrument), 4);
+  for (const instrument of ['guitar', 'trumpet', 'organ']) assert.equal(baseVolumeDb(score, instrument), 0);
+  assert.equal(baseVolumeDb({}, 'drums'), 0);
+});
 test('el banc conté les mostres enregistrades dels instruments i els tres kits requerits', () => {
   assert(raw.byteLength > 1000000 && raw.byteLength < 40 * 1024 * 1024);
   assert.equal(bank.presets.length, 35);

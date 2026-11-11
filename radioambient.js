@@ -2210,6 +2210,10 @@
             throw new Error('Versió musical no vàlida');
         checkGroove(settings.groove, settings.style); checkGroove(part.groove, settings.style);
         checkMix(settings.mix); checkMix(part.mix); checkFx(settings.fx); checkFx(part.fx);
+        const baseVolume = settings.baseVolume === undefined ? {} : settings.baseVolume;
+        if (!baseVolume || typeof baseVolume !== 'object' || Array.isArray(baseVolume)
+            || Object.entries(baseVolume).some(([name, db]) => !['drums', 'bass'].includes(name) || !Number.isInteger(db) || db < -24 || db > 6))
+            throw new Error('Volums generals de la base no vàlids');
         // Sense base rítmica (projectes antics), cada versió porta el seu patró.
         const groove = {};
         for (const name of GROOVE_FAMILIES) groove[name] = part.groove?.[name] ?? settings.groove?.[name]
@@ -2357,6 +2361,7 @@
             drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn }),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: { ...(settings.mix || {}), ...(part.mix || {}) },
+            baseVolume: { ...baseVolume },
             fx: { ...(settings.fx || {}), ...(part.fx || {}) },
             feel: { ...(part.feel || {}) } };
     }

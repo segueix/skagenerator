@@ -391,6 +391,7 @@ function createPerformance(spec) {
     }
     channels.find(c => c.channel === 1).fxTweak = { drive: -10, tone: 8 };
   }
-  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, mix: spec.mix || {}, fx: spec.fx || {} };
+  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type,
+    mix: spec.mix || {}, baseVolume: spec.baseVolume || {}, fx: spec.fx || {} };
 }
 module.exports = { createPerformance };
