@@ -63,7 +63,7 @@
       b2 = A * ((A + 1) - sign * (A - 1) * c - root);
       a0 = (A + 1) + sign * (A - 1) * c + root;
       a1 = -2 * sign * ((A - 1) + sign * (A + 1) * c);
-      a2 = (A + 1) - sign * (A - 1) * c + root;
+      a2 = (A + 1) + sign * (A - 1) * c - root;
     }
     return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
       a1: a1 / a0, a2: a2 / a0, x1: 0, x2: 0, y1: 0, y2: 0 };
