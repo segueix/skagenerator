@@ -12,7 +12,10 @@ Després la veu es comprimeix, se li posa una mica de sala i es mescla amb la ba
 """
 import glob, json, math, os, subprocess, sys, time
 import numpy as np
-import onnxruntime as ort
+try:
+    import onnxruntime as ort   # només cal per a les veus DiffSinger (TIGER)
+except ImportError:
+    ort = None
 import yaml
 from scipy import signal
 import soundfile as sf
