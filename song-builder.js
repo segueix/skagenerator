@@ -328,6 +328,13 @@
     if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
     // Ska jamaicà: el baix tapava els vents (comentaris de les cançons): baix més suau i vents més presents.
     if (key === 'jamaican') { settings.baseVolume = { drums: 0, bass: -3 }; settings.volumes = { trumpet: 2, trombone: 2, sax: 2 }; }
+    if (!punk) {
+      // Ska: el clarinet que fa la melodia de veu és el solista i ha de quedar per davant de la banda.
+      settings.volumes = { ...(settings.volumes || {}), vocal: 3 };
+      // On el baix és el protagonista (rocksteady, early reggae, o línies «dub» i melòdiques) es modera perquè no tapi la resta.
+      if (key === 'rocksteady' || key === 'bossreggae') settings.baseVolume = { drums: 0, bass: -3 };
+      else if (key !== 'jamaican' && [1, 3].includes(groove.bass)) settings.baseVolume = { drums: 0, bass: -2 };
+    }
     for (const option of ['drumTune', 'humanize', 'cymbals', 'countIn']) if (sg[option] !== undefined) settings[option] = sg[option];
     if (settings.swing === 0) delete settings.swing;
 

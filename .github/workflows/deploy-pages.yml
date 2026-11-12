@@ -2,7 +2,8 @@ name: Publicar Ska Generator amb els instruments reals
 
 on:
   push:
-    branches: [main]
+    # També la branca de treball: Pages la publica i sense el build no hi hauria instruments (error 404).
+    branches: [main, 'claude/**']
   workflow_dispatch:
 
 permissions:
