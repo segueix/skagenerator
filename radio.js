@@ -235,19 +235,12 @@
   // Prepara les síl·labes per a les notes (compta la mateixa mètrica que el motor musical).
   function singingLines(song, seg, spec) {
     const text = seg.section?.lyrics?.trim() || '';
-    const names = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const counts = engine.analyzeLyrics(text, song.settings.lang).syllables;
-    const notes = (spec.lines?.vocal || []).slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
-    if (names.length !== counts.length || counts.reduce((sum, x) => sum + x, 0) !== notes.length) return [];
-    const beat = 60 / (seg.section?.bpm ?? song.settings.bpm);
-    let offset = 0;
-    return names.map((name, i) => {
-      const these = notes.slice(offset, offset + counts[i]).map(([bar, b, midi, dur]) => ({
-        at: (bar * 4 + b) * beat, dur: dur * beat, midi
-      }));
-      offset += counts[i];
-      return { text: name, notes: these };
-    });
+    return window.SkaBrowserSinging.scoreLines(
+      text,
+      engine.analyzeLyrics(text, song.settings.lang).syllables,
+      spec.lines?.vocal || [],
+      seg.section?.bpm ?? song.settings.bpm
+    );
   }
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
   // (cada síl·laba és una nota, en ordre).
