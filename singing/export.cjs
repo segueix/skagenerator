@@ -11,7 +11,8 @@ const path = require('node:path');
 // Estils on una veu sintètica funciona: melòdics, sense crits.
 const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'skaswing', 'poppunk'];
 // Amb EXPORT_STYLES=ska,punk les cançons alternen un subgènere d'ska i un de punk (els que canta bé la veu).
-const SKA = ['jamaican', 'twotone', 'nutty', 'skaswing', 'skapunk'], PUNK = ['poppunk', 'punk77', 'oi', 'skatepunk'];
+const SKA = ['jamaican', 'rocksteady', 'twotone', 'nutty', 'bossreggae', 'skaswing', 'skapunk'];
+const PUNK = ['punk77', 'oi', 'skatepunk', 'garage', 'postpunk', 'hardcore', 'poppunk', 'horrorpunk'];
 // Llengua de la lletra automàtica: EXPORT_LANG=ca (per defecte) o en (la veu TIGER canta en anglès).
 const LANG = process.env.EXPORT_LANG || 'ca';
 
@@ -29,7 +30,12 @@ const LANG = process.env.EXPORT_LANG || 'ca';
   await page.waitForFunction(() => window.SkaStudio && window.SkaSampleAudio && window.SkaLyrics);
   for (let i = 0; i < count; i++) {
     const mixed = process.env.EXPORT_STYLES === 'ska,punk' ? (i % 2 ? PUNK : SKA) : STYLES;
-    const subgenre = fixed ? fixed.song.settings.subgenre : own ? own.subgenre : mixed[(seed0 + Math.floor(i / 2)) % mixed.length];
+    // En la generació programada, un ska i un punk cada dia; el subgènere rota
+    // sistemàticament per acabar cobrint els 15 estils, no sempre els mateixos.
+    const selection = process.env.EXPORT_ROTATE === 'daily'
+      ? (Math.floor(Date.now() / 86400000) + Math.floor(i / 2)) % mixed.length
+      : (seed0 + Math.floor(i / 2)) % mixed.length;
+    const subgenre = fixed ? fixed.song.settings.subgenre : own ? own.subgenre : mixed[selection];
     const seed = fixed ? fixed.song.settings.seed : own ? own.seed : (seed0 * 7919 + i * 104729) % 4294967291 + 1;
     const started = Date.now();
     const result = await page.evaluate(async ({ subgenre, seed, fixedSong, ownText, lang }) => {
