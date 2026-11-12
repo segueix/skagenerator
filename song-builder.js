@@ -334,6 +334,9 @@
     if (key === 'jamaican') { settings.baseVolume = { drums: 0, bass: -3 }; settings.volumes = { trumpet: 2, trombone: 2, sax: 2 }; }
     // Punk: la veu solista una mica per davant de les guitarres.
     if (punk) settings.volumes = { ...(settings.volumes || {}), vocal: 2 };
+    // Hardcore: el baix Growlybass saturava el limitador i enterrava les guitarres (comentaris de la ràdio):
+    // baix 4 dB avall i guitarres rítmiques 2 dB amunt.
+    if (key === 'hardcore') { settings.baseVolume = { drums: 0, bass: -4 }; settings.volumes = { ...settings.volumes, guitar: 2, guitar2: 2 }; }
     // Post-punk: el baix porta la cançó.
     if (key === 'postpunk') settings.baseVolume = { drums: 0, bass: 2 };
     if (!punk) {

@@ -13,7 +13,9 @@
   const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', HISTORY_MAX = 300;
   // De tant en tant torna a sonar una cançó amb 👍 de la mateixa emissora.
   const REPLAY_CHANCE = .3, REPLAY_EVERY = 3, REPLAY_MEMORY = 5;
-  const STATIONS = { ska: 'Ska', punk: 'Punk' };
+  // «mix»: emissora Ska-Punk, que barreja cançons de totes dues.
+  const STATIONS = { ska: 'Ska', punk: 'Punk', mix: 'Ska-Punk' };
+  const inStation = style => station === 'mix' ? style === 'ska' || style === 'punk' : style === station;
   const NOTES = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const CANCELLED = Symbol('cancel·lat');
   const audio = $('radio-audio');
@@ -67,7 +69,7 @@
 
   function chooseSong() {
     const history = readHistory(), queued = [current?.id, ...played.slice(-REPLAY_MEMORY)];
-    const liked = history.filter(e => e.style === station && e.vote === 1 && !queued.includes(e.id));
+    const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id));
     if (liked.length && sinceReplay >= REPLAY_EVERY && Math.random() < REPLAY_CHANCE) {
       // Entre les preferides, les que fa més que no sonen.
       liked.sort((a, b) => (a.lastPlayed || 0) - (b.lastPlayed || 0));
@@ -76,14 +78,17 @@
       catch (error) { console.warn('Cançó de l’historial no vàlida', error); }
     }
     // Cançó nova: subgènere a l'atzar (diferent de l'anterior) i estructura que s'allunya de les últimes.
-    const keys = Object.keys(engine.SUBGENRES).filter(key => engine.SUBGENRES[key].style === station);
+    // A l'emissora Ska-Punk els dos estils s'alternen (tres de cada quatre vegades canvia d'estil).
+    const lastStyle = engine.SUBGENRES[lastSubgenre]?.style;
+    const style = station !== 'mix' ? station : !lastStyle ? pickOne(['ska', 'punk']) : Math.random() < .75 ? (lastStyle === 'ska' ? 'punk' : 'ska') : lastStyle;
+    const keys = Object.keys(engine.SUBGENRES).filter(key => engine.SUBGENRES[key].style === style);
     const fresh = keys.filter(key => key !== lastSubgenre), subgenre = pickOne(fresh.length ? fresh : keys);
     const recent = history.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created)).slice(0, 12)
       .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
     const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, seed: studio.newSeed(), vary: true, recent,
       liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
     // Punk: sobretot una guitarra, sovint dues i només excepcionalment tres.
-    if (station === 'punk') { const dice = Math.random(); options.guitars = dice < .5 ? 1 : dice < .92 ? 2 : 3; }
+    if (style === 'punk') { const dice = Math.random(); options.guitars = dice < .5 ? 1 : dice < .92 ? 2 : 3; }
     const song = studio.validateSong(builder.createAutoSong(engine, subgenre, options));
     lastSubgenre = subgenre;
     return { id: studio.uid(), replay: false, song };

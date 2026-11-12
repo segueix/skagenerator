@@ -4,7 +4,7 @@ Una ràdio de ska i punk que compon cada cançó al navegador. A sota hi continu
 
 ## La ràdio
 
-- **Dues emissores**: Ska (jamaicà, rocksteady, early reggae, 2-tone, nutty sound, ska-swing, ska-punk) i Punk (punk del 77, street punk / Oi!, garage, post-punk, skate punk, hardcore, pop-punk, horror punk). En triar-ne una s’obre el reproductor, es compon la primera cançó i comença a sonar sola.
+- **Tres emissores**: Ska-Punk, que barreja les altres dues alternant estils (tres de cada quatre cançons canvien d’estil), Ska (jamaicà, rocksteady, early reggae, 2-tone, nutty sound, ska-swing, ska-punk) i Punk (punk del 77, street punk / Oi!, garage, post-punk, skate punk, hardcore, pop-punk, horror punk). En triar-ne una s’obre el reproductor, es compon la primera cançó i comença a sonar sola.
 - **Cada cançó és nova**: subgènere a l’atzar dins de l’emissora (diferent del de la cançó anterior), tonalitat i durada (2–3,5 min) a l’atzar, i l’estructura s’allunya de les 12 últimes cançons de l’historial (l’opció «Estructura diferent de les últimes cançons» del taller). Al punk també varia el nombre de guitarres: la meitat de les cançons en tenen una, el 42 % dues i només el 8 % tres.
 - **La següent es prepara en segon pla** mentre sona l’actual i comença **2 segons** després que acabi. El silenci forma part del fitxer d’àudio, de manera que el canvi també funciona amb la pantalla del mòbil apagada. «Següent cançó» hi salta quan ja és a punt.
 - **👍 / 👎 i comentari** a cada cançó, des del reproductor o des de l’historial.

@@ -473,7 +473,7 @@ test('ska: el clarinet solista puja i el baix es modera on és el protagonista; 
   for (const key of Object.keys(engine.SUBGENRES)) for (const seed of [5, 60, 700]) {
     const { settings } = builder.createAutoSong(engine, key, { minutes: 2, seed, recent: [], liked: [] });
     // Punk: la veu també va una mica per davant; només el post-punk toca el baix (cap amunt: porta la cançó).
-    if (settings.style === 'punk') { assert.equal(settings.volumes.vocal, 2); assert.equal(settings.baseVolume?.bass, key === 'postpunk' ? 2 : undefined); continue; }
+    if (settings.style === 'punk') { assert.equal(settings.volumes.vocal, 2); assert.equal(settings.baseVolume?.bass, key === 'postpunk' ? 2 : key === 'hardcore' ? -4 : undefined); continue; }
     assert.equal(settings.volumes.vocal, 3);
     const prominent = ['jamaican', 'rocksteady', 'bossreggae'].includes(key) || [1, 3].includes(settings.groove.bass);
     assert.equal((settings.baseVolume?.bass ?? 0) < 0, prominent, `${key}: baix`);
