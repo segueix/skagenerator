@@ -1,0 +1,34 @@
+name: Provar el cant Matxa al navegador
+
+on:
+  push:
+    branches: ['feat/browser-matxa-singing']
+    paths:
+      - 'browser-singing.js'
+      - 'browser-singing-worker.js'
+      - 'radio.js'
+      - 'audio-utils.js'
+      - 'scripts/build.mjs'
+      - 'tests/browser-singing.test.cjs'
+      - '.github/workflows/test-browser-singing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprovar els mòduls
+        run: |
+          node --check browser-singing.js
+          node --check browser-singing-worker.js
+          node --check radio.js
+          node --check scripts/build.mjs
+      - name: Provar síl·labes, afinació, timbres i cancel·lació
+        run: node --test tests/browser-singing.test.cjs
