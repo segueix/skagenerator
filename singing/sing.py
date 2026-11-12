@@ -297,7 +297,7 @@ def megaphone(x):
     air = signal.sosfilt(signal.butter(2, 4500, 'high', fs=RATE, output='sos'), x)
     return (y + .6 * air).astype(np.float32)
 
-def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None, matxa=None, external_vocal=None):
+def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None, matxa=None, external_vocal=None, timbre='auto'):
     score = json.load(open(score_path, encoding='utf-8'))
     band, rate = sf.read(band_path, dtype='float32', always_2d=True)
     assert rate == RATE
@@ -312,7 +312,9 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
         sing_one, speaker = None, 'veu externa'
     elif matxa:
         # Matxa (veu neuronal catalana) dita vers a vers i convertida en cant.
-        import catalan, speech2sing
+        import catalan, speech2sing, voice_timbres
+        if matxa == 'auto':
+            matxa = voice_timbres.preset_for(score.get('subgenre')).speaker
         singer = speech2sing.MatxaSinger(matxa, cache=os.path.join(os.path.dirname(os.path.abspath(out_path)), 'matxa-cache'))
         shift = 12 * round((singer.note - median) / 12)   # la melodia, a l'octava més cantable per a la veu
         sing_one = lambda line: singer.sing_line(line, shift, catalan.syllables)
@@ -372,6 +374,12 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     dry_vocal = vocal.copy()
     vocal = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), vocal)
     vocal = compress(vocal)
+    if matxa and timbre != 'none':
+        # La veu Matxa es transforma segons el subgènere (no canvia l'afinació).
+        import voice_timbres
+        chosen = score.get('subgenre') if timbre == 'auto' else timbre
+        vocal = voice_timbres.apply_timbre(vocal, chosen, RATE)
+        print(f'  timbre vocal: {voice_timbres.preset_for(chosen).name}')
     if fx == 'megaphone': vocal = megaphone(vocal)
     # Nivell: es compara als mitjos (300–4.000 Hz), on s'entén la veu i on el baix no infla la
     # mesura. La veu queda 5 dB per sobre de la banda en aquesta zona.
@@ -430,6 +438,7 @@ if __name__ == '__main__':
     ap.add_argument('--steps', type=int, default=40)
     ap.add_argument('--voicebank', nargs='+', help='ZIP (o parts) de veu.html: canta amb la veu gravada (en català) en lloc de DiffSinger')
     ap.add_argument('--vocal', help='WAV amb la veu ja cantada (sec, des del començament de la cançó): només es tracta i es mescla')
-    ap.add_argument('--matxa', help='canta amb Matxa (veu catalana del Projecte Aina): elia, grau, emma, pere, gina, lluc, olga o quim')
+    ap.add_argument('--matxa', help='Matxa: auto (veu segons subgènere), elia, grau, emma, pere, gina, lluc, olga o quim')
+    ap.add_argument('--timbre', default='auto', help='filtre de timbre: auto (subgènere), none o un altre subgènere')
     a = ap.parse_args()
-    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank, a.matxa, a.vocal)
+    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank, a.matxa, a.vocal, a.timbre)
