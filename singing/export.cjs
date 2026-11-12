@@ -26,7 +26,7 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
       const engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder, studio = window.SkaStudio, utils = window.SkaAudioUtils, RATE = studio.RATE;
       const song = studio.validateSong(builder.createAutoSong(engine, subgenre, { minutes: 2.25 + (seed % 4) * .25, vocal: true, autoLyrics: 'en', seed, vary: true, recent: [], liked: [] }));
       const band = { ...song, clips: song.clips.filter(c => c.instrument !== 'vocal') };
-      const parts = [], lengths = [], notes = [];
+      const parts = [], lengths = [], notes = [], lines = [];
       let at = 0;
       const segs = studio.segmentsOf(song), bandSegs = studio.segmentsOf(band);
       for (let k = 0; k < segs.length; k++) {
@@ -46,9 +46,11 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
           const swing = song.settings.swing || 0, swung = beats => Math.abs(beats % 1 - .5) < .04 ? beats + swing / 6 : beats;
           const words = text.split('\n').map(l => l.trim()).filter(Boolean)
             .flatMap((line, li) => (line.match(/[A-Za-z'’]+/g) || []).map((w, wi) => ({ word: w.replace(/’/g, "'"), line: li, first: wi === 0, count: Math.max(1, engine.englishWord(w).count) })));
+          const lineTexts = text.split('\n').map(l => l.trim()).filter(Boolean);
           let n = 0;
           for (const w of words) for (let s = 0; s < w.count && n < melody.length; s++, n++) {
             const [bar, b, pitch, dur] = melody[n], start = swung(bar * 4 + b);
+            if (w.first && s === 0) lines.push({ at: Math.round((at + start * beat) * 100) / 100, text: lineTexts[w.line] });
             notes.push({ t: at + start * beat, d: dur * beat, midi: pitch, word: w.word.toLowerCase(), syllable: s, syllables: w.count, line: w.line, lineStart: w.first && s === 0, section: seg.section.type });
           }
         }
@@ -58,11 +60,14 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
       const wav = new Uint8Array(utils.encodeWav(mixed, RATE));
       let binary = '';
       for (let i = 0; i < wav.length; i += 0x8000) binary += String.fromCharCode.apply(null, wav.subarray(i, i + 0x8000));
-      return { wav: btoa(binary), song, notes, seconds: mixed[0].length / RATE };
+      return { wav: btoa(binary), song, notes, lines, seconds: mixed[0].length / RATE };
     }, { subgenre, seed });
     const id = `${new Date().toISOString().slice(0, 10)}-${subgenre}-${seed}`;
     fs.writeFileSync(path.join(outDir, `${id}.band.wav`), Buffer.from(result.wav, 'base64'));
     fs.writeFileSync(path.join(outDir, `${id}.json`), JSON.stringify({ id, subgenre, title: result.song.title, seconds: result.seconds, notes: result.notes, song: result.song }));
+    // Fitxa per a la ràdio: el que cal per mostrar-la, votar-la i seguir la lletra.
+    fs.writeFileSync(path.join(outDir, `${id}.meta.json`), JSON.stringify({ id, file: `${id}.mp3`, subgenre, style: result.song.settings.style,
+      title: result.song.title, seconds: Math.round(result.seconds * 10) / 10, created: new Date().toISOString(), lines: result.lines, song: result.song }));
     console.log(`${id}: «${result.song.title}», ${Math.round(result.seconds)} s, ${result.notes.length} síl·labes, ${Math.round((Date.now() - started) / 1000)} s de càlcul`);
   }
   await browser.close();
