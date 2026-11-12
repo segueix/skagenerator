@@ -32,3 +32,11 @@ jobs:
           node --check scripts/build.mjs
       - name: Provar síl·labes, afinació, timbres i cancel·lació
         run: node --test tests/browser-singing.test.cjs
+      - name: Comprovar que es publica el worker i el motor
+        run: |
+          npm ci
+          npm run build
+          test -s dist/browser-singing.js
+          test -s dist/browser-singing-worker.js
+          grep -q 'browser-singing.js?v=' dist/index.html
+          grep -q 'browser-singing-worker.js?v=' dist/browser-singing.js
