@@ -118,6 +118,10 @@
     skaswing: { open: { riff: .8, drums: .75, buildup: .65, countin: .5 }, close: { hit: .85, ring: .7, ritard: .65, riff: .5 }, silence: .5, stop: .75, color: .5 },
     skapunk: { open: { drums: .7, halftime: .65, buildup: .6, riff: .6, countin: .5 }, close: { cold: .8, ring: .7, hit: .7, breakdown: .35 }, silence: .7, stop: .7, color: .45 },
     punk77: { open: { countin: .8, drums: .7, riff: .7, voice: .45, buildup: .4 }, close: { hit: .8, cold: .8, ring: .6 }, silence: .6, stop: .7, color: .45 },
+    oi: { open: { countin: .8, drums: .7, voice: .65, riff: .6, buildup: .5 }, close: { hit: .85, ring: .7, cold: .6, ritard: .4 }, silence: .55, stop: .75, color: .35 },
+    skatepunk: { open: { countin: .8, riff: .75, drums: .65, halftime: .5 }, close: { cold: .85, hit: .75, ring: .55 }, silence: .75, stop: .7, color: .3 },
+    garage: { open: { riff: .8, drums: .7, countin: .65, voice: .4 }, close: { cold: .8, ring: .7, hit: .7 }, silence: .5, stop: .7, color: .7 },
+    postpunk: { open: { riddim: .85, drums: .7, buildup: .7, fadein: .5, riff: .5 }, close: { cold: .75, fadeout: .7, ring: .6, breakdown: .5 }, silence: .65, stop: .5, color: .65 },
     hardcore: { open: { countin: .8, drums: .7, riff: .5 }, close: { cold: .9, hit: .7, ring: .4 }, silence: .8, stop: .75, color: .25 },
     poppunk: { open: { riff: .8, voice: .7, buildup: .6, drums: .6, countin: .4 }, close: { ring: .8, hit: .7, cold: .55, riff: .5, ritard: .4 }, silence: .7, stop: .6, color: .55 },
     horrorpunk: { open: { drums: .7, riff: .7, voice: .6, buildup: .6, fadein: .5 }, close: { ring: .8, cold: .7, ritard: .6, breakdown: .5 }, silence: .6, stop: .55, color: .65 }
@@ -328,6 +332,10 @@
     if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
     // Ska jamaicà: el baix tapava els vents (comentaris de les cançons): baix més suau i vents més presents.
     if (key === 'jamaican') { settings.baseVolume = { drums: 0, bass: -3 }; settings.volumes = { trumpet: 2, trombone: 2, sax: 2 }; }
+    // Punk: la veu solista una mica per davant de les guitarres.
+    if (punk) settings.volumes = { ...(settings.volumes || {}), vocal: 2 };
+    // Post-punk: el baix porta la cançó.
+    if (key === 'postpunk') settings.baseVolume = { drums: 0, bass: 2 };
     if (!punk) {
       // Ska: el clarinet que fa la melodia de veu és el solista i ha de quedar per davant de la banda.
       settings.volumes = { ...(settings.volumes || {}), vocal: 3 };
@@ -388,6 +396,12 @@
     if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });
     if (key === 'twotone' || key === 'punk77') sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     if (key === 'skapunk') { const b = of('bridge')[0] || of('solo')[0]; if (b) b.feel = { drums: .5 }; tempo(lastChorus, 1.04); sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 1; }); }
+    // Skate punk: tornades a doble temps i pont a mig temps; street punk: de vegades l'última tornada puja un to.
+    if (key === 'skatepunk') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); const b = of('bridge')[0]; if (b) b.feel = { drums: .5, bass: .5 }; }
+    if (key === 'oi' && r() < .4) sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
+    // Garage: l'orgue de combo fa blanques a l'estrofa i s'obre a la tornada; post-punk: ponts a mig temps.
+    if (key === 'garage') sections.forEach(s => { s.patterns = { ...(s.patterns || {}), organ: s.type === 'chorus' ? 4 : s.type === 'verse' ? 3 : 2 }; });
+    if (key === 'postpunk') { const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; of('intro').forEach(s => { s.cymbals = 'hats'; }); }
     if (key === 'hardcore') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); const b = of('bridge')[0]; if (b) b.feel = { drums: .5, bass: .5 }; }
     if (key === 'poppunk') { of('prechorus').forEach(s => tempo(s, 1.04)); const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; }); }
     if (key === 'horrorpunk') { if (of('intro')[0]) of('intro')[0].feel = { drums: .5, bass: .5 }; const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
@@ -397,7 +411,7 @@
     for (const type of new Set(sections.map(s => s.type))) harmony[type] = 1 + Math.floor(r() * 5);
 
     // ── Arranjament: el riff identifica la cançó; els vents responen a la veu ──
-    const register = key === 'rocksteady' || key === 'horrorpunk' ? -1 : key === 'poppunk' ? 1 : 0;
+    const register = key === 'rocksteady' || key === 'horrorpunk' || key === 'postpunk' ? -1 : key === 'poppunk' ? 1 : 0;
     const base = sg.base, layersOf = [];
     // Subgèneres lents: vents més escassos (sense saxo als riffs).
     const mellow = key === 'rocksteady' || key === 'bossreggae';
@@ -435,8 +449,10 @@
         if (sec.type === 'verse') {
           verses++;
           // Sense la segona guitarra les estrofes perdien força (comentaris de les cançons).
-          if (key !== 'poppunk' || verses > 1) add(sec, 'guitar2', { revision: 2 });
-          if (key === 'poppunk') add(sec, 'guitar3', { revision: 1, fx: { type: 'none', drive: 50, tone: 50 } }); else if (verses > 1) add(sec, 'guitar3', { line: 'answer' });
+          // Pop-punk i post-punk: estrofes més buides, amb arpegis nets en lloc de la segona rítmica.
+          const airy = key === 'poppunk' || key === 'postpunk';
+          if (!airy || verses > 1 && key !== 'postpunk') add(sec, 'guitar2', { revision: 2 });
+          if (airy) add(sec, 'guitar3', { revision: key === 'postpunk' ? 3 : 1, fx: { type: 'none', drive: 50, tone: 50 } }); else if (verses > 1) add(sec, 'guitar3', { line: 'answer' });
         }
         if (sec.type === 'prechorus') add(sec, 'guitar2', { revision: 2 });
         if (sec.type === 'chorus') { add(sec, 'guitar2', { revision: 2 }); if (key !== 'hardcore') add(sec, 'guitar3', { line: 'riff' }); }

@@ -82,7 +82,8 @@
       .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
     const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, seed: studio.newSeed(), vary: true, recent,
       liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
-    if (station === 'punk') options.guitars = Number(pickOne(Object.keys(builder.GUITAR_SETUPS)));
+    // Punk: sobretot una guitarra, sovint dues i només excepcionalment tres.
+    if (station === 'punk') { const dice = Math.random(); options.guitars = dice < .5 ? 1 : dice < .92 ? 2 : 3; }
     const song = studio.validateSong(builder.createAutoSong(engine, subgenre, options));
     lastSubgenre = subgenre;
     return { id: studio.uid(), replay: false, song };

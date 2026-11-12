@@ -4,8 +4,8 @@ Una ràdio de ska i punk que compon cada cançó al navegador. A sota hi continu
 
 ## La ràdio
 
-- **Dues emissores**: Ska (jamaicà, rocksteady, early reggae, 2-tone, nutty sound, ska-swing, ska-punk) i Punk (punk del 77, hardcore, pop-punk, horror punk). En triar-ne una s’obre el reproductor, es compon la primera cançó i comença a sonar sola.
-- **Cada cançó és nova**: subgènere a l’atzar dins de l’emissora (diferent del de la cançó anterior), tonalitat i durada (2–3,5 min) a l’atzar, i l’estructura s’allunya de les 12 últimes cançons de l’historial (l’opció «Estructura diferent de les últimes cançons» del taller). Al punk també varia el nombre de guitarres.
+- **Dues emissores**: Ska (jamaicà, rocksteady, early reggae, 2-tone, nutty sound, ska-swing, ska-punk) i Punk (punk del 77, street punk / Oi!, garage, post-punk, skate punk, hardcore, pop-punk, horror punk). En triar-ne una s’obre el reproductor, es compon la primera cançó i comença a sonar sola.
+- **Cada cançó és nova**: subgènere a l’atzar dins de l’emissora (diferent del de la cançó anterior), tonalitat i durada (2–3,5 min) a l’atzar, i l’estructura s’allunya de les 12 últimes cançons de l’historial (l’opció «Estructura diferent de les últimes cançons» del taller). Al punk també varia el nombre de guitarres: la meitat de les cançons en tenen una, el 42 % dues i només el 8 % tres.
 - **La següent es prepara en segon pla** mentre sona l’actual i comença **2 segons** després que acabi. El silenci forma part del fitxer d’àudio, de manera que el canvi també funciona amb la pantalla del mòbil apagada. «Següent cançó» hi salta quan ja és a punt.
 - **👍 / 👎 i comentari** a cada cançó, des del reproductor o des de l’historial.
 - **Preferides**: de tant en tant (com a molt una de cada quatre cançons, amb un 30 % de probabilitat) torna a sonar una cançó amb 👍 de la mateixa emissora que no hagi sonat fa poc. Les cançons amb 👍 també inspiren les noves del mateix subgènere.
@@ -114,6 +114,10 @@ Cada subgènere té de 4 a 7 tonalitats pròpies (només en els modes per als qu
 | Ska-swing | Fa, Si♭, Mi♭, Do i Sol majors; Sol i Re menors |
 | Ska-punk | Sol, Do, Si♭, Fa i Mi♭ majors; La i Re menors |
 | Punk del 77 | La, Mi, Re, Sol i Do majors; Mi i La menors |
+| Street punk / Oi! | La, Mi, Re, Sol i Do majors |
+| Skate punk | Re, Sol i Do majors; Mi, Si, La i Re menors |
+| Garage punk | Mi, La, Sol i Re majors; Mi i La menors |
+| Post-punk | Mi, La, Si i Re menors |
 | Hardcore | Si, Mi, La i Re menors |
 | Pop-punk | Re, Sol, Mi, La i Do majors |
 | Horror punk | Mi, La i Sol majors; Mi, La, Si i Re menors |
@@ -133,6 +137,10 @@ Cada subgènere té de 4 a 7 tonalitats pròpies (només en els modes per als qu
 | Hardcore | 200–220 | Fuzz, acord bII i breakdown a mig temps |
 | Pop punk | 165–185 | Overdrive, vi–IV–I–V, pretornada que accelera |
 | Horror punk | 170–192 | Distorsió Misfits, acords prestats foscos (bVI, iv) |
+| Street punk / Oi! | 150–174 | Mig temps amb pes, crunch, tornades d’himne (I–IV–V) i, de vegades, última tornada un to amunt |
+| Skate punk (hardcore melòdic) | 196–220 | Tornades a doble temps, progressions melòdiques (vi–IV–I–V), guitarra solista i pont a mig temps |
+| Garage punk | 148–176 | Fuzz, orgue de combo a la base, kit lo-fi, riffs amb bVII i bIII i molta humanització |
+| Post-punk | 140–164 | Tonalitats menors, el baix porta el riff (+2 dB), guitarra prima amb arpegis nets, bateria seca i veu greu |
 
 El subgènere també es pot triar al panell de la base, juntament amb el **balanceig** (swing), que endarrereix les corxeres a contratemps.
 
