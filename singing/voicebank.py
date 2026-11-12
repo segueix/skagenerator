@@ -66,12 +66,31 @@ class Bank:
         self.files, self.cache, notes = {}, {}, set()
         for path in paths:
             z = zipfile.ZipFile(path)
-            manifest = json.loads(z.read('manifest.json'))
-            notes.add(int(manifest.get('note', 55)))
-            for s in manifest['samples']: self.files[s['id']] = (z, s['file'])
+            # Els WAV es reconeixen pel nom (V-a, CV-b-a, CCV-pR-a, VC-a-l), encara que siguin dins
+            # de carpetes o el ZIP s'hagi refet a mà sense el manifest.json.
+            for name in z.namelist():
+                base = name.rsplit('/', 1)[-1]
+                if base == 'manifest.json':
+                    manifest = json.loads(z.read(name))
+                    if manifest.get('note') is not None: notes.add(int(manifest['note']))
+                elif base.lower().endswith('.wav') and base.split('-')[0] in ('V', 'CV', 'CCV', 'VC'):
+                    self.files[base[:-4]] = (z, name)
         if len(notes) > 1: print(f'Atenció: les parts es van gravar a notes diferents ({sorted(notes)})')
-        self.note = sorted(notes)[0]
+        # La nota on realment es va cantar (sovint més greu que la de referència): així el canvi d'octava
+        # de la melodia s'acosta a la veu real.
+        self.note = self.measured_note() if self.files else (sorted(notes)[0] if notes else 55)
         print(f'Veu gravada: {len(self.files)} síl·labes ({len(paths)} fitxers), cantades a la nota {self.note}')
+
+    def measured_note(self):
+        """Sense manifest: la nota es mesura a les vocals soles."""
+        found = []
+        for key in [k for k in self.files if k.startswith('V-')][:8]:
+            z, name = self.files[key]
+            x, rate = sf.read(io.BytesIO(z.read(name)), dtype='float64', always_2d=False)
+            if x.ndim > 1: x = x.mean(1)
+            f0, _ = pw.harvest(x, rate, f0_floor=60, f0_ceil=900, frame_period=10)
+            if (f0 > 0).sum() > 20: found.append(69 + 12 * math.log2(float(np.median(f0[f0 > 0])) / 440))
+        return int(round(float(np.median(found)))) if found else 55
 
     def unit(self, key):
         if key not in self.files: return None
