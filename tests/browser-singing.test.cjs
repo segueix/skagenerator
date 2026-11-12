@@ -83,3 +83,48 @@ test('una petició Matxa cancel·lada no crida el servei extern', async () => {
   const client = new singer.MatxaClient();
   await assert.rejects(client.speak('Hola', 'grau', rate, controller.signal), /cancel·lada/);
 });
+
+test('el client Matxa segueix la cua Gradio i reutilitza una locució', async () => {
+  const oldFetch = global.fetch, oldWindow = global.window;
+  let joined = 0, downloads = 0, activeEvent;
+  const encoder = new TextEncoder();
+  global.window = {
+    AudioContext: class {
+      decodeAudioData() {
+        return Promise.resolve({ length: 2205, sampleRate: rate, numberOfChannels: 1,
+          getChannelData: () => tone(180, .1) });
+      }
+    },
+    SkaAudioUtils: { resampleLinear: x => x }
+  };
+  global.fetch = async (url, options) => {
+    if (url.endsWith('/queue/join')) {
+      joined++;
+      activeEvent = 'test-' + joined;
+      return { ok: true, json: async () => ({ event_id: activeEvent }) };
+    }
+    if (url.includes('/queue/data?')) {
+      let read = false;
+      const payload = { msg: 'process_completed', event_id: activeEvent, success: true,
+        output: { data: [{ url: 'https://projecte-aina-matxa-alvocat-tts-ca.hf.space/gradio_api/file=test.wav' }] } };
+      return { ok: true, body: { getReader: () => ({
+        read: async () => read ? { done: true } : (read = true, { done: false, value: encoder.encode('data: ' + JSON.stringify(payload) + '\\n\\n') }),
+        cancel: async () => {}
+      }) } };
+    }
+    if (url.includes('file=test.wav')) {
+      downloads++;
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(12) };
+    }
+    throw Error('Petició inesperada: ' + url);
+  };
+  try {
+    const client = new singer.MatxaClient();
+    const first = await client.speak('Bon dia', 'grau', rate);
+    const again = await client.speak('Bon dia', 'grau', rate);
+    assert.equal(first, again, 'la locució és a la memòria cau');
+    assert.equal(joined, 2, 'només les dues operacions de Gradio');
+    assert.equal(downloads, 1, 'WAV descarregat una vegada');
+    assert.equal(first.length, 2205);
+  } finally { global.fetch = oldFetch; global.window = oldWindow; }
+});
