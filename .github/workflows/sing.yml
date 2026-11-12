@@ -1,0 +1,34 @@
+name: Cançons cantades (veu DiffSinger)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['singing/**', '.github/workflows/sing.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Dependències
+        run: pip install onnxruntime==1.20.1 pyyaml numpy
+      - name: Baixar la veu TIGER i els vocoders (no es redistribueixen)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p voice
+          gh release view v102 --repo spicytigermeat/tiger_diffsinger --json assets --jq '.assets[] | "\(.name) \(.size)"'
+          gh release download v102 --repo spicytigermeat/tiger_diffsinger -D voice/raw
+          gh release list --repo openvpi/vocoders --limit 10
+          gh release view --repo openvpi/vocoders --json tagName,assets --jq '.tagName, (.assets[] | "\(.name) \(.size)")'
+          cd voice/raw && for f in *.zip; do unzip -q -o "$f" -d "../${f%.zip}"; done
+          cd .. && for f in $(find . -name '*.zip' -not -path './raw/*'); do unzip -q -o "$f" -d "${f%.zip}"; done
+      - name: Explorar
+        run: python singing/probe.py voice
