@@ -107,6 +107,12 @@ class Voice:
         guess = {'a': 'ae', 'e': 'eh', 'i': 'ih', 'o': 'aa', 'u': 'ah', 'y': 'iy'}
         return [guess.get(c, c) for c in w if c.isalpha() and (c in guess or c in 'bdfghjklmnprstvwz')]
 
+    def syllables_of(self, word):
+        if getattr(self, 'lang', 'en') == 'ca':
+            import catalan
+            return catalan.syllables(word)
+        return self.syllables(word)
+
     def syllables(self, word):
         """Fonemes partits en síl·labes: (inici, vocal, final)."""
         ph = self.phonemes_of(word)
@@ -145,7 +151,7 @@ def build_phrase(voice, notes, shift):
     segs = []  # [fonema, inici, final]
     last_vowel = -1e9  # inici de l'última vocal: les consonants següents no se la poden menjar
     for group in words:
-        sylls = voice.syllables(group[0]['word'])
+        sylls = voice.syllables_of(group[0]['word'])
         # Ajusta síl·labes fonètiques a notes: sobren → s'ajunten a l'última nota; falten → la vocal s'allarga.
         per_note = [[s] for s in sylls[:len(group)]]
         for extra in sylls[len(group):]: per_note[-1].append(extra)
@@ -163,7 +169,7 @@ def build_phrase(voice, notes, shift):
                 cs = vs - min(sum(CONS_DUR['default'] for _ in onset), max(.03 * len(onset), (vs - last_vowel) * .4))
                 if segs and segs[-1][2] > cs:
                     # La nota anterior (vocal o consonants finals) s'escurça fins on comença aquesta.
-                    while segs and segs[-1][1] >= cs - .02 and segs[-1][0] not in voice.vowels: segs.pop()
+                    while segs and segs[-1][1] >= cs - .02 and segs[-1][0] not in voice.vowels and segs[-1][0] not in ('y', 'w'): segs.pop()
                     if segs: segs[-1][2] = min(segs[-1][2], cs)
                 t = cs
                 for c in onset:
@@ -297,6 +303,8 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     shift = -12 if median > 60 else 0
     speaker = speaker or {'rocksteady': 'tiger_vinyl', 'bossreggae': 'tiger_vinyl', 'jamaican': 'tiger_vinyl', 'poppunk': 'tiger_electric'}.get(score.get('subgenre'), 'tiger_fresh')
     voice = Voice(voice_dir, speaker, vocoder_dir)
+    voice.lang = score.get('lang') or 'en'
+    print(f'Llengua de la lletra: {voice.lang}')
     if limit:
         notes = [n for n in notes if n['t'] < limit]
         band = band[:int((limit + 3) * RATE)]

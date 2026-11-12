@@ -59,10 +59,11 @@ jobs:
           (cd dist && python -m http.server 8000 >/dev/null 2>&1 &)
           sleep 1
           node singing/export.cjs http://localhost:8000/ out --song singing/samples/all-is-well.json
+          node singing/export.cjs http://localhost:8000/ out --lyrics singing/samples/balla-a-contratemps.txt twotone 7
       - name: Cantar les mostres
         env:
           SKIP_TIGER: '1'
-          ONLY_MEGAPHONE: '1'
+          CATALAN: '1'
         run: |
           mkdir -p mostres
           id=2026-11-12-jamaican-273377106
@@ -71,6 +72,13 @@ jobs:
           if [ -z "$SKIP_TIGER" ]; then
             sing "all-is-well-megafon" voice/tiger --speaker tiger_vinyl --fx megaphone
             for sp in vinyl fresh disco electric mystic falsetto cetera; do sing "tiger-$sp" voice/tiger --speaker "tiger_$sp" --limit 45; done
+          fi
+          # Cançó en català (lletra pròpia), amb megàfon i sense.
+          if [ -n "$CATALAN" ]; then
+            ca=balla-a-contratemps-twotone
+            python singing/sing.py voice/tiger "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-megafon.mp3" --fx megaphone || echo "FALLA catala megafon"
+            python singing/sing.py voice/tiger "out/$ca.json" "out/$ca.band.wav" "mostres/$ca.mp3" || echo "FALLA catala"
+            ls -la mostres; exit 0
           fi
           # La mescla nova amb megàfon (el baix ja no tapa la veu).
           if [ -n "$ONLY_MEGAPHONE" ]; then sing "all-is-well-megafon-mescla-nova" voice/tiger --speaker tiger_vinyl --fx megaphone; ls -la mostres; exit 0; fi
