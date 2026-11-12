@@ -11,6 +11,13 @@ on:
       count:
         description: Quantes cançons (alterna ska i punk)
         default: '2'
+  # La primera fusió activa una generació inicial, sense esperar al cron de demà.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sing.yml'
+      - 'singing/voice_timbres.py'
+      - 'singing/sing.py'
 
 permissions:
   contents: write
