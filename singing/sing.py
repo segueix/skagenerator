@@ -107,6 +107,12 @@ class Voice:
         guess = {'a': 'ae', 'e': 'eh', 'i': 'ih', 'o': 'aa', 'u': 'ah', 'y': 'iy'}
         return [guess.get(c, c) for c in w if c.isalpha() and (c in guess or c in 'bdfghjklmnprstvwz')]
 
+    def syllables_of(self, word):
+        if getattr(self, 'lang', 'en') == 'ca':
+            import catalan
+            return catalan.syllables(word)
+        return self.syllables(word)
+
     def syllables(self, word):
         """Fonemes partits en síl·labes: (inici, vocal, final)."""
         ph = self.phonemes_of(word)
@@ -145,7 +151,7 @@ def build_phrase(voice, notes, shift):
     segs = []  # [fonema, inici, final]
     last_vowel = -1e9  # inici de l'última vocal: les consonants següents no se la poden menjar
     for group in words:
-        sylls = voice.syllables(group[0]['word'])
+        sylls = voice.syllables_of(group[0]['word'])
         # Ajusta síl·labes fonètiques a notes: sobren → s'ajunten a l'última nota; falten → la vocal s'allarga.
         per_note = [[s] for s in sylls[:len(group)]]
         for extra in sylls[len(group):]: per_note[-1].append(extra)
@@ -163,7 +169,7 @@ def build_phrase(voice, notes, shift):
                 cs = vs - min(sum(CONS_DUR['default'] for _ in onset), max(.03 * len(onset), (vs - last_vowel) * .4))
                 if segs and segs[-1][2] > cs:
                     # La nota anterior (vocal o consonants finals) s'escurça fins on comença aquesta.
-                    while segs and segs[-1][1] >= cs - .02 and segs[-1][0] not in voice.vowels: segs.pop()
+                    while segs and segs[-1][1] >= cs - .02 and segs[-1][0] not in voice.vowels and segs[-1][0] not in ('y', 'w'): segs.pop()
                     if segs: segs[-1][2] = min(segs[-1][2], cs)
                 t = cs
                 for c in onset:
@@ -286,7 +292,7 @@ def megaphone(x):
     y = signal.sosfilt(signal.butter(2, [450, 3600], 'band', fs=RATE, output='sos'), y)
     return (y * rms / (math.sqrt(float(np.mean(y ** 2))) + 1e-12)).astype(np.float32)
 
-def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0):
+def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None):
     score = json.load(open(score_path, encoding='utf-8'))
     band, rate = sf.read(band_path, dtype='float32', always_2d=True)
     assert rate == RATE
@@ -296,14 +302,25 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     median = float(np.median([n['midi'] for n in notes]))
     shift = -12 if median > 60 else 0
     speaker = speaker or {'rocksteady': 'tiger_vinyl', 'bossreggae': 'tiger_vinyl', 'jamaican': 'tiger_vinyl', 'poppunk': 'tiger_electric'}.get(score.get('subgenre'), 'tiger_fresh')
-    voice = Voice(voice_dir, speaker, vocoder_dir)
+    if voicebank:
+        # Veu gravada síl·laba a síl·laba (veu.html): sempre en català, a l'octava on es va gravar.
+        import catalan, voicebank as vb
+        bank = vb.Bank(voicebank)
+        shift = 12 * round((bank.note - median) / 12)
+        sing_one = lambda phrase: vb.sing_phrase(bank, phrase, shift, catalan.syllables)
+        speaker = 'veu gravada'
+    else:
+        voice = Voice(voice_dir, speaker, vocoder_dir)
+        voice.lang = score.get('lang') or 'en'
+        print(f'Llengua de la lletra: {voice.lang}')
+        sing_one = lambda phrase: sing_phrase(voice, phrase, shift, steps, gender)
     if limit:
         notes = [n for n in notes if n['t'] < limit]
         band = band[:int((limit + 3) * RATE)]
     vocal = np.zeros(len(band) + RATE * 2, np.float32)
     started = time.time()
     for k, phrase in enumerate(plan_phrases(notes)):
-        start, wave = sing_phrase(voice, phrase, shift, steps, gender)
+        start, wave = sing_one(phrase)
         a = int(round(start * RATE))
         if a < 0: wave = wave[-a:]; a = 0
         end = min(len(vocal), a + len(wave))
@@ -312,7 +329,7 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
         w = wave[:end - a].copy(); w[:fade] *= np.linspace(0, 1, fade); w[-fade:] *= np.linspace(1, 0, fade)
         vocal[a:end] += w
         print(f'  frase {k + 1}: {len(phrase)} síl·labes, {len(wave) / RATE:.1f} s')
-    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {voice.speaker_name})')
+    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {speaker if voicebank else voice.speaker_name})')
     vocal = vocal[:len(band)]
     vocal = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), vocal)
     vocal = compress(vocal)
@@ -352,5 +369,6 @@ if __name__ == '__main__':
     ap.add_argument('--fx', choices=['megaphone'], help='efecte de la veu')
     ap.add_argument('--gender', type=float, default=0.0, help='-1 més greu … +1 més aguda (si el model ho admet)')
     ap.add_argument('--steps', type=int, default=40)
+    ap.add_argument('--voicebank', help='ZIP de veu.html: canta amb la veu gravada (en català) en lloc de DiffSinger')
     a = ap.parse_args()
-    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender)
+    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank)

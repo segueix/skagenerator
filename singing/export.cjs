@@ -14,6 +14,8 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
 (async () => {
   const [url, outDir, countArg, seedArg] = process.argv.slice(2);
   const fixed = countArg === '--song' ? JSON.parse(fs.readFileSync(seedArg, 'utf8')) : null;
+  // Lletra pròpia: node singing/export.cjs <url> <carpeta> --lyrics <fitxer.txt> <subgènere> [llavor]
+  const own = countArg === '--lyrics' ? { text: fs.readFileSync(seedArg, 'utf8'), subgenre: process.argv[6], seed: Number(process.argv[7]) || 1, name: path.basename(seedArg).replace(/\.[^.]+$/, '') } : null;
   const count = fixed ? 1 : Number(countArg) || 1, seed0 = fixed ? 0 : Number(seedArg) || Date.now() % 1000000;
   fs.mkdirSync(outDir, { recursive: true });
   const browser = await chromium.launch();
@@ -22,11 +24,16 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
   await page.goto(url);
   await page.waitForFunction(() => window.SkaStudio && window.SkaSampleAudio && window.SkaLyrics);
   for (let i = 0; i < count; i++) {
-    const subgenre = fixed ? fixed.song.settings.subgenre : STYLES[(seed0 + i) % STYLES.length], seed = fixed ? fixed.song.settings.seed : (seed0 * 7919 + i * 104729) % 4294967291 + 1;
+    const subgenre = fixed ? fixed.song.settings.subgenre : own ? own.subgenre : STYLES[(seed0 + i) % STYLES.length];
+    const seed = fixed ? fixed.song.settings.seed : own ? own.seed : (seed0 * 7919 + i * 104729) % 4294967291 + 1;
     const started = Date.now();
-    const result = await page.evaluate(async ({ subgenre, seed, fixedSong }) => {
+    const result = await page.evaluate(async ({ subgenre, seed, fixedSong, ownText }) => {
       const engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder, studio = window.SkaStudio, utils = window.SkaAudioUtils, RATE = studio.RATE;
-      const song = fixedSong ? studio.validateSong(fixedSong) : studio.validateSong(builder.createAutoSong(engine, subgenre, { minutes: 2.25 + (seed % 4) * .25, vocal: true, autoLyrics: 'en', seed, vary: true, recent: [], liked: [] }));
+      // Lletra pròpia (en català): la cançó es fa a la mida dels versos, com al taller.
+      const sheet = ownText ? builder.parseLyricsSheet(ownText).map(({ type, text }) => ({ type, text })) : null;
+      const song = fixedSong ? studio.validateSong(fixedSong) : studio.validateSong(builder.createAutoSong(engine, subgenre,
+        { minutes: 2.25 + (seed % 4) * .25, vocal: true, ...(sheet ? { lyrics: sheet } : { autoLyrics: 'en' }), seed, vary: true, recent: [], liked: [] }));
+      const english = song.settings.lang === 'en', counter = english ? engine.englishWord : engine.catalanWord;
       // La banda sense la veu guia i amb el baix 3 dB més fluix: així no tapa la veu cantada.
       const bv = song.settings.baseVolume || {};
       const band = { ...song, settings: { ...song.settings, baseVolume: { drums: bv.drums || 0, bass: Math.max(-24, (bv.bass || 0) - 3) } },
@@ -50,7 +57,8 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
           const melody = (vspec.lines?.vocal || []).slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
           const swing = song.settings.swing || 0, swung = beats => Math.abs(beats % 1 - .5) < .04 ? beats + swing / 6 : beats;
           const words = text.split('\n').map(l => l.trim()).filter(Boolean)
-            .flatMap((line, li) => (line.match(/[A-Za-z'’]+/g) || []).map((w, wi) => ({ word: w.replace(/’/g, "'"), line: li, first: wi === 0, count: Math.max(1, engine.englishWord(w).count) })));
+            .flatMap((line, li) => (line.toLowerCase().match(english ? /[a-z'’]+/g : /[a-zàèéíïòóúüç·'’-]+/g) || [])
+              .map((w, wi) => ({ word: w.replace(/’/g, "'"), line: li, first: wi === 0, count: Math.max(1, counter(w).count) })));
           const lineTexts = text.split('\n').map(l => l.trim()).filter(Boolean);
           let n = 0;
           for (const w of words) for (let s = 0; s < w.count && n < melody.length; s++, n++) {
@@ -66,10 +74,10 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
       let binary = '';
       for (let i = 0; i < wav.length; i += 0x8000) binary += String.fromCharCode.apply(null, wav.subarray(i, i + 0x8000));
       return { wav: btoa(binary), song, notes, lines, seconds: mixed[0].length / RATE };
-    }, { subgenre, seed, fixedSong: fixed?.song || null });
-    const id = fixed?.id || `${new Date().toISOString().slice(0, 10)}-${subgenre}-${seed}`;
+    }, { subgenre, seed, fixedSong: fixed?.song || null, ownText: own?.text || null });
+    const id = fixed?.id || (own ? `${own.name}-${subgenre}` : `${new Date().toISOString().slice(0, 10)}-${subgenre}-${seed}`);
     fs.writeFileSync(path.join(outDir, `${id}.band.wav`), Buffer.from(result.wav, 'base64'));
-    fs.writeFileSync(path.join(outDir, `${id}.json`), JSON.stringify({ id, subgenre, title: result.song.title, seconds: result.seconds, notes: result.notes, song: result.song }));
+    fs.writeFileSync(path.join(outDir, `${id}.json`), JSON.stringify({ id, subgenre, lang: result.song.settings.lang || 'ca', title: result.song.title, seconds: result.seconds, notes: result.notes, song: result.song }));
     // Fitxa per a la ràdio: el que cal per mostrar-la, votar-la i seguir la lletra.
     fs.writeFileSync(path.join(outDir, `${id}.meta.json`), JSON.stringify({ id, file: `${id}.mp3`, subgenre, style: result.song.settings.style,
       title: result.song.title, seconds: Math.round(result.seconds * 10) / 10, created: new Date().toISOString(), lines: result.lines, song: result.song }));
