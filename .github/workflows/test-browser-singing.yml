@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: navegador-matxa-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -32,6 +36,12 @@ jobs:
           node --check scripts/build.mjs
       - name: Provar síl·labes, afinació, timbres i cancel·lació
         run: node --test tests/browser-singing.test.cjs
+      - name: Recuperar els bancs d'instruments
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs', 'extra-instruments.json', 'scripts/extra-instruments.mjs', 'round-robin.json') }}
+          restore-keys: soundbanks-
       - name: Comprovar que es publica el worker i el motor
         run: |
           npm ci
