@@ -76,7 +76,7 @@ test('els nou instruments generen àudio propi i trompeta i trombó són diferen
   for (let i = 0; i < samples.length; i++) for (let j = i + 1; j < samples.length; j++) assert.notDeepEqual(samples[i], samples[j]);
   // Una secció pot quedar en silenci (tota la base silenciada): llista buida vàlida.
   assert.equal(engine.composeSongPart({ ...settings, instruments: [] }, part('intro')).instruments.length, 0);
-  assert.throws(() => engine.composeSongPart({ ...settings, instruments: ['piano'] }, part('intro')));
+  assert.throws(() => engine.composeSongPart({ ...settings, instruments: ['banjo'] }, part('intro')));
 });
 
 test('cada part admet una combinació instrumental pròpia independent de la formació base', () => {
@@ -91,7 +91,7 @@ test('cada part admet una combinació instrumental pròpia independent de la for
   assert.deepEqual(base.instruments, ['guitar', 'drums', 'bass']);
   assert.deepEqual(engine.composeSongPart(base, JSON.parse(JSON.stringify(intro))).instruments, intro.instruments);
   assert.deepEqual(engine.composeSongPart({ ...base, instruments: ['drums'] }, intro).instruments, intro.instruments);
-  for (const instruments of [['piano'], ['bass', 'bass'], null, 'bass']) {
+  for (const instruments of [['banjo'], ['bass', 'bass'], null, 'bass']) {
     assert.throws(() => engine.composeSongPart(base, { ...intro, instruments }));
   }
 });
@@ -228,7 +228,7 @@ test('les seccions admeten qualsevol durada i cada instrument afegit té la seva
   assert.notDeepEqual(trumpet(a), trumpet(b));
   const guitars = [1, 2, 3].map(rev => performance.createPerformance(layered({ guitar: rev })).events.filter(e => e.type === 'on' && e.channel === 0).length);
   assert(new Set(guitars).size > 1);
-  for (const layers of [{ piano: 1 }, { trumpet: 0 }, { trumpet: 1.5 }, [], null])
+  for (const layers of [{ banjo: 1 }, { trumpet: 0 }, { trumpet: 1.5 }, [], null])
     assert.throws(() => engine.composeSongPart(base, { ...part('verse'), layers }), /Capes/);
 });
 
@@ -246,7 +246,7 @@ test('un instrument pot sonar només en una part del tram (clips que travessen s
   // La base no es veu afectada pels trams dels instruments afegits.
   assert.deepEqual(on(cut, 9), on(full, 9).length ? on(cut, 9) : []);
   assert.equal(on(cut, 2).length, on(full, 2).length);
-  for (const ranges of [{ trumpet: [[3, 3]] }, { trumpet: [[0, 9]] }, { trumpet: [] }, { piano: [[0, 1]] }, { trumpet: [[-1, 2]] }, { trumpet: [1, 2] }])
+  for (const ranges of [{ trumpet: [[3, 3]] }, { trumpet: [[0, 9]] }, { trumpet: [] }, { banjo: [[0, 1]] }, { trumpet: [[-1, 2]] }, { trumpet: [1, 2] }])
     assert.throws(() => engine.composeSongPart(base, part(ranges)), /Trams/);
 });
 
@@ -278,7 +278,7 @@ test('cada instrument pot anar a mig temps o a doble temps dins la secció', () 
   const moved = notes(half, 2).filter(e => barOf(e) % 2 === 1);
   assert(moved.length > 0);
   for (const e of moved) assert(half.chords[barOf(e)].pcs.includes(e.note % 12), `nota ${e.note} fora de l’acord`);
-  for (const feel of [{ drums: 3 }, { drums: 0 }, { piano: 2 }, []]) assert.throws(() => spec(feel), /Ritme/);
+  for (const feel of [{ drums: 3 }, { drums: 0 }, { banjo: 2 }, []]) assert.throws(() => spec(feel), /Ritme/);
 });
 
 test('la melodia de veu fa una nota per síl·laba, amb respiracions i en un registre cantable', () => {

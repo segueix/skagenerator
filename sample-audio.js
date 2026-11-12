@@ -2,10 +2,10 @@
   'use strict';
   const base = document.currentScript.src;
   const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.3-urban', base).href;
-  // Bateries i baixos gravats addicionals: fitxer a part que només es baixa si cal.
+  // Bateries, baixos i piano gravats addicionals: fitxer a part que només es baixa si cal.
   const extraURL = new URL('assets/extra-instruments.sf2?v=20261111-extra', base).href;
   const EXTRA = { drums: ['rusty', 'club', 'lofi'], bass: ['growly'] };
-  const needsExtra = spec => EXTRA.drums.includes(spec?.timbres?.drums) || EXTRA.bass.includes(spec?.timbres?.bass);
+  const needsExtra = spec => EXTRA.drums.includes(spec?.timbres?.drums) || EXTRA.bass.includes(spec?.timbres?.bass) || !!spec?.instruments?.includes('piano');
   const workerURL = new URL('sample-worker.js?v=20261110-samples', base).href;
   let worker, ready, extraReady, serial = 0;
   const requests = new Map();

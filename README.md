@@ -4,7 +4,7 @@ Una ràdio de ska i punk que compon cada cançó al navegador. A sota hi continu
 
 ## La ràdio
 
-- **Dues emissores**: Ska (jamaicà, rocksteady, 2-tone, ska-punk) i Punk (punk del 77, hardcore, pop-punk, horror punk). En triar-ne una s’obre el reproductor, es compon la primera cançó i comença a sonar sola.
+- **Dues emissores**: Ska (jamaicà, rocksteady, early reggae, 2-tone, nutty sound, ska-swing, ska-punk) i Punk (punk del 77, hardcore, pop-punk, horror punk). En triar-ne una s’obre el reproductor, es compon la primera cançó i comença a sonar sola.
 - **Cada cançó és nova**: subgènere a l’atzar dins de l’emissora (diferent del de la cançó anterior), tonalitat i durada (2–3,5 min) a l’atzar, i l’estructura s’allunya de les 12 últimes cançons de l’historial (l’opció «Estructura diferent de les últimes cançons» del taller). Al punk també varia el nombre de guitarres.
 - **La següent es prepara en segon pla** mentre sona l’actual i comença **2 segons** després que acabi. El silenci forma part del fitxer d’àudio, de manera que el canvi també funciona amb la pantalla del mòbil apagada. «Següent cançó» hi salta quan ja és a punt.
 - **👍 / 👎 i comentari** a cada cançó, des del reproductor o des de l’historial.
@@ -109,6 +109,9 @@ Cada subgènere té de 4 a 7 tonalitats pròpies (només en els modes per als qu
 | Ska jamaicà | Fa, Si♭, Mi♭, Do i Sol majors (bemolls, còmodes per als vents) |
 | Rocksteady | La, Re, Sol i Do menors; Do i Fa majors |
 | Ska 2-tone | Do, Sol, Fa i Si♭ majors; La, Re i Sol menors |
+| Nutty sound (estil Madness) | Do, Fa, Sol i Si♭ majors; Re, La i Do menors |
+| Early reggae | Do, Fa, Sol i Si♭ majors; La i Re menors |
+| Ska-swing | Fa, Si♭, Mi♭, Do i Sol majors; Sol i Re menors |
 | Ska-punk | Sol, Do, Si♭, Fa i Mi♭ majors; La i Re menors |
 | Punk del 77 | La, Mi, Re, Sol i Do majors; Mi i La menors |
 | Hardcore | Si, Mi, La i Re menors |
@@ -122,6 +125,9 @@ Cada subgènere té de 4 a 7 tonalitats pròpies (només en els modes per als qu
 | Ska jamaicà (anys 60) | 110–128 | Swing marcat, bateria jazz, baix de dits, acords amb setena i ii–V |
 | Rocksteady | 100–108 | Més lent i greu, trompeta amb sordina, tonalitats menors |
 | Ska 2-tone | 132–156 | Nerviós, orgue i metalls amb riffs |
+| Nutty sound (estil Madness) | 126–152 | Piano de pub a la base («bounce» a l’estrofa, corxeres martellejades a la tornada), saxo tenor al davant i responent a la veu, orgue només a la tornada, acords de music-hall (VI7, II7, iv), aturades de tota la banda i, de vegades, última tornada un to amunt |
+| Early reggae (boss reggae del 69) | 100–116 | Orgue «bubble» tota la cançó, piano i guitarra a contratemps, harmonies de dos acords, baix melòdic, trompeta amb sordina i final en fos |
+| Ska-swing (jump blues) | 150–176 | Balanceig fort, baix caminant, piano de boogie, kit de jazz i vents fent riffs de big band; pont de dominants encadenades (III7–VI7–II7–V7) |
 | Ska-punk | 160–180 | Guitarres distorsionades, ponts a mig temps |
 | Punk 77 | 180–205 | Tres acords amb bVII, distorsió clàssica |
 | Hardcore | 200–220 | Fuzz, acord bII i breakdown a mig temps |
@@ -129,6 +135,18 @@ Cada subgènere té de 4 a 7 tonalitats pròpies (només en els modes per als qu
 | Horror punk | 170–192 | Distorsió Misfits, acords prestats foscos (bVI, iv) |
 
 El subgènere també es pot triar al panell de la base, juntament amb el **balanceig** (swing), que endarrereix les corxeres a contratemps.
+
+### Piano vertical gravat
+
+L’ska té un instrument nou: un **piano vertical gravat nota a nota** (VSCO 2 CE «Upright Nr. 1», domini públic; 11 notes de Do2 a Do7 amb dues dinàmiques). És al banc addicional, que només es baixa quan una cançó el fa servir. Al taller es pot afegir a la base o com a instrument d’una secció, amb cinc patrons:
+
+| Patró | Què toca |
+|---|---|
+| Contratemps | Acords curts a les quatre «i», com la guitarra |
+| «Bounce» de music-hall | Baix a la mà esquerra (1 i 3), acords a contratemps i un toc suau als temps 2 i 4 |
+| Boogie | Baix caminant a corxeres (1–3–5–6–♭7) i acords sincopats |
+| Acords llargs | Blanques amb el baix sostingut |
+| Corxeres martellejades | Vuit acords per compàs amb l’accent a contratemps |
 
 ### Harmonia i riffs
 
@@ -379,7 +397,7 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 - El kit Muldjord original ocupa 209 MB i té un mapa de tecles propi: se’n construeix un kit GM nou (bombo, caixa, cop de vora, charleston, plats, ride i timbals) amb tres capes de força.
 - El banc final ocupa uns 30 MB i es carrega una sola vegada. Les descàrregues i el banc convertit es guarden a `.cache/` i a la memòria cau de GitHub Actions.
 - Els sons de GeneralUser GS continuen disponibles com a alternatives («… GM») als selectors de so. L’orgue continua sent el de GeneralUser: l’orgue de FreePats és una emulació sintetitzada, no una gravació.
-- **Banc addicional** (`assets/extra-instruments.sf2`, uns 10 MB): les bateries Big Rusty i Virtuosity i el baix Growlybass. Es publiquen en SFZ amb FLAC/WAV: el build tria unes quantes capes de força, barreja els micròfons (p. ex. bombo + ambient, caixa a sobre i a sota + ambient) i ho converteix a SF2 (FLAC descodificat amb `@wasm-audio-decoders/flac`). La web només el baixa quan una cançó fa servir algun d’aquests sons, així el banc principal no creix.
+- **Banc addicional** (`assets/extra-instruments.sf2`, uns 15 MB): les bateries Big Rusty i Virtuosity, el baix Growlybass i el piano vertical de VSCO 2 CE. Es publiquen en SFZ amb FLAC/WAV: el build tria unes quantes capes de força, barreja els micròfons (p. ex. bombo + ambient, caixa a sobre i a sota + ambient) i ho converteix a SF2 (FLAC descodificat amb `@wasm-audio-decoders/flac`). La web només el baixa quan una cançó fa servir algun d’aquests sons, així el banc principal no creix.
 - Cada peça de cada kit s’iguala a la sonoritat de la mateixa peça del kit Muldjord (bombo amb bombo, charles amb charles…) i les capes més suaus queden 3,5 dB per sota cada una; els baixos s’igualen al baix amb dits. Un guany calibrat amb parts reals fa que canviar de kit o de baix no canviï el volum de la mescla.
 - **Correcció**: el kit Muldjord era al programa 64, que al sintetitzador (SpessaSynth 4) és un «User Drum Set» GS: en realitat sonava el kit GM estàndard. Ara és al programa 69 i se sent el kit gravat de debò.
 
