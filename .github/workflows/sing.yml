@@ -74,6 +74,7 @@ jobs:
       - name: Cantar
         run: |
           for score in out/*.json; do
+            case "$score" in *.meta.json) continue ;; esac
             base="${score%.json}"
             python singing/sing.py voice/tiger "$score" "$base.band.wav" "$base.mp3"
           done
