@@ -73,6 +73,10 @@ class Voice:
             if cand in self.words: return list(self.words[cand])
         if w in self.cmu:
             return [''.join(c for c in p if not c.isdigit()).lower() for p in self.cmu[w][0]]
+        # Possessius i contraccions que no són al diccionari: «trouble's» = «trouble» + z.
+        for suffix, extra in (("'s", ['z']), ("'ll", ['l']), ("'re", ['er']), ("'ve", ['v']), ("'d", ['d'])):
+            if w.endswith(suffix) and len(w) > len(suffix):
+                return self.phonemes_of(w[:-len(suffix)]) + extra
         # Últim recurs: lletra a lletra amb vocals simples (paraules inventades).
         guess = {'a': 'ae', 'e': 'eh', 'i': 'ih', 'o': 'aa', 'u': 'ah', 'y': 'iy'}
         return [guess.get(c, c) for c in w if c.isalpha() and (c in guess or c in 'bdfghjklmnprstvwz')]
@@ -113,6 +117,7 @@ def build_phrase(voice, notes, shift):
             group.append(notes[i]); i += 1
         words.append(group)
     segs = []  # [fonema, inici, final]
+    last_vowel = -1e9  # inici de l'última vocal: les consonants següents no se la poden menjar
     for group in words:
         sylls = voice.syllables(group[0]['word'])
         # Ajusta síl·labes fonètiques a notes: sobren → s'ajunten a l'última nota; falten → la vocal s'allarga.
@@ -128,19 +133,21 @@ def build_phrase(voice, notes, shift):
             for k, (onset, vowel, coda) in enumerate(parts):
                 vs, ve = t0 + k * slot, t0 + (k + 1) * slot
                 # Consonants d'inici abans de la vocal; si trepitgen la nota anterior, l'escurcen.
-                cs = vs - sum(CONS_DUR['default'] for _ in onset)
+                # Com a molt el 40 % de la nota anterior (si les notes són seguides).
+                cs = vs - min(sum(CONS_DUR['default'] for _ in onset), max(.03 * len(onset), (vs - last_vowel) * .4))
                 if segs and segs[-1][2] > cs:
-                    cs = max(cs, segs[-1][1] + .05)
-                    segs[-1][2] = cs
+                    # La nota anterior (vocal o consonants finals) s'escurça fins on comença aquesta.
+                    while segs and segs[-1][1] >= cs - .02 and segs[-1][0] not in voice.vowels: segs.pop()
+                    if segs: segs[-1][2] = min(segs[-1][2], cs)
                 t = cs
                 for c in onset:
                     step = (vs - cs) / max(1, len(onset)); segs.append([c, t, t + step]); t += step
                 coda_len = min(.08 * len(coda), (ve - vs) * .4)
-                segs.append([vowel, vs, ve - coda_len])
+                segs.append([vowel, vs, ve - coda_len]); last_vowel = vs
                 t = ve - coda_len
                 for c in coda:
                     step = coda_len / len(coda); segs.append([c, t, t + step]); t += step
-    return segs
+    return [x for x in segs if x[2] - x[1] > .005]
 
 def to_frames(segs, start, end):
     """Segments amb SP entre forats i al principi i al final → fonemes i durades en frames."""
