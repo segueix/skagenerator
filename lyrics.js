@@ -497,7 +497,8 @@
     const families = [...pools[themes[0]], ...pools[themes[0]], ...(themes[1] ? pools[themes[1]] : [])];
     const used = new Set();
     // Un vers que encara no ha sortit: de la família demanada o, si ja s'ha gastat, d'una altra.
-    const unused = family => family.lines.filter(line => !used.has(line));
+    const normalized = line => line.toLocaleLowerCase().normalize('NFC');
+    const unused = family => family.lines.filter(line => !used.has(normalized(line)));
     // Xocs de vocals entre paraules («la trompeta escalfa»): cantats es fonen i s'entenen pitjor.
     const clashes = line => { const w = line.toLowerCase().replace(/[’']/g, ' ').split(/\s+/); let c = 0;
       for (let i = 0; i + 1 < w.length; i++) if ('aeiouàèéíïòóú'.includes(w[i].at(-1)) && 'aeiouàèéíïòóúüh'.includes(w[i + 1][0])) c++; return c; };
@@ -506,7 +507,7 @@
     const fresh = family => {
       let left = unused(family);
       if (!left.length) { const other = families.filter(f => f !== chorusFamily && unused(f).length); left = other.length ? unused(pick(other)) : family.lines; }
-      const line = choose(left); used.add(line); return line;
+      const line = choose(left); used.add(normalized(line)); return line;
     };
     // La tornada: una família pròpia amb el seu hook.
     const chorusFamily = pick(families), hook = pick(chorusFamily.hooks);
