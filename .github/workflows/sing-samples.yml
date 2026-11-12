@@ -76,13 +76,11 @@ jobs:
           # Cançó en català (lletra pròpia), amb megàfon i sense.
           if [ -n "$CATALAN" ]; then
             ca=balla-a-contratemps-twotone
-            # Amb la teva veu gravada (veu.html), si el fitxer és al repositori.
-            for bank in singing/samples/*.zip; do
-              [ -f "$bank" ] || continue
-              name=$(basename "$bank" .zip)
-              python singing/sing.py none "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-$name.mp3" --voicebank "$bank" || echo "FALLA $name"
-              python singing/sing.py none "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-$name-megafon.mp3" --voicebank "$bank" --fx megaphone || echo "FALLA $name megafon"
-            done
+            # Amb la teva veu gravada (veu.html): totes les parts de singing/samples/veu/ fan una sola veu.
+            if ls singing/samples/veu/*.zip >/dev/null 2>&1; then
+              python singing/sing.py none "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-la-meva-veu.mp3" --voicebank singing/samples/veu/*.zip || echo "FALLA la meva veu"
+              python singing/sing.py none "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-la-meva-veu-megafon.mp3" --voicebank singing/samples/veu/*.zip --fx megaphone || echo "FALLA la meva veu megafon"
+            fi
             python singing/sing.py voice/tiger "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-megafon.mp3" --fx megaphone || echo "FALLA catala megafon"
             python singing/sing.py voice/tiger "out/$ca.json" "out/$ca.band.wav" "mostres/$ca.mp3" || echo "FALLA catala"
             ls -la mostres; exit 0

@@ -369,6 +369,6 @@ if __name__ == '__main__':
     ap.add_argument('--fx', choices=['megaphone'], help='efecte de la veu')
     ap.add_argument('--gender', type=float, default=0.0, help='-1 més greu … +1 més aguda (si el model ho admet)')
     ap.add_argument('--steps', type=int, default=40)
-    ap.add_argument('--voicebank', help='ZIP de veu.html: canta amb la veu gravada (en català) en lloc de DiffSinger')
+    ap.add_argument('--voicebank', nargs='+', help='ZIP (o parts) de veu.html: canta amb la veu gravada (en català) en lloc de DiffSinger')
     a = ap.parse_args()
     main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank)

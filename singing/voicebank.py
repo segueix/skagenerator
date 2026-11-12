@@ -60,18 +60,24 @@ class Unit:
         self.note = note
 
 class Bank:
-    def __init__(self, path):
-        self.zip = zipfile.ZipFile(path)
-        self.manifest = json.loads(self.zip.read('manifest.json'))
-        self.note = int(self.manifest.get('note', 55))
-        self.files = {s['id']: s['file'] for s in self.manifest['samples']}
-        self.cache = {}
-        print(f'Veu gravada: {len(self.files)} síl·labes, cantades a la nota {self.note}')
+    """Una veu gravada, en un o més ZIP (les parts de l'exportació de veu.html)."""
+    def __init__(self, paths):
+        if isinstance(paths, str): paths = [paths]
+        self.files, self.cache, notes = {}, {}, set()
+        for path in paths:
+            z = zipfile.ZipFile(path)
+            manifest = json.loads(z.read('manifest.json'))
+            notes.add(int(manifest.get('note', 55)))
+            for s in manifest['samples']: self.files[s['id']] = (z, s['file'])
+        if len(notes) > 1: print(f'Atenció: les parts es van gravar a notes diferents ({sorted(notes)})')
+        self.note = sorted(notes)[0]
+        print(f'Veu gravada: {len(self.files)} síl·labes ({len(paths)} fitxers), cantades a la nota {self.note}')
 
     def unit(self, key):
         if key not in self.files: return None
         if key not in self.cache:
-            x, rate = sf.read(io.BytesIO(self.zip.read(self.files[key])), dtype='float64', always_2d=False)
+            z, name = self.files[key]
+            x, rate = sf.read(io.BytesIO(z.read(name)), dtype='float64', always_2d=False)
             if x.ndim > 1: x = x.mean(1)
             if rate != RATE: raise SystemExit(f'{key}: freqüència {rate}, s’esperava {RATE}')
             self.cache[key] = Unit(x, self.note)

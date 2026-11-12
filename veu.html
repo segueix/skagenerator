@@ -36,6 +36,7 @@
     .msg { min-height: 2.6em; font-size: 14px; color: var(--muted); margin: 0; }
     .note { display: flex; align-items: center; gap: 8px; } .note strong { min-width: 4ch; text-align: center; font-size: 17px; }
     .list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .parts { display: grid; gap: 8px; } .part { display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); border-color: var(--st); }
     .veu-group { width: 100%; margin: 10px 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
     .veu-chip { min-width: 46px; min-height: 36px; padding: 4px 8px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); font-size: 14px; }
     .veu-chip.done { border-color: #4ade80; color: #4ade80; } .veu-chip.now { background: var(--st); color: var(--st-text); border-color: var(--st); }
@@ -52,7 +53,7 @@
       <li>Escolta la nota i canta la síl·laba sostinguda uns 1,5 segons, a volum constant, sense vibrato.</li>
       <li>Pronúncia central: la ə és la vocal neutra («casa»), la r és suau («cara») i la rr, forta.</li>
       <li>Amb «Grava seguit» les va gravant una rere l’altra; les gravacions es desen en aquest navegador.</li>
-      <li>Al final, «Baixa el fitxer» crea un ZIP. Recorda que, si es puja al repositori públic, la teva veu queda pública.</li>
+      <li>Al final, «Prepara els fitxers» crea un o més ZIP de com a molt 24 MB. Recorda que, si es puja al repositori públic, la teva veu queda pública.</li>
     </ul>
   </details>
   <div class="row"><span class="muted">Gravades: <strong id="veu-count">0</strong></span>
@@ -77,7 +78,8 @@
     </div>
     <p class="msg" id="veu-msg" role="status" aria-live="polite">Prem «Grava»: sonarà la nota i després tens 2 segons per cantar.</p>
   </section>
-  <button class="big" id="veu-export" type="button">⇩ Baixa el fitxer (ZIP)</button>
+  <button class="big" id="veu-export" type="button">⇩ Prepara els fitxers (ZIP)</button>
+  <div class="parts" id="veu-parts"></div>
   <div class="list" id="veu-list" aria-label="Totes les síl·labes"></div>
 </main>
 <script src="veu.js"></script>

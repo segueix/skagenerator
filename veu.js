@@ -188,22 +188,47 @@
     const s = off.createBufferSource(); s.buffer = buffer; s.connect(off.destination); s.start();
     return (await off.startRendering()).getChannelData(0);
   }
+  // Treu el silenci d'abans i de després (deixa 80 ms i 150 ms de marge).
+  function trim(data, rate) {
+    let peak = 0; for (const x of data) peak = Math.max(peak, Math.abs(x));
+    const hop = Math.round(rate * .01), gate = peak * .03, loud = [];
+    for (let i = 0; i + hop <= data.length; i += hop) {
+      let s = 0; for (let k = i; k < i + hop; k++) s += data[k] * data[k];
+      if (Math.sqrt(s / hop) > gate) loud.push(i);
+    }
+    if (!loud.length) return data;
+    const a = Math.max(0, loud[0] - Math.round(rate * .08)), b = Math.min(data.length, loud.at(-1) + hop + Math.round(rate * .15));
+    return data.subarray(a, b);
+  }
+  // Fitxers de com a molt 24 MB (per poder-los enviar): cada part té el seu manifest.json.
+  const PART_BYTES = 24 * 1024 * 1024;
   async function onExport() {
-    busy = true; render(); $('veu-msg').textContent = 'Preparant el fitxer…';
+    busy = true; render(); $('veu-msg').textContent = 'Preparant els fitxers…';
+    const box = $('veu-parts'); box.replaceChildren();
     try {
-      const files = [], manifest = { format: 'radiospam-voicebank', version: 1, language: 'ca-central', note, rate: 44100, created: new Date().toISOString(), samples: [] };
+      const stamp = new Date().toISOString().slice(0, 10), parts = [];
+      let files = [], size = 0, samples = [];
+      const flush = () => { if (samples.length) parts.push({ files, samples }); files = []; size = 0; samples = []; };
       for (const item of items) {
         if (!recorded.has(item.id)) continue;
         const rec = await get(item.id);
-        const file = `${item.id}.wav`;
-        files.push({ name: file, data: wav(await resample(rec.data, rec.rate), 44100) });
-        manifest.samples.push({ ...item, file });
+        const file = `${item.id}.wav`, data = wav(trim(await resample(rec.data, rec.rate), 44100), 44100);
+        if (size + data.length > PART_BYTES) flush();
+        files.push({ name: file, data }); samples.push({ ...item, file }); size += data.length;
       }
-      files.unshift({ name: 'manifest.json', data: new TextEncoder().encode(JSON.stringify(manifest, null, 1)) });
-      const url = URL.createObjectURL(zip(files)), a = document.createElement('a');
-      a.href = url; a.download = `la-meva-veu-${new Date().toISOString().slice(0, 10)}.zip`; document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      $('veu-msg').textContent = `Fitxer baixat amb ${manifest.samples.length} síl·labes.`;
+      flush();
+      const blobs = parts.map((part, k) => {
+        const manifest = { format: 'radiospam-voicebank', version: 1, language: 'ca-central', note, rate: 44100, created: new Date().toISOString(),
+          part: k + 1, parts: parts.length, samples: part.samples };
+        return zip([{ name: 'manifest.json', data: new TextEncoder().encode(JSON.stringify(manifest, null, 1)) }, ...part.files]);
+      });
+      blobs.forEach((blob, k) => {
+        const a = document.createElement('a'), name = parts.length > 1 ? `la-meva-veu-${stamp}-part${k + 1}de${parts.length}.zip` : `la-meva-veu-${stamp}.zip`;
+        a.href = URL.createObjectURL(blob); a.download = name; a.className = 'btn part';
+        a.textContent = `⇩ ${parts.length > 1 ? `Part ${k + 1} de ${parts.length}` : 'Fitxer'} · ${(blob.size / 1048576).toFixed(1)} MB`;
+        box.append(a);
+      });
+      $('veu-msg').textContent = parts.length > 1 ? `Llest: ${parts.length} fitxers (cap passa de 24 MB). Baixa’ls tots.` : 'Llest: baixa el fitxer.';
     } catch (error) { $('veu-msg').textContent = `No s’ha pogut exportar: ${error.message || error}`; }
     finally { busy = false; render(); }
   }
