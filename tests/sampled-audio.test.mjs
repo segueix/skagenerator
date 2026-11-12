@@ -140,7 +140,13 @@ test('urban activa els sintetitzadors i el kit electrònic amb cinc grooves dife
 test('l’equalitzador canvia el volum i el timbre de cada instrument per separat', async () => {
   const flat = { low: 0, mid: 0, high: 0, volume: 0 };
   const rms = data => Math.sqrt(data[0].reduce((s, x) => s + x * x, 0) / data[0].length);
-  const solo = { ...settings, instruments: ['trumpet', 'bass'] }, sp = mix => engine.composeSongPart({ ...solo, mix }, { ...part, layers: { trumpet: 2 } });
+  const solo = { ...settings, instruments: ['trumpet', 'bass'] };
+  // Fixture amb atacs aïllats: el contingut agut no depèn del fraseig del generador.
+  const sp = mix => {
+    const score = engine.composeSongPart({ ...solo, mix }, { ...part, layers: { trumpet: 2 } });
+    score.lines.trumpet = Array.from({ length: 16 }, (_, i) => [Math.floor(i / 4), i % 4, 79, .25]);
+    return score;
+  };
   const base = rms(await renderSampledPart(bank, sp(undefined), 16000, { raw: true }));
   const quiet = rms(await renderSampledPart(bank, sp({ trumpet: { ...flat, volume: -24 }, bass: { ...flat, volume: -24 } }), 16000, { raw: true }));
   assert(Math.abs(20 * Math.log10(quiet / base) + 24) < 2.5, 'el volum ha de baixar uns 24 dB');
