@@ -68,3 +68,39 @@ test('lletra automàtica en català: versos cantables, tornada repetida i una no
     assert(Object.values(lyrics.POOLS_CA).flat().some(f => f.hooks.includes(song.title)), `${key}: títol en català`);
   }
 });
+
+test('el repertori ampliat supera els 70 versos per tema i respecta la mètrica', () => {
+  for (const [lang, pools] of [['ca', lyrics.POOLS_CA], ['en', lyrics.POOLS]]) {
+    for (const [theme, families] of Object.entries(pools)) {
+      const lines = families.flatMap(f => f.lines);
+      assert(lines.length >= 70, `${lang}/${theme}: repertori insuficient`);
+      assert(new Set(families.flatMap(f => f.hooks)).size >= 12, `${lang}/${theme}: falten títols`);
+      for (const line of families.flatMap(f => [...f.hooks, ...f.lines])) {
+        const count = engine.analyzeLyrics(line, lang).syllables[0];
+        assert(count >= (lang === 'ca' ? 2 : 1) && count <= 10, `${lang}: ${line}: ${count} síl·labes`);
+      }
+    }
+  }
+});
+
+test('800 cançons de prova: títols variats, lletres deterministes i cap vers duplicat', () => {
+  const sections = [
+    { type: 'verse', bars: 8 }, { type: 'prechorus', bars: 4 },
+    { type: 'chorus', bars: 8 }, { type: 'verse', bars: 16 },
+    { type: 'chorus', bars: 8 }, { type: 'verse', bars: 8 }
+  ];
+  for (const lang of ['ca', 'en']) for (const subgenre of ['twotone', 'punk77', 'horrorpunk', 'poppunk', 'postpunk']) {
+    const titles = new Set();
+    for (let seed = 1; seed <= 80; seed++) {
+      const options = { subgenre, style: subgenre === 'twotone' ? 'ska' : 'punk', sections, seed: seed * 101, lang };
+      const song = lyrics.writeLyrics(options);
+      titles.add(song.hook);
+      const verses = song.sections.filter((_, i) => sections[i].type === 'verse')
+        .flatMap(s => s.text.toLocaleLowerCase().split('\n'));
+      assert.equal(new Set(verses).size, verses.length, `${lang}/${subgenre}/${seed}: versos repetits`);
+      if (seed === 1) assert.deepEqual(song, lyrics.writeLyrics(options), 'mateixa llavor, mateixa lletra');
+      assert.equal(song.sections[2].text, song.sections[4].text, 'tornada idèntica');
+    }
+    assert(titles.size >= 10, `${lang}/${subgenre}: poca varietat de títols`);
+  }
+});
