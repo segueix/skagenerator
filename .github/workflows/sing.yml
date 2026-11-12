@@ -26,9 +26,8 @@ jobs:
           mkdir -p voice
           gh release view v102 --repo spicytigermeat/tiger_diffsinger --json assets --jq '.assets[] | "\(.name) \(.size)"'
           gh release download v102 --repo spicytigermeat/tiger_diffsinger -D voice/raw
-          gh release list --repo openvpi/vocoders --limit 10
-          gh release view --repo openvpi/vocoders --json tagName,assets --jq '.tagName, (.assets[] | "\(.name) \(.size)")'
-          cd voice/raw && for f in *.zip; do unzip -q -o "$f" -d "../${f%.zip}"; done
-          cd .. && for f in $(find . -name '*.zip' -not -path './raw/*'); do unzip -q -o "$f" -d "${f%.zip}"; done
+          gh release download pc-nsf-hifigan-44.1k-hop512-128bin-2025.02 --repo openvpi/vocoders -p '*.zip' -D voice/raw
+          python singing/unzip_all.py voice/raw/TIGER_DS_v102_PACK.zip voice/tiger voice/raw/pc_nsf_hifigan_44.1k_hop512_128bin_2025.02.zip voice/vocoder
+          rm -rf voice/raw
       - name: Explorar
         run: python singing/probe.py voice
