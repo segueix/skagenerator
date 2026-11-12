@@ -6,11 +6,14 @@ name: Cançons cantades (veu DiffSinger)
 # publicar la web, que les copia; a les branques de treball només en deixa un
 # artefacte per escoltar-les.
 on:
+  # Dues cançons cada dia (03:17 UTC).
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
       count:
         description: Quantes cançons
-        default: '6'
+        default: '2'
   push:
     branches: ['claude/**']
     paths: ['singing/**', '.github/workflows/sing.yml']
@@ -70,13 +73,14 @@ jobs:
         run: |
           (cd dist && python -m http.server 8000 >/dev/null 2>&1 &)
           sleep 1
-          node singing/export.cjs http://localhost:8000/ out ${{ github.event.inputs.count || '1' }}
+          node singing/export.cjs http://localhost:8000/ out ${{ github.event.inputs.count || (github.event_name == 'schedule' && '2') || '1' }}
       - name: Cantar
         run: |
           for score in out/*.json; do
             case "$score" in *.meta.json) continue ;; esac
             base="${score%.json}"
-            python singing/sing.py voice/tiger "$score" "$base.band.wav" "$base.mp3"
+            # Veu TIGER amb efecte megàfon (el timbre es tria segons l'estil).
+            python singing/sing.py voice/tiger "$score" "$base.band.wav" "$base.mp3" --fx megaphone
           done
           ls -la out
       - uses: actions/upload-artifact@v4

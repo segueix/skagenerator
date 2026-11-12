@@ -317,11 +317,18 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     vocal = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), vocal)
     vocal = compress(vocal)
     if fx == 'megaphone': vocal = megaphone(vocal)
-    # Nivell: la veu uns 2 dB per sota de la banda als trams on canta.
+    # Nivell: es compara als mitjos (300–4.000 Hz), on s'entén la veu i on el baix no infla la
+    # mesura. La veu queda 5 dB per sobre de la banda en aquesta zona.
+    mids = lambda x: signal.sosfilt(signal.butter(4, [300, 4000], 'band', fs=RATE, output='sos'), x, axis=0)
     sung = np.abs(vocal) > 1e-3
     if sung.any():
-        vr = math.sqrt(float(np.mean(vocal[sung] ** 2))); br = math.sqrt(float(np.mean(band[sung] ** 2)) + 1e-12)
-        vocal *= (br * 10 ** (-1 / 20)) / (vr + 1e-9)
+        vr = math.sqrt(float(np.mean(mids(vocal)[sung] ** 2))); br = math.sqrt(float(np.mean(mids(band.mean(1))[sung] ** 2)) + 1e-12)
+        vocal *= (br * 10 ** (5 / 20)) / (vr + 1e-9)
+    # Mentre canta la veu, els greus de la banda (baix i bombo per sota de 250 Hz) baixen 4 dB.
+    env = signal.sosfiltfilt(signal.butter(1, 4, 'low', fs=RATE, output='sos'), (np.abs(vocal) > 2e-3).astype(np.float32))
+    duck = (1 - (1 - 10 ** (-4 / 20)) * np.clip(env * 1.5, 0, 1)).astype(np.float32)
+    low = signal.sosfiltfilt(signal.butter(4, 250, 'low', fs=RATE, output='sos'), band, axis=0).astype(np.float32)
+    band = band - low + low * duck[:, None]
     wet = room(vocal) * (.35 if fx == 'megaphone' else .9)
     mix = band.copy()
     mix[:, 0] += vocal + wet * .9; mix[:, 1] += vocal + wet * 1.1

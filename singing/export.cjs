@@ -27,7 +27,10 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
     const result = await page.evaluate(async ({ subgenre, seed, fixedSong }) => {
       const engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder, studio = window.SkaStudio, utils = window.SkaAudioUtils, RATE = studio.RATE;
       const song = fixedSong ? studio.validateSong(fixedSong) : studio.validateSong(builder.createAutoSong(engine, subgenre, { minutes: 2.25 + (seed % 4) * .25, vocal: true, autoLyrics: 'en', seed, vary: true, recent: [], liked: [] }));
-      const band = { ...song, clips: song.clips.filter(c => c.instrument !== 'vocal') };
+      // La banda sense la veu guia i amb el baix 3 dB més fluix: així no tapa la veu cantada.
+      const bv = song.settings.baseVolume || {};
+      const band = { ...song, settings: { ...song.settings, baseVolume: { drums: bv.drums || 0, bass: Math.max(-24, (bv.bass || 0) - 3) } },
+        clips: song.clips.filter(c => c.instrument !== 'vocal') };
       const parts = [], lengths = [], notes = [], lines = [];
       let at = 0;
       const segs = studio.segmentsOf(song), bandSegs = studio.segmentsOf(band);

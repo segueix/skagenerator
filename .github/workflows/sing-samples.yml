@@ -62,6 +62,7 @@ jobs:
       - name: Cantar les mostres
         env:
           SKIP_TIGER: '1'
+          ONLY_MEGAPHONE: '1'
         run: |
           mkdir -p mostres
           id=2026-11-12-jamaican-273377106
@@ -71,6 +72,8 @@ jobs:
             sing "all-is-well-megafon" voice/tiger --speaker tiger_vinyl --fx megaphone
             for sp in vinyl fresh disco electric mystic falsetto cetera; do sing "tiger-$sp" voice/tiger --speaker "tiger_$sp" --limit 45; done
           fi
+          # La mescla nova amb megàfon (el baix ja no tapa la veu).
+          if [ -n "$ONLY_MEGAPHONE" ]; then sing "all-is-well-megafon-mescla-nova" voice/tiger --speaker tiger_vinyl --fx megaphone; ls -la mostres; exit 0; fi
           # Canary: tots els seus timbres.
           for sp in $(python - <<'PY'
           import glob, os, yaml
