@@ -10,6 +10,10 @@ const path = require('node:path');
 
 // Estils on una veu sintètica funciona: melòdics, sense crits.
 const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'skaswing', 'poppunk'];
+// Amb EXPORT_STYLES=ska,punk les cançons alternen un subgènere d'ska i un de punk (els que canta bé la veu).
+const SKA = ['jamaican', 'twotone', 'nutty', 'skaswing', 'skapunk'], PUNK = ['poppunk', 'punk77', 'oi', 'skatepunk'];
+// Llengua de la lletra automàtica: EXPORT_LANG=ca (per defecte) o en (la veu TIGER canta en anglès).
+const LANG = process.env.EXPORT_LANG || 'ca';
 
 (async () => {
   const [url, outDir, countArg, seedArg] = process.argv.slice(2);
@@ -24,15 +28,16 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
   await page.goto(url);
   await page.waitForFunction(() => window.SkaStudio && window.SkaSampleAudio && window.SkaLyrics);
   for (let i = 0; i < count; i++) {
-    const subgenre = fixed ? fixed.song.settings.subgenre : own ? own.subgenre : STYLES[(seed0 + i) % STYLES.length];
+    const mixed = process.env.EXPORT_STYLES === 'ska,punk' ? (i % 2 ? PUNK : SKA) : STYLES;
+    const subgenre = fixed ? fixed.song.settings.subgenre : own ? own.subgenre : mixed[(seed0 + Math.floor(i / 2)) % mixed.length];
     const seed = fixed ? fixed.song.settings.seed : own ? own.seed : (seed0 * 7919 + i * 104729) % 4294967291 + 1;
     const started = Date.now();
-    const result = await page.evaluate(async ({ subgenre, seed, fixedSong, ownText }) => {
+    const result = await page.evaluate(async ({ subgenre, seed, fixedSong, ownText, lang }) => {
       const engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder, studio = window.SkaStudio, utils = window.SkaAudioUtils, RATE = studio.RATE;
       // Lletra pròpia (en català): la cançó es fa a la mida dels versos, com al taller.
       const sheet = ownText ? builder.parseLyricsSheet(ownText).map(({ type, text }) => ({ type, text })) : null;
       const song = fixedSong ? studio.validateSong(fixedSong) : studio.validateSong(builder.createAutoSong(engine, subgenre,
-        { minutes: 2.25 + (seed % 4) * .25, vocal: true, ...(sheet ? { lyrics: sheet } : { autoLyrics: 'en' }), seed, vary: true, recent: [], liked: [] }));
+        { minutes: 2.25 + (seed % 4) * .25, vocal: true, ...(sheet ? { lyrics: sheet } : { autoLyrics: lang }), seed, vary: true, recent: [], liked: [] }));
       const english = song.settings.lang === 'en', counter = english ? engine.englishWord : engine.catalanWord;
       // La banda sense la veu guia i amb el baix 3 dB més fluix: així no tapa la veu cantada.
       const bv = song.settings.baseVolume || {};
@@ -74,7 +79,7 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
       let binary = '';
       for (let i = 0; i < wav.length; i += 0x8000) binary += String.fromCharCode.apply(null, wav.subarray(i, i + 0x8000));
       return { wav: btoa(binary), song, notes, lines, seconds: mixed[0].length / RATE };
-    }, { subgenre, seed, fixedSong: fixed?.song || null, ownText: own?.text || null });
+    }, { subgenre, seed, fixedSong: fixed?.song || null, ownText: own?.text || null, lang: LANG });
     const id = fixed?.id || (own ? `${own.name}-${subgenre}` : `${new Date().toISOString().slice(0, 10)}-${subgenre}-${seed}`);
     fs.writeFileSync(path.join(outDir, `${id}.band.wav`), Buffer.from(result.wav, 'base64'));
     fs.writeFileSync(path.join(outDir, `${id}.json`), JSON.stringify({ id, subgenre, lang: result.song.settings.lang || 'ca', title: result.song.title, seconds: result.seconds, notes: result.notes, song: result.song }));

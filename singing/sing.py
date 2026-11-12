@@ -12,7 +12,10 @@ Després la veu es comprimeix, se li posa una mica de sala i es mescla amb la ba
 """
 import glob, json, math, os, subprocess, sys, time
 import numpy as np
-import onnxruntime as ort
+try:
+    import onnxruntime as ort   # només cal per a les veus DiffSinger (TIGER)
+except ImportError:
+    ort = None
 import yaml
 from scipy import signal
 import soundfile as sf
@@ -284,15 +287,17 @@ def room(x):
     return wet / (np.abs(ir).sum() ** .5 * 6 + 1e-9)
 
 def megaphone(x):
-    """Megàfon: només els mitjos (500–3.200 Hz), saturació i la ressonància de la botzina."""
+    """Megàfon suau: mitjos (350–4.500 Hz), saturació lleugera i la ressonància de la botzina, barrejat
+    amb una mica de veu neta als aguts perquè les consonants (s, t, x) es continuïn entenent."""
     rms = math.sqrt(float(np.mean(x ** 2)) + 1e-12)
-    y = signal.sosfilt(signal.butter(4, [500, 3200], 'band', fs=RATE, output='sos'), x)
-    y = np.tanh(y / (float(np.abs(y).max()) + 1e-9) * 3.5)
-    y = y + .7 * signal.sosfilt(signal.butter(2, [1500, 1900], 'band', fs=RATE, output='sos'), y)
-    y = signal.sosfilt(signal.butter(2, [450, 3600], 'band', fs=RATE, output='sos'), y)
-    return (y * rms / (math.sqrt(float(np.mean(y ** 2))) + 1e-12)).astype(np.float32)
+    y = signal.sosfilt(signal.butter(3, [350, 4500], 'band', fs=RATE, output='sos'), x)
+    y = np.tanh(y / (float(np.abs(y).max()) + 1e-9) * 2.0)
+    y = y + .45 * signal.sosfilt(signal.butter(2, [1500, 1900], 'band', fs=RATE, output='sos'), y)
+    y = y * rms / (math.sqrt(float(np.mean(y ** 2))) + 1e-12)
+    air = signal.sosfilt(signal.butter(2, 4500, 'high', fs=RATE, output='sos'), x)
+    return (y + .6 * air).astype(np.float32)
 
-def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None):
+def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None, matxa=None, external_vocal=None):
     score = json.load(open(score_path, encoding='utf-8'))
     band, rate = sf.read(band_path, dtype='float32', always_2d=True)
     assert rate == RATE
@@ -302,7 +307,23 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     median = float(np.median([n['midi'] for n in notes]))
     shift = -12 if median > 60 else 0
     speaker = speaker or {'rocksteady': 'tiger_vinyl', 'bossreggae': 'tiger_vinyl', 'jamaican': 'tiger_vinyl', 'poppunk': 'tiger_electric'}.get(score.get('subgenre'), 'tiger_fresh')
-    if voicebank:
+    phrases = plan_phrases
+    if external_vocal:
+        sing_one, speaker = None, 'veu externa'
+    elif matxa:
+        # Matxa (veu neuronal catalana) dita vers a vers i convertida en cant.
+        import catalan, speech2sing
+        singer = speech2sing.MatxaSinger(matxa, cache=os.path.join(os.path.dirname(os.path.abspath(out_path)), 'matxa-cache'))
+        shift = 12 * round((singer.note - median) / 12)   # la melodia, a l'octava més cantable per a la veu
+        sing_one = lambda line: singer.sing_line(line, shift, catalan.syllables)
+        speaker = f'Matxa {matxa}'
+        def phrases(ns):
+            out = []
+            for n in ns:
+                if n.get('lineStart') or not out: out.append([])
+                out[-1].append(n)
+            return out
+    elif voicebank:
         # Veu gravada síl·laba a síl·laba (veu.html): sempre en català, a l'octava on es va gravar.
         import catalan, voicebank as vb
         bank = vb.Bank(voicebank)
@@ -318,19 +339,37 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
         notes = [n for n in notes if n['t'] < limit]
         band = band[:int((limit + 3) * RATE)]
     vocal = np.zeros(len(band) + RATE * 2, np.float32)
-    started = time.time()
-    for k, phrase in enumerate(plan_phrases(notes)):
-        start, wave = sing_one(phrase)
+    # Cors a la tornada (només amb Matxa): altres veus canten la mateixa lletra, una a cada banda.
+    choir_names = [v for v in os.environ.get('MATXA_CHOIR', 'pere,quim').split(',') if v] if matxa and not external_vocal else []
+    choir = [np.zeros(len(vocal), np.float32) for _ in choir_names]
+    choir_singers = [speech2sing.MatxaSinger(v, cache=singer.cache) for v in choir_names]
+    def lay(target, start, wave):
         a = int(round(start * RATE))
         if a < 0: wave = wave[-a:]; a = 0
-        end = min(len(vocal), a + len(wave))
+        end = min(len(target), a + len(wave))
         # Fos curt als extrems de cada frase per evitar clics.
         fade = min(256, len(wave) // 4)
         w = wave[:end - a].copy(); w[:fade] *= np.linspace(0, 1, fade); w[-fade:] *= np.linspace(1, 0, fade)
-        vocal[a:end] += w
+        target[a:end] += w
+    started = time.time()
+    for k, phrase in enumerate([] if external_vocal else phrases(notes)):
+        start, wave = sing_one(phrase)
+        lay(vocal, start, wave)
+        if choir_names and phrase[0].get('section') == 'chorus':
+            for buf, other in zip(choir, choir_singers):
+                lay(buf, *other._sing_take(phrase, 12 * round((other.note - median) / 12), catalan.syllables, 0))
         print(f'  frase {k + 1}: {len(phrase)} síl·labes, {len(wave) / RATE:.1f} s')
-    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {speaker if voicebank else voice.speaker_name})')
+    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {speaker if (voicebank or matxa or external_vocal) else voice.speaker_name})')
     vocal = vocal[:len(band)]
+    if external_vocal:
+        # Veu ja feta (p. ex. convertida al timbre d'una altra persona): passa pel mateix tractament i mescla.
+        ext, er = sf.read(external_vocal, dtype='float32', always_2d=True)
+        ext = ext.mean(1)
+        if er != RATE:
+            from scipy.signal import resample_poly
+            ext = resample_poly(ext, RATE, er).astype(np.float32)
+        vocal = np.zeros(len(band), np.float32); vocal[:min(len(ext), len(band))] = ext[:len(band)]
+    dry_vocal = vocal.copy()
     vocal = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), vocal)
     vocal = compress(vocal)
     if fx == 'megaphone': vocal = megaphone(vocal)
@@ -340,7 +379,16 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     sung = np.abs(vocal) > 1e-3
     if sung.any():
         vr = math.sqrt(float(np.mean(mids(vocal)[sung] ** 2))); br = math.sqrt(float(np.mean(mids(band.mean(1))[sung] ** 2)) + 1e-12)
-        vocal *= (br * 10 ** (5 / 20)) / (vr + 1e-9)
+        scale_v = (br * 10 ** (5 / 20)) / (vr + 1e-9)
+        vocal *= scale_v
+        # Cors: cada veu al nivell de la principal menys 7 dB (es compara el volum de cada una).
+        for c in range(len(choir)):
+            cv = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), choir[c][:len(band)])
+            on = np.abs(cv) > 1e-3
+            if on.any():
+                cr = math.sqrt(float(np.mean(mids(cv)[on] ** 2)) + 1e-12)
+                cv *= (br * 10 ** (5 / 20)) * 10 ** (-7 / 20) / cr
+            choir[c] = cv.astype(np.float32)
     # Mentre canta la veu, els greus de la banda (baix i bombo per sota de 250 Hz) baixen 4 dB.
     env = signal.sosfiltfilt(signal.butter(1, 4, 'low', fs=RATE, output='sos'), (np.abs(vocal) > 2e-3).astype(np.float32))
     duck = (1 - (1 - 10 ** (-4 / 20)) * np.clip(env * 1.5, 0, 1)).astype(np.float32)
@@ -349,6 +397,16 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     wet = room(vocal) * float(os.environ.get('VOCAL_WET', .35 if fx == 'megaphone' else .9))
     mix = band.copy()
     mix[:, 0] += vocal + wet * .9; mix[:, 1] += vocal + wet * 1.1
+    for c, cv in enumerate(choir):
+        cw = room(cv) * .9
+        mix[:, c % 2] += (cv + cw)[:len(mix)] * .95; mix[:, 1 - c % 2] += (cv + cw)[:len(mix)] * .35
+    if os.environ.get('VOCAL_DOUBLE', '1' if matxa else '0') == '1':
+        # Veu doblada, com als discos de punk i ska: dues còpies a banda i banda, uns mil·lisegons tard i amb
+        # l'afinació que es mou molt lentament (retard variable), 8 dB per sota de la veu principal.
+        t = np.arange(len(vocal)); g = 10 ** (-8 / 20)
+        for side, (base_ms, lfo_hz, phase) in enumerate([(19, .31, 0.0), (27, .23, 1.7)]):
+            delay = (base_ms + 3.5 * np.sin(2 * math.pi * lfo_hz * t / RATE + phase)) * RATE / 1000
+            mix[:, side] += g * np.interp(t - delay, t, vocal, left=0).astype(np.float32)
     if limit:  # tros de mostra: fos de sortida als 2 últims segons
         fade = min(len(mix), 2 * RATE); mix[-fade:] *= np.linspace(1, 0, fade)[:, None]
     peak = float(np.abs(mix).max())
@@ -356,6 +414,7 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     base = os.path.splitext(out_path)[0]
     sf.write(base + '.wav', mix, RATE, subtype='PCM_16')
     sf.write(base + '.vocal.wav', vocal + wet, RATE, subtype='PCM_16')
+    if os.environ.get('VOCAL_DRY'): sf.write(base + '.dry.wav', dry_vocal, RATE, subtype='PCM_16')
     subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', base + '.wav', '-codec:a', 'libmp3lame', '-b:a', '160k', out_path], check=True)
     os.remove(base + '.wav')
 
@@ -370,5 +429,7 @@ if __name__ == '__main__':
     ap.add_argument('--gender', type=float, default=0.0, help='-1 més greu … +1 més aguda (si el model ho admet)')
     ap.add_argument('--steps', type=int, default=40)
     ap.add_argument('--voicebank', nargs='+', help='ZIP (o parts) de veu.html: canta amb la veu gravada (en català) en lloc de DiffSinger')
+    ap.add_argument('--vocal', help='WAV amb la veu ja cantada (sec, des del començament de la cançó): només es tracta i es mescla')
+    ap.add_argument('--matxa', help='canta amb Matxa (veu catalana del Projecte Aina): elia, grau, emma, pere, gina, lluc, olga o quim')
     a = ap.parse_args()
-    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank)
+    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank, a.matxa, a.vocal)

@@ -112,8 +112,8 @@
     const waitingSongs = queue.map(t => ({ subgenre: t.song.settings.subgenre, style: t.song.settings.style, song: t.song })).reverse();
     const recent = [...waitingSongs, ...history.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created))].slice(0, 12)
       .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
-    // Cada cançó nova porta lletra en anglès; la melodia de veu la segueix.
-    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, autoLyrics: 'en', seed: studio.newSeed(), vary: true, recent,
+    // Cada cançó nova porta lletra en català; la melodia de veu la segueix.
+    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, autoLyrics: 'ca', seed: studio.newSeed(), vary: true, recent,
       liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
     // Punk: sobretot una guitarra, sovint dues i només excepcionalment tres.
     if (style === 'punk') { const dice = Math.random(); options.guitars = dice < .5 ? 1 : dice < .92 ? 2 : 3; }

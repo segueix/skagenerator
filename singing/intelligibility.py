@@ -56,7 +56,7 @@ def main():
         total += len(want); hit += matched
         samples.append(f"«{' '.join(want)}» → «{text}»")
     print(f'Entès: {hit}/{total} paraules ({100 * hit / max(1, total):.0f} %)')
-    for s in samples[:10]: print('  ', s[:160])
+    for s in samples[:40]: print('  ', s[:160])
 
 if __name__ == '__main__':
     main()
