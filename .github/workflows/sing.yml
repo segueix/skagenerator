@@ -1,0 +1,99 @@
+name: Cançons cantades (veu DiffSinger)
+
+# Compon cançons amb lletra dels estils melòdics, les fa cantar amb la veu TIGER
+# (DiffSinger, CC BY-NC-ND 4.0: ús no comercial; el model es baixa a cada execució
+# i no es redistribueix). A main les publica a la release «cantades» i torna a
+# publicar la web, que les copia; a les branques de treball només en deixa un
+# artefacte per escoltar-les.
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: Quantes cançons
+        default: '6'
+  push:
+    branches: ['claude/**']
+    paths: ['singing/**', '.github/workflows/sing.yml']
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: cancons-cantades
+  cancel-in-progress: false
+
+jobs:
+  sing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Dependències
+        run: |
+          npm ci
+          npm i --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+          pip install onnxruntime==1.17.3 'numpy<2' onnx pyyaml scipy soundfile cmudict
+          sudo apt-get install -y ffmpeg >/dev/null
+      - name: Recuperar els bancs de mostres descarregats
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs', 'extra-instruments.json', 'scripts/extra-instruments.mjs', 'round-robin.json') }}
+          restore-keys: soundbanks-
+      - name: Construir la web
+        run: npm run build
+      - name: Baixar la veu TIGER i el vocoder (no es redistribueixen)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v102 --repo spicytigermeat/tiger_diffsinger -D voice/raw
+          python singing/unzip_all.py voice/raw/TIGER_DS_v102_PACK.zip voice/tiger
+          rm -rf voice/raw
+      - name: Comprovar que els models es carreguen
+        run: |
+          python - <<'PY'
+          import glob, subprocess, sys
+          for m in sorted(glob.glob('voice/**/*.onnx', recursive=True)):
+              r = subprocess.run([sys.executable, '-c', "import onnxruntime as o,sys; o.InferenceSession(sys.argv[1], providers=['CPUExecutionProvider'])", m], capture_output=True, text=True)
+              print('ok   ' if r.returncode == 0 else f'FALLA ({r.returncode}) ', m, r.stderr[-300:] if r.returncode else '')
+          PY
+      - name: Compondre les cançons i exportar la banda
+        run: |
+          (cd dist && python -m http.server 8000 >/dev/null 2>&1 &)
+          sleep 1
+          node singing/export.cjs http://localhost:8000/ out ${{ github.event.inputs.count || '1' }}
+      - name: Cantar
+        run: |
+          for score in out/*.json; do
+            base="${score%.json}"
+            python singing/sing.py voice/tiger "$score" "$base.band.wav" "$base.mp3"
+          done
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cancons-cantades
+          path: |
+            out/*.mp3
+            out/*.vocal.wav
+            out/*.json
+          retention-days: 14
+      - name: Publicar a la release «cantades» i tornar a publicar la web
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view cantades >/dev/null 2>&1 || gh release create cantades --title "Cançons cantades" --notes "Cançons de Radio Spam cantades per la veu TIGER DS (tigermeat, DiffSinger). Llicència CC BY-NC-ND 4.0 + Commons Clause: només ús no comercial. Es renoven amb cada execució (com a molt 60)."
+          gh release download cantades -p catalog.json -D prev || true
+          python singing/catalog.py prev/catalog.json out catalog.json drop.txt
+          gh release upload cantades out/*.mp3 catalog.json --clobber
+          while read -r file; do if [ -n "$file" ]; then gh release delete-asset cantades "$file" -y || true; fi; done < drop.txt
+          gh workflow run deploy-pages.yml --ref main

@@ -70,6 +70,19 @@
   let station = null, session = 0, current = null, queue = [], waiting = false, filling = false, failures = 0, retryTimer = null, releaseLock = null;
   let sinceReplay = REPLAY_EVERY, lastSubgenre = null, played = [], prep = null, userPaused = false, needsTap = false;
 
+  // ── Cançons cantades ──────────────────────────────────────────────────
+  // Les fa cada nit GitHub Actions amb una veu DiffSinger (singing/) i la web les publica a
+  // cantades/. Si no n'hi ha, la ràdio funciona igual. Se n'intercala una de tant en tant.
+  const SUNG_CHANCE = .4;
+  let sungCatalog = null, sungLoading = null;
+  function loadSung() {
+    sungLoading ||= fetch(new URL('cantades/catalog.json', document.baseURI), { cache: 'no-cache' })
+      .then(response => response.ok ? response.json() : { songs: [] })
+      .then(data => { sungCatalog = Array.isArray(data?.songs) ? data.songs.filter(s => s && s.id && s.file && s.song) : []; })
+      .catch(() => { sungCatalog = []; });
+    return sungLoading;
+  }
+  const sungById = id => sungCatalog?.find(s => s.id === id);
   function chooseSong() {
     const history = readHistory(), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
     const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id));
@@ -77,8 +90,17 @@
       // Entre les preferides, les que fa més que no sonen.
       liked.sort((a, b) => (a.lastPlayed || 0) - (b.lastPlayed || 0));
       const entry = pickOne(liked.slice(0, Math.max(1, Math.ceil(liked.length / 2))));
-      try { return { id: entry.id, replay: true, song: studio.validateSong(JSON.parse(JSON.stringify(entry.song))) }; }
+      // Una cantada que encara és al catàleg torna a sonar cantada; si no, en versió instrumental.
+      const sung = entry.sung ? sungById(entry.id) : null;
+      try { return { id: entry.id, replay: true, ...(sung ? { sung } : {}), song: studio.validateSong(JSON.parse(JSON.stringify(entry.song))) }; }
       catch (error) { console.warn('Cançó de l’historial no vàlida', error); }
+    }
+    // Una cançó cantada que encara no ha sonat mai (com a molt una a la cua).
+    const unheard = (sungCatalog || []).filter(s => inStation(s.style) && !queued.includes(s.id) && !history.some(e => e.id === s.id));
+    if (unheard.length && !queue.some(t => t.sung) && !current?.sung && Math.random() < SUNG_CHANCE) {
+      const sung = pickOne(unheard);
+      try { lastSubgenre = sung.subgenre; return { id: sung.id, replay: false, sung, song: studio.validateSong(JSON.parse(JSON.stringify(sung.song))) }; }
+      catch (error) { console.warn('Cançó cantada no vàlida', error); }
     }
     // Cançó nova: subgènere a l'atzar (diferent de l'anterior) i estructura que s'allunya de les últimes.
     // A l'emissora Ska-Punk els dos estils s'alternen (tres de cada quatre vegades canvia d'estil).
@@ -128,7 +150,25 @@
   async function prepare(mine) {
     setPrep({ stage: 'compose', value: 0 });
     await breathe();
+    if (sungCatalog === null) await loadSung();
     const choice = chooseSong(), song = choice.song, segs = studio.segmentsOf(song), parts = [], lengths = [];
+    if (choice.sung) {
+      // Cançó cantada: ja està feta, es baixa sencera abans que soni (també amb la pantalla apagada).
+      setPrep({ stage: 'download', value: 0, title: song.title });
+      const response = await fetch(new URL(`cantades/${choice.sung.file}`, document.baseURI));
+      if (!response.ok) throw new Error(`No s’ha pogut baixar la cançó cantada (error ${response.status})`);
+      const blob = await response.blob();
+      if (mine !== session) throw CANCELLED;
+      // Seccions i lletra per al reproductor, amb els temps de la partitura.
+      const timeline = []; let at = 0;
+      const lines = Array.isArray(choice.sung.lines) ? choice.sung.lines.filter(l => l && Number.isFinite(l.at) && typeof l.text === 'string') : [];
+      for (const seg of segs) {
+        const bpm = seg.section?.bpm ?? song.settings.bpm, length = seg.bars * 240 / bpm;
+        timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lines.filter(l => l.at >= at && l.at < at + length) });
+        at += length;
+      }
+      return { id: choice.id, replay: choice.replay, sung: true, song, seconds: Number(choice.sung.seconds) || at, timeline, url: URL.createObjectURL(blob) };
+    }
     const bars = segs.reduce((n, seg) => n + seg.bars, 0); let done = 0;
     const timeline = []; let at = 0;
     for (const seg of segs) {
@@ -226,7 +266,7 @@
     const now = Date.now(), list = readHistory(), old = list.find(e => e.id === current.id);
     if (old) { old.plays = (old.plays || 1) + 1; old.lastPlayed = now; }
     else list.unshift({ id: current.id, title: current.song.title, style: current.song.settings.style, subgenre: current.song.settings.subgenre || '',
-      seconds: Math.floor(current.seconds), created: now, lastPlayed: now, plays: 1, vote: 0, comment: '', song: current.song });
+      seconds: Math.floor(current.seconds), created: now, lastPlayed: now, plays: 1, vote: 0, comment: '', ...(current.sung ? { sung: true } : {}), song: current.song });
     writeHistory(list);
     played.push(current.id); sinceReplay = current.replay ? 0 : sinceReplay + 1;
     onTrack = true; userPaused = false; needsTap = false; audio.loop = false; audio.src = current.url; audio.currentTime = 0;
@@ -295,6 +335,7 @@
     if (prep.stage === 'error') return [`No s’ha pogut preparar la cançó: ${prep.message}`, null];
     if (prep.stage === 'bank') return [`Baixant els instruments${prep.value === null ? '…' : ` · ${Math.round(prep.value * 100)} %`}`, prep.value];
     if (prep.stage === 'compose') return ['Component una cançó nova…', 0];
+    if (prep.stage === 'download') return ['Baixant una cançó cantada…', null];
     if (prep.stage === 'mix') return ['Fent la mescla final…', 1];
     return [`Gravant la banda · ${Math.round(prep.value * 100)} %`, prep.value];
   }
@@ -322,6 +363,7 @@
     $('radio-disc-label').textContent = STATIONS[station] ? STATIONS[station].toUpperCase() : '';
     $('radio-subgenre').textContent = current ? subgenreName(current.song.settings.subgenre) : `Emissora ${STATIONS[station] || ''}`;
     $('radio-replay').hidden = !current?.replay;
+    $('radio-sung').hidden = !current?.sung;
     $('radio-title').textContent = current ? current.song.title : '';
     $('radio-meta').textContent = current ? `${keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}` : '';
     const play = $('radio-play');
@@ -404,7 +446,7 @@
       const head = make('div', 'history-row'), text = make('div', 'history-text');
       text.append(make('strong', '', entry.title || 'Sense títol'),
         make('small', '', [subgenreName(entry.subgenre || entry.style), clock(entry.seconds || 0), entry.song?.settings ? keyName(entry.song) : '', dateText(entry.lastPlayed || entry.created),
-          entry.plays > 1 ? `sonada ${entry.plays} cops` : '', current?.id === entry.id ? 'sonant ara' : ''].filter(Boolean).join(' · ')));
+          entry.sung ? '🎤 cantada' : '', entry.plays > 1 ? `sonada ${entry.plays} cops` : '', current?.id === entry.id ? 'sonant ara' : ''].filter(Boolean).join(' · ')));
       const votes = make('div', 'history-votes');
       for (const [value, icon, label] of [[1, '👍', 'M’agrada'], [-1, '👎', 'No m’agrada']]) {
         const button = make('button', `vote small ${value === 1 ? 'up' : 'down'}`, icon); button.type = 'button';
@@ -447,6 +489,7 @@
       report.format = 'radiospam-feedback';
       report.about = 'Cançons que han sonat a Radio Spam, amb el vot (up, down o null), el comentari, quantes vegades han sonat, el resum de les decisions de composició i el projecte complet. «rating» és 5 per a 👍 i 1 per a 👎.';
       report.songs.forEach((item, i) => Object.assign(item, { station: list[i].style, vote: list[i].vote === 1 ? 'up' : list[i].vote === -1 ? 'down' : null,
+        sung: !!list[i].sung,
         lyrics: (list[i].song.sections || []).filter(s => s.lyrics?.trim()).map(s => ({ section: engine.SONG_PARTS[s.type]?.name || s.type, text: s.lyrics.trim() })),
         comment: list[i].comment?.trim() || '', plays: list[i].plays || 1, lastPlayed: list[i].lastPlayed ? new Date(list[i].lastPlayed).toISOString() : null }));
       report.totals = { songs: report.songs.length, up: list.filter(e => e.vote === 1).length, down: list.filter(e => e.vote === -1).length, comments: list.filter(e => e.comment?.trim()).length };
