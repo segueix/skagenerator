@@ -43,7 +43,7 @@ jobs:
           npm i --no-save playwright@1.49.1
           npx playwright install --with-deps chromium
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.0 torchaudio==2.4.0
-          pip install 'numpy<2' scipy soundfile pyworld librosa munch einops transformers==4.46.3 hydra-core pyyaml huggingface-hub accelerate descript-audio-codec pydub tqdm matplotlib
+          pip install 'numpy<2' scipy soundfile pyworld librosa munch einops transformers==4.46.3 hydra-core pyyaml huggingface-hub accelerate descript-audio-codec pydub tqdm matplotlib faster-whisper
           sudo apt-get install -y ffmpeg >/dev/null
       - name: Seed-VC (versió fixada)
         run: |
@@ -61,6 +61,7 @@ jobs:
           path: |
             seedvc/checkpoints
             ~/.cache/huggingface
+            ~/.cache/torch
           key: seedvc-${{ env.SEED_VC_COMMIT }}
       - name: Construir la web
         run: npm run build
@@ -73,6 +74,8 @@ jobs:
           sleep 1
           node singing/export.cjs http://localhost:8000/ out ${{ github.event.inputs.count || '2' }}
       - name: Cantar amb Matxa i posar-hi el timbre
+        env:
+          MATXA_TAKES: '3'   # tres preses per vers; es queda la que un reconeixedor de veu entén millor
         run: |
           if [ ! -f singing/samples/veu-referencia.wav ]; then
             echo "::warning::Falta singing/samples/veu-referencia.wav (la mostra del teu timbre): només es fa la versió de Matxa."

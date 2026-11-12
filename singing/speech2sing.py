@@ -36,24 +36,49 @@ class MatxaSinger:
         self.note = 54 if speaker in self.MALE else 64
         self._matxa = matxa
         self._units = {}
+        self._best = {}
         os.makedirs(cache, exist_ok=True)
 
-    def speech(self, text):
+    TEMPERATURES = [.2, .45, .667]   # preses: Matxa diu el vers una mica diferent amb cada temperatura
+
+    def speech(self, text, take=0):
         scale = float(os.environ.get('MATXA_SCALE', 1.1))   # una mica més a poc a poc: síl·labes més clares (mesurat)
-        key = hashlib.sha1(f'{self.speaker}|{scale}|{text}'.encode()).hexdigest()[:16]
+        key = hashlib.sha1(f'{self.speaker}|{scale}|{text}{"|t" + str(take) if take else ""}'.encode()).hexdigest()[:16]
         path = os.path.join(self.cache, f'{key}.wav')
         if not os.path.exists(path):
             self.client = self.client or self._matxa.Matxa(self.speaker)
-            self.client.say(text, path, length_scale=scale)
+            self.client.say(text, path, length_scale=scale, temperature=self.TEMPERATURES[take % len(self.TEMPERATURES)])
         x, rate = sf.read(path, dtype='float64', always_2d=True)
         return x.mean(1), rate
 
-    def analyse(self, text, count):
+    _fa = None
+
+    @classmethod
+    def _char_times(cls, x, rate, words):
+        """Alineació forçada amb el model MMS de torchaudio: segon on sona cada lletra de cada paraula.
+        Retorna None si torch/torchaudio no hi són (llavors es fan servir els pics de volum)."""
+        if cls._fa is None:
+            try:
+                import torch, torchaudio
+                bundle = torchaudio.pipelines.MMS_FA
+                cls._fa = (torch, bundle.get_model(), bundle.get_tokenizer(), bundle.get_aligner())
+            except Exception as error:
+                print('  (sense alineador MMS:', str(error)[:80], ')'); cls._fa = False
+        if not cls._fa: return None
+        torch, model, tokenizer, aligner = cls._fa
+        wave = torch.tensor(resample_poly(x, 16000, rate), dtype=torch.float32)[None]
+        with torch.inference_mode():
+            emission, _ = model(wave)
+            spans = aligner(emission[0], tokenizer(words))
+        ratio = wave.size(1) / emission.size(1) / 16000
+        return [[(sp_.start + sp_.end) / 2 * ratio for sp_ in word] for word in spans]
+
+    def analyse(self, text, count, phones=None, take=0):
         """Matxa diu `text`; retorna els paràmetres WORLD i, per a cada una de les `count` síl·labes,
         (inici de les consonants, inici de la vocal, final de la vocal, final de les consonants finals)."""
-        key = (text, count)
+        key = (text, count, phones is not None, take)
         if key in self._units: return self._units[key]
-        x, rate = self.speech(text)
+        x, rate = self.speech(text, take)
         x = x / (np.abs(x).max() + 1e-9) * .5
         f0, t = pw.harvest(x, rate, f0_floor=60, f0_ceil=600, frame_period=PERIOD)
         sp = pw.cheaptrick(x, f0, t, rate); ap = pw.d4c(x, f0, t, rate)
@@ -74,6 +99,28 @@ class MatxaSinger:
             bounds.append([a, b + 1])
         s0 = int(np.argmax(rms > rms.max() * .03)); s1 = n - int(np.argmax(rms[::-1] > rms.max() * .03))
         sylls = []
+        if phones and os.environ.get('MATXA_ALIGN', '1') == '1':
+            # phones: paraules del vers (netes, només a-z) amb els nuclis vocàlics de cada una.
+            times = self._char_times(x, rate, [w for w, _ in phones])
+            if times:
+                centre = [int(round(tt * FPS)) for word in times for tt in word]
+                # Límit entre dues lletres: el punt mig entre els seus centres.
+                edge = [s0] + [(centre[i] + centre[i + 1]) // 2 for i in range(len(centre) - 1)] + [s1]
+                edge = list(np.maximum.accumulate(np.clip(edge, s0, s1)))
+                pos = 0
+                for word, nuc in phones:
+                    base = pos; pos += len(word)
+                    for k, (na, nb) in enumerate(nuc):
+                        # Consonants abans de la vocal: l'última (o les dues últimes si fan grup) són d'aquesta síl·laba.
+                        prev_end = nuc[k - 1][1] if k else 0
+                        cons = word[prev_end:na]
+                        take = len(cons) if k == 0 else (0 if not cons else 2 if len(cons) >= 2 and (cons[-2:] in ('ll', 'ny', 'rr', 'ss', 'tx', 'tj', 'tg') or (cons[-1] in 'rl' and cons[-2] in 'pbtdcgf')) else 1)
+                        o0 = edge[base + na - take]
+                        nxt = nuc[k + 1][0] if k + 1 < len(nuc) else len(word)
+                        tail = word[nb:nxt]
+                        keep = len(tail) if k + 1 == len(nuc) else len(tail) - (0 if not tail else 2 if len(tail) >= 2 and (tail[-2:] in ('ll', 'ny', 'rr', 'ss', 'tx', 'tj', 'tg') or (tail[-1] in 'rl' and tail[-2] in 'pbtdcgf')) else 1)
+                        sylls.append((int(o0), int(edge[base + na]), int(edge[base + nb]), int(edge[base + nb + keep])))
+                bounds = []
         for k, (a, b) in enumerate(bounds):
             if k == 0: o0 = s0
             else: o0 = bounds[k - 1][1] + int((a - bounds[k - 1][1]) * .4)   # 60 % de les consonants, per a aquesta síl·laba
@@ -83,12 +130,54 @@ class MatxaSinger:
         self._units[key] = unit
         return unit
 
+    _asr = None
+
+    def _understood(self, wave, notes):
+        """Paraules del vers que un reconeixedor de veu (Whisper) entén a la veu cantada."""
+        import difflib, re, intelligibility as it
+        if MatxaSinger._asr is None:
+            from faster_whisper import WhisperModel
+            MatxaSinger._asr = WhisperModel('small', device='cpu', compute_type='int8')
+        x = resample_poly(wave, 16000, 44100).astype(np.float32)
+        segs, _ = MatxaSinger._asr.transcribe(x, language='ca', beam_size=5, vad_filter=False, condition_on_previous_text=False, without_timestamps=True)
+        heard = [it.norm(w) for w in re.split(r"[\s'’-]+", ' '.join(g.text for g in segs)) if it.norm(w)]
+        want = it.words_of(notes)
+        if len(heard) > 2 * len(want) + 3: return 0
+        return sum(b.size for b in difflib.SequenceMatcher(a=want, b=heard, autojunk=False).get_matching_blocks())
+
     def sing_line(self, notes, shift, syllables_of):
-        """Notes d'un vers → (inici en segons, ona a 44,1 kHz)."""
+        """Notes d'un vers → (inici en segons, ona). Amb MATXA_TAKES > 1 es canten diverses preses i es tria
+        la que s'entén millor; un vers repetit (la tornada) fa servir sempre la mateixa presa."""
+        takes = int(os.environ.get('MATXA_TAKES', 1))
+        if takes <= 1: return self._sing_take(notes, shift, syllables_of, 0)
+        memo = (_line_text(notes), tuple((n['midi'], round(n['d'], 3)) for n in notes))
+        if memo not in self._best:
+            best = (-1, 0)
+            for take in range(takes):
+                _, wave = self._sing_take(notes, shift, syllables_of, take)
+                got = self._understood(wave, notes)
+                if got > best[0]: best = (got, take)
+                if got >= len({n['word'] for n in notes if n['syllable'] == 0}): break   # tot entès: no cal provar-ne més
+            self._best[memo] = best[1]
+        return self._sing_take(notes, shift, syllables_of, self._best[memo])
+
+    def _sing_take(self, notes, shift, syllables_of, take):
+        """Una presa d'un vers → (inici en segons, ona a 44,1 kHz)."""
         # Unitats de veu: cada paraula dita per separat (límits de síl·laba fiables) o el vers sencer.
         plan = []   # (nota, unitat, índex de síl·laba)
         if os.environ.get('MATXA_UNIT', 'line') == 'line':
-            unit = self.analyse(_line_text(notes), len(notes))
+            # Paraules del vers i els seus nuclis vocàlics (si cada paraula té tantes síl·labes com notes).
+            import catalan, unicodedata
+            phones, i, ok = [], 0, True
+            while i < len(notes):
+                j = i + 1
+                while j < len(notes) and notes[j]['syllable'] > 0 and notes[j]['word'] == notes[i]['word']: j += 1
+                word = catalan.clean(notes[i]['word']).replace('·', '')
+                nuc = catalan.nuclei(word)
+                plain = ''.join(c for c in unicodedata.normalize('NFD', word.replace('ç', 'c')) if 'a' <= c <= 'z')
+                if len(nuc) != j - i or len(plain) != len(word): ok = False; break
+                phones.append((plain, nuc)); i = j
+            unit = self.analyse(_line_text(notes), len(notes), phones if ok else None, take)
             plan = [(n, unit, k) for k, n in enumerate(notes)]
         else:
             i = 0
@@ -129,6 +218,8 @@ class MatxaSinger:
                 room_end = fr(nn['t']) - min(naa - no0, max_on)
                 nb = min(nb, max(na + 3, room_end))
             ve = max(na + 2, nb - len(coda))
+            cap = float(os.environ.get('MATXA_MAXSTRETCH', 0))
+            if cap: ve = min(ve, na + max(int(.3 * FPS), int((b - a) * cap)))   # notes llargues: vocal sostinguda fins a un límit i silenci
             if len(on): put(na - len(on), unit, on, m)
             # Vocal: els extrems (transicions, 30 ms) a velocitat natural i el centre estirat.
             length = ve - na; edge = min(6, (b - a) // 3, length // 3)
