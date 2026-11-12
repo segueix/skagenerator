@@ -128,3 +128,38 @@ test('el client Matxa segueix la cua Gradio i reutilitza una locució', async ()
     assert.equal(first.length, 2205);
   } finally { global.fetch = oldFetch; global.window = oldWindow; }
 });
+
+test('el mapeig de versos respecta el recompte de síl·labes i el tempo', () => {
+  const notes = [[0,0,57,1],[0,1,59,1],[1,0,62,1]];
+  const mapped = singer.scoreLines('Vine a ballar\nJa som aquí', [2,1], notes, 120);
+  assert.equal(mapped.length, 2);
+  assert.equal(mapped[0].text, 'Vine a ballar');
+  assert.equal(mapped[1].notes[0].at, 2);
+  assert.equal(mapped[0].notes[1].at, .5);
+  assert.equal(singer.scoreLines('Vine a ballar\nJa som aquí', [2,2], notes, 120).length, 0);
+});
+
+test('el worker aplica el preset i lliura una veu processada', async () => {
+  const fs = require('node:fs'), vm = require('node:vm');
+  let output;
+  const context = {
+    Float32Array, Math, console,
+    self: { postMessage: data => { output = data; } }
+  };
+  context.importScripts = () => {
+    context.self.SkaAudioUtils = require('../audio-utils.js');
+    context.self.SkaBrowserSinging = singer;
+  };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../browser-singing-worker.js'), 'utf8'), context);
+  const pcm = tone(185, .5);
+  context.self.onmessage({ data: {
+    id: 8, type:'sing', pcm, rate, frames: rate,
+    lines: [{ text:'Vine', notes: [{ at:.1, dur:.22, midi:60 }] }],
+    preset: singer.presetFor('punk77')
+  } });
+  assert.equal(output.id, 8);
+  assert(!output.error, output.error);
+  assert.equal(output.voice.length, rate);
+  assert(output.voice.some(x => Math.abs(x) > .001));
+  assert(output.voice.every(x => Number.isFinite(x) && Math.abs(x) <= 1));
+});
