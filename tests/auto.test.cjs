@@ -243,8 +243,8 @@ test('millores dels comentaris: transicions suaus, guitarra 2, varietat al punk 
     const intro = song.sections[0];
     if (intro.entrance?.drums !== undefined) assert.equal(intro.entrance.drums, intro.bars - 1);
     assert(!(intro.mute || []).includes('drums') || intro.bars < 2 || song.edges.opening === 'band', `${key}: la bateria no queda muda a la intro`);
-    // Les estrofes punk porten guitarra 2.
-    if (['punk77', 'hardcore', 'horrorpunk'].includes(key)) for (const verse of song.sections.filter(s => s.type === 'verse'))
+    // Els subgèneres més densos mantenen la segona rítmica a les estrofes.
+    if (['hardcore', 'horrorpunk'].includes(key)) for (const verse of song.sections.filter(s => s.type === 'verse'))
       assert(song.clips.some(c => c.instrument === 'guitar2' && c.start === verse.start), `${key}: guitarra 2 a l’estrofa`);
   }
   // El punk del 77 ja no surt sempre igual.

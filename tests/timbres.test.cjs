@@ -81,6 +81,7 @@ test('l’equalitzador es valida i arriba a la interpretació', () => {
 test('per defecte sonen els instruments gravats i les notes curtes dels metalls van a l’staccato', () => {
   const spec = engine.composeSongPart({ ...config, instruments: ['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'sax'] },
     { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3, sax: 4 } });
+  spec.lines.trumpet = [[0, 0, 67, .25], [0, 1, 69, 1]]; // accent aïllat i nota sostinguda
   const music = createPerformance(spec), entry = channel => music.channels.find(p => p.channel === channel);
   assert.deepEqual([0, 2, 3, 4, 8, 12, 13].map(c => `${entry(c).bank}:${entry(c).program}`), ['2:27', '2:33', '2:56', '2:66', '2:66', '3:56', '3:57']);
   assert.equal(entry(9).program, 69);
@@ -205,7 +206,9 @@ test('la segona veu de vent sona amb saxo tenor gravat i el trombó és opcional
   const music = createPerformance(sp(undefined)), entry = c => music.channels.find(p => p.channel === c);
   assert.deepEqual([entry(4).bank, entry(4).program], [2, 66]);
   assert(music.events.filter(e => e.type === 'on').every(e => e.channel === 4), 'el saxo no fa servir l’staccato del trombó');
-  const trombone = createPerformance(sp({ trombone: 'vsco' }));
+  const detached = sp({ trombone: 'vsco' });
+  detached.lines.trombone = [[0, 0, 67, .25], [0, 1, 69, 1]];
+  const trombone = createPerformance(detached);
   assert.deepEqual([trombone.channels.find(p => p.channel === 4).bank, trombone.channels.find(p => p.channel === 4).program], [2, 57]);
   assert(trombone.events.some(e => e.type === 'on' && e.channel === 13), 'el trombó gravat conserva l’staccato');
   assert.equal(createPerformance(sp({ trombone: 'gm' })).channels.find(p => p.channel === 4).bank, 0);

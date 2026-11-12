@@ -203,9 +203,9 @@ function createPerformance(spec) {
     events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) }); };
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
-  function horn(channel, pitch, start, duration, velocity, accent) {
-    // Les notes curtes dels metalls gravats fan servir les mostres d'staccato.
-    if (realBrass[channel] && duration < .3) channel += 9;
+  function horn(channel, pitch, start, duration, velocity, accent, connected = false) {
+    // Només els accents curts separats fan servir les mostres de staccato.
+    if (realBrass[channel] && duration < .3 && !connected) channel += 9;
     const at = Math.max(0, start), long = duration > beat * .9;
     bend(channel, at - .002, accent && random() < .55 ? 8192 - 700 - random() * 500 : 8192);
     if (accent) for (let k = 1; k <= 4; k++) bend(channel, at + k * .016, 8192 - (4 - k) * 260 * (1 - k / 5));
@@ -232,7 +232,10 @@ function createPerformance(spec) {
       ? [[0, .5, 1, 1.5, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 3, 3.5], [0, .5, 1.5, 2, 2.5, 3.5], [0, .5, 1, 1.5, 2.5, 3], [0, 1, 2, 2.5, 3, 3.5]]
       : [[.5, 1.5, 2.5, 3.5], [.5, 1.5, 2.5, 3.5, 3.75], [.5, 1.5, 3.5], [.5, 1.75, 2.5, 3.5], [.5, 1.5, 2.75, 3.5]];
     const guitarIndex = spec.layers?.guitar ?? spec.groove?.guitar ?? Math.max(0, variation);
-    const hits = ending ? [0] : guitarPatterns[guitarIndex % guitarPatterns.length];
+    const restrained = punk && !misfits && ['verse', 'bridge'].includes(spec.type);
+    const hits = ending ? [0] : restrained
+      ? [[0, .5, 2], [0, 1.5], [0, 1.5, 2.5], [0, .5, 2, 3], [0, 2.5]][(guitarIndex + b % 2) % 5]
+      : guitarPatterns[guitarIndex % guitarPatterns.length];
     // Horror punk (estil Misfits): acords de quinta tot a cops avall en corxeres,
     // apagats amb el palmell a les estrofes i oberts a les tornades, amb dues
     // guitarres iguals a esquerra i dreta (paret de guitarres).
@@ -245,11 +248,11 @@ function createPerformance(spec) {
       }));
     } else if (has('guitar') && spec.guitarBase !== false) hits.forEach((t, hit) => {
       const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
-      const duration = ending ? bar * .75 : beat * (punk ? .4 : .22);
+      const duration = ending ? bar * .75 : beat * (punk ? restrained ? .23 : .46 : .18);
       pitches.forEach((pitch, k) => {
         note(0, pitch, t0 + t * beat + k * .007, duration, punk ? hit % 2 ? 76 : 100 : 90);
-        // Segona guitarra: apagats a l’estrofa i doblatge obert a la tornada.
-        if (punk || hit % 2 === 1) note(1, pitch, t0 + t * beat + .012 + k * .006, duration * .85, punk ? 70 : 46);
+        // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.
+        if (!punk && hit % 2 === 1) note(1, pitch, t0 + t * beat + .012 + k * .006, duration * .85, 46);
       });
     });
     // Guitarra 2: rítmica aguda (acords una octava amunt) amb el seu propi patró.
@@ -412,27 +415,35 @@ function createPerformance(spec) {
     if (!has(instrument)) continue;
     const own = Array.isArray(spec.lines?.[instrument]), line = own ? spec.lines[instrument] : spec.melody;
     const channel = { synthLead: 5, trumpet: 3, trombone: 4, sax: 8 }[instrument];
-    for (const [b, t, pitch, duration] of line) {
+    for (const [index, [b, t, pitch, duration]] of line.entries()) {
       const at = b * bar + t * beat, last = finale && b === spec.chords.length - 1;
       if (last) continue;
       // Sense capa pròpia, els metalls esperen a la segona meitat de la intro.
       if (!own && instrument !== 'synthLead' && spec.type === 'intro' && b < 2) continue;
       // La força depèn només de la intensitat de la secció (abans l'estrofa baixava uns 9 dB).
       const chord = spec.chords[b], velocity = 84;
-      const length = Math.max(.07, duration * beat - .045), accent = t % 1 === 0 || duration >= 1;
+      // Lliguem notes contigües, però preservem els silencis escrits i les respiracions.
+      const next = line[index + 1], previous = line[index - 1];
+      const joins = (a, z) => a && z && Math.abs(a[0] * 4 + a[1] + a[3] - (z[0] * 4 + z[1])) < .01
+        && Math.floor((a[0] * 4 + a[1]) / 16) === Math.floor((z[0] * 4 + z[1]) / 16);
+      const joinedNext = joins(line[index], next), joinedPrevious = joins(previous, line[index]);
+      const connected = joinedNext || joinedPrevious;
+      const gap = joinedNext ? .008 : Math.min(.065, duration * beat * .18);
+      const length = Math.max(.025, duration * beat - gap);
+      const accent = !joinedPrevious && (t % 1 === 0 || duration >= 1);
       if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0);
-      else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent);
+      else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected);
       else if (instrument === 'sax') {
         // El saxo toca la seva línia en el registre agut del tenor (55–74), per sobre
         // de la segona veu i de la guitarra, perquè no quedi tapat.
         let high = pitch; while (high > 74) high -= 12; while (high < 55) high += 12;
-        horn(8, high, at + .004, length, velocity, accent);
+        horn(8, high, at + .004, length, velocity, accent, connected);
       }
       else {
         // Amb línia pròpia es toca tal com està composta (una octava avall, dins del
         // registre del trombó); sense, harmonitza la melodia amb notes de l'acord.
         let low = pitch - 12; while (low > 67) low -= 12; while (low < 45) low += 12;
-        horn(4, own ? low : nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length * .94, velocity - 5, accent);
+        horn(4, own ? low : nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length, velocity - 5, accent, connected);
       }
     }
   }

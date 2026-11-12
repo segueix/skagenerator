@@ -2154,8 +2154,8 @@
         }
         return onsets.map((t, i) => {
             const gap = (onsets[i + 1] ?? Math.min(8, t + 2)) - t;
-            // A l'ska, notes curtes i seques (com els metalls); al punk, lligades.
-            return [t, i === onsets.length - 1 ? Math.min(2, 8 - t) : punk ? gap : Math.min(gap, gap > 1 ? 1 : gap)];
+            // Frases fluides amb respiració al final de la cèl·lula de dos compassos.
+            return [t, i === onsets.length - 1 ? Math.max(.25, Math.min(2, 8 - t) - .25) : gap];
         });
     }
     function composeRiff(seed, punk) {

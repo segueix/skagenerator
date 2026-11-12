@@ -410,6 +410,9 @@
     if (key === 'horrorpunk') { if (of('intro')[0]) of('intro')[0].feel = { drums: .5, bass: .5 }; const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
     // Punk: de vegades una segona bateria a contratemps a partir de la segona tornada.
     if (['punk77', 'hardcore', 'horrorpunk'].includes(key) && r() < .55) of('chorus').slice(1).forEach(s => { s.offbeat = true; });
+    if (key === 'punk77' || key === 'skapunk') for (const sec of sections) {
+      if (['verse', 'bridge'].includes(sec.type)) sec.groove = { ...(sec.groove || {}), bass: 3 };
+    }
     const harmony = {};
     for (const type of new Set(sections.map(s => s.type))) harmony[type] = 1 + Math.floor(r() * 5);
 
@@ -440,25 +443,29 @@
         if (sec.type === 'verse') { verses++; if (key !== 'nutty') add(sec, 'organ', { revision: 2 }); if (verses > 1) add(sec, key === 'nutty' ? 'sax' : 'trumpet', { line: 'answer' }); }
         if (sec.type === 'prechorus') add(sec, 'trombone', { line: 'answer' });
         if (sec.type === 'chorus') {
-          add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' });
-          if (!mellow) add(sec, 'sax', { line: 'riff' });
+          add(sec, 'trumpet', { line: sing ? 'answer' : 'riff' });
+          if (sec === lastChorus) add(sec, 'trombone', { line: sing ? 'answer' : 'riff' });
+          if (!sing && !mellow) add(sec, 'sax', { line: 'riff' });
           if (key === 'nutty') add(sec, 'organ', { revision: 1 });
           if (key === 'skapunk') add(sec, 'guitar2', { fx: { type: 'distortion', drive: 65, tone: 55 }, revision: 2 });
         }
-        if (sec.type === 'solo') { add(sec, key === 'twotone' ? 'trumpet' : 'sax'); add(sec, 'guitar3', { revision: 1 + Math.floor(r() * 5) }); }
+        if (sec.type === 'solo') {
+          const soloist = r() < .5 ? 'trumpet' : 'sax';
+          add(sec, key === 'twotone' ? 'trumpet' : soloist);
+        }
         if (sec.type === 'bridge') { if (key === 'rocksteady') add(sec, 'synthPad', { revision: 1 }); else add(sec, 'trombone'); if (key === 'skapunk') add(sec, 'guitar3', { revision: 4, fx: { type: 'crunch', drive: 40, tone: 50 } }); }
       } else {
         if (sec.type === 'intro') { add(sec, 'guitar3', { line: 'riff' }); if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 }); }
         if (sec.type === 'verse') {
           verses++;
-          // Sense la segona guitarra les estrofes perdien força (comentaris de les cançons).
+          // Reservem la segona rítmica per a la tornada; els estils més densos la mantenen.
           // Pop-punk i post-punk: estrofes més buides, amb arpegis nets en lloc de la segona rítmica.
           const airy = key === 'poppunk' || key === 'postpunk';
-          if (!airy || verses > 1 && key !== 'postpunk') add(sec, 'guitar2', { revision: 2 });
+          if (key === 'horrorpunk' || key === 'hardcore') add(sec, 'guitar2', { revision: 2 });
           if (airy) add(sec, 'guitar3', { revision: key === 'postpunk' ? 3 : 1, fx: { type: 'none', drive: 50, tone: 50 } }); else if (verses > 1) add(sec, 'guitar3', { line: 'answer' });
         }
         if (sec.type === 'prechorus') add(sec, 'guitar2', { revision: 2 });
-        if (sec.type === 'chorus') { add(sec, 'guitar2', { revision: 2 }); if (key !== 'hardcore') add(sec, 'guitar3', { line: 'riff' }); }
+        if (sec.type === 'chorus') { add(sec, 'guitar2', { revision: 2 }); if (key !== 'hardcore') add(sec, 'guitar3', { line: sing ? 'answer' : 'riff' }); }
         if (sec.type === 'bridge') {
           if (key === 'hardcore') add(sec, 'guitar2', { fx: { type: 'metal', drive: 80, tone: 50 } });
           if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 });
