@@ -108,7 +108,7 @@ test('el client Matxa segueix la cua Gradio i reutilitza una locució', async ()
       const payload = { msg: 'process_completed', event_id: activeEvent, success: true,
         output: { data: [{ url: 'https://projecte-aina-matxa-alvocat-tts-ca.hf.space/gradio_api/file=test.wav' }] } };
       return { ok: true, body: { getReader: () => ({
-        read: async () => read ? { done: true } : (read = true, { done: false, value: encoder.encode('data: ' + JSON.stringify(payload) + '\\n\\n') }),
+        read: async () => read ? { done: true } : (read = true, { done: false, value: encoder.encode('data: ' + JSON.stringify(payload) + '\n\n') }),
         cancel: async () => {}
       }) } };
     }
