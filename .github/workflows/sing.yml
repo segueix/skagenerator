@@ -2,19 +2,26 @@ name: Cançons cantades (veu DiffSinger)
 
 # Compon cançons amb lletra dels estils melòdics, les fa cantar amb la veu TIGER
 # (DiffSinger, CC BY-NC-ND 4.0: ús no comercial; el model es baixa a cada execució
-# i no es redistribueix) i les deixa com a artefacte per escoltar-les.
+# i no es redistribueix). A main les publica a la release «cantades» i torna a
+# publicar la web, que les copia; a les branques de treball només en deixa un
+# artefacte per escoltar-les.
 on:
   workflow_dispatch:
     inputs:
       count:
         description: Quantes cançons
-        default: '1'
+        default: '6'
   push:
     branches: ['claude/**']
     paths: ['singing/**', '.github/workflows/sing.yml']
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
+
+concurrency:
+  group: cancons-cantades
+  cancel-in-progress: false
 
 jobs:
   sing:
@@ -79,3 +86,14 @@ jobs:
             out/*.vocal.wav
             out/*.json
           retention-days: 14
+      - name: Publicar a la release «cantades» i tornar a publicar la web
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view cantades >/dev/null 2>&1 || gh release create cantades --title "Cançons cantades" --notes "Cançons de Radio Spam cantades per la veu TIGER DS (tigermeat, DiffSinger). Llicència CC BY-NC-ND 4.0 + Commons Clause: només ús no comercial. Es renoven amb cada execució (com a molt 60)."
+          gh release download cantades -p catalog.json -D prev || true
+          python singing/catalog.py prev/catalog.json out catalog.json drop.txt
+          gh release upload cantades out/*.mp3 catalog.json --clobber
+          while read -r file; do if [ -n "$file" ]; then gh release delete-asset cantades "$file" -y || true; fi; done < drop.txt
+          gh workflow run deploy-pages.yml --ref main

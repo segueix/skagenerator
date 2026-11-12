@@ -37,6 +37,10 @@ jobs:
         run: npm test
       - name: Construir la web
         run: npm run build
+      - name: Afegir les cançons cantades (release «cantades»)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download cantades -D dist/cantades --clobber || echo "Encara no hi ha cançons cantades."
       - name: Comprovar els recursos necessaris
         run: |
           test -s dist/index.html
