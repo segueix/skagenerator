@@ -380,18 +380,18 @@
     settings.bars = at;
     // Lletra automàtica (de moment en anglès): es posa a les seccions que es cantaran i la
     // melodia de veu la segueix (síl·labes, tòniques als temps forts i tornades iguals).
-    if (!sheet.length && vocal && options.autoLyrics === 'en') {
+    if (!sheet.length && vocal && ['en', 'ca'].includes(options.autoLyrics)) {
       const writer = lyricsModule?.();
       if (writer) {
         const singer = sec => !roles.get(sec) && (['verse', 'prechorus', 'chorus'].includes(sec.type) || key === 'horrorpunk' && sec.type === 'bridge');
-        const written = writer.writeLyrics({ subgenre: key, style: sg.style, seed: (seed ^ 0x5bd1e995) >>> 0, sections, sung: type => true });
+        const written = writer.writeLyrics({ subgenre: key, style: sg.style, seed: (seed ^ 0x5bd1e995) >>> 0, sections, sung: type => true, lang: options.autoLyrics });
         written.sections.forEach((entry, i) => {
           const sec = sections[i];
           if (!singer(sec) || !entry.text) return;
           sec.lyrics = entry.text;
           if (entry.phraseBars === 4) sec.phraseBars = 4;
         });
-        settings.lang = 'en';
+        settings.lang = options.autoLyrics;
       }
     }
     const of = type => sections.filter(s => s.type === type), lastChorus = of('chorus').at(-1);

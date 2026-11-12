@@ -70,6 +70,8 @@ jobs:
               print('ok   ' if r.returncode == 0 else f'FALLA ({r.returncode}) ', m, r.stderr[-300:] if r.returncode else '')
           PY
       - name: Compondre les cançons i exportar la banda
+        env:
+          EXPORT_LANG: en   # TIGER canta en anglès
         run: |
           (cd dist && python -m http.server 8000 >/dev/null 2>&1 &)
           sleep 1

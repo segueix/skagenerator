@@ -3,7 +3,7 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SkaLyrics = api;
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  // Lletres automàtiques en anglès per a la cançó automàtica i la ràdio.
+  // Lletres automàtiques (en català o en anglès) per a la cançó automàtica i la ràdio.
   // Cada tema té famílies de rima: unes frases curtes per a la tornada (el «hook»,
   // que també fa de títol) i versos de 5 a 9 síl·labes. Les estrofes són de rima
   // AABB, la tornada repeteix el hook i les seccions llargues ajunten dos versos
@@ -51,6 +51,39 @@
       { hooks: ["Alone", "Concrete and stone"], lines: ["a voice on the telephone", "the faces I have known", "the static on the phone", "the cities made of stone"] }
     ]
   };
+  // Català: mateixa estructura (famílies de rima; versos de 5 a 9 síl·labes comptades com l'app).
+  const POOLS_CA = {
+    ska: [
+      { hooks: ["Ballem a la ciutat", "Ningú no s'ha cansat"], lines: ["el barri s'ha despertat", "el ritme ens ha atrapat", "la trompeta ha començat", "dissabte ja ha arribat", "el sol ja s'ha amagat"] },
+      { hooks: ["Vine a ballar", "A la vora del mar"], lines: ["ningú no vol parar", "la nit no ha d'acabar", "el baix comença a sonar", "ens tornem a trobar", "deixa la feina per demà"] },
+      { hooks: ["Fins que surti el sol", "Ballem sota el sol"], lines: ["tothom balla com vol", "ningú no està tot sol", "les sabates de xarol", "el cel és un llençol"] },
+      { hooks: ["A contratemps", "Tota la gent"], lines: ["la plaça plena de gent", "la música dins del vent", "ballem tots en un moment", "el món sembla diferent"] },
+      { hooks: ["Festa tot el dia", "Quina alegria"], lines: ["la banda fa harmonia", "la nit sembla un nou dia", "som una gran companyia", "ningú no se n'aniria"] },
+      { hooks: ["Ritme i calor", "Amb tot el cor"], lines: ["la plaça bull de calor", "la trompeta i el tambor", "la nit fa olor de flor", "ballem amb tot el cor"] }
+    ],
+    punk: [
+      { hooks: ["Ens volen fer callar", "Tot ho farem petar"], lines: ["no ens deixaran parlar", "el barri vol cridar", "res no ens farà aturar", "tornem a començar"] },
+      { hooks: ["Volem llibertat", "Ningú ens ha comprat"], lines: ["ens han tancat la ciutat", "el lloguer s'ha disparat", "el silenci s'ha trencat", "som el barri revoltat"] },
+      { hooks: ["Som la gent", "Contra el vent"], lines: ["la tele sempre ens ment", "ningú no és innocent", "cridem tots al mateix temps", "la ràbia creix lentament"] },
+      { hooks: ["Sense sortida", "És la nostra vida"], lines: ["la ràbia no s'oblida", "el carrer és una ferida", "la lluita està decidida", "la nit és una crida"] },
+      { hooks: ["Crida la cançó", "Tenim la raó"], lines: ["no demanem perdó", "no tenim cap patró", "ens volen a la presó", "fem soroll pel carreró"] }
+    ],
+    horror: [
+      { hooks: ["Fills de la nit", "Un crit a la nit"], lines: ["la lluna ens ha seguit", "ningú no ha dormit", "el cementiri ha cruixit", "el mort ja s'ha vestit", "el cel s'ha enfosquit"] },
+      { hooks: ["Ball de la mort", "Rellotge de la mort"], lines: ["el rellotge sona fort", "la nit fa un fred tan fort", "el corb vola cap al nord", "ningú no té bona sort", "la campana toca a mort"] },
+      { hooks: ["Sang a la lluna", "Una per una"], lines: ["les ombres d'una en una", "la boira com una duna", "no ens queda cap fortuna", "la tomba és tan profunda"] }
+    ],
+    love: [
+      { hooks: ["Ets la meva alegria", "Cada dia"], lines: ["pensant en tu tot el dia", "la teva veu em guia", "no sé què faria", "la platja ens esperaria"] },
+      { hooks: ["Tot és per amor", "Amb tot el cor"], lines: ["la platja i la calor", "el teu nom en una flor", "les nits i la calor", "l'estiu té un altre color"] },
+      { hooks: ["Torna a casa", "Aquesta nit passa"], lines: ["el telèfon que no passa", "la ràdio que s'apaga", "la tarda que s'acaba", "la lluna que ens abraça"] }
+    ],
+    dark: [
+      { hooks: ["Pluja i vent", "Lentament"], lines: ["les llums s'apaguen lentament", "un tren que passa sense gent", "la ciutat dorm sense temps", "el silenci és transparent"] },
+      { hooks: ["Fa fred", "Carrer estret"], lines: ["la ciutat és un secret", "el teu nom en un paret", "un vidre trencat i fred", "el món és cada cop més estret"] },
+      { hooks: ["Ombres de neó", "Sense cap raó"], lines: ["la nit sense cap cançó", "les ombres del balcó", "un llum dins el racó", "les fàbriques i el carbó"] }
+    ]
+  };
   // Temes de cada subgènere (el primer pesa més).
   const THEMES = { horrorpunk: ['horror'], poppunk: ['love', 'punk'], postpunk: ['dark'], skapunk: ['ska', 'punk'], oi: ['punk'], garage: ['punk', 'love'] };
   const themesOf = (subgenre, style) => THEMES[subgenre] || (style === 'punk' ? ['punk'] : ['ska']);
@@ -64,11 +97,12 @@
   const capital = text => text[0].toUpperCase() + text.slice(1);
 
   // sections: [{ type, bars }] → { hook, sections: [{ text, phraseBars }] } (text buit a les seccions que no es canten).
-  function writeLyrics({ subgenre, style, sections, seed = 1, sung } = {}) {
+  // lang: 'en' (anglès) o 'ca' (català).
+  function writeLyrics({ subgenre, style, sections, seed = 1, sung, lang = 'en' } = {}) {
     const r = rng(seed), pick = list => list[Math.floor(r() * list.length)];
-    const themes = themesOf(subgenre, style);
+    const themes = themesOf(subgenre, style), pools = lang === 'ca' ? POOLS_CA : POOLS;
     // Famílies disponibles: les del tema principal dues vegades (pesen més).
-    const families = [...POOLS[themes[0]], ...POOLS[themes[0]], ...(themes[1] ? POOLS[themes[1]] : [])];
+    const families = [...pools[themes[0]], ...pools[themes[0]], ...(themes[1] ? pools[themes[1]] : [])];
     const used = new Set();
     // Un vers que encara no ha sortit: de la família demanada o, si ja s'ha gastat, d'una altra.
     const unused = family => family.lines.filter(line => !used.has(line));
@@ -114,7 +148,7 @@
       if (sec.type === 'bridge') return bridge && bridge.count === count ? bridge.value : (bridge = { count, value: make() }).value;
       return make();
     });
-    return { lang: 'en', hook: capital(hook), sections: result };
+    return { lang, hook: capital(hook), sections: result };
   }
-  return { writeLyrics, POOLS, THEMES, themesOf };
+  return { writeLyrics, POOLS, POOLS_CA, THEMES, themesOf };
 });

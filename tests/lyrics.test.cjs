@@ -49,3 +49,22 @@ test('cançó automàtica amb lletra en anglès: la veu la segueix, la tornada e
   // Sense l'opció (o amb lletra enganxada) no s'hi posa lletra.
   assert(!builder.createAutoSong(engine, 'twotone', { seed: 17 }).sections.some(s => s.lyrics));
 });
+
+test('lletra automàtica en català: versos cantables, tornada repetida i una nota per síl·laba', () => {
+  for (const [name, pool] of Object.entries(lyrics.POOLS_CA)) {
+    assert(pool.reduce((n, f) => n + f.lines.length, 0) >= 12, name);
+    for (const family of pool) for (const line of [...family.hooks, ...family.lines]) {
+      const [count] = engine.analyzeLyrics(line).syllables;
+      assert(count >= 2 && count <= 10, `${line}: ${count} síl·labes`);
+    }
+  }
+  for (const key of ['twotone', 'punk77', 'horrorpunk', 'poppunk', 'postpunk']) {
+    const song = builder.createAutoSong(engine, key, { minutes: 3, seed: 23, autoLyrics: 'ca', recent: [], liked: [] });
+    assert.equal(song.settings.lang, 'ca');
+    const sung = song.sections.filter(s => s.lyrics);
+    const chorus = sung.find(s => s.type === 'chorus');
+    assert(chorus && sung.some(s => s.type === 'verse'), key);
+    assert.equal(song.title, chorus.lyrics.split('\n')[0]);
+    assert(Object.values(lyrics.POOLS_CA).flat().some(f => f.hooks.includes(song.title)), `${key}: títol en català`);
+  }
+});

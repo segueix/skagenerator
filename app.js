@@ -2136,7 +2136,7 @@
       const recent = readLibrary().filter(e => Array.isArray(e.song?.sections)).sort((a, b) => b.created - a.created).slice(0, 12)
         .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
       const vary = $('auto-vary').checked, punkSong = engine.SUBGENRES[key].style === 'punk';
-      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, ...($('auto-english').checked && !lyricSheet.length ? { autoLyrics: 'en' } : {}), seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(lyricSheet.length ? { lyrics: lyricSheet.map(({ type, text }) => ({ type, text })) } : {}), ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
+      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, ...($('auto-english').checked && !lyricSheet.length ? { autoLyrics: 'ca' } : {}), seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(lyricSheet.length ? { lyrics: lyricSheet.map(({ type, text }) => ({ type, text })) } : {}), ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
         ...(mode ? { key: [Number(tonic), mode] } : {}) });
       migrated = false;
       openSong(validateSong(project), '');
