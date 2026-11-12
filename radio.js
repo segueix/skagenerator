@@ -90,7 +90,8 @@
     const waitingSongs = queue.map(t => ({ subgenre: t.song.settings.subgenre, style: t.song.settings.style, song: t.song })).reverse();
     const recent = [...waitingSongs, ...history.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created))].slice(0, 12)
       .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
-    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, seed: studio.newSeed(), vary: true, recent,
+    // Cada cançó nova porta lletra en anglès; la melodia de veu la segueix.
+    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, autoLyrics: 'en', seed: studio.newSeed(), vary: true, recent,
       liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
     // Punk: sobretot una guitarra, sovint dues i només excepcionalment tres.
     if (style === 'punk') { const dice = Math.random(); options.guitars = dice < .5 ? 1 : dice < .92 ? 2 : 3; }
@@ -144,7 +145,7 @@
       } else { const empty = Math.round((spec.seconds + TAIL_SECONDS) * RATE); data = [new Float32Array(empty), new Float32Array(empty)]; }
       if (seg.section?.fade) data = audioUtils.applyFade(data, Math.min(frames, data[0].length), seg.section.fade);
       parts.push(data); lengths.push(Math.min(frames, data[0].length));
-      timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm: seg.section?.bpm ?? song.settings.bpm });
+      timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm: seg.section?.bpm ?? song.settings.bpm, lines: lyricLines(song, seg, spec, at) });
       at += frames / RATE; done += seg.bars;
       setPrep({ stage: 'render', value: done / bars, title: song.title });
     }
@@ -154,6 +155,21 @@
     const mixed = audioUtils.mixSections(parts, lengths); parts.length = 0;
     const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
     return { id: choice.id, replay: choice.replay, song, seconds, timeline, url: URL.createObjectURL(blob) };
+  }
+  // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
+  // (cada síl·laba és una nota, en ordre).
+  function lyricLines(song, seg, spec, at) {
+    const text = seg.section?.lyrics?.trim(), notes = spec.lines?.vocal;
+    if (!text || !Array.isArray(notes) || !notes.length) return [];
+    const info = engine.analyzeLyrics(text, song.settings.lang), lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const beat = 60 / (seg.section?.bpm ?? song.settings.bpm), sorted = [...notes].sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
+    const out = []; let index = 0;
+    info.syllables.forEach((count, k) => {
+      const first = sorted[index];
+      if (first && lines[k]) out.push({ at: at + (first[0] * 4 + first[1]) * beat, text: lines[k] });
+      index += count;
+    });
+    return out;
   }
   // Manté sempre cançons a punt. Si una falla, en prova una altra; si falla tres vegades, ho torna
   // a provar sol al cap d'una estona (amb la pantalla apagada ningú pot prémer «Torna-ho a provar»).
@@ -333,6 +349,14 @@
     let now = current.timeline[0];
     for (const mark of current.timeline) if (mark.at <= t) now = mark;
     $('radio-section').textContent = audio.currentTime >= current.seconds ? '' : now ? `${now.name} · ${now.bpm} BPM` : '';
+    // Lletra: el vers que es canta ara i el següent (a partir de mig segon abans que comenci).
+    const lines = current.timeline.flatMap(mark => mark.lines || []);
+    let line = -1;
+    for (let i = 0; i < lines.length; i++) if (lines[i].at - .5 <= t) line = i;
+    const sung = line >= 0 && (lines[line + 1]?.at ?? Infinity) > t && t - lines[line].at < 12 ? lines[line] : null, next = lines[line + 1];
+    $('radio-lyrics').hidden = !lines.length;
+    $('radio-lyric-now').textContent = sung ? sung.text : '♪';
+    $('radio-lyric-next').textContent = next && next.at - t < 8 ? next.text : '';
   }
   $('radio-seek').addEventListener('input', () => { seeking = true; if (current) $('radio-time').textContent = clock($('radio-seek').value / 1000 * current.seconds); });
   $('radio-seek').addEventListener('change', () => {
@@ -423,6 +447,7 @@
       report.format = 'radiospam-feedback';
       report.about = 'Cançons que han sonat a Radio Spam, amb el vot (up, down o null), el comentari, quantes vegades han sonat, el resum de les decisions de composició i el projecte complet. «rating» és 5 per a 👍 i 1 per a 👎.';
       report.songs.forEach((item, i) => Object.assign(item, { station: list[i].style, vote: list[i].vote === 1 ? 'up' : list[i].vote === -1 ? 'down' : null,
+        lyrics: (list[i].song.sections || []).filter(s => s.lyrics?.trim()).map(s => ({ section: engine.SONG_PARTS[s.type]?.name || s.type, text: s.lyrics.trim() })),
         comment: list[i].comment?.trim() || '', plays: list[i].plays || 1, lastPlayed: list[i].lastPlayed ? new Date(list[i].lastPlayed).toISOString() : null }));
       report.totals = { songs: report.songs.length, up: list.filter(e => e.vote === 1).length, down: list.filter(e => e.vote === -1).length, comments: list.filter(e => e.comment?.trim()).length };
       const name = `radiospam-${everything ? 'historial' : 'valoracions'}-${new Date().toISOString().slice(0, 10)}.json`;

@@ -2248,14 +2248,47 @@
         if (count === 1) return { count, stress: ATONES.has(bare) ? -1 : 0 };
         return { count, stress: /([aeiou]s?|[ei]n)$/.test(bare) ? count - 2 : count - 1 };
     }
-    function analyzeLyrics(text) {
+    // ── Anglès: síl·labes i síl·laba tònica de cada paraula ─────────────
+    // Regles d'ortografia (grups de vocals, «e» muda, -ed i -es) amb excepcions per a
+    // les paraules on fallen. Els monosíl·labs funcionals (the, and, to…) són àtons.
+    const EN_SYLLABLES = { everybody: 4, everyone: 3, everything: 3, every: 2, evening: 2, different: 2, family: 3, being: 2, seeing: 2,
+        liar: 2, quiet: 2, going: 2, doing: 2, saying: 2, playing: 2, trying: 2, dying: 2, crying: 2, flying: 2, riot: 2, neon: 2, idea: 3, rhythm: 2, poem: 2, lion: 2, science: 2, create: 2, fire: 1, hour: 1, our: 1, ruin: 2,
+        real: 1, really: 2, area: 3, radio: 3, video: 3, violence: 3, people: 2, there: 1, where: 1, here: 1, were: 1, are: 1, some: 1, come: 1,
+        done: 1, gone: 1, none: 1, one: 1, love: 1, give: 1, live: 1, have: 1, move: 1, lose: 1, choose: 1, whose: 1, cause: 1, because: 2, maybe: 2,
+        anyone: 3, someone: 2, sometimes: 2, somewhere: 2, nowhere: 2, everywhere: 3, forever: 3, whatever: 3, heaven: 2, devil: 2, telephone: 3, okay: 2 };
+    const EN_SECOND = new Set(['tonight', 'today', 'tomorrow', 'alone', 'around', 'away', 'again', 'along', 'behave', 'polite', 'begun', 'begin', 'begins',
+        'explain', 'survive', 'survives', 'allowed', 'forget', 'forever', 'together', 'beneath', 'believe', 'become', 'before', 'about', 'above', 'among',
+        'across', 'apart', 'ahead', 'alive', 'unknown', 'outside', 'inside', 'guitar', 'police', 'return', 'remember', 'decide', 'desire', 'escape', 'enough',
+        'okay', 'because', 'whatever', 'downtown', 'upon', 'until', 'below', 'awake', 'afraid', 'agree', 'arrive', 'collide', 'control', 'machine']);
+    const EN_ATONES = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'from', 'with', 'as', 'is', 'am', 'are', 'was',
+        'be', 'i', 'me', 'my', 'we', 'us', 'our', 'you', 'your', 'he', 'his', 'she', 'her', 'it', 'its', 'they', 'them', 'their', 'that', 'this', 'so', 'if',
+        'do', 'can', 'will', 'just', 'than', 'then', 'all', 'up']);
+    function englishWord(raw) {
+        const word = raw.toLowerCase().replace(/[’']/g, "'").replace(/'(re|ll|ve|s|d|m|t)$/, '').replace(/[^a-z]/g, '');
+        if (!word) return { count: 0, stress: -1 };
+        let count = EN_SYLLABLES[word];
+        if (count === undefined) {
+            const letters = word.replace(/^y(?=[aeiou])/, '');
+            count = (letters.match(/[aeiouy]+/g) || []).length;
+            const vowel = c => 'aeiouy'.includes(c);
+            if (count > 1 && /e$/.test(word) && !/[^aeiouy]le$/.test(word) && !vowel(word.at(-2))) count--;
+            else if (count > 1 && /ed$/.test(word) && !/[td]ed$/.test(word) && !vowel(word.at(-3))) count--;
+            else if (count > 1 && /es$/.test(word) && !vowel(word.at(-3)) && !/([sxzcg]|ch|sh|[^aeiouy]l)es$/.test(word)) count--;
+            count = Math.max(1, count);
+        }
+        if (count === 1) return { count, stress: EN_ATONES.has(word) ? -1 : 0 };
+        return { count, stress: EN_SECOND.has(word) ? 1 : /(tion|sion)s?$/.test(word) ? count - 2 : 0 };
+    }
+    // lang: 'ca' (per defecte) o 'en'.
+    function analyzeLyrics(text, lang = 'ca') {
+        const english = lang === 'en';
         const lines = String(text || '').split(/\n/).map(l => l.trim()).filter(l => l && /[a-zàèéíòóúïü]/i.test(l)).slice(0, 32);
         const keys = [], out = { syllables: [], stress: [], repeats: [] };
         for (const line of lines) {
             let total = 0;
             const stress = [];
-            for (const word of line.toLowerCase().match(/[a-zàèéíïòóúüç·'’-]+/g) || []) {
-                const w = wordStress(word);
+            for (const word of line.toLowerCase().match(english ? /[a-z'’]+/g : /[a-zàèéíïòóúüç·'’-]+/g) || []) {
+                const w = english ? englishWord(word) : wordStress(word);
                 if (w.stress >= 0) stress.push(total + w.stress);
                 total += w.count;
             }
@@ -2758,7 +2791,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, englishWord, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

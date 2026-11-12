@@ -1,7 +1,9 @@
 (function (root, factory) {
-  const api = factory();
+  // Les lletres automàtiques (lyrics.js) s'obtenen del mòdul de Node o de la pàgina.
+  const lyrics = () => (typeof module !== 'undefined' && module.exports ? require('./lyrics.js') : root.SkaLyrics);
+  const api = factory(lyrics);
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SkaSongBuilder = api;
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (lyricsModule) {
   'use strict';
   // Cançó automàtica: a partir d'un subgènere, compon una cançó sencera de
   // 2 a 4 minuts (estructura, harmonia, arranjament, riff, respostes, canvis
@@ -376,6 +378,22 @@
       at += bars;
     });
     settings.bars = at;
+    // Lletra automàtica (de moment en anglès): es posa a les seccions que es cantaran i la
+    // melodia de veu la segueix (síl·labes, tòniques als temps forts i tornades iguals).
+    if (!sheet.length && vocal && options.autoLyrics === 'en') {
+      const writer = lyricsModule?.();
+      if (writer) {
+        const singer = sec => !roles.get(sec) && (['verse', 'prechorus', 'chorus'].includes(sec.type) || key === 'horrorpunk' && sec.type === 'bridge');
+        const written = writer.writeLyrics({ subgenre: key, style: sg.style, seed: (seed ^ 0x5bd1e995) >>> 0, sections, sung: type => true });
+        written.sections.forEach((entry, i) => {
+          const sec = sections[i];
+          if (!singer(sec) || !entry.text) return;
+          sec.lyrics = entry.text;
+          if (entry.phraseBars === 4) sec.phraseBars = 4;
+        });
+        settings.lang = 'en';
+      }
+    }
     const of = type => sections.filter(s => s.type === type), lastChorus = of('chorus').at(-1);
     // ── Moviments propis del subgènere (tempo, to, ritme) ─────────────
     const tempo = (sec, factor) => { if (sec) sec.bpm = Math.max(40, Math.min(240, Math.round(bpm * factor))); };
@@ -482,7 +500,7 @@
       for (const field of ['bpm', 'transpose', 'feel']) if (sec[field] !== undefined) part[field] = sec[field];
       if (extra?.register) part.register = extra.register;
       // La melodia de veu segueix la lletra de la secció (síl·labes, tòniques i versos repetits).
-      if (layers.vocal !== undefined && sec.lyrics) { const info = engine.analyzeLyrics(sec.lyrics); if (info.syllables.length) Object.assign(part, info); }
+      if (layers.vocal !== undefined && sec.lyrics) { const info = engine.analyzeLyrics(sec.lyrics, settings.lang); if (info.syllables.length) Object.assign(part, info); }
       if (sec.phraseBars) part.phraseBars = sec.phraseBars;
       return part;
     };

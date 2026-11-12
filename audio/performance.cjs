@@ -203,10 +203,13 @@ function createPerformance(spec) {
     events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) }); };
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
-  function horn(channel, pitch, start, duration, velocity, accent, connected = false) {
+  function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false) {
     // Només els accents curts separats fan servir les mostres de staccato.
     if (realBrass[channel] && duration < .3 && !connected) channel += 9;
     const at = Math.max(0, start), long = duration > beat * .9;
+    // Nota lligada a l'anterior: atac suau (CC73, uns 30 ms) perquè no se senti el cop de llengua
+    // de la mostra gravada; la resta de notes, atac natural.
+    control(channel, at - .003, 73, slurred ? 127 : 64);
     bend(channel, at - .002, accent && random() < .55 ? 8192 - 700 - random() * 500 : 8192);
     if (accent) for (let k = 1; k <= 4; k++) bend(channel, at + k * .016, 8192 - (4 - k) * 260 * (1 - k / 5));
     // Crescendo subtil a les notes llargues (uns 2 dB): més fort sonava com si la nota s'apagués.
@@ -428,22 +431,27 @@ function createPerformance(spec) {
         && Math.floor((a[0] * 4 + a[1]) / 16) === Math.floor((z[0] * 4 + z[1]) / 16);
       const joinedNext = joins(line[index], next), joinedPrevious = joins(previous, line[index]);
       const connected = joinedNext || joinedPrevious;
-      const gap = joinedNext ? .008 : Math.min(.065, duration * beat * .18);
-      const length = Math.max(.025, duration * beat - gap);
+      // Notes lligades: la nota s'allarga 25 ms per sota de la següent (que entra amb atac suau),
+      // així no queda cap forat. Les altres respiren una mica abans de la següent.
+      const gap = joinedNext ? -.025 : Math.min(.065, duration * beat * .18);
+      // El balanceig endarrereix l'inici de les notes a contratemps: el final s'ha de moure igual,
+      // si no les notes lligades quedaven separades (o trepitjades) fins a 50 ms.
+      const nominalEnd = at + duration * beat, swingShift = (swung(nominalEnd) - nominalEnd) - (swung(at) - at);
+      const length = Math.max(.025, duration * beat - gap + swingShift);
       const accent = !joinedPrevious && (t % 1 === 0 || duration >= 1);
       if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0);
-      else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected);
+      else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected, joinedPrevious);
       else if (instrument === 'sax') {
         // El saxo toca la seva línia en el registre agut del tenor (55–74), per sobre
         // de la segona veu i de la guitarra, perquè no quedi tapat.
         let high = pitch; while (high > 74) high -= 12; while (high < 55) high += 12;
-        horn(8, high, at + .004, length, velocity, accent, connected);
+        horn(8, high, at + .004, length, velocity, accent, connected, joinedPrevious);
       }
       else {
         // Amb línia pròpia es toca tal com està composta (una octava avall, dins del
         // registre del trombó); sense, harmonitza la melodia amb notes de l'acord.
         let low = pitch - 12; while (low > 67) low -= 12; while (low < 45) low += 12;
-        horn(4, own ? low : nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length, velocity - 5, accent, connected);
+        horn(4, own ? low : nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length, velocity - 5, accent, connected, joinedPrevious);
       }
     }
   }
