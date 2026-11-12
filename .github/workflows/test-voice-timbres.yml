@@ -1,0 +1,41 @@
+name: Comprovació dels timbres Matxa i de la ràdio
+
+on:
+  push:
+    branches: [main, 'feat/matxa-catala-timbres-auto']
+    paths:
+      - 'singing/voice_timbres.py'
+      - 'singing/test_voice_timbres.py'
+      - 'singing/sing.py'
+      - 'singing/export.cjs'
+      - 'singing/catalog.py'
+      - 'radio.js'
+      - '.github/workflows/sing.yml'
+      - '.github/workflows/test-voice-timbres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Dependències per als filtres
+        run: pip install 'numpy<2' scipy soundfile pyyaml
+      - name: Comprovar el codi de Matxa sense fer peticions a tercers
+        run: |
+          python -m py_compile singing/voice_timbres.py singing/sing.py singing/catalog.py singing/matxa.py
+          python -m unittest discover -s singing -p 'test_voice_timbres.py'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprovar JavaScript
+        run: |
+          node --check singing/export.cjs
+          node --check radio.js
+          node --test tests/lyrics.test.cjs
