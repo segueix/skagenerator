@@ -71,20 +71,44 @@
   let sinceReplay = REPLAY_EVERY, lastSubgenre = null, played = [], prep = null, userPaused = false, needsTap = false;
 
   // ── Cançons cantades ──────────────────────────────────────────────────
-  // Les fa cada nit GitHub Actions amb una veu DiffSinger (singing/) i la web les publica a
-  // cantades/. Si no n'hi ha, la ràdio funciona igual. Se n'intercala una de tant en tant.
-  const SUNG_CHANCE = .4;
+  // Les noves cançons cantades en català es generen a GitHub Actions amb Matxa
+  // i es publiquen a cantades/. Es prioritzen sempre que l'emissora en tingui.
+  // La síntesi de Matxa encara no es pot executar en aquest reproductor local:
+  // quan falten enregistraments, es manté la generació instrumental existent.
   let sungCatalog = null, sungLoading = null;
   function loadSung() {
     sungLoading ||= fetch(new URL('cantades/catalog.json', document.baseURI), { cache: 'no-cache' })
       .then(response => response.ok ? response.json() : { songs: [] })
-      .then(data => { sungCatalog = Array.isArray(data?.songs) ? data.songs.filter(s => s && s.id && s.file && s.song) : []; })
+      .then(data => {
+        const all = Array.isArray(data?.songs) ? data.songs.filter(s => s && s.id && s.file && s.song) : [];
+        // El catàleg pot conservar cançons antigues de DiffSinger: no es confonen
+        // amb les noves cançons cantades en català per Matxa.
+        sungCatalog = all.filter(s => s.voiceEngine === 'matxa' && s.language === 'ca');
+      })
       .catch(() => { sungCatalog = []; });
     return sungLoading;
   }
   const sungById = id => sungCatalog?.find(s => s.id === id);
   function chooseSong() {
     const history = readHistory(), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
+    // Quan hi ha cançons Matxa en català, omplim la cua amb aquestes.
+    // Evitem repetir-les fins que totes les de l'emissora hagin tingut torn.
+    const sungAvailable = (sungCatalog || []).filter(s => inStation(s.style));
+    if (sungAvailable.length) {
+      const notQueued = sungAvailable.filter(s => !queued.includes(s.id));
+      const available = notQueued.length ? notQueued : sungAvailable;
+      const unheard = available.filter(s => !history.some(e => e.id === s.id));
+      const lastPlayed = id => history.find(e => e.id === id)?.lastPlayed || 0;
+      const candidates = unheard.length ? unheard : available.slice().sort((a, b) => lastPlayed(a.id) - lastPlayed(b.id));
+      const chosen = unheard.length ? pickOne(candidates) : pickOne(candidates.slice(0, Math.max(1, Math.ceil(candidates.length / 2))));
+      try {
+        const song = studio.validateSong(JSON.parse(JSON.stringify(chosen.song)));
+        lastSubgenre = chosen.subgenre;
+        return { id: chosen.id, replay: history.some(e => e.id === chosen.id && e.vote === 1), sung: chosen, song };
+      } catch (error) {
+        console.warn('Cançó Matxa del catàleg no vàlida', error);
+      }
+    }
     const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id));
     if (liked.length && sinceReplay >= REPLAY_EVERY && !queue.some(t => t.replay) && Math.random() < REPLAY_CHANCE) {
       // Entre les preferides, les que fa més que no sonen.
@@ -94,13 +118,6 @@
       const sung = entry.sung ? sungById(entry.id) : null;
       try { return { id: entry.id, replay: true, ...(sung ? { sung } : {}), song: studio.validateSong(JSON.parse(JSON.stringify(entry.song))) }; }
       catch (error) { console.warn('Cançó de l’historial no vàlida', error); }
-    }
-    // Una cançó cantada que encara no ha sonat mai (com a molt una a la cua).
-    const unheard = (sungCatalog || []).filter(s => inStation(s.style) && !queued.includes(s.id) && !history.some(e => e.id === s.id));
-    if (unheard.length && !queue.some(t => t.sung) && !current?.sung && Math.random() < SUNG_CHANCE) {
-      const sung = pickOne(unheard);
-      try { lastSubgenre = sung.subgenre; return { id: sung.id, replay: false, sung, song: studio.validateSong(JSON.parse(JSON.stringify(sung.song))) }; }
-      catch (error) { console.warn('Cançó cantada no vàlida', error); }
     }
     // Cançó nova: subgènere a l'atzar (diferent de l'anterior) i estructura que s'allunya de les últimes.
     // A l'emissora Ska-Punk els dos estils s'alternen (tres de cada quatre vegades canvia d'estil).
@@ -167,7 +184,8 @@
         timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lines.filter(l => l.at >= at && l.at < at + length) });
         at += length;
       }
-      return { id: choice.id, replay: choice.replay, sung: true, song, seconds: Number(choice.sung.seconds) || at, timeline, url: URL.createObjectURL(blob) };
+      return { id: choice.id, replay: choice.replay, sung: true, voiceTimbre: choice.sung.voiceTimbre,
+        song, seconds: Number(choice.sung.seconds) || at, timeline, url: URL.createObjectURL(blob) };
     }
     const bars = segs.reduce((n, seg) => n + seg.bars, 0); let done = 0;
     const timeline = []; let at = 0;
@@ -365,7 +383,7 @@
     $('radio-replay').hidden = !current?.replay;
     $('radio-sung').hidden = !current?.sung;
     $('radio-title').textContent = current ? current.song.title : '';
-    $('radio-meta').textContent = current ? `${keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}` : '';
+    $('radio-meta').textContent = current ? `${keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}${current.voiceTimbre ? ' · ' + current.voiceTimbre : ''}` : '';
     const play = $('radio-play');
     play.disabled = !current || !onTrack;
     play.firstElementChild.textContent = isPlaying ? '❚❚' : '▶';
