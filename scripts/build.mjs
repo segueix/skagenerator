@@ -3,7 +3,7 @@ import { mkdir, copyFile, cp, readFile, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { prepareSoundBank } from './prepare-soundbank.mjs';
 await mkdir('dist', { recursive: true });
-for (const file of ['index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css']) await copyFile(file, `dist/${file}`);
+for (const file of ['veu.html', 'veu.js', 'index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css']) await copyFile(file, `dist/${file}`);
 await cp('licenses', 'dist/licenses', { recursive: true });
 await cp('exemples', 'dist/exemples', { recursive: true });
 await build({ entryPoints: ['audio/worker.mjs'], bundle: true, outfile: 'dist/sample-worker.js',

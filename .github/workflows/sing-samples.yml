@@ -31,7 +31,7 @@ jobs:
           npm ci
           npm i --no-save playwright@1.49.1
           npx playwright install --with-deps chromium
-          pip install onnxruntime==1.17.3 'numpy<2' onnx pyyaml scipy soundfile cmudict
+          pip install onnxruntime==1.17.3 'numpy<2' onnx pyyaml scipy soundfile cmudict pyworld
           sudo apt-get install -y ffmpeg >/dev/null
       - name: Recuperar els bancs de mostres descarregats
         uses: actions/cache@v4
@@ -76,6 +76,13 @@ jobs:
           # Cançó en català (lletra pròpia), amb megàfon i sense.
           if [ -n "$CATALAN" ]; then
             ca=balla-a-contratemps-twotone
+            # Amb la teva veu gravada (veu.html), si el fitxer és al repositori.
+            for bank in singing/samples/*.zip; do
+              [ -f "$bank" ] || continue
+              name=$(basename "$bank" .zip)
+              python singing/sing.py none "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-$name.mp3" --voicebank "$bank" || echo "FALLA $name"
+              python singing/sing.py none "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-$name-megafon.mp3" --voicebank "$bank" --fx megaphone || echo "FALLA $name megafon"
+            done
             python singing/sing.py voice/tiger "out/$ca.json" "out/$ca.band.wav" "mostres/$ca-megafon.mp3" --fx megaphone || echo "FALLA catala megafon"
             python singing/sing.py voice/tiger "out/$ca.json" "out/$ca.band.wav" "mostres/$ca.mp3" || echo "FALLA catala"
             ls -la mostres; exit 0
