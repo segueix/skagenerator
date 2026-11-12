@@ -10,13 +10,13 @@
   const INSTRUMENTS = engine.SONG_INSTRUMENTS, TYPES = engine.SONG_PARTS, STYLES = engine.SONG_STYLES;
   // Colors vius que funcionen en mode clar i fosc (la interfície els barreja amb el fons).
   const colors = { intro: '#14b8a6', verse: '#8b5cf6', prechorus: '#f97316', chorus: '#ec4899', bridge: '#3b82f6', solo: '#84cc16', outro: '#10b981' };
-  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e', guitar2: '#84cc16', guitar3: '#10b981', vocal: '#f472b6' };
+  const instrumentColors = { guitar: '#22c55e', drums: '#0ea5e9', bass: '#a855f7', trumpet: '#f59e0b', trombone: '#ef4444', synthLead: '#06b6d4', synthPad: '#6366f1', synthBass: '#7c3aed', electronicDrums: '#14b8a6', sax: '#eab308', organ: '#f43f5e', piano: '#d946ef', guitar2: '#84cc16', guitar3: '#10b981', vocal: '#f472b6' };
   const plurals = { intro: 'les intros', verse: 'les estrofes', prechorus: 'les pretornades', chorus: 'les tornades', bridge: 'els ponts', solo: 'les parts instrumentals', outro: 'els finals' };
   const noteNames = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const GUITARS = ['guitar', 'guitar2', 'guitar3'];
   const STACKABLE_GUITARS = ['guitar', 'guitar2']; // Diverses preses simultànies de la guitarra 1 i la 2.
   // Noms curts per a les etiquetes de la línia (hi caben al mòbil).
-  const SHORT = { guitar: 'Guitarra 1', guitar2: 'Guitarra 2', guitar3: 'Guitarra 3', trombone: '2a veu vent', sax: 'Saxo', synthLead: 'Sinte melodia', synthPad: 'Sinte acords', synthBass: 'Baix sinte', electronicDrums: 'Bat. electr.', vocal: 'Veu (guia)' };
+  const SHORT = { guitar: 'Guitarra 1', guitar2: 'Guitarra 2', guitar3: 'Guitarra 3', trombone: '2a veu vent', sax: 'Saxo', synthLead: 'Sinte melodia', synthPad: 'Sinte acords', synthBass: 'Baix sinte', piano: 'Piano', electronicDrums: 'Bat. electr.', vocal: 'Veu (guia)' };
   const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
   const LINES = [['own', 'Pròpia'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu']];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
@@ -46,7 +46,7 @@
   }
   const FADES = [['', 'Sense fos'], ['in', 'Fos d’entrada (puja des del silenci)'], ['out', 'Fos de sortida (baixa fins al silenci)']];
   const DRUM_TUNES = [['2', 'Aguda (+2)'], ['0', 'Natural'], ['-2', 'Greu (−2)'], ['-4', 'Molt greu (−4)'], ['-6', 'Profunda (−6)']];
-  const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad'];
+  const BASE_CHOICES = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'piano', 'synthPad'];
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
     // «gravat»: mostres nota a nota de VSCO 2 CE, FreePats o el kit Muldjord.
@@ -92,6 +92,7 @@
   // Edició de la base per secció: instruments silenciats, so propi i patró (orgue i coixí).
   const BASE_SOUNDS = ['drums', 'bass', 'guitar'], BASE_PATTERNS = {
     organ: ['Contratemps', '«Bubble»', 'Sostingut', 'Blanques', 'Síncopa'],
+    piano: ['Contratemps', '«Bounce» de music-hall', 'Boogie', 'Acords llargs', 'Corxeres martellejades'],
     synthPad: ['Sostingut', 'Blanques', 'Contratemps', 'Negres', 'Síncopa'] };
   const validBaseEdits = s => (s.mute === undefined || Array.isArray(s.mute) && s.mute.length <= Object.keys(INSTRUMENTS).length && new Set(s.mute).size === s.mute.length && s.mute.every(n => Object.hasOwn(INSTRUMENTS, n)))
     && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => BASE_SOUNDS.includes(n)))
@@ -2540,6 +2541,9 @@
   }
   $('voice-eq-reset').addEventListener('click', () => updateVoiceProcessing(voice => { voice.eq = flatVoiceEq(); }));
   window.addEventListener('pagehide', stop);
+  // La ràdio (radio.js) compon i grava cançons senceres amb les mateixes peces del taller.
+  window.SkaStudio = { RATE, segmentsOf, partFor, validateSong, newSeed, uid, download,
+    stop() { if (playing || recording) { stop(); render(); } }, refresh() { applyZoom(); measureDock(); paintTheme(); } };
   let firstTab = song.base.generated ? (song.sections.length ? 'line' : 'line') : 'song';
   try { firstTab = sessionStorage.getItem('skagenerator.tab') || firstTab; } catch {}
   setTab(firstTab, false);

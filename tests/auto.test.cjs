@@ -428,3 +428,43 @@ test('lletra curta: frases amples i seccions afegides per acostar-se a la durada
   assert(notes.filter(n => n[0] < 4).length === engine.analyzeLyrics(verse.lyrics).syllables[0], 'el primer vers ocupa els 4 primers compassos');
   assert.throws(() => engine.composeSongPart(long.settings, { type: 'verse', bars: 8, energy: 60, revision: 1, instruments: ['vocal'], layers: { vocal: 1 }, phraseBars: 3 }), /frase/);
 });
+
+test('subgèneres nous de ska: nutty (Madness), early reggae i ska-swing porten el piano gravat a la base', () => {
+  const patterns = { nutty: 1, skaswing: 2 };
+  for (const key of ['nutty', 'bossreggae', 'skaswing']) {
+    const sg = engine.SUBGENRES[key];
+    assert.equal(sg.style, 'ska');
+    assert(sg.base.includes('piano'));
+    assert(sg.keys.every(([tonic, mode]) => engine.SONG_STYLES.ska.keys.some(([t, m]) => t === tonic && m === mode)), `${key}: tonalitats de l'estil`);
+    for (const seed of [3, 41, 977]) {
+      const song = builder.createAutoSong(engine, key, { minutes: 2.5, seed, recent: [], liked: [] });
+      assert.equal(song.settings.subgenre, key);
+      assert(song.settings.bpm >= sg.bpm[0] && song.settings.bpm <= sg.bpm[1]);
+      assert(song.base.instruments.includes('piano'));
+      const verse = song.sections.find(s => s.type === 'verse');
+      if (patterns[key] !== undefined) assert.equal(verse.patterns.piano, patterns[key]);
+      if (key === 'bossreggae') assert.equal(verse.patterns.organ, 1);
+      // Nutty: el saxo al davant i l'orgue només a la tornada.
+      if (key === 'nutty') {
+        assert(song.clips.some(c => c.instrument === 'sax'));
+        assert(song.clips.filter(c => c.instrument === 'organ').every(c => song.sections.some(s => s.type === 'chorus' && c.start >= s.start && c.start < s.start + s.bars)));
+      }
+    }
+  }
+});
+
+test('el piano té canal propi, cinc patrons diferents i no trepitja les preses de guitarra', () => {
+  const settings = { seed: 9, style: 'ska', bpm: 140, tonic: 0, mode: 'major', instruments: ['piano', 'guitar'] };
+  const notes = layers => {
+    const music = createPerformance(engine.composeSongPart(settings, { type: 'verse', bars: 4, energy: 70, revision: 1, layers }));
+    const channel = music.channels.find(c => c.instrument === 'piano');
+    assert.deepEqual([channel.bank, channel.program], [2, 0]);
+    return music.events.filter(e => e.type === 'on' && e.channel === channel.channel).map(e => `${e.time.toFixed(2)}:${e.note}`).join(' ');
+  };
+  const all = [1, 2, 3, 4, 5].map(revision => notes({ piano: revision }));
+  assert.equal(new Set(all).size, 5);
+  assert(all.every(text => text.length > 0));
+  const takes = createPerformance(engine.composeSongPart(settings, { type: 'verse', bars: 4, energy: 70, revision: 1,
+    guitarTakes: [{ id: 'a', instrument: 'guitar', revision: 1, from: 0, to: 4 }, { id: 'b', instrument: 'guitar2', revision: 1, from: 0, to: 4 }] }));
+  assert.equal(takes.channels.find(c => c.instrument === 'piano').channel, 19);
+});

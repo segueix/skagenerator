@@ -15,7 +15,7 @@ export const EQ_PRESETS = {
   vocal: [-4, 3, 2],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
-  guitar: [-6, 1, 3], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1],
+  guitar: [-6, 1, 3], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1], piano: [-3, 0, 3],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
 // Presència de la trompeta (gravat VSCO i alternatives GM): el volum MIDI
@@ -26,7 +26,7 @@ export const INSTRUMENT_GAIN_DB = { trumpet: 3, guitar3: 3 };
 export const SONG_GAIN = 10 ** (5.5 / 20);
 export const EQ_BANDS = { low: 120, mid: 900, high: 6000 };
 // Reverberació: el baix sec, la bateria curta, metalls i orgue amb sala.
-export const REVERB = { vocal: 34, guitar2: 30, guitar3: 34, drums: 14, electronicDrums: 8, bass: 4, synthBass: 0, guitar: 30, trumpet: 58, trombone: 38, sax: 40, organ: 30, synthLead: 32, synthPad: 40 };
+export const REVERB = { vocal: 34, guitar2: 30, guitar3: 34, drums: 14, electronicDrums: 8, bass: 4, synthBass: 0, guitar: 30, trumpet: 58, trombone: 38, sax: 40, organ: 30, piano: 26, synthLead: 32, synthPad: 40 };
 
 // Filtres biquadràtics (Robert Bristow-Johnson, «Audio EQ Cookbook»).
 function biquad(type, frequency, gainDb, sampleRate, q = .8) {

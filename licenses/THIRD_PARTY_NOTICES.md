@@ -9,6 +9,7 @@
 El build descarrega aquestes fonts (versions fixades a `real-instruments.json`, amb SHA-256 o commit) i les converteix en un banc propi: mono, remostreig a 32 kHz (baixos a 22,05 kHz), silenci inicial retallat, cues escurçades amb una baixada suau, sense bucles i amb nivells normalitzats.
 
 - **Trompeta i trombó tenor, sostinguts i staccato** — Versilian Community Sample Library 2 Community Edition (VSCO 2 CE), Versilian Studios LLC. CC0 1.0 (domini públic). https://github.com/sgossner/VSCO-2-CE (commit 440300901dfe9275fd84e0b7763af1f8443ae62e). Es fan servir dues dinàmiques per nota; s’hi ha afegit una correcció d’afinació mesurada. Llicència a VSCO-2-CE-LICENSE.txt.
+- **Piano vertical («Upright Nr. 1»)** — Versilian Community Sample Library 2 Community Edition (VSCO 2 CE), Versilian Studios LLC. CC0 1.0 (domini públic). https://github.com/sgossner/VSCO-2-CE (commit 440300901dfe9275fd84e0b7763af1f8443ae62e). Es fan servir 11 notes (Do2–Do7) amb dues dinàmiques (mf i f), remostrejades a 32 kHz en mono, retallades a 2,6 s i igualades de nivell. Es publica al banc addicional.
 - **Baix amb dits i baix amb pua (YR)** — Andrea Biasior, FreePats. CC0 1.0. https://freepats.zenvoid.org/ElectricGuitar/clean-electric-bass.html
 - **Guitarra elèctrica neta FSBS (pastilla del pont, versió reduïda)** — FreePats. CC0 1.0. https://freepats.zenvoid.org/ElectricGuitar/clean-electric-guitar.html
 - **Saxo tenor (versió reduïda)** — roberto@zenvoid.org per a FreePats, amb mostres de VSCO. CC0 1.0. https://freepats.zenvoid.org/Reed/saxophone.html

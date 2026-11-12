@@ -74,7 +74,7 @@ test('l’equalitzador es valida i arriba a la interpretació', () => {
     { ...part, mix: { bass: { ...flat, volume: -6 } } });
   assert.deepEqual(spec.mix, { bass: { ...flat, volume: -6 }, master: { ...flat, high: -3 } });
   assert.deepEqual(createPerformance(spec).mix, spec.mix);
-  for (const mix of [{ piano: flat }, { bass: { ...flat, low: 13 } }, { bass: { ...flat, volume: -25 } }, { bass: { low: 0 } }, { bass: { ...flat, mid: NaN } }, [], null])
+  for (const mix of [{ banjo: flat }, { bass: { ...flat, low: 13 } }, { bass: { ...flat, volume: -25 } }, { bass: { low: 0 } }, { bass: { ...flat, mid: NaN } }, [], null])
     assert.throws(() => engine.composeSongPart({ ...config, mix }, part), /Equalitzador/);
 });
 

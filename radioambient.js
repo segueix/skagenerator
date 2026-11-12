@@ -1752,7 +1752,7 @@
         outro: { name: 'Final', bars: 4, energy: 30, description: 'Recupera el motiu i tanca la cançó.' }
     };
     // Preseleccions de treball: no són límits teòrics dels gèneres.
-    const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Segona veu de vent (saxo / trombó)', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue',
+    const SONG_INSTRUMENTS = { guitar: 'Guitarra 1 (rítmica)', drums: 'Bateria', bass: 'Baix', trumpet: 'Trompeta', trombone: 'Segona veu de vent (saxo / trombó)', synthLead: 'Sintetitzador melòdic', synthPad: 'Sintetitzador d’acords', synthBass: 'Baix sintetitzat', electronicDrums: 'Bateria electrònica', sax: 'Saxo tenor', organ: 'Orgue', piano: 'Piano vertical',
         guitar2: 'Guitarra 2 (aguda)', guitar3: 'Guitarra 3 (arpegis)', vocal: 'Melodia de veu (guia)' };
     // Efectes de guitarra que aplica el motor de mostres (vegeu audio/render.mjs).
     // Efectes de color per a vents i guitarres: el so passa per un aparell
@@ -2022,6 +2022,31 @@
                 chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'V', 'iii', 'vi'], ['vi', 'IV', 'I', 'V']],
                 prechorus: [['ii', 'V', 'ii', 'V']], bridge: [['ii', 'V', 'I', 'vi'], ['IV', 'iv', 'I', 'I']] },
               minor: { verse: [['i', 'bVII', 'bVI', 'V7'], ['i', 'iv', 'bVII', 'i']], chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'bIII', 'bVII', 'iv']], bridge: [['iv', 'V7', 'i', 'bVI']] } } },
+        nutty: { name: 'Nutty sound (estil Madness)', style: 'ska', bpm: [126, 152], swing: 0, keys: [[0, 'major'], [5, 'major'], [7, 'major'], [10, 'major'], [2, 'minor'], [9, 'minor'], [0, 'minor']],
+            groove: { drums: [0, 2], bass: [0, 3, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'piano'], timbres: { drums: 'real', bass: 'finger' }, humanize: .55,
+            description: 'El so «nutty» del Londres del 79: ska 2-tone amb piano de pub, saxo tenor al davant, acords de music-hall i aturades de tota la banda.',
+            harmony: { major: {
+                verse: [['I', 'VI7', 'ii', 'V7'], ['I', 'iii', 'IV', 'V'], ['I', 'I7', 'IV', 'iv'], ['I', 'bVII', 'IV', 'I']],
+                chorus: [['IV', 'V', 'I', 'vi'], ['I', 'V7/vi', 'vi', 'IV'], ['IV', 'iv', 'I', 'VI7']],
+                prechorus: [['ii', 'V7', 'ii', 'V7'], ['IV', 'V', 'IV', 'V']], bridge: [['vi', 'II7', 'IV', 'V7'], ['bVI', 'bVII', 'I', 'I']] },
+              minor: {
+                verse: [['i', 'bVII', 'bVI', 'V7'], ['i', 'iv', 'i', 'V7'], ['i', 'bIII', 'iv', 'V7']],
+                chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'V7', 'i', 'bVI'], ['i', 'bVII', 'bIII', 'V7']], bridge: [['iv', 'bVII', 'bIII', 'V7']] } } },
+        bossreggae: { name: 'Early reggae (boss reggae del 69)', style: 'ska', bpm: [100, 116], swing: .2, keys: [[0, 'major'], [5, 'major'], [7, 'major'], [10, 'major'], [9, 'minor'], [2, 'minor']],
+            groove: { drums: [1, 3, 2], bass: [1, 3], guitar: [1, 0] }, base: ['drums', 'bass', 'guitar', 'organ', 'piano'], timbres: { drums: 'club', bass: 'finger', trumpet: 'muted' }, humanize: .65,
+            description: 'El reggae primerenc dels sound systems del 69: més lent, orgue «bubble» fent de motor, piano i guitarra a contratemps i baix melòdic en primer pla.',
+            harmony: { major: {
+                verse: [['I', 'IV', 'I', 'IV'], ['I', 'V', 'I', 'V'], ['I', 'ii', 'I', 'ii'], ['I', 'bVII', 'I', 'bVII']],
+                chorus: [['IV', 'V', 'I', 'I'], ['I', 'IV', 'V', 'IV'], ['IV', 'I', 'V', 'I']], bridge: [['vi', 'IV', 'vi', 'V']] },
+              minor: { verse: [['i', 'iv', 'i', 'iv'], ['i', 'bVII', 'i', 'bVII']], chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'i', 'bVII', 'i']], bridge: [['iv', 'iv', 'V7', 'V7']] } } },
+        skaswing: { name: 'Ska-swing (jump blues)', style: 'ska', bpm: [150, 176], swing: .55, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major'], [7, 'major'], [7, 'minor'], [2, 'minor']],
+            groove: { drums: [0], bass: [0], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'piano'], timbres: { drums: 'jazz', bass: 'finger', trombone: 'vsco' }, humanize: .6, countIn: true,
+            description: 'Ska a ritme de swing: balanceig marcat, baix caminant, piano de boogie i tota la secció de vents fent riffs de big band.',
+            harmony: { major: {
+                verse: [['I', 'VI7', 'II7', 'V7'], ['I', 'I7', 'IV', 'iv'], ['I', 'IV', 'I', 'V7']],
+                chorus: [['IV', 'IV7', 'I', 'VI7'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'I7', 'IV', 'V7']],
+                prechorus: [['ii7', 'V7', 'ii7', 'V7']], bridge: [['III7', 'VI7', 'II7', 'V7']] },
+              minor: { verse: [['i', 'iv', 'i', 'V7'], ['i', 'bVI', 'V7', 'i']], chorus: [['iv', 'i', 'V7', 'i'], ['bVI', 'V7', 'i', 'i']], bridge: [['iv', 'bVII', 'bIII', 'V7']] } } },
         skapunk: { name: 'Ska-punk', style: 'ska', bpm: [160, 180], swing: 0, keys: [[7, 'major'], [0, 'major'], [10, 'major'], [5, 'major'], [3, 'major'], [9, 'minor'], [2, 'minor']],
             groove: { drums: [4, 5], bass: [2, 4], guitar: [3, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'real', bass: 'pick' }, humanize: .45, countIn: true,
             description: 'Estrofes a contratemps i tornades amb guitarres distorsionades i metalls a l’uníson, a tota velocitat.',
@@ -2620,6 +2645,7 @@
             const soft = spec.type === 'intro' || spec.type === 'bridge';
             if (has('synthPad')) chord.notes.forEach(n => syn.pad(t0, n, bar * .95, .018 * intensity, .35));
             if (has('organ')) (ending ? [0] : [.5, 1.5, 2.5, 3.5]).forEach(t => chord.notes.forEach(n => syn.pad(t0 + t * beat, n + 12, beat * .4, .02 * intensity, .01)));
+            if (has('piano')) (ending ? [0] : [.5, 1.5, 2.5, 3.5]).forEach(t => chord.notes.forEach(n => syn.pad(t0 + t * beat, n + 24, beat * .25, .03 * intensity, .005)));
             const guitarPatterns = punk
                 ? [[0,.5,1,1.5,2,2.5,3,3.5],[0,1,1.5,2,3,3.5],
                    [0,.5,1.5,2,2.5,3.5],[0,.5,1,1.5,2.5,3],[0,1,2,2.5,3,3.5]]

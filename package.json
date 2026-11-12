@@ -2,11 +2,11 @@
   "name": "skagenerator",
   "version": "1.0.0",
   "private": true,
-  "description": "Editor de cançons instrumentals per seccions",
+  "description": "Radio Spam: ràdio de ska i punk generada al navegador, amb editor de cançons per seccions",
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.cjs tests/*.test.mjs",
-    "check": "node --check app.js && node --check radioambient.js && node --check sample-audio.js && node --check audio-utils.js && node --check song-builder.js && node --check audio/worker.mjs && node --check audio/render.mjs",
+    "check": "node --check app.js && node --check radioambient.js && node --check sample-audio.js && node --check audio-utils.js && node --check song-builder.js && node --check radio.js && node --check audio/worker.mjs && node --check audio/render.mjs",
     "pretest": "node scripts/prepare-soundbank.mjs"
   },
   "dependencies": {

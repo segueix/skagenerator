@@ -113,6 +113,9 @@
     jamaican: { open: { riff: .8, riddim: .7, fadein: .65, buildup: .55, drums: .3 }, close: { fadeout: .8, riff: .7, ritard: .6, hit: .5, breakdown: .4 }, silence: .35, stop: .5, color: .7 },
     rocksteady: { open: { riddim: .85, fadein: .8, riff: .6, buildup: .6, voice: .4 }, close: { fadeout: .9, ritard: .55, riff: .6, breakdown: .45 }, silence: .3, stop: .35, color: .65 },
     twotone: { open: { riff: .8, buildup: .7, drums: .6, countin: .45, halftime: .35 }, close: { hit: .8, cold: .65, riff: .6, ring: .5, ritard: .4 }, silence: .55, stop: .65, color: .55 },
+    nutty: { open: { riff: .8, voice: .6, drums: .6, countin: .55, buildup: .5 }, close: { hit: .8, cold: .7, riff: .6, ritard: .55, ring: .5 }, silence: .6, stop: .8, color: .6 },
+    bossreggae: { open: { riddim: .85, fadein: .7, riff: .6, drums: .5 }, close: { fadeout: .9, riff: .6, ritard: .5, hit: .4 }, silence: .3, stop: .4, color: .7 },
+    skaswing: { open: { riff: .8, drums: .75, buildup: .65, countin: .5 }, close: { hit: .85, ring: .7, ritard: .65, riff: .5 }, silence: .5, stop: .75, color: .5 },
     skapunk: { open: { drums: .7, halftime: .65, buildup: .6, riff: .6, countin: .5 }, close: { cold: .8, ring: .7, hit: .7, breakdown: .35 }, silence: .7, stop: .7, color: .45 },
     punk77: { open: { countin: .8, drums: .7, riff: .7, voice: .45, buildup: .4 }, close: { hit: .8, cold: .8, ring: .6 }, silence: .6, stop: .7, color: .45 },
     hardcore: { open: { countin: .8, drums: .7, riff: .5 }, close: { cold: .9, hit: .7, ring: .4 }, silence: .8, stop: .75, color: .25 },
@@ -189,7 +192,7 @@
   const CLOSINGS = { hit: 'cop final de tota la banda', fadeout: 'fos de sortida', cold: 'tall en sec', ritard: 'final que s’alenteix',
     ring: 'redoble i acord llarg', breakdown: 'la banda calla per capes', riff: 'acaba amb el riff sol' };
   const MIDDLES = { none: 'sense silenci', break: 'cop i silenci', silence: 'un compàs de silenci' };
-  const LAYER_ORDER = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'synthPad', 'guitar2', 'guitar3', 'trumpet', 'trombone', 'sax', 'synthLead', 'vocal'];
+  const LAYER_ORDER = ['drums', 'electronicDrums', 'bass', 'synthBass', 'guitar', 'organ', 'piano', 'synthPad', 'guitar2', 'guitar3', 'trumpet', 'trombone', 'sax', 'synthLead', 'vocal'];
   function shuffle(list, r) {
     const out = list.slice();
     for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
@@ -362,6 +365,14 @@
     // «més lent» sense canviar de tempo, la bateria i el baix van a mig temps.
     if (key === 'jamaican') { tempo(of('intro')[0], .94); }
     // Rocksteady: estrofes amb cops d'aro en lloc de charles (sense platets); horror punk: intro de toms sense platets.
+    // Piano de la base: cada secció toca el seu patró (0 contratemps, 1 «bounce», 2 boogie, 3 llargs, 4 corxeres).
+    const pianoBy = { nutty: { intro: 0, verse: 1, prechorus: 4, chorus: 4, bridge: 3, solo: 2, outro: 1 },
+      skaswing: { intro: 2, verse: 2, prechorus: 0, chorus: 2, bridge: 3, solo: 2, outro: 2 }, bossreggae: { bridge: 3 } }[key];
+    if (pianoBy) for (const s of sections) if (pianoBy[s.type] !== undefined) s.patterns = { ...(s.patterns || {}), piano: pianoBy[s.type] };
+    // Early reggae: l'orgue fa el «bubble» tota la cançó i el final es relaxa.
+    if (key === 'bossreggae') { sections.forEach(s => { s.patterns = { ...(s.patterns || {}), organ: s.type === 'bridge' ? 2 : 1 }; }); tempo(of('outro')[0], .95); }
+    // Nutty: de vegades l'última tornada puja un to, com al 2-tone.
+    if (key === 'nutty' && r() < .5) sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     if (key === 'rocksteady') { tempo(of('bridge')[0], .93); tempo(of('outro')[0], .95); of('verse').forEach(s => { s.cymbals = 'rim'; }); }
     if (key === 'horrorpunk' && of('intro')[0]) of('intro')[0].cymbals = 'none';
     // Un altre ritme de bateria a la segona estrofa (de vegades), com fa «Dona-li varietat».
@@ -381,6 +392,8 @@
     // ── Arranjament: el riff identifica la cançó; els vents responen a la veu ──
     const register = key === 'rocksteady' || key === 'horrorpunk' ? -1 : key === 'poppunk' ? 1 : 0;
     const base = sg.base, layersOf = [];
+    // Subgèneres lents: vents més escassos (sense saxo als riffs).
+    const mellow = key === 'rocksteady' || key === 'bossreggae';
     // Punk: nombre de guitarres triat (1, 2 o 3); les que no hi són no s'afegeixen enlloc.
     if (punk) settings.guitars = [1, 2, 3].includes(Number(options.guitars)) ? Number(options.guitars) : 3;
     const excluded = excludedBy({ settings });
@@ -392,18 +405,20 @@
       const role = roles.get(sec);
       if (role === 'riff') {
         if (punk) { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
-        else { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (key !== 'rocksteady') add(sec, 'sax', { line: 'riff' }); }
+        else { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow) add(sec, 'sax', { line: 'riff' }); }
         continue;
       }
       if (role === 'breakdown' && punk) { add(sec, 'guitar2', { revision: 2 }); continue; }
       if (sing) add(sec, 'vocal', register ? { register } : {});
       if (!punk) {
-        if (sec.type === 'intro' || sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (key !== 'rocksteady') add(sec, 'sax', { line: 'riff' }); }
-        if (sec.type === 'verse') { verses++; add(sec, 'organ', { revision: 2 }); if (verses > 1) add(sec, 'trumpet', { line: 'answer' }); }
+        if (sec.type === 'intro' || sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow) add(sec, 'sax', { line: 'riff' }); }
+        // Nutty: el piano ja omple l'estrofa i hi respon el saxo; l'orgue entra a la tornada.
+        if (sec.type === 'verse') { verses++; if (key !== 'nutty') add(sec, 'organ', { revision: 2 }); if (verses > 1) add(sec, key === 'nutty' ? 'sax' : 'trumpet', { line: 'answer' }); }
         if (sec.type === 'prechorus') add(sec, 'trombone', { line: 'answer' });
         if (sec.type === 'chorus') {
           add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' });
-          if (key !== 'rocksteady') add(sec, 'sax', { line: 'riff' });
+          if (!mellow) add(sec, 'sax', { line: 'riff' });
+          if (key === 'nutty') add(sec, 'organ', { revision: 1 });
           if (key === 'skapunk') add(sec, 'guitar2', { fx: { type: 'distortion', drive: 65, tone: 55 }, revision: 2 });
         }
         if (sec.type === 'solo') { add(sec, key === 'twotone' ? 'trumpet' : 'sax'); add(sec, 'guitar3', { revision: 1 + Math.floor(r() * 5) }); }
@@ -571,7 +586,7 @@
     // Gèneres: el hardcore sense pretornada i amb breakdown; el rocksteady sense solos ràpids.
     let templates = FORMS[style] || FORMS.punk;
     if (key === 'hardcore') templates = templates.filter(t => !t.includes('P'));
-    if (key === 'rocksteady') templates = templates.filter(t => !t.includes('R'));
+    if (key === 'rocksteady' || key === 'bossreggae') templates = templates.filter(t => !t.includes('R'));
     const seconds = plan => plan.reduce((t, [, bars]) => t + bars * 240 / bpm, 0);
     const candidates = [];
     for (let k = 0; k < 160; k++) {
@@ -603,7 +618,7 @@
 
   // Pes sonor de cada instrument dins de la banda (les guitarres distorsionades pesen més).
   const WEIGHT = { drums: 3, electronicDrums: 3, bass: 2, synthBass: 2, guitar: 2, guitar2: 2, guitar3: 1.5, trumpet: 1.2, trombone: 1.2, sax: 1.2,
-    organ: 1, synthPad: 1, synthLead: 1, vocal: .8 };
+    organ: 1, piano: 1.2, synthPad: 1, synthLead: 1, vocal: .8 };
   const CLEAN_FX = ['none', 'boost', 'tape', 'lofi'];
   function sectionWeight(song, sec) {
     const mute = sec.mute || [], st = song.settings;

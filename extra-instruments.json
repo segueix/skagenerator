@@ -1,5 +1,5 @@
 {
- "about": "Bateries i baixos gravats addicionals (CC0). Es carreguen a part, només quan una cançó els fa servir.",
+ "about": "Bateries, baixos i piano gravats addicionals (CC0). Es carreguen a part, només quan una cançó els fa servir.",
  "kits": [
   {
    "name": "Big Rusty Drums",
@@ -2629,5 +2629,49 @@
     }
    ]
   }
- ]
+ ],
+ "vsco": {
+  "name": "Versilian Community Sample Library 2 (VSCO 2 CE)",
+  "license": "CC0 1.0",
+  "commit": "440300901dfe9275fd84e0b7763af1f8443ae62e",
+  "base": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/440300901dfe9275fd84e0b7763af1f8443ae62e/",
+  "instruments": [
+   {
+    "name": "Piano vertical (VSCO 2 CE)",
+    "bank": 2,
+    "program": 0,
+    "match": "Keys/Upright Nr1/",
+    "maxSeconds": 2.6,
+    "release": 0.22,
+    "levelDb": [
+     -12,
+     -17
+    ]
+   }
+  ],
+  "files": [
+   "Keys/Upright Nr1/UR1_C2_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_C2_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_G2_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_G2_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_C3_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_C3_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_G3_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_G3_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_C4_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_C4_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_G4_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_G4_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_C5_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_C5_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_G5_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_G5_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_C6_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_C6_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_G6_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_G6_f_RR1.wav",
+   "Keys/Upright Nr1/UR1_C7_mf_RR1.wav",
+   "Keys/Upright Nr1/UR1_C7_f_RR1.wav"
+  ]
+ }
 }

@@ -13,7 +13,7 @@ function createPerformance(spec) {
   if (!spec || !['ska', 'punk', 'urban'].includes(spec.style) || !Number.isFinite(spec.beat) || spec.beat <= 0
     || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 400 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
-    || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ', 'guitar2', 'guitar3', 'vocal'].includes(i))) throw new Error('Partitura no vàlida');
+    || spec.instruments.some(i => !['guitar', 'bass', 'drums', 'trumpet', 'trombone', 'synthLead', 'synthPad', 'synthBass', 'electronicDrums', 'sax', 'organ', 'piano', 'guitar2', 'guitar3', 'vocal'].includes(i))) throw new Error('Partitura no vàlida');
   // [banc, programa]. Banc 2: instruments gravats nota a nota (VSCO 2 CE i
   // FreePats); banc 3: staccato de VSCO; banc 1: variacions GS; banc 0: GM.
   // Kit 69: Muldjord (gravat; els programes 64 i 65 són els «User Drum Set» GS del sintetitzador). Banc addicional (CC0, es baixa a part): kits 68 Big Rusty,
@@ -96,6 +96,9 @@ function createPerformance(spec) {
     instrumentOf[channel] = family;
     takeChannels.set(channel, take);
   }
+  // Piano vertical gravat (VSCO 2 CE): canal propi, després de les preses de guitarra.
+  const PIANO = 17 + guitarTakes.length;
+  if (has('piano')) { channels.push(patch(PIANO, [2, 0], 74, 94)); instrumentOf[PIANO] = 'piano'; }
   // Un instrument amb trams només sona dins d'aquests compassos.
   function audible(channel, start) {
     const take = takeChannels.get(channel);
@@ -140,7 +143,7 @@ function createPerformance(spec) {
     // Punk: la bateria empeny i respira més (menys mecànica); l'ska, més regular.
     drums: punk ? [-3, 5, 4.5, 11] : [0, 3, 2.6, 8], electronicDrums: [0, 0, .4, 3],
     bass: [spec.style === 'ska' ? 9 : punk ? -1 : 4, 4, 3.5, 8], synthBass: [0, .5, .5, 2],
-    guitar: [punk ? -4 : 3, 4, 3.5, 9], guitar2: [punk ? -3 : 5, 4, 4.5, 9], guitar3: [2, 5, 6, 10], organ: [5, 4, 5, 8],
+    guitar: [punk ? -4 : 3, 4, 3.5, 9], guitar2: [punk ? -3 : 5, 4, 4.5, 9], guitar3: [2, 5, 6, 10], organ: [5, 4, 5, 8], piano: [4, 4, 5, 10],
     trumpet: [punk ? 3 : 9, 7, 8, 9], trombone: [punk ? 4 : 11, 7, 8, 9], sax: [punk ? 4 : 10, 7, 8, 9], vocal: [12, 8, 9, 9],
     synthLead: [0, 1, 1, 3], synthPad: [0, 0, 0, 0]
   };
@@ -313,6 +316,30 @@ function createPerformance(spec) {
       for (const [t, length] of organ) chord.notes.forEach((pitch, k) =>
         note(11, pitch + (length < 1 ? 12 : 0), t0 + t * beat + k * .003, length * beat, (t % 1 === .5 ? 74 : 60) - (soft ? 8 : 0), .003));
     }
+    if (has('piano')) {
+      // Piano vertical: contratemps, «bounce» de music-hall (baix a l'esquerra, acords a la dreta),
+      // boogie (baix caminant a corxeres), acords llargs o corxeres martellejades.
+      const pattern = (spec.layers?.piano ?? 0) % 5, drop = soft ? 8 : 0;
+      const right = chord.notes.map(pitch => pitch + 12), low = chord.root + 12;
+      const minor = (chord.pcs[1] - chord.pcs[0] + 12) % 12 === 3, third = minor ? 3 : 4;
+      const hand = (t, length, velocity, pitches = right) => pitches.forEach((pitch, k) =>
+        note(PIANO, pitch, t0 + t * beat + k * .005, length * beat, velocity - drop - k * 2, .004));
+      const bassNote = (t, pitch, length, velocity) => note(PIANO, pitch, t0 + t * beat, length * beat, velocity - drop, .004);
+      if (ending) { bassNote(0, low - 12, 3.4, 96); bassNote(0, low, 3.4, 92); hand(0, 3.4, 92, [...chord.notes, right.at(-1)]); }
+      else if (pattern === 0) [.5, 1.5, 2.5, 3.5].forEach((t, k) => hand(t, .3, k % 2 ? 84 : 90));
+      else if (pattern === 1) {
+        bassNote(0, low, .85, 96); bassNote(2, b % 2 ? low + third : low + 7 > 55 ? low - 5 : low + 7, .85, 88);
+        [.5, 1.5, 2.5, 3.5].forEach(t => hand(t, .28, 88));
+        [1, 3].forEach(t => hand(t, .4, 70, right.slice(0, 2)));
+      } else if (pattern === 2) {
+        [0, third, 7, 9, 10, 9, 7, third].forEach((step, k) => bassNote(k * .5, low + step, .45, k % 2 ? 78 : 92));
+        hand(0, .35, 78); [1.5, 3.5].forEach(t => hand(t, .3, 90)); hand(2.5, .25, 76, right.slice(1));
+      } else if (pattern === 3) { bassNote(0, low, 3.7, 84); hand(0, 1.9, 82); hand(2, 1.8, 76); }
+      else {
+        bassNote(0, low, .9, 94); bassNote(2, low, .9, 86);
+        for (let k = 0; k < 8; k++) hand(k * .5, .3, k % 2 ? 92 : 74, k % 2 ? right : right.slice(0, 2));
+      }
+    }
     if (has('synthPad')) {
       // Coixí sostingut, a blanques, a contratemps, a negres o amb síncopa.
       const padPatterns = [[[0, 3.8]], [[0, 1.9], [2, 1.9]], [[.5, .4], [1.5, .4], [2.5, .4], [3.5, .4]], [[0, .8], [1, .8], [2, .8], [3, .8]], [[0, 1.4], [1.5, 1], [3, .9]]];
@@ -415,7 +442,7 @@ function createPerformance(spec) {
   // fa cas de les notes off, així que només cal canviar la tecla de cada cop.
   for (const e of events) if (e.type === 'on' && e.channel === 9) e.note = take(e.note);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
-  const level = { '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
+  const level = { '2:0': 94, '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   // Guany fix (dB) dels kits i baixos gravats addicionals: calibrat amb parts reals
   // perquè sonin al mateix nivell que el kit GM i el baix amb dits.
   const boost = { '0:69': 7.4, '0:68': 7.2, '0:66': 6.8, '0:67': 8.1, '2:32': 1.2, '4:33': 5.5 };

@@ -1,5 +1,5 @@
 // Construeix un banc SF2 amb instruments gravats nota a nota:
-// - VSCO 2 CE (CC0): trompeta i trombó, sostinguts i staccato, a partir dels WAV.
+// - VSCO 2 CE (CC0): trompeta i trombó, sostinguts i staccato, a partir dels WAV (i el piano vertical del banc addicional).
 // - FreePats (CC0): baixos, guitarra neta, saxo tenor i orgue, a partir dels seus SF2.
 // - Muldjord Kit (CC-BY 4.0): un kit GM nou amb quatre capes de força per cop.
 // Tot es remostreja a 32 kHz en mono i es retalla perquè la web pesi poc.
@@ -167,11 +167,18 @@ export function level(data, rate, targetDb) {
   for (let i = 0; i < data.length; i++) data[i] *= gain;
 }
 
-// ── VSCO 2 CE: metalls a partir dels WAV ─────────────────────────────
+// ── VSCO 2 CE: metalls (i piano vertical) a partir dels WAV ─────────────────────────────
 const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
-async function buildVsco(bank, config, log) {
+export async function buildVsco(bank, config, log) {
   for (const spec of config.instruments) {
-    const parse = file => { const m = file.match(/_([A-G]#?)(-?\d)_v(\d)/); return m && { named: (Number(m[2]) + 2) * 12 + NOTE[m[1]], layer: Number(m[3]) }; };
+    // Dos formats de nom: «…_A#2_v3_…» (do central = C3) i el piano «UR1_C4_mf_RR1» (do central = C4; pp, mf i f).
+    const DYNAMICS = { pp: 1, mf: 2, f: 3 };
+    const parse = file => {
+      const m = file.match(/_([A-G]#?)(-?\d)_v(\d)/);
+      if (m) return { named: (Number(m[2]) + 2) * 12 + NOTE[m[1]], layer: Number(m[3]) };
+      const p = file.match(/_([A-G]#?)(\d)_(pp|mf|f)_RR\d/);
+      return p && { named: (Number(p[2]) + 1) * 12 + NOTE[p[1]], layer: DYNAMICS[p[3]] };
+    };
     let files = config.files.filter(file => file.startsWith(spec.match));
     // Forats de l'staccato: les notes a més de 2 semitons d'una gravació
     // staccato fan servir la sostinguda (retallada i amb atac immediat).
@@ -185,17 +192,16 @@ async function buildVsco(bank, config, log) {
     }
     const loaded = [];
     for (const file of files) {
-      const match = file.match(/_([A-G]#?)(-?\d)_v(\d)/);
-      if (!match) continue;
-      // VSCO numera les octaves amb do central = C3.
-      const named = (Number(match[2]) + 2) * 12 + NOTE[match[1]];
+      const info = parse(file);
+      if (!info) continue;
+      const named = info.named;
       const path = await download(config.base + file.split('/').map(encodeURIComponent).join('/'));
       const wav = readWav(await readFile(path));
       const sampled = resample(wav.data, wav.rate, RATE);
       const data = trim(spec.tightAttack || fills.has(file) ? tightenAttack(sampled, RATE) : sampled, RATE, spec.maxSeconds);
       const measured = detectMidi(data, RATE);
       const cents = measured !== null && Math.abs(measured - named) < .5 ? -Math.round((measured - named) * 100) : 0;
-      loaded.push({ named, layer: Number(match[3]), data, cents });
+      loaded.push({ named, layer: info.layer, data, cents });
     }
     if (!loaded.length) throw new Error(`No hi ha mostres per a ${spec.name}`);
     // Mateix nivell per a totes les notes i per a staccato i sostingut; la

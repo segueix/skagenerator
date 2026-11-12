@@ -9,7 +9,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BasicInstrument, BasicPreset, BasicSoundBank, GeneratorTypes, SpessaLog } from 'spessasynth_core';
 import ROUND_ROBIN from '../round-robin.json' with { type: 'json' };
-import { download, loadBank, makeSample, readWav, resample, timecents, trim } from './real-instruments.mjs';
+import { buildVsco, download, loadBank, makeSample, readWav, resample, timecents, trim } from './real-instruments.mjs';
 
 const CACHE = '.cache/real', RATE = 32000;
 const sha = data => createHash('sha256').update(data).digest('hex');
@@ -132,7 +132,7 @@ export async function buildExtraInstruments(config, log = console.log) {
   const cached = join(CACHE, `extra-${fingerprint.slice(0, 16)}.sf2`);
   try { return new Uint8Array(await readFile(cached)); } catch { /* Es construeix. */ }
   const bank = new BasicSoundBank();
-  bank.soundBankInfo.name = 'Ska Generator extra drums and basses';
+  bank.soundBankInfo.name = 'Ska Generator extra drums, basses and piano';
   for (const kit of config.kits) await buildKit(bank, kit, log);
   for (const spec of config.basses) {
     for (const note of spec.notes) {
@@ -142,6 +142,8 @@ export async function buildExtraInstruments(config, log = console.log) {
     await buildBass(bank, spec, log);
     for (const note of spec.notes) delete note.audio;
   }
+  // Piano vertical gravat (VSCO 2 CE, CC0): banc 2, programa 0.
+  if (config.vsco) await buildVsco(bank, config.vsco, log);
   flac?.free(); flac = null;
   const binary = new Uint8Array(bank.writeSF2());
   await writeFile(cached, binary);
