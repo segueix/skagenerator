@@ -173,6 +173,8 @@
     migrateVolumes(value);
     if (st.countIn !== undefined && typeof st.countIn !== 'boolean') fail('Configuració no vàlida');
     if (st.guitars !== undefined && ![1, 2, 3].includes(st.guitars)) fail('Configuració no vàlida');
+    // Idioma de la lletra (per comptar síl·labes): català per defecte o anglès.
+    if (st.lang !== undefined && !['ca', 'en'].includes(st.lang)) delete st.lang;
     st.timbres = { ...defaultTimbres(), ...(st.timbres || {}) }; st.groove = { ...defaultGroove(), ...(st.groove || {}) };
     if (st.mix !== undefined) engine.composeSongPart({ ...st }, { type: 'verse', bars: 1, energy: 50, revision: 1 });
     const base = value.base;
@@ -334,7 +336,7 @@
       if ('vocal' in extra.layers) {
         if (extra.register) part.register = extra.register;
         // Síl·labes de cada vers, síl·labes tòniques (cauen a temps) i versos repetits (es canten igual).
-        const lyric = engine.analyzeLyrics(seg.section?.lyrics || '');
+        const lyric = engine.analyzeLyrics(seg.section?.lyrics || '', s.settings.lang);
         if (lyric.syllables.length) Object.assign(part, lyric);
       }
     }
@@ -2101,7 +2103,7 @@
       item.append(select, text); list.append(item);
     });
     $('auto-lyrics-panel').classList.toggle('filled', lyricSheet.length > 0);
-    $('auto-vocal').disabled = lyricSheet.length > 0;
+    $('auto-vocal').disabled = lyricSheet.length > 0; $('auto-english').disabled = lyricSheet.length > 0;
   }
   $('auto-lyrics').addEventListener('input', () => { lyricSheet = builder.parseLyricsSheet($('auto-lyrics').value); renderLyricSheet(); });
   // Forma de la cançó en text curt: «intro › estrofa › tornada ×2 › …».
@@ -2134,7 +2136,7 @@
       const recent = readLibrary().filter(e => Array.isArray(e.song?.sections)).sort((a, b) => b.created - a.created).slice(0, 12)
         .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
       const vary = $('auto-vary').checked, punkSong = engine.SUBGENRES[key].style === 'punk';
-      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(lyricSheet.length ? { lyrics: lyricSheet.map(({ type, text }) => ({ type, text })) } : {}), ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
+      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, ...($('auto-english').checked && !lyricSheet.length ? { autoLyrics: 'en' } : {}), seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(lyricSheet.length ? { lyrics: lyricSheet.map(({ type, text }) => ({ type, text })) } : {}), ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
         ...(mode ? { key: [Number(tonic), mode] } : {}) });
       migrated = false;
       openSong(validateSong(project), '');
@@ -2372,7 +2374,7 @@
         const ranges = part.ranges?.vocal;
         if (ranges) notes = notes.filter(n => ranges.some(([a, b]) => n[0] >= a && n[0] < b));
       } else if (!voice && ['verse', 'prechorus', 'chorus'].includes(sec.type)) {
-        const lyric = engine.analyzeLyrics(sec.lyrics || '');
+        const lyric = engine.analyzeLyrics(sec.lyrics || '', song.settings.lang);
         notes = engine.composeSongPart(song.settings, { ...part, instruments: [...new Set([...part.instruments, 'vocal'])],
           layers: { ...(part.layers || {}), vocal: song.harmony[sec.type] || 1 }, ...(lyric.syllables.length ? lyric : {}) }).lines.vocal;
         guess = true;
