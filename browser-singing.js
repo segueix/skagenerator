@@ -124,7 +124,7 @@
   }
 
   function scoreLines(text, counts, vocalNotes, bpm) {
-    const names = String(text || '').split('\\n').map(l => l.trim()).filter(Boolean);
+    const names = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
     if (!Array.isArray(counts) || !Array.isArray(vocalNotes) || !Number.isFinite(bpm) || bpm <= 0) return [];
     const notes = vocalNotes.slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
     if (!names.length || names.length !== counts.length ||
