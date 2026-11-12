@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Dependències
-        run: pip install onnxruntime==1.20.1 pyyaml numpy
+        run: pip install onnxruntime==1.20.1 onnx pyyaml numpy
       - name: Baixar la veu TIGER i els vocoders (no es redistribueixen)
         env:
           GH_TOKEN: ${{ github.token }}

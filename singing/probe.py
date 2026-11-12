@@ -1,15 +1,18 @@
 # Exploració: estructura de la veu TIGER i del vocoder (fitxers, configuració i entrades/sortides ONNX).
 import glob, os, sys
-import onnxruntime as ort
+import onnx
 root = sys.argv[1]
 for path in sorted(glob.glob(f'{root}/**/*', recursive=True)):
-    if os.path.isfile(path): print(f'{os.path.getsize(path):>12}  {path}')
-for path in sorted(glob.glob(f'{root}/**/*.yaml', recursive=True)) + sorted(glob.glob(f'{root}/**/*.txt', recursive=True)):
-    print(f'\n===== {path}'); print(open(path, encoding='utf-8', errors='replace').read()[:3000])
+    if os.path.isfile(path) and not path.endswith(('.wav', '.png', '.jpg')): print(f'{os.path.getsize(path):>11} {path}')
+for path in sorted(glob.glob(f'{root}/**/*.yaml', recursive=True)):
+    text = open(path, encoding='utf-8', errors='replace').read()
+    print(f'\n===== {path}\n' + (text[:1800] if 'dict' not in path.lower() else text[:400]))
+def dims(t):
+    return [d.dim_param or d.dim_value for d in t.type.tensor_type.shape.dim]
 for path in sorted(glob.glob(f'{root}/**/*.onnx', recursive=True)):
-    try:
-        s = ort.InferenceSession(path, providers=['CPUExecutionProvider'])
-        print(f'\n##### {path}')
-        for i in s.get_inputs(): print('  in ', i.name, i.shape, i.type)
-        for o in s.get_outputs(): print('  out', o.name, o.shape, o.type)
-    except Exception as e: print('ERR', path, e)
+    m = onnx.load(path, load_external_data=False)
+    inits = {i.name for i in m.graph.initializer}
+    print(f'\n##### {path}')
+    for i in m.graph.input:
+        if i.name not in inits: print('  in ', i.name, dims(i), onnx.TensorProto.DataType.Name(i.type.tensor_type.elem_type))
+    for o in m.graph.output: print('  out', o.name, dims(o), onnx.TensorProto.DataType.Name(o.type.tensor_type.elem_type))
