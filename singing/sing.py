@@ -287,13 +287,15 @@ def room(x):
     return wet / (np.abs(ir).sum() ** .5 * 6 + 1e-9)
 
 def megaphone(x):
-    """Megàfon: només els mitjos (500–3.200 Hz), saturació i la ressonància de la botzina."""
+    """Megàfon suau: mitjos (350–4.500 Hz), saturació lleugera i la ressonància de la botzina, barrejat
+    amb una mica de veu neta als aguts perquè les consonants (s, t, x) es continuïn entenent."""
     rms = math.sqrt(float(np.mean(x ** 2)) + 1e-12)
-    y = signal.sosfilt(signal.butter(4, [500, 3200], 'band', fs=RATE, output='sos'), x)
-    y = np.tanh(y / (float(np.abs(y).max()) + 1e-9) * 3.5)
-    y = y + .7 * signal.sosfilt(signal.butter(2, [1500, 1900], 'band', fs=RATE, output='sos'), y)
-    y = signal.sosfilt(signal.butter(2, [450, 3600], 'band', fs=RATE, output='sos'), y)
-    return (y * rms / (math.sqrt(float(np.mean(y ** 2))) + 1e-12)).astype(np.float32)
+    y = signal.sosfilt(signal.butter(3, [350, 4500], 'band', fs=RATE, output='sos'), x)
+    y = np.tanh(y / (float(np.abs(y).max()) + 1e-9) * 2.0)
+    y = y + .45 * signal.sosfilt(signal.butter(2, [1500, 1900], 'band', fs=RATE, output='sos'), y)
+    y = y * rms / (math.sqrt(float(np.mean(y ** 2))) + 1e-12)
+    air = signal.sosfilt(signal.butter(2, 4500, 'high', fs=RATE, output='sos'), x)
+    return (y + .6 * air).astype(np.float32)
 
 def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None, matxa=None, external_vocal=None):
     score = json.load(open(score_path, encoding='utf-8'))

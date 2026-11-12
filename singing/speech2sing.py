@@ -35,31 +35,33 @@ class MatxaSinger:
         self.speaker, self.cache = speaker, cache
         self.note = 54 if speaker in self.MALE else 64
         self._matxa = matxa
+        self._units = {}
         os.makedirs(cache, exist_ok=True)
 
     def speech(self, text):
-        key = hashlib.sha1(f'{self.speaker}|{text}'.encode()).hexdigest()[:16]
+        scale = float(os.environ.get('MATXA_SCALE', 1.1))   # una mica més a poc a poc: síl·labes més clares (mesurat)
+        key = hashlib.sha1(f'{self.speaker}|{scale}|{text}'.encode()).hexdigest()[:16]
         path = os.path.join(self.cache, f'{key}.wav')
         if not os.path.exists(path):
             self.client = self.client or self._matxa.Matxa(self.speaker)
-            self.client.say(text, path, length_scale=1.0)
+            self.client.say(text, path, length_scale=scale)
         x, rate = sf.read(path, dtype='float64', always_2d=True)
         return x.mean(1), rate
 
-    def sing_line(self, notes, shift, syllables_of):
-        """Notes d'un vers → (inici en segons, ona a 44,1 kHz)."""
-        x, rate = self.speech(_line_text(notes))
+    def analyse(self, text, count):
+        """Matxa diu `text`; retorna els paràmetres WORLD i, per a cada una de les `count` síl·labes,
+        (inici de les consonants, inici de la vocal, final de la vocal, final de les consonants finals)."""
+        key = (text, count)
+        if key in self._units: return self._units[key]
+        x, rate = self.speech(text)
         x = x / (np.abs(x).max() + 1e-9) * .5
         f0, t = pw.harvest(x, rate, f0_floor=60, f0_ceil=600, frame_period=PERIOD)
         sp = pw.cheaptrick(x, f0, t, rate); ap = pw.d4c(x, f0, t, rate)
         hop = int(rate * PERIOD / 1000); n = len(f0)
         rms = np.array([math.sqrt(float(np.mean(x[i * hop:(i + 1) * hop] ** 2)) + 1e-12) for i in range(n)])
         voiced = f0 > 0
-        # Envolupant de les vocals: energia de la veu sonora, suavitzada (~25 ms).
         env = signal.savgol_filter(np.where(voiced, rms, 0), 7, 2).clip(0)
-        count = len(notes)
         nuclei = self._nuclei(env, count)
-        # Límits de cada vocal: on l'energia cau per sota del 45 % del seu pic.
         bounds = []
         for k, p in enumerate(nuclei):
             lo = nuclei[k - 1] if k else 0
@@ -69,58 +71,81 @@ class MatxaSinger:
             while a > lo + 1 and env[a - 1] > thr and voiced[a - 1]: a -= 1
             b = p
             while b < hi - 1 and env[b + 1] > thr and voiced[b + 1]: b += 1
-            bounds.append((a, b + 1))
-        speech_start = int(np.argmax(rms > rms.max() * .03)); speech_end = n - int(np.argmax(rms[::-1] > rms.max() * .03))
-        # Línia de temps de sortida (fotogrames de 5 ms): índex de la veu parlada i nota de cada fotograma.
+            bounds.append([a, b + 1])
+        s0 = int(np.argmax(rms > rms.max() * .03)); s1 = n - int(np.argmax(rms[::-1] > rms.max() * .03))
+        sylls = []
+        for k, (a, b) in enumerate(bounds):
+            if k == 0: o0 = s0
+            else: o0 = bounds[k - 1][1] + int((a - bounds[k - 1][1]) * .4)   # 60 % de les consonants, per a aquesta síl·laba
+            c1 = s1 if k == len(bounds) - 1 else bounds[k][1] + int((bounds[k + 1][0] - bounds[k][1]) * .4)
+            sylls.append((min(o0, a), a, b, max(b, c1)))
+        unit = {'sp': sp, 'ap': ap, 'voiced': voiced, 'rate': rate, 'sylls': sylls, 'n': n}
+        self._units[key] = unit
+        return unit
+
+    def sing_line(self, notes, shift, syllables_of):
+        """Notes d'un vers → (inici en segons, ona a 44,1 kHz)."""
+        # Unitats de veu: cada paraula dita per separat (límits de síl·laba fiables) o el vers sencer.
+        plan = []   # (nota, unitat, índex de síl·laba)
+        if os.environ.get('MATXA_UNIT', 'line') == 'line':
+            unit = self.analyse(_line_text(notes), len(notes))
+            plan = [(n, unit, k) for k, n in enumerate(notes)]
+        else:
+            i = 0
+            while i < len(notes):
+                group = [notes[i]]; i += 1
+                while i < len(notes) and notes[i]['syllable'] > 0 and notes[i]['word'] == group[0]['word']:
+                    group.append(notes[i]); i += 1
+                unit = self.analyse(group[0]['word'] + '.', len(group))
+                plan += [(n, unit, k) for k, n in enumerate(group)]
+        rate = plan[0][1]['rate']; bins = plan[0][1]['sp'].shape[1]
         start = notes[0]['t'] - .45
-        end = notes[-1]['t'] + notes[-1]['d'] + .35
+        end = notes[-1]['t'] + notes[-1]['d'] + .4
         total = int(math.ceil((end - start) * FPS))
-        src = np.full(total, -1.0); midi = np.zeros(total)
-        fr = lambda tt: int(round((tt - start) * FPS))
-        for k, note in enumerate(notes):
-            a, b = bounds[k]
-            # Consonants entre la vocal anterior i aquesta: abans de la nota, amb la seva durada (com a molt 220 ms).
-            prev_b = bounds[k - 1][1] if k else speech_start
-            gap = a - prev_b
-            on_len = min(gap if k == 0 else int(gap * .6), int(.22 * FPS))
-            coda_len = 0
-            if k + 1 < len(notes):
-                nxt_a = bounds[k + 1][0]
-                coda_len = min(int((nxt_a - b) * .4), int(.12 * FPS))
-            else:
-                coda_len = min(speech_end - b, int(.2 * FPS))
-            na, nb = fr(note['t']), fr(note['t'] + note['d'])
-            # Consonants d'inici
-            if on_len > 0:
-                o0 = max(0, na - on_len)
-                src[o0:na] = np.linspace(a - (na - o0), a, na - o0, endpoint=False)
-                midi[o0:na] = note['midi'] + shift
-            # Vocal estirada fins al final de la nota (menys les consonants finals)
-            ve = max(na + 2, nb - coda_len)
-            src[na:ve] = np.linspace(a, max(a + 1, b - 1), ve - na)
-            midi[na:ve] = note['midi'] + shift
-            if coda_len > 0:
-                src[ve:ve + coda_len] = np.linspace(b, b + coda_len, coda_len, endpoint=False)
-                midi[ve:ve + coda_len] = note['midi'] + shift
-        # Paràmetres WORLD interpolats.
-        bins = sp.shape[1]
         SP = np.full((total, bins), 1e-12); AP = np.ones((total, bins)); V = np.zeros(total, bool)
-        have = src >= 0
-        i0 = np.clip(np.floor(src).astype(int), 0, n - 1); i1 = np.minimum(i0 + 1, n - 1); w = (src - np.floor(src))[:, None]
-        SP[have] = np.exp(np.log(sp[i0]) * (1 - w) + np.log(sp[i1]) * w)[have]
-        AP[have] = (ap[i0] * (1 - w) + ap[i1] * w)[have]
-        V[have] = voiced[np.rint(src).astype(int).clip(0, n - 1)][have]
+        have = np.zeros(total, bool); midi = np.zeros(total)
+        fr = lambda tt: int(round((tt - start) * FPS))
+        def put(at, unit, idx, m):
+            idx = np.asarray(idx, float); n = min(len(idx), total - at)
+            if n <= 0 or at < 0: return
+            idx = idx[:n]
+            i0 = np.clip(np.floor(idx).astype(int), 0, unit['n'] - 1); i1 = np.minimum(i0 + 1, unit['n'] - 1); w = (idx - np.floor(idx))[:, None]
+            sl = slice(at, at + n)
+            SP[sl] = np.exp(np.log(unit['sp'][i0]) * (1 - w) + np.log(unit['sp'][i1]) * w)
+            AP[sl] = unit['ap'][i0] * (1 - w) + unit['ap'][i1] * w
+            V[sl] = unit['voiced'][np.rint(idx).astype(int).clip(0, unit['n'] - 1)]
+            have[sl] = True; midi[sl] = m
+        max_on, max_coda = int(.22 * FPS), int(.16 * FPS)
+        for k, (note, unit, si) in enumerate(plan):
+            o0, a, b, c1 = unit['sylls'][si]
+            m = note['midi'] + shift
+            na, nb = fr(note['t']), fr(note['t'] + note['d'])
+            on = np.arange(max(o0, a - max_on), a)
+            coda = np.arange(b, min(c1, b + max_coda))
+            # Si la nota següent va seguida, el final de la síl·laba deixa lloc a les seves consonants.
+            if k + 1 < len(plan):
+                nn, nu, nsi = plan[k + 1]
+                no0, naa = nu['sylls'][nsi][0], nu['sylls'][nsi][1]
+                room_end = fr(nn['t']) - min(naa - no0, max_on)
+                nb = min(nb, max(na + 3, room_end))
+            ve = max(na + 2, nb - len(coda))
+            if len(on): put(na - len(on), unit, on, m)
+            # Vocal: els extrems (transicions, 30 ms) a velocitat natural i el centre estirat.
+            length = ve - na; edge = min(6, (b - a) // 3, length // 3)
+            mid = np.linspace(a + edge, max(a + edge, b - edge - 1), max(0, length - 2 * edge))
+            put(na, unit, np.concatenate([np.arange(a, a + edge), mid, np.arange(b - edge, b)]), m)
+            if len(coda): put(ve, unit, coda[:max(0, total - ve)], m)
         # Entonació amb vibrato suau (a partir de 250 ms dins de la nota) i portament de 40 ms.
         semis = np.zeros(total); prev, run = None, 0
         for f in range(total):
             if not have[f]: prev, run = None, 0; continue
-            m = midi[f]
-            if m != prev: run = 0
-            run += 1; prev = m
-            semis[f] = m + .2 * math.sin(2 * math.pi * 5.4 * run / FPS) * min(1, max(0, (run - 50) / 40))
-        k = np.ones(8) / 8
-        inside = np.convolve(have.astype(float), k, mode='same') > .99
-        semis = np.where(inside, np.convolve(semis, k, mode='same'), semis)
+            mm = midi[f]
+            if mm != prev: run = 0
+            run += 1; prev = mm
+            semis[f] = mm + .2 * math.sin(2 * math.pi * 5.4 * run / FPS) * min(1, max(0, (run - 50) / 40))
+        kern = np.ones(8) / 8
+        inside = np.convolve(have.astype(float), kern, mode='same') > .99
+        semis = np.where(inside, np.convolve(semis, kern, mode='same'), semis)
         F0 = np.where(V & have, 440 * 2 ** ((semis - 69) / 12), 0.0)
         y = pw.synthesize(np.ascontiguousarray(F0), np.ascontiguousarray(SP), np.ascontiguousarray(AP), rate, PERIOD)
         if rate != 44100: y = resample_poly(y, 44100, rate)
