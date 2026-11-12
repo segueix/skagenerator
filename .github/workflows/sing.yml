@@ -1,23 +1,16 @@
 name: Cançons cantades en català (Matxa i timbres)
 
-# Generació nocturna en segon pla: lletra catalana, melodia i veu Matxa cantada.
+# Generació manual de mostres preproduïdes. La ràdio canta al navegador.
 # L'àudio es prepara a GitHub Actions i es publica a 'cantades' perquè els
 # mòbils no hagin de sintetitzar-lo mentre escolten la ràdio.
 on:
-  schedule:
-    - cron: '17 3 * * *'
+  # Els enregistraments preproduïts es conserven com a opció manual.
+  # La generació automàtica de veu cantada passa al navegador.
   workflow_dispatch:
     inputs:
       count:
         description: Quantes cançons (alterna ska i punk)
         default: '2'
-  # La primera fusió activa una generació inicial, sense esperar al cron de demà.
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/sing.yml'
-      - 'singing/voice_timbres.py'
-      - 'singing/sing.py'
 
 permissions:
   contents: write

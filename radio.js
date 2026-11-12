@@ -7,6 +7,8 @@
   const studio = window.SkaStudio, engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder,
     audioUtils = window.SkaAudioUtils, sampleAudio = window.SkaSampleAudio;
   const $ = id => document.getElementById(id), root = document.documentElement;
+  const browserSinger = studio && window.SkaBrowserSinging?.createBrowserSinger({ rate: studio.RATE });
+  let generationController = null;
   if (!studio || !engine || !builder || !audioUtils || !sampleAudio || !$('radio')) return;
 
   const RATE = studio.RATE, GAP_SECONDS = 2, TAIL_SECONDS = 1.5;
@@ -71,10 +73,10 @@
   let sinceReplay = REPLAY_EVERY, lastSubgenre = null, played = [], prep = null, userPaused = false, needsTap = false;
 
   // ── Cançons cantades ──────────────────────────────────────────────────
-  // Les noves cançons cantades en català es generen a GitHub Actions amb Matxa
-  // i es publiquen a cantades/. Es prioritzen sempre que l'emissora en tingui.
-  // La síntesi de Matxa encara no es pot executar en aquest reproductor local:
-  // quan falten enregistraments, es manté la generació instrumental existent.
+  // Per defecte la ràdio crea una cançó nova i la fa cantar al navegador.
+  // Els enregistraments preproduïts continuen disponibles per a les preferides.
+  // Matxa proporciona la veu parlada des del servei extern; el navegador
+  // n'ajusta la melodia, hi aplica el timbre i fa la mescla completa.
   let sungCatalog = null, sungLoading = null;
   function loadSung() {
     sungLoading ||= fetch(new URL('cantades/catalog.json', document.baseURI), { cache: 'no-cache' })
@@ -91,24 +93,6 @@
   const sungById = id => sungCatalog?.find(s => s.id === id);
   function chooseSong() {
     const history = readHistory(), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
-    // Quan hi ha cançons Matxa en català, omplim la cua amb aquestes.
-    // Evitem repetir-les fins que totes les de l'emissora hagin tingut torn.
-    const sungAvailable = (sungCatalog || []).filter(s => inStation(s.style));
-    if (sungAvailable.length) {
-      const notQueued = sungAvailable.filter(s => !queued.includes(s.id));
-      const available = notQueued.length ? notQueued : sungAvailable;
-      const unheard = available.filter(s => !history.some(e => e.id === s.id));
-      const lastPlayed = id => history.find(e => e.id === id)?.lastPlayed || 0;
-      const candidates = unheard.length ? unheard : available.slice().sort((a, b) => lastPlayed(a.id) - lastPlayed(b.id));
-      const chosen = unheard.length ? pickOne(candidates) : pickOne(candidates.slice(0, Math.max(1, Math.ceil(candidates.length / 2))));
-      try {
-        const song = studio.validateSong(JSON.parse(JSON.stringify(chosen.song)));
-        lastSubgenre = chosen.subgenre;
-        return { id: chosen.id, replay: history.some(e => e.id === chosen.id && e.vote === 1), sung: chosen, song };
-      } catch (error) {
-        console.warn('Cançó Matxa del catàleg no vàlida', error);
-      }
-    }
     const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id));
     if (liked.length && sinceReplay >= REPLAY_EVERY && !queue.some(t => t.replay) && Math.random() < REPLAY_CHANCE) {
       // Entre les preferides, les que fa més que no sonen.
@@ -168,7 +152,10 @@
     setPrep({ stage: 'compose', value: 0 });
     await breathe();
     if (sungCatalog === null) await loadSung();
+    const controller = new AbortController();
+    generationController = controller;
     const choice = chooseSong(), song = choice.song, segs = studio.segmentsOf(song), parts = [], lengths = [];
+    let sungCount = 0, vocalCount = 0, voiceError = false;
     if (choice.sung) {
       // Cançó cantada: ja està feta, es baixa sencera abans que soni (també amb la pantalla apagada).
       setPrep({ stage: 'download', value: 0, title: song.title });
@@ -193,14 +180,41 @@
       if (mine !== session) throw CANCELLED;
       const spec = engine.composeSongPart(song.settings, studio.partFor(song, seg));
       const frames = Math.round(seg.bars * 240 / (seg.section?.bpm ?? song.settings.bpm) * RATE);
+      const lyrics = seg.section?.lyrics?.trim();
+      const hasVocal = !!lyrics && spec.instruments.includes('vocal') && !!spec.lines?.vocal?.length;
+      let voice = null;
+      if (hasVocal && browserSinger) {
+        vocalCount++;
+        try {
+          const lines = singingLines(song, seg, spec);
+          if (!lines.length) throw new Error('No quadren les síl·labes amb les notes');
+          setPrep({ stage: 'voice', value: done / bars, title: song.title });
+          voice = await browserSinger.renderSection({
+            text: lyrics, lines, subgenre: song.settings.subgenre, frames, signal: controller.signal
+          });
+          if (mine !== session) throw CANCELLED;
+          if (!voice.some(x => Math.abs(x) > .0001)) throw new Error('Matxa ha retornat silenci');
+          sungCount++;
+        } catch (error) {
+          if (mine !== session || controller.signal.aborted) throw CANCELLED;
+          console.warn('La veu Matxa no està disponible; es conserva la melodia de guia:', error);
+          voiceError = true;
+        }
+      }
+      // La guia MIDI només es manté en aquelles seccions en què Matxa falla.
+      const renderSpec = voice ? {
+        ...spec, instruments: spec.instruments.filter(name => name !== 'vocal'),
+        lines: { ...spec.lines, vocal: [] }
+      } : spec;
       let data;
-      if (spec.instruments.length) {
-        data = await sampleAudio.render(spec, RATE, { onProgress: progress => {
+      if (renderSpec.instruments.length) {
+        data = await sampleAudio.render(renderSpec, RATE, { onProgress: progress => {
           if (mine !== session) return;
           if (progress.stage === 'loading') setPrep({ stage: 'bank', value: progress.value, title: song.title });
           else setPrep({ stage: 'render', value: (done + seg.bars * (progress.stage === 'rendering' ? progress.value || 0 : 0)) / bars, title: song.title });
         } });
       } else { const empty = Math.round((spec.seconds + TAIL_SECONDS) * RATE); data = [new Float32Array(empty), new Float32Array(empty)]; }
+      if (voice) data = audioUtils.mixVoice(data, voice, { processed: true, rate: RATE, gainDb: -2 });
       if (seg.section?.fade) data = audioUtils.applyFade(data, Math.min(frames, data[0].length), seg.section.fade);
       parts.push(data); lengths.push(Math.min(frames, data[0].length));
       timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm: seg.section?.bpm ?? song.settings.bpm, lines: lyricLines(song, seg, spec, at) });
@@ -212,7 +226,21 @@
     await breathe();
     const mixed = audioUtils.mixSections(parts, lengths); parts.length = 0;
     const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
-    return { id: choice.id, replay: choice.replay, song, seconds, timeline, url: URL.createObjectURL(blob) };
+    if (voiceError) toast('No s’ha pogut obtenir tota la veu de Matxa: s’ha conservat la guia musical en les parts afectades.');
+    const fullySung = sungCount > 0 && sungCount === vocalCount && !voiceError;
+    return { id: choice.id, replay: choice.replay, sung: fullySung, 
+      voiceTimbre: sungCount ? window.SkaBrowserSinging.presetFor(song.settings.subgenre).name : null,
+      song, seconds, timeline, url: URL.createObjectURL(blob) };
+  }
+  // Prepara les síl·labes per a les notes (compta la mateixa mètrica que el motor musical).
+  function singingLines(song, seg, spec) {
+    const text = seg.section?.lyrics?.trim() || '';
+    return window.SkaBrowserSinging.scoreLines(
+      text,
+      engine.analyzeLyrics(text, song.settings.lang).syllables,
+      spec.lines?.vocal || [],
+      seg.section?.bpm ?? song.settings.bpm
+    );
   }
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
   // (cada síl·laba és una nota, en ordre).
@@ -295,6 +323,7 @@
   function chooseStation(style) {
     if (!STATIONS[style]) return;
     studio.stop();
+    generationController?.abort();
     session++; station = style; waiting = true; failures = 0; played = []; sinceReplay = REPLAY_EVERY; lastSubgenre = null;
     dropTracks();
     // Mentre la ràdio està engegada, el navegador no ha de congelar la pàgina en segon pla.
@@ -308,6 +337,8 @@
     current = null; queue = []; prep = null;
   }
   function leaveStation() {
+    generationController?.abort();
+    browserSinger?.dispose();
     session++; station = null; waiting = false; onTrack = false;
     clearTimeout(retryTimer); releaseLock?.(); releaseLock = null;
     audio.pause(); audio.removeAttribute('src'); audio.load();
@@ -354,6 +385,7 @@
     if (prep.stage === 'bank') return [`Baixant els instruments${prep.value === null ? '…' : ` · ${Math.round(prep.value * 100)} %`}`, prep.value];
     if (prep.stage === 'compose') return ['Component una cançó nova…', 0];
     if (prep.stage === 'download') return ['Baixant una cançó cantada…', null];
+    if (prep.stage === 'voice') return ['Matxa prepara la veu · el navegador la farà cantar i hi aplicarà el timbre…', null];
     if (prep.stage === 'mix') return ['Fent la mescla final…', 1];
     return [`Gravant la banda · ${Math.round(prep.value * 100)} %`, prep.value];
   }
