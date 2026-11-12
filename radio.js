@@ -7,7 +7,7 @@
   const studio = window.SkaStudio, engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder,
     audioUtils = window.SkaAudioUtils, sampleAudio = window.SkaSampleAudio;
   const $ = id => document.getElementById(id), root = document.documentElement;
-  const browserSinger = window.SkaBrowserSinging?.createBrowserSinger({ rate: studio.RATE });
+  const browserSinger = studio && window.SkaBrowserSinging?.createBrowserSinger({ rate: studio.RATE });
   let generationController = null;
   if (!studio || !engine || !builder || !audioUtils || !sampleAudio || !$('radio')) return;
 
@@ -226,6 +226,7 @@
     await breathe();
     const mixed = audioUtils.mixSections(parts, lengths); parts.length = 0;
     const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
+    if (voiceError) toast('No s’ha pogut obtenir tota la veu de Matxa: s’ha conservat la guia musical en les parts afectades.');
     const fullySung = sungCount > 0 && sungCount === vocalCount && !voiceError;
     return { id: choice.id, replay: choice.replay, sung: fullySung, 
       voiceTimbre: sungCount ? window.SkaBrowserSinging.presetFor(song.settings.subgenre).name : null,
