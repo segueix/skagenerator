@@ -64,13 +64,16 @@
   const secondsOf = s => { let t = 0; for (let b = 0; b < s.settings.bars; b++) t += 240 / (s.sections.find(x => b >= x.start && b < x.start + x.bars)?.bpm || s.settings.bpm); return t; };
 
   // ── Tria de la cançó següent ─────────────────────────────────────────
-  let station = null, session = 0, current = null, upcoming = null, waiting = false, filling = false, failures = 0;
+  // Sempre hi ha dues cançons a punt per endavant: amb la pantalla apagada el mòbil va més lent
+  // i així la ràdio té marge per no quedar-se sense música.
+  const AHEAD = 2;
+  let station = null, session = 0, current = null, queue = [], waiting = false, filling = false, failures = 0, retryTimer = null, releaseLock = null;
   let sinceReplay = REPLAY_EVERY, lastSubgenre = null, played = [], prep = null, userPaused = false, needsTap = false;
 
   function chooseSong() {
-    const history = readHistory(), queued = [current?.id, ...played.slice(-REPLAY_MEMORY)];
+    const history = readHistory(), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
     const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id));
-    if (liked.length && sinceReplay >= REPLAY_EVERY && Math.random() < REPLAY_CHANCE) {
+    if (liked.length && sinceReplay >= REPLAY_EVERY && !queue.some(t => t.replay) && Math.random() < REPLAY_CHANCE) {
       // Entre les preferides, les que fa més que no sonen.
       liked.sort((a, b) => (a.lastPlayed || 0) - (b.lastPlayed || 0));
       const entry = pickOne(liked.slice(0, Math.max(1, Math.ceil(liked.length / 2))));
@@ -83,7 +86,9 @@
     const style = station !== 'mix' ? station : !lastStyle ? pickOne(['ska', 'punk']) : Math.random() < .75 ? (lastStyle === 'ska' ? 'punk' : 'ska') : lastStyle;
     const keys = Object.keys(engine.SUBGENRES).filter(key => engine.SUBGENRES[key].style === style);
     const fresh = keys.filter(key => key !== lastSubgenre), subgenre = pickOne(fresh.length ? fresh : keys);
-    const recent = history.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created)).slice(0, 12)
+    // Les que ja esperen torn també compten com a recents.
+    const waitingSongs = queue.map(t => ({ subgenre: t.song.settings.subgenre, style: t.song.settings.style, song: t.song })).reverse();
+    const recent = [...waitingSongs, ...history.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created))].slice(0, 12)
       .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
     const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, seed: studio.newSeed(), vary: true, recent,
       liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
@@ -150,17 +155,20 @@
     const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
     return { id: choice.id, replay: choice.replay, song, seconds, timeline, url: URL.createObjectURL(blob) };
   }
-  // Manté sempre una cançó a punt. Si una falla, en prova una altra.
+  // Manté sempre cançons a punt. Si una falla, en prova una altra; si falla tres vegades, ho torna
+  // a provar sol al cap d'una estona (amb la pantalla apagada ningú pot prémer «Torna-ho a provar»).
   async function fill(mine) {
     if (filling) return;
     filling = true;
     let fatal = null;
     try {
-      while (mine === session && station && !upcoming) {
+      clearTimeout(retryTimer);
+      while (mine === session && station && queue.length < AHEAD) {
         try {
           const track = await prepare(mine);
           if (mine !== session) { URL.revokeObjectURL(track.url); break; }
-          upcoming = track; failures = 0;
+          queue.push(track); failures = 0;
+          if (waiting) advance(); else renderPrep();
         } catch (error) {
           if (error === CANCELLED || mine !== session) break;
           console.error(error);
@@ -170,7 +178,8 @@
     } finally { filling = false; }
     if (mine !== session) { if (station) fill(session); return; }
     setPrep(fatal ? { stage: 'error', message: reasonOf(fatal) } : null);
-    if (upcoming && waiting) advance();
+    if (fatal) retryTimer = setTimeout(() => { if (mine === session && station) { failures = 0; fill(session); } }, 30000);
+    if (queue.length && waiting) advance();
   }
 
   // ── Reproducció ──────────────────────────────────────────────────────
@@ -178,20 +187,26 @@
   // després pot canviar de cançó tot sol, també amb el mòbil bloquejat.
   let silenceUrl = null, onTrack = false;
   function playSilence() {
-    silenceUrl ||= URL.createObjectURL(new Blob([audioUtils.encodeWav([new Float32Array(RATE), new Float32Array(RATE)], RATE)], { type: 'audio/wav' }));
+    // No és silenci del tot: un fons greu a −60 dB, que no se sent però fa que el mòbil consideri
+    // que la pàgina està sonant i no l'adormi mentre es prepara la cançó.
+    if (!silenceUrl) {
+      const hum = new Float32Array(RATE * 2); let low = 0;
+      for (let i = 0; i < hum.length; i++) { low += (Math.random() * 2 - 1 - low) * .02; hum[i] = low * .012 * Math.min(1, i / 2000, (hum.length - i) / 2000); }
+      silenceUrl = URL.createObjectURL(new Blob([audioUtils.encodeWav([hum, hum], RATE)], { type: 'audio/wav' }));
+    }
     onTrack = false; audio.loop = true; audio.src = silenceUrl;
     return audio.play().catch(() => {});
   }
   function advance() {
     if (!station) return;
-    if (!upcoming) {
+    if (!queue.length) {
       // La següent encara no és a punt: silenci fins que arribi.
       waiting = true; if (current) { URL.revokeObjectURL(current.url); current = null; }
       playSilence(); renderPlayer(); fill(session); return;
     }
     waiting = false;
     if (current) URL.revokeObjectURL(current.url);
-    current = upcoming; upcoming = null; prep = null;
+    current = queue.shift();
     const now = Date.now(), list = readHistory(), old = list.find(e => e.id === current.id);
     if (old) { old.plays = (old.plays || 1) + 1; old.lastPlayed = now; }
     else list.unshift({ id: current.id, title: current.song.title, style: current.song.settings.style, subgenre: current.song.settings.subgenre || '',
@@ -208,16 +223,19 @@
     studio.stop();
     session++; station = style; waiting = true; failures = 0; played = []; sinceReplay = REPLAY_EVERY; lastSubgenre = null;
     dropTracks();
+    // Mentre la ràdio està engegada, el navegador no ha de congelar la pàgina en segon pla.
+    if (navigator.locks?.request && !releaseLock) navigator.locks.request('radiospam-on-air', () => new Promise(resolve => { releaseLock = resolve; })).catch(() => {});
     playSilence(); // dins del toc: desbloqueja el so per a tota la sessió
     setPrep({ stage: 'compose', value: 0 });
     showScreen('player'); renderPlayer(); fill(session);
   }
   function dropTracks() {
-    for (const track of [current, upcoming]) if (track) URL.revokeObjectURL(track.url);
-    current = null; upcoming = null; prep = null;
+    for (const track of [current, ...queue]) if (track) URL.revokeObjectURL(track.url);
+    current = null; queue = []; prep = null;
   }
   function leaveStation() {
     session++; station = null; waiting = false; onTrack = false;
+    clearTimeout(retryTimer); releaseLock?.(); releaseLock = null;
     audio.pause(); audio.removeAttribute('src'); audio.load();
     dropTracks(); showScreen('home');
     if ('mediaSession' in navigator) { try { navigator.mediaSession.metadata = null; } catch {} }
@@ -227,7 +245,7 @@
     if (audio.paused) { userPaused = false; needsTap = false; audio.play().catch(error => toast(`No s’ha pogut reproduir: ${reasonOf(error)}`)); }
     else { userPaused = true; audio.pause(); }
   }
-  function skip() { if (upcoming) advance(); }
+  function skip() { if (queue.length) advance(); }
   audio.addEventListener('ended', () => { if (onTrack) advance(); });
   audio.addEventListener('error', () => {
     if (!onTrack || !station) return;
@@ -273,7 +291,8 @@
     $('radio-loading-title').textContent = failed ? 'La banda s’ha encallat' : current || played.length ? 'Preparant la cançó següent…' : 'Afinant la banda…';
     $('radio-retry').hidden = !failed;
     const next = $('radio-next');
-    if (upcoming) next.textContent = `A continuació: «${upcoming.song.title}» · ${subgenreName(upcoming.song.settings.subgenre)}${upcoming.replay ? ' · 👍' : ''}`;
+    const upcoming = queue[0];
+    if (upcoming) next.textContent = `A continuació: «${upcoming.song.title}» · ${subgenreName(upcoming.song.settings.subgenre)}${upcoming.replay ? ' · 👍' : ''}${queue.length > 1 ? ` · i ${queue.length - 1} més a punt` : ''}`;
     else if (waiting) next.textContent = '';
     else next.textContent = text ? `A continuació: ${text[0].toLowerCase()}${text.slice(1)}` : '';
     next.classList.toggle('ready', !!upcoming);
@@ -452,5 +471,5 @@
   $('radio-history-count').textContent = readHistory().length || '';
   if (root.classList.contains('radio-on')) $('theme-color').content = '#0c0b12';
   showScreen('home');
-  window.RadioSpam = { get state() { return { station, waiting, filling, current: current && { id: current.id, title: current.song.title, seconds: current.seconds, replay: current.replay }, upcoming: upcoming && { id: upcoming.id, title: upcoming.song.title }, prep }; } };
+  window.RadioSpam = { get state() { return { station, waiting, filling, current: current && { id: current.id, title: current.song.title, seconds: current.seconds, replay: current.replay }, queued: queue.length, upcoming: queue[0] && { id: queue[0].id, title: queue[0].song.title }, prep }; } };
 })();

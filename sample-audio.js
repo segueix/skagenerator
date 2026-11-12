@@ -17,10 +17,13 @@
   function send(type, data, progress, transfer = []) {
     const id = ++serial;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => destroy(new Error('El motor d’àudio ha trigat massa. Torna-ho a provar.')), 120000);
-      requests.set(id, { resolve, reject, progress, timer });
+      // El temps d'espera compta des de l'últim senyal de progrés, no des de l'inici: amb la pantalla
+      // del mòbil apagada el motor va més lent, però mentre avanci no s'ha de donar per penjat.
+      const request = { resolve, reject, progress, timer: null };
+      request.touch = () => { clearTimeout(request.timer); request.timer = setTimeout(() => destroy(new Error('El motor d’àudio ha trigat massa. Torna-ho a provar.')), 180000); };
+      request.touch(); requests.set(id, request);
       try { worker.postMessage({ id, type, ...data }, transfer); }
-      catch (error) { clearTimeout(timer); requests.delete(id); reject(error); }
+      catch (error) { clearTimeout(request.timer); requests.delete(id); reject(error); }
     });
   }
   // Descarrega un banc mostrant el progrés. El temps d'espera només salta si la
@@ -63,7 +66,7 @@
       worker = new Worker(workerURL);
       worker.onmessage = ({ data }) => {
         const request = requests.get(data.id); if (!request) return;
-        if (data.type === 'progress') { request.progress?.({ stage: 'rendering', value: data.value }); return; }
+        if (data.type === 'progress') { request.touch(); request.progress?.({ stage: 'rendering', value: data.value }); return; }
         clearTimeout(request.timer); requests.delete(data.id);
         if (data.type === 'error') request.reject(new Error(data.message)); else request.resolve(data.channels);
       };
