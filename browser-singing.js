@@ -131,7 +131,7 @@
     if (windowSize < 300) return 180;
     const step = 2, minLag = Math.floor(rate / 410 / step), maxLag = Math.min(Math.floor(rate / 85 / step), Math.floor(windowSize / 3 / step));
     const length = Math.floor(windowSize / step);
-    let bestLag = 0, bestScore = 0;
+    let bestLag = 0, bestScore = 0, firstReliable = 0;
     for (let lag = minLag; lag <= maxLag; lag++) {
       let a = 0, b = 0, corr = 0;
       for (let i = 0; i < length - lag; i++) {
@@ -140,8 +140,12 @@
       }
       const score = corr / (Math.sqrt(a * b) + 1e-8);
       if (score > bestScore) { bestScore = score; bestLag = lag; }
+      // El màxim global sol caure a dues vegades el període (una octava falsa).
+      // Prioritzem el primer període amb una correlació clarament fiable.
+      if (!firstReliable && score > .965) firstReliable = lag;
     }
-    return bestLag && bestScore > .27 ? rate / (bestLag * step) : 180;
+    const chosen = firstReliable || bestLag;
+    return chosen && bestScore > .27 ? rate / (chosen * step) : 180;
   }
   function boundaries(samples, count, rate) {
     const out = [0], step = Math.max(1, Math.round(rate * .01)), sums = [];
