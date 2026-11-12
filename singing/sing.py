@@ -292,7 +292,7 @@ def megaphone(x):
     y = signal.sosfilt(signal.butter(2, [450, 3600], 'band', fs=RATE, output='sos'), y)
     return (y * rms / (math.sqrt(float(np.mean(y ** 2))) + 1e-12)).astype(np.float32)
 
-def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None):
+def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0, voicebank=None, matxa=None, external_vocal=None):
     score = json.load(open(score_path, encoding='utf-8'))
     band, rate = sf.read(band_path, dtype='float32', always_2d=True)
     assert rate == RATE
@@ -302,7 +302,23 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     median = float(np.median([n['midi'] for n in notes]))
     shift = -12 if median > 60 else 0
     speaker = speaker or {'rocksteady': 'tiger_vinyl', 'bossreggae': 'tiger_vinyl', 'jamaican': 'tiger_vinyl', 'poppunk': 'tiger_electric'}.get(score.get('subgenre'), 'tiger_fresh')
-    if voicebank:
+    phrases = plan_phrases
+    if external_vocal:
+        sing_one, speaker = None, 'veu externa'
+    elif matxa:
+        # Matxa (veu neuronal catalana) dita vers a vers i convertida en cant.
+        import catalan, speech2sing
+        singer = speech2sing.MatxaSinger(matxa, cache=os.path.join(os.path.dirname(os.path.abspath(out_path)), 'matxa-cache'))
+        shift = 12 * round((singer.note - median) / 12)   # la melodia, a l'octava més cantable per a la veu
+        sing_one = lambda line: singer.sing_line(line, shift, catalan.syllables)
+        speaker = f'Matxa {matxa}'
+        def phrases(ns):
+            out = []
+            for n in ns:
+                if n.get('lineStart') or not out: out.append([])
+                out[-1].append(n)
+            return out
+    elif voicebank:
         # Veu gravada síl·laba a síl·laba (veu.html): sempre en català, a l'octava on es va gravar.
         import catalan, voicebank as vb
         bank = vb.Bank(voicebank)
@@ -319,7 +335,7 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
         band = band[:int((limit + 3) * RATE)]
     vocal = np.zeros(len(band) + RATE * 2, np.float32)
     started = time.time()
-    for k, phrase in enumerate(plan_phrases(notes)):
+    for k, phrase in enumerate([] if external_vocal else phrases(notes)):
         start, wave = sing_one(phrase)
         a = int(round(start * RATE))
         if a < 0: wave = wave[-a:]; a = 0
@@ -329,8 +345,17 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
         w = wave[:end - a].copy(); w[:fade] *= np.linspace(0, 1, fade); w[-fade:] *= np.linspace(1, 0, fade)
         vocal[a:end] += w
         print(f'  frase {k + 1}: {len(phrase)} síl·labes, {len(wave) / RATE:.1f} s')
-    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {speaker if voicebank else voice.speaker_name})')
+    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {speaker if (voicebank or matxa or external_vocal) else voice.speaker_name})')
     vocal = vocal[:len(band)]
+    if external_vocal:
+        # Veu ja feta (p. ex. convertida al timbre d'una altra persona): passa pel mateix tractament i mescla.
+        ext, er = sf.read(external_vocal, dtype='float32', always_2d=True)
+        ext = ext.mean(1)
+        if er != RATE:
+            from scipy.signal import resample_poly
+            ext = resample_poly(ext, RATE, er).astype(np.float32)
+        vocal = np.zeros(len(band), np.float32); vocal[:min(len(ext), len(band))] = ext[:len(band)]
+    dry_vocal = vocal.copy()
     vocal = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), vocal)
     vocal = compress(vocal)
     if fx == 'megaphone': vocal = megaphone(vocal)
@@ -356,6 +381,7 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     base = os.path.splitext(out_path)[0]
     sf.write(base + '.wav', mix, RATE, subtype='PCM_16')
     sf.write(base + '.vocal.wav', vocal + wet, RATE, subtype='PCM_16')
+    if os.environ.get('VOCAL_DRY'): sf.write(base + '.dry.wav', dry_vocal, RATE, subtype='PCM_16')
     subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', base + '.wav', '-codec:a', 'libmp3lame', '-b:a', '160k', out_path], check=True)
     os.remove(base + '.wav')
 
@@ -370,5 +396,7 @@ if __name__ == '__main__':
     ap.add_argument('--gender', type=float, default=0.0, help='-1 més greu … +1 més aguda (si el model ho admet)')
     ap.add_argument('--steps', type=int, default=40)
     ap.add_argument('--voicebank', nargs='+', help='ZIP (o parts) de veu.html: canta amb la veu gravada (en català) en lloc de DiffSinger')
+    ap.add_argument('--vocal', help='WAV amb la veu ja cantada (sec, des del començament de la cançó): només es tracta i es mescla')
+    ap.add_argument('--matxa', help='canta amb Matxa (veu catalana del Projecte Aina): elia, grau, emma, pere, gina, lluc, olga o quim')
     a = ap.parse_args()
-    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank)
+    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender, a.voicebank, a.matxa, a.vocal)
