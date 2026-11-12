@@ -36,6 +36,9 @@
     .msg { min-height: 2.6em; font-size: 14px; color: var(--muted); margin: 0; }
     .note { display: flex; align-items: center; gap: 8px; } .note strong { min-width: 4ch; text-align: center; font-size: 17px; }
     .list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tandes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .tandes .btn { font-size: 14px; }
+    .tandes .btn[aria-pressed="true"] { background: var(--st); color: var(--st-text); border-color: var(--st); }
+    .pitch { margin: 0; min-height: 1.5em; font-weight: 700; font-size: 16px; } .pitch.ok { color: #4ade80; } .pitch.near { color: #fbbf24; } .pitch.far { color: var(--bad); }
     .parts { display: grid; gap: 8px; } .part { display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); border-color: var(--st); }
     .veu-group { width: 100%; margin: 10px 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
     .veu-chip { min-width: 46px; min-height: 36px; padding: 4px 8px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); font-size: 14px; }
@@ -53,9 +56,14 @@
       <li>Escolta la nota i canta la síl·laba sostinguda uns 1,5 segons, a volum constant, sense vibrato.</li>
       <li>Pronúncia central: la ə és la vocal neutra («casa»), la r és suau («cara») i la rr, forta.</li>
       <li>Amb «Grava seguit» les va gravant una rere l’altra; les gravacions es desen en aquest navegador.</li>
+      <li><strong>Tanda 2</strong> (millores, ~100 síl·labes): canta exactament a la nota (l’afinador es posa verd), marca molt les consonants i, a «a·lla», «a·ra»…, canta la a i passa a la síl·laba sense parar.</li>
       <li>Al final, «Prepara els fitxers» crea un o més ZIP de com a molt 24 MB. Recorda que, si es puja al repositori públic, la teva veu queda pública.</li>
     </ul>
   </details>
+  <div class="tandes" role="group" aria-label="Tanda de gravació">
+    <button class="btn" id="veu-tanda1" type="button" aria-pressed="true">Tanda 1 · Totes les síl·labes</button>
+    <button class="btn" id="veu-tanda2" type="button" aria-pressed="false">Tanda 2 · Millores</button>
+  </div>
   <div class="row"><span class="muted">Gravades: <strong id="veu-count">0</strong></span>
     <span class="note"><button class="btn" id="veu-down" type="button" aria-label="Nota més greu">−</button><strong id="veu-note">Sol3</strong><button class="btn" id="veu-up" type="button" aria-label="Nota més aguda">＋</button><button class="btn" id="veu-tone" type="button">♪</button></span></div>
   <div class="bar"><i id="veu-progress"></i></div>
@@ -66,6 +74,7 @@
     <p class="state" id="veu-state"></p>
     <div class="meter"><i id="veu-meter"></i></div>
     <div class="timer"><i id="veu-timer"></i></div>
+    <p class="pitch" id="veu-pitch" aria-live="off"></p>
     <button class="big" id="veu-record" type="button">● Grava</button>
     <div class="grid">
       <button class="btn" id="veu-prev" type="button">‹ Anterior</button>
