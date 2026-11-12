@@ -99,6 +99,7 @@ class MatxaSinger:
             bounds.append([a, b + 1])
         s0 = int(np.argmax(rms > rms.max() * .03)); s1 = n - int(np.argmax(rms[::-1] > rms.max() * .03))
         sylls = []
+        unvoiced = np.zeros(n, bool)
         if phones and os.environ.get('MATXA_ALIGN', '1') == '1':
             # phones: paraules del vers (netes, només a-z) amb els nuclis vocàlics de cada una.
             times = self._char_times(x, rate, [w for w, _ in phones])
@@ -107,6 +108,10 @@ class MatxaSinger:
                 # Límit entre dues lletres: el punt mig entre els seus centres.
                 edge = [s0] + [(centre[i] + centre[i + 1]) // 2 for i in range(len(centre) - 1)] + [s1]
                 edge = list(np.maximum.accumulate(np.clip(edge, s0, s1)))
+                # Lletres sordes (s, x, f, p, t, k…): el detector de to les marcava com a sonores i sonaven brunzides.
+                letters = ''.join(w for w, _ in phones)
+                for ci, ch in enumerate(letters):
+                    if ch in 'sxfptkcq': unvoiced[edge[ci]:edge[ci + 1]] = True
                 pos = 0
                 for word, nuc in phones:
                     base = pos; pos += len(word)
@@ -126,7 +131,7 @@ class MatxaSinger:
             else: o0 = bounds[k - 1][1] + int((a - bounds[k - 1][1]) * .4)   # 60 % de les consonants, per a aquesta síl·laba
             c1 = s1 if k == len(bounds) - 1 else bounds[k][1] + int((bounds[k + 1][0] - bounds[k][1]) * .4)
             sylls.append((min(o0, a), a, b, max(b, c1)))
-        unit = {'sp': sp, 'ap': ap, 'voiced': voiced, 'rate': rate, 'sylls': sylls, 'n': n}
+        unit = {'sp': sp, 'ap': ap, 'voiced': voiced & ~unvoiced, 'unvoiced': unvoiced, 'x': x, 'rate': rate, 'sylls': sylls, 'n': n}
         self._units[key] = unit
         return unit
 
@@ -204,11 +209,16 @@ class MatxaSinger:
             AP[sl] = unit['ap'][i0] * (1 - w) + unit['ap'][i1] * w
             V[sl] = unit['voiced'][np.rint(idx).astype(int).clip(0, unit['n'] - 1)]
             have[sl] = True; midi[sl] = m
+        human = os.environ.get('MATXA_HUMAN', '1') == '1'
+        rnd = np.random.default_rng(abs(hash(_line_text(notes))) % (2 ** 32) + take)
+        gain = np.ones(total); vstart = []; splices = []
         max_on, max_coda = int(.22 * FPS), int(.16 * FPS)
         for k, (note, unit, si) in enumerate(plan):
             o0, a, b, c1 = unit['sylls'][si]
             m = note['midi'] + shift
-            na, nb = fr(note['t']), fr(note['t'] + note['d'])
+            # Humà: cada nota entra uns mil·lisegons tard (mai abans) i no totes igual de fortes.
+            late = int(rnd.integers(0, 4)) if human else 0
+            na, nb = fr(note['t']) + late, fr(note['t'] + note['d'])
             on = np.arange(max(o0, a - max_on), a)
             coda = np.arange(b, min(c1, b + max_coda))
             # Si la nota següent va seguida, el final de la síl·laba deixa lloc a les seves consonants.
@@ -218,27 +228,72 @@ class MatxaSinger:
                 room_end = fr(nn['t']) - min(naa - no0, max_on)
                 nb = min(nb, max(na + 3, room_end))
             ve = max(na + 2, nb - len(coda))
-            cap = float(os.environ.get('MATXA_MAXSTRETCH', 0))
-            if cap: ve = min(ve, na + max(int(.3 * FPS), int((b - a) * cap)))   # notes llargues: vocal sostinguda fins a un límit i silenci
-            if len(on): put(na - len(on), unit, on, m)
+            if len(on): put(na - len(on), unit, on, m); splices.append((na - len(on), unit, on))
             # Vocal: els extrems (transicions, 30 ms) a velocitat natural i el centre estirat.
             length = ve - na; edge = min(6, (b - a) // 3, length // 3)
             mid = np.linspace(a + edge, max(a + edge, b - edge - 1), max(0, length - 2 * edge))
             put(na, unit, np.concatenate([np.arange(a, a + edge), mid, np.arange(b - edge, b)]), m)
-            if len(coda): put(ve, unit, coda[:max(0, total - ve)], m)
-        # Entonació amb vibrato suau (a partir de 250 ms dins de la nota) i portament de 40 ms.
-        semis = np.zeros(total); prev, run = None, 0
-        for f in range(total):
-            if not have[f]: prev, run = None, 0; continue
-            mm = midi[f]
-            if mm != prev: run = 0
-            run += 1; prev = mm
-            semis[f] = mm + .2 * math.sin(2 * math.pi * 5.4 * run / FPS) * min(1, max(0, (run - 50) / 40))
-        kern = np.ones(8) / 8
-        inside = np.convolve(have.astype(float), kern, mode='same') > .99
-        semis = np.where(inside, np.convolve(semis, kern, mode='same'), semis)
+            vstart.append((na, ve, k == 0 or not have[max(0, na - len(on) - 2)]))
+            if human:
+                # Dinàmica: atac de 30 ms, una mica de caiguda a les notes llargues i ±1 dB d'una nota a l'altra.
+                env = np.ones(length) * 10 ** (rnd.uniform(-1, 1) / 20)
+                att = min(6, length); env[:att] *= np.linspace(.75, 1, att)
+                if length > 60: env[60:] *= np.linspace(1, .82, length - 60)
+                gain[na:ve] = env[:max(0, min(length, total - na))]
+            if len(coda): put(ve, unit, coda[:max(0, total - ve)], m); splices.append((ve, unit, coda[:max(0, total - ve)]))
+        SP *= (gain ** 2)[:, None]
+        if human:
+            # Entonació de cantant: cada frase entra per sota i puja a la nota; les notes es lliguen amb un
+            # lliscament de 60 ms; el to deriva lentament ±20 centèsimes; el vibrato comença tard i canvia de
+            # velocitat i d'amplitud a cada nota; l'última nota cau una mica al final.
+            semis = midi.copy()
+            drift = np.convolve(rnd.standard_normal(total + 400), np.ones(200) / 200, mode='same')[200:200 + total]
+            semis += drift / (np.abs(drift).max() + 1e-9) * .2
+            for i, (na, ve, fresh) in enumerate(vstart):
+                length = ve - na
+                if length <= 0: continue
+                t = np.arange(length)
+                scoop = (.9 if fresh else .25) * rnd.uniform(.6, 1.2)
+                semis[na:ve] -= scoop * np.exp(-t / (14 if fresh else 8))
+                rate_hz, depth = rnd.uniform(5.0, 6.0), rnd.uniform(.18, .38)
+                ramp = np.clip((t - 44) / 50, 0, 1)
+                semis[na:ve] += depth * ramp * np.sin(2 * math.pi * rate_hz * t / FPS + rnd.uniform(0, 6.28))
+                if i == len(vstart) - 1 and length > 30:
+                    fall = np.clip((t - (length - 30)) / 30, 0, 1); semis[na:ve] -= .6 * fall ** 2
+            semis += rnd.standard_normal(total) * .03
+            kern = np.hanning(15); kern /= kern.sum()
+        else:
+            semis = np.zeros(total); prev, run = None, 0
+            for f in range(total):
+                if not have[f]: prev, run = None, 0; continue
+                mm = midi[f]
+                if mm != prev: run = 0
+                run += 1; prev = mm
+                semis[f] = mm + .2 * math.sin(2 * math.pi * 5.4 * run / FPS) * min(1, max(0, (run - 50) / 40))
+            kern = np.ones(8) / 8
+        filled = np.where(have, semis, 0)
+        weight = np.convolve(have.astype(float), kern, mode='same')
+        semis = np.where(have, np.convolve(filled, kern, mode='same') / np.maximum(weight, 1e-6), semis)
         F0 = np.where(V & have, 440 * 2 ** ((semis - 69) / 12), 0.0)
         y = pw.synthesize(np.ascontiguousarray(F0), np.ascontiguousarray(SP), np.ascontiguousarray(AP), rate, PERIOD)
+        if os.environ.get('MATXA_SPLICE', '1') == '1':
+            # Consonants sordes: s'hi posa l'àudio original de Matxa (sense passar pel sintetitzador, que les
+            # fa brunzir), amb fosos de 3 ms.
+            spf = rate * PERIOD / 1000; fade = int(rate * .003)
+            for at, unit, idx in splices:
+                idx = np.asarray(idx, int)
+                mask = unit['unvoiced'][np.clip(idx, 0, unit['n'] - 1)]
+                j = 0
+                while j < len(idx):
+                    if not mask[j]: j += 1; continue
+                    e = j
+                    while e < len(idx) and mask[e]: e += 1
+                    d0, s0_ = int(round((at + j) * spf)), int(round(idx[j] * spf)); nsm = int(round((e - j) * spf))
+                    nsm = min(nsm, len(y) - d0, len(unit['x']) - s0_)
+                    if nsm > 2 * fade:
+                        w = np.ones(nsm); w[:fade] = np.linspace(0, 1, fade); w[-fade:] = np.linspace(1, 0, fade)
+                        y[d0:d0 + nsm] = y[d0:d0 + nsm] * (1 - w) + unit['x'][s0_:s0_ + nsm] * w
+                    j = e
         if rate != 44100: y = resample_poly(y, 44100, rate)
         return start, y.astype(np.float32)
 

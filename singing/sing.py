@@ -379,6 +379,13 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     wet = room(vocal) * float(os.environ.get('VOCAL_WET', .35 if fx == 'megaphone' else .9))
     mix = band.copy()
     mix[:, 0] += vocal + wet * .9; mix[:, 1] += vocal + wet * 1.1
+    if os.environ.get('VOCAL_DOUBLE', '1' if matxa else '0') == '1':
+        # Veu doblada, com als discos de punk i ska: dues còpies a banda i banda, uns mil·lisegons tard i amb
+        # l'afinació que es mou molt lentament (retard variable), 8 dB per sota de la veu principal.
+        t = np.arange(len(vocal)); g = 10 ** (-8 / 20)
+        for side, (base_ms, lfo_hz, phase) in enumerate([(19, .31, 0.0), (27, .23, 1.7)]):
+            delay = (base_ms + 3.5 * np.sin(2 * math.pi * lfo_hz * t / RATE + phase)) * RATE / 1000
+            mix[:, side] += g * np.interp(t - delay, t, vocal, left=0).astype(np.float32)
     if limit:  # tros de mostra: fos de sortida als 2 últims segons
         fade = min(len(mix), 2 * RATE); mix[-fade:] *= np.linspace(1, 0, fade)[:, None]
     peak = float(np.abs(mix).max())
