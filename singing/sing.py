@@ -40,7 +40,7 @@ class Voice:
         self.dir = os.path.dirname(base)
         cfg = yaml.safe_load(open(base, encoding='utf-8'))
         d = lambda *p: os.path.join(self.dir, *p)
-        self.max_depth = int(cfg.get('max_depth', 400))
+        self.max_depth = float(cfg.get('max_depth', 400))
         so = ort.SessionOptions(); so.intra_op_num_threads = os.cpu_count() or 4
         sess = lambda p: ort.InferenceSession(p, so, providers=['CPUExecutionProvider'])
         self.acoustic = sess(d(cfg['acoustic']))
@@ -237,16 +237,20 @@ def sing_phrase(voice, notes, shift, steps, gender=0.0):
     f0 = (440 * 2 ** ((np.asarray(f0_midi, np.float32) - 69) / 12)).astype(np.float32)
     tokens = i64([voice.token(voice.ac_tokens, p) for p in names])
     feed = {'tokens': tokens, 'durations': i64(durs), 'f0': f0[None, :], 'gender': np.full((1, n_frames), gender, np.float32),
-        'velocity': np.ones((1, n_frames), np.float32), 'depth': np.array(voice.max_depth, np.int64),
-        'speedup': np.array(max(1, voice.max_depth // steps), np.int64), 'steps': np.array(steps, np.int64), 'languages': np.zeros_like(tokens),
+        'velocity': np.ones((1, n_frames), np.float32), 'depth': np.array(int(voice.max_depth), np.int64),
+        'speedup': np.array(max(1, int(voice.max_depth) // steps), np.int64), 'steps': np.array(steps, np.int64), 'languages': np.zeros_like(tokens),
         'key_shift': np.zeros((1, n_frames), np.float32), 'speed': np.ones((1, n_frames), np.float32),
         'energy': np.zeros((1, n_frames), np.float32), 'breathiness': np.zeros((1, n_frames), np.float32),
         'voicing': np.zeros((1, n_frames), np.float32), 'tension': np.zeros((1, n_frames), np.float32)}
     if voice.speaker is not None: feed['spk_embed'] = np.broadcast_to(voice.speaker, (1, n_frames, 256)).astype(np.float32)
-    wanted = {i.name for i in voice.acoustic.get_inputs()}
-    missing = wanted - set(feed)
+    types = {i.name: i.type for i in voice.acoustic.get_inputs()}
+    missing = set(types) - set(feed)
     if missing: raise SystemExit(f'El model acústic demana entrades desconegudes: {sorted(missing)}')
-    mel = voice.acoustic.run(None, {k: v for k, v in feed.items() if k in wanted})[0]
+    # Les versions noves de DiffSinger volen la profunditat com a fracció (0–1) i els passos a part.
+    if types.get('depth') == 'tensor(float)':
+        feed['depth'] = np.array(voice.max_depth / 1000 if voice.max_depth > 1 else voice.max_depth, np.float32)
+    cast = {'tensor(float)': np.float32, 'tensor(int64)': np.int64, 'tensor(bool)': bool}
+    mel = voice.acoustic.run(None, {k: np.asarray(feed[k]).astype(cast.get(t, np.asarray(feed[k]).dtype)) for k, t in types.items()})[0]
     wave = voice.vocoder.run(None, {'mel': mel, 'f0': f0[None, :]})[0][0]
     return start, wave.astype(np.float32)
 

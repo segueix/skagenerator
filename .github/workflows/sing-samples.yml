@@ -60,14 +60,17 @@ jobs:
           sleep 1
           node singing/export.cjs http://localhost:8000/ out --song singing/samples/all-is-well.json
       - name: Cantar les mostres
+        env:
+          SKIP_TIGER: '1'
         run: |
           mkdir -p mostres
           id=2026-11-12-jamaican-273377106
           sing() { name="$1"; shift; python singing/sing.py "$@" "out/$id.json" "out/$id.band.wav" "mostres/$name.mp3" || echo "FALLA $name"; }
-          # Megàfon: la cançó sencera, tal com va sonar (TIGER Vinyl).
-          sing "all-is-well-megafon" voice/tiger --speaker tiger_vinyl --fx megaphone
-          # Timbres de TIGER: els primers 45 s de la mateixa cançó.
-          for sp in vinyl fresh disco electric mystic falsetto cetera; do sing "tiger-$sp" voice/tiger --speaker "tiger_$sp" --limit 45; done
+          # Megàfon (cançó sencera) i timbres de TIGER (45 s). Es poden saltar amb SKIP_TIGER=1.
+          if [ -z "$SKIP_TIGER" ]; then
+            sing "all-is-well-megafon" voice/tiger --speaker tiger_vinyl --fx megaphone
+            for sp in vinyl fresh disco electric mystic falsetto cetera; do sing "tiger-$sp" voice/tiger --speaker "tiger_$sp" --limit 45; done
+          fi
           # Canary: tots els seus timbres.
           for sp in $(python - <<'PY'
           import glob, os, yaml
