@@ -123,6 +123,23 @@
     }
   }
 
+  function scoreLines(text, counts, vocalNotes, bpm) {
+    const names = String(text || '').split('\\n').map(l => l.trim()).filter(Boolean);
+    if (!Array.isArray(counts) || !Array.isArray(vocalNotes) || !Number.isFinite(bpm) || bpm <= 0) return [];
+    const notes = vocalNotes.slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
+    if (!names.length || names.length !== counts.length ||
+      counts.reduce((sum, n) => sum + n, 0) !== notes.length) return [];
+    let index = 0;
+    const beat = 60 / bpm;
+    return names.map((name, i) => {
+      const noteGroup = notes.slice(index, index + counts[i]).map(([bar, b, midi, dur]) => ({
+        at: (bar * 4 + b) * beat, dur: dur * beat, midi
+      }));
+      index += counts[i];
+      return { text: name, notes: noteGroup };
+    });
+  }
+
   // Un segment de veu parlada per síl·laba, ajustat a la durada i la nota musical.
   // És cant aproximat amb granulat: no és el model WORLD/Matxa que funciona en Python.
   function estimatePitch(samples, rate) {
@@ -270,5 +287,5 @@
   }
 
   return { PRESETS, ACCENTS, presetFor, renderPCM, estimatePitch, boundaries,
-    MatxaClient, createBrowserSinger, extractAudioUrl };
+    MatxaClient, createBrowserSinger, extractAudioUrl, scoreLines };
 });
