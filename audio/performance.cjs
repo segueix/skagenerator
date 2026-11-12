@@ -457,6 +457,27 @@ function createPerformance(spec) {
   }
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
+  // Una nota repetida (mateix canal i mateixa tecla) no pot encavalcar-se amb l'anterior:
+  // el final de l'anterior tallaria la nova just en començar (la trompeta sonava «trencada»).
+  // L'anterior s'acaba 4 ms abans que entri la nova.
+  const pending = new Map(), pairs = [];
+  for (const e of events) {
+    if (e.channel === 9 || e.channel === 10 || (e.type !== 'on' && e.type !== 'off')) continue;
+    const key = `${e.channel}:${e.note}`;
+    if (e.type === 'on') { const list = pending.get(key) || []; list.push(e); pending.set(key, list); }
+    else { const on = pending.get(key)?.shift(); if (on) pairs.push([key, on, e]); }
+  }
+  const byKey = new Map();
+  for (const [key, on, off] of pairs) (byKey.get(key) || byKey.set(key, []).get(key)).push([on, off]);
+  let moved = false;
+  for (const list of byKey.values()) {
+    list.sort((a, b) => a[0].time - b[0].time);
+    for (let i = 1; i < list.length; i++) {
+      const [prevOn, prevOff] = list[i - 1], [on] = list[i];
+      if (prevOff.time > on.time - .004) { prevOff.time = Math.max(prevOn.time + .01, on.time - .004); moved = true; }
+    }
+  }
+  if (moved) events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Alternança en ordre de temps (els cops fantasma també compten). La bateria no
   // fa cas de les notes off, així que només cal canviar la tecla de cada cop.
   for (const e of events) if (e.type === 'on' && e.channel === 9) e.note = take(e.note);

@@ -30,37 +30,63 @@ def emb(path):
     return np.fromfile(path, dtype=np.float32).reshape(256)
 
 class Voice:
-    def __init__(self, root, speaker='tiger_fresh'):
-        base = glob.glob(os.path.join(root, '**', 'dsconfig.yaml'), recursive=True)
-        base = min(base, key=len)
+    """Qualsevol veu DiffSinger en format OpenUtau (dsconfig.yaml, dsacoustic, dspitch, dsdict).
+    speaker: nom (o part del nom) d'un dels timbres de la veu; vocoder_dir: vocoder ONNX per a les
+    veus que no en porten (p. ex. el PC-NSF-HiFiGAN d'OpenVPI)."""
+    def __init__(self, root, speaker=None, vocoder_dir=None):
+        configs = [p for p in glob.glob(os.path.join(root, '**', 'dsconfig.yaml'), recursive=True)
+                   if 'acoustic' in (yaml.safe_load(open(p, encoding='utf-8')) or {})]
+        base = min(configs, key=len)
         self.dir = os.path.dirname(base)
         cfg = yaml.safe_load(open(base, encoding='utf-8'))
         d = lambda *p: os.path.join(self.dir, *p)
-        self.max_depth = int(cfg.get('max_depth', 400))
+        self.max_depth = float(cfg.get('max_depth', 400))
         so = ort.SessionOptions(); so.intra_op_num_threads = os.cpu_count() or 4
         sess = lambda p: ort.InferenceSession(p, so, providers=['CPUExecutionProvider'])
         self.acoustic = sess(d(cfg['acoustic']))
         self.ac_tokens = token_map(load_phonemes(d(cfg['phonemes'])))
-        self.speaker = emb(d('dsacoustic', f'{speaker}.emb'))
-        voc = yaml.safe_load(open(d('dsvocoder', 'vocoder.yaml'), encoding='utf-8'))
-        self.vocoder = sess(d('dsvocoder', voc['model']))
-        pcfg = yaml.safe_load(open(d('dspitch', 'dsconfig.yaml'), encoding='utf-8'))
-        self.pitch_ling = sess(d('dspitch', pcfg['linguistic']))
-        self.pitch = sess(d('dspitch', pcfg['pitch']))
-        self.pitch_tokens = token_map(load_phonemes(d('dspitch', pcfg['phonemes'])))
-        self.pitch_speaker = emb(d('dspitch', pcfg['speakers'][0] + '.emb'))
-        # Diccionari: símbols (amb el tipus: vocal, oclusiva…) i entrades paraula → fonemes.
-        dic = yaml.safe_load(open(d('dsdur', 'dsdict-en.yaml'), encoding='utf-8'))
+        self.speakers = [str(x) for x in cfg.get('speakers') or []]
+        chosen = next((x for x in self.speakers if speaker and speaker.lower() in os.path.basename(x).lower()), self.speakers[0] if self.speakers else None)
+        self.speaker_name = os.path.basename(chosen) if chosen else 'única'
+        self.speaker = emb(d(chosen + '.emb')) if chosen else None
+        # Vocoder: el de la veu (carpeta amb vocoder.yaml) o un d'extern.
+        voc_dir = d(str(cfg.get('vocoder', 'dsvocoder')))
+        if os.path.exists(os.path.join(voc_dir, 'vocoder.yaml')):
+            voc = yaml.safe_load(open(os.path.join(voc_dir, 'vocoder.yaml'), encoding='utf-8'))
+            self.vocoder = sess(os.path.join(voc_dir, voc['model']))
+        else:
+            models = glob.glob(os.path.join(vocoder_dir or '', '**', '*.onnx'), recursive=True)
+            if not models: raise SystemExit(f'La veu demana el vocoder «{cfg.get("vocoder")}» i no n\'hi ha cap a {vocoder_dir}')
+            self.vocoder = sess(models[0])
+        # Model d'entonació (opcional).
+        self.pitch = None
+        pitch_cfg = glob.glob(d('dspitch', 'dsconfig.yaml'))
+        if pitch_cfg:
+            pcfg = yaml.safe_load(open(pitch_cfg[0], encoding='utf-8'))
+            pd = lambda *p: os.path.join(self.dir, 'dspitch', *p)
+            self.pitch_ling = sess(pd(pcfg['linguistic']))
+            self.pitch = sess(pd(pcfg['pitch']))
+            self.pitch_tokens = token_map(load_phonemes(pd(pcfg['phonemes'])))
+            spk = [str(x) for x in pcfg.get('speakers') or []]
+            pick = next((x for x in spk if speaker and speaker.lower() in os.path.basename(x).lower()), spk[0] if spk else None)
+            self.pitch_speaker = emb(pd(pick + '.emb')) if pick else None
+        # Diccionari anglès: símbols (amb el tipus: vocal, oclusiva…) i entrades paraula → fonemes.
+        dicts = sorted(glob.glob(os.path.join(self.dir, '**', 'dsdict*.yaml'), recursive=True),
+                       key=lambda p: (0 if os.path.basename(p) == 'dsdict-en.yaml' else 1 if 'en' in os.path.basename(p) else 2, len(p)))
+        dic = yaml.safe_load(open(dicts[0], encoding='utf-8')) if dicts else {}
         self.vowels = {s['symbol'] for s in dic.get('symbols', []) if s.get('type') == 'vowel'} - {'AP', 'SP'}
+        if not self.vowels: self.vowels = {'aa', 'ae', 'ah', 'ao', 'aw', 'ax', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw'}
         self.words = {}
-        for e in dic.get('entries', []):
+        for e in dic.get('entries', []) or []:
             self.words.setdefault(str(e['grapheme']).lower(), e['phonemes'] if isinstance(e['phonemes'], list) else str(e['phonemes']).split())
         try:
             import cmudict
             self.cmu = cmudict.dict()
         except Exception:
             self.cmu = {}
-        print(f'Veu: {len(self.ac_tokens)} fonemes acústics, {len(self.vowels)} vocals, {len(self.words)} paraules al diccionari, CMU {len(self.cmu)}')
+        names = lambda m: [i.name for i in m.get_inputs()]
+        print(f'Veu {os.path.basename(self.dir)} · timbre {self.speaker_name} (de {len(self.speakers) or 1}) · {len(self.ac_tokens)} fonemes · '
+              f'diccionari {len(self.words)} paraules · entrades acústiques {names(self.acoustic)} · pitch {"sí" if self.pitch else "no"}')
 
     def token(self, table, p):
         for cand in (p, f'en/{p}', p.upper(), p.lower()):
@@ -175,7 +201,7 @@ def midi_curve(notes, start, n_frames, shift):
         curve[rest] = curve[nearest[rest]]
     return curve, rest
 
-def sing_phrase(voice, notes, shift, steps):
+def sing_phrase(voice, notes, shift, steps, gender=0.0):
     pad = .25
     segs = build_phrase(voice, notes, shift)
     start = min(s[1] for s in segs) - pad
@@ -194,22 +220,37 @@ def sing_phrase(voice, notes, shift, steps):
     note_midi.append(cur[0][0]); note_rest.append(cur[0][1]); note_dur.append(cur[1])
     i64 = lambda x: np.array([x], np.int64)
     try:
+        if voice.pitch is None: raise RuntimeError('la veu no té model de pitch')
         tokens = i64([voice.token(voice.pitch_tokens, p) for p in names])
-        enc, _ = voice.pitch_ling.run(None, {'tokens': tokens, 'ph_dur': i64(durs)})
-        f0_midi = voice.pitch.run(None, {
-            'encoder_out': enc, 'ph_dur': i64(durs), 'note_midi': np.array([note_midi], np.float32),
+        lwanted = {i.name for i in voice.pitch_ling.get_inputs()}
+        enc = voice.pitch_ling.run(None, {k: v for k, v in {'tokens': tokens, 'ph_dur': i64(durs), 'languages': np.zeros_like(tokens)}.items() if k in lwanted})[0]
+        if voice.pitch is None: raise RuntimeError('la veu no té model de pitch')
+        feed = {'encoder_out': enc, 'ph_dur': i64(durs), 'note_midi': np.array([note_midi], np.float32),
             'note_rest': np.array([note_rest], bool), 'note_dur': i64(note_dur), 'pitch': base[None, :],
-            'expr': np.ones((1, n_frames), np.float32), 'retake': np.ones((1, n_frames), bool),
-            'spk_embed': np.broadcast_to(voice.pitch_speaker, (1, n_frames, 256)).astype(np.float32), 'speedup': np.array(10, np.int64)})[0][0]
+            'expr': np.ones((1, n_frames), np.float32), 'retake': np.ones((1, n_frames), bool), 'speedup': np.array(10, np.int64), 'steps': np.array(10, np.int64)}
+        if voice.pitch_speaker is not None: feed['spk_embed'] = np.broadcast_to(voice.pitch_speaker, (1, n_frames, 256)).astype(np.float32)
+        wanted = {i.name for i in voice.pitch.get_inputs()}
+        f0_midi = voice.pitch.run(None, {k: v for k, v in feed.items() if k in wanted})[0][0]
     except Exception as error:
         print('  (pitch automàtic no disponible, corba pròpia):', str(error)[:200])
         f0_midi = signal.savgol_filter(base, 9, 2) + .15 * np.sin(np.arange(n_frames) / FPS * 2 * math.pi * 5.5) * np.clip((np.arange(n_frames) % 200) / 60 - .5, 0, 1)
     f0 = (440 * 2 ** ((np.asarray(f0_midi, np.float32) - 69) / 12)).astype(np.float32)
     tokens = i64([voice.token(voice.ac_tokens, p) for p in names])
-    mel = voice.acoustic.run(None, {
-        'tokens': tokens, 'durations': i64(durs), 'f0': f0[None, :], 'gender': np.zeros((1, n_frames), np.float32),
-        'velocity': np.ones((1, n_frames), np.float32), 'spk_embed': np.broadcast_to(voice.speaker, (1, n_frames, 256)).astype(np.float32),
-        'depth': np.array(voice.max_depth, np.int64), 'speedup': np.array(max(1, voice.max_depth // steps), np.int64)})[0]
+    feed = {'tokens': tokens, 'durations': i64(durs), 'f0': f0[None, :], 'gender': np.full((1, n_frames), gender, np.float32),
+        'velocity': np.ones((1, n_frames), np.float32), 'depth': np.array(int(voice.max_depth), np.int64),
+        'speedup': np.array(max(1, int(voice.max_depth) // steps), np.int64), 'steps': np.array(steps, np.int64), 'languages': np.zeros_like(tokens),
+        'key_shift': np.zeros((1, n_frames), np.float32), 'speed': np.ones((1, n_frames), np.float32),
+        'energy': np.zeros((1, n_frames), np.float32), 'breathiness': np.zeros((1, n_frames), np.float32),
+        'voicing': np.zeros((1, n_frames), np.float32), 'tension': np.zeros((1, n_frames), np.float32)}
+    if voice.speaker is not None: feed['spk_embed'] = np.broadcast_to(voice.speaker, (1, n_frames, 256)).astype(np.float32)
+    types = {i.name: i.type for i in voice.acoustic.get_inputs()}
+    missing = set(types) - set(feed)
+    if missing: raise SystemExit(f'El model acústic demana entrades desconegudes: {sorted(missing)}')
+    # Les versions noves de DiffSinger volen la profunditat com a fracció (0–1) i els passos a part.
+    if types.get('depth') == 'tensor(float)':
+        feed['depth'] = np.array(voice.max_depth / 1000 if voice.max_depth > 1 else voice.max_depth, np.float32)
+    cast = {'tensor(float)': np.float32, 'tensor(int64)': np.int64, 'tensor(bool)': bool}
+    mel = voice.acoustic.run(None, {k: np.asarray(feed[k]).astype(cast.get(t, np.asarray(feed[k]).dtype)) for k, t in types.items()})[0]
     wave = voice.vocoder.run(None, {'mel': mel, 'f0': f0[None, :]})[0][0]
     return start, wave.astype(np.float32)
 
@@ -236,7 +277,16 @@ def room(x):
     wet = signal.fftconvolve(x, ir)[:len(x)]
     return wet / (np.abs(ir).sum() ** .5 * 6 + 1e-9)
 
-def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40):
+def megaphone(x):
+    """Megàfon: només els mitjos (500–3.200 Hz), saturació i la ressonància de la botzina."""
+    rms = math.sqrt(float(np.mean(x ** 2)) + 1e-12)
+    y = signal.sosfilt(signal.butter(4, [500, 3200], 'band', fs=RATE, output='sos'), x)
+    y = np.tanh(y / (float(np.abs(y).max()) + 1e-9) * 3.5)
+    y = y + .7 * signal.sosfilt(signal.butter(2, [1500, 1900], 'band', fs=RATE, output='sos'), y)
+    y = signal.sosfilt(signal.butter(2, [450, 3600], 'band', fs=RATE, output='sos'), y)
+    return (y * rms / (math.sqrt(float(np.mean(y ** 2))) + 1e-12)).astype(np.float32)
+
+def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, vocoder_dir=None, limit=None, fx=None, gender=0.0):
     score = json.load(open(score_path, encoding='utf-8'))
     band, rate = sf.read(band_path, dtype='float32', always_2d=True)
     assert rate == RATE
@@ -246,11 +296,14 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40):
     median = float(np.median([n['midi'] for n in notes]))
     shift = -12 if median > 60 else 0
     speaker = speaker or {'rocksteady': 'tiger_vinyl', 'bossreggae': 'tiger_vinyl', 'jamaican': 'tiger_vinyl', 'poppunk': 'tiger_electric'}.get(score.get('subgenre'), 'tiger_fresh')
-    voice = Voice(voice_dir, speaker)
+    voice = Voice(voice_dir, speaker, vocoder_dir)
+    if limit:
+        notes = [n for n in notes if n['t'] < limit]
+        band = band[:int((limit + 3) * RATE)]
     vocal = np.zeros(len(band) + RATE * 2, np.float32)
     started = time.time()
     for k, phrase in enumerate(plan_phrases(notes)):
-        start, wave = sing_phrase(voice, phrase, shift, steps)
+        start, wave = sing_phrase(voice, phrase, shift, steps, gender)
         a = int(round(start * RATE))
         if a < 0: wave = wave[-a:]; a = 0
         end = min(len(vocal), a + len(wave))
@@ -259,18 +312,28 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40):
         w = wave[:end - a].copy(); w[:fade] *= np.linspace(0, 1, fade); w[-fade:] *= np.linspace(1, 0, fade)
         vocal[a:end] += w
         print(f'  frase {k + 1}: {len(phrase)} síl·labes, {len(wave) / RATE:.1f} s')
-    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {speaker})')
+    print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {voice.speaker_name})')
     vocal = vocal[:len(band)]
     vocal = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), vocal)
     vocal = compress(vocal)
-    # Nivell: la veu uns 2 dB per sota de la banda als trams on canta.
+    if fx == 'megaphone': vocal = megaphone(vocal)
+    # Nivell: es compara als mitjos (300–4.000 Hz), on s'entén la veu i on el baix no infla la
+    # mesura. La veu queda 5 dB per sobre de la banda en aquesta zona.
+    mids = lambda x: signal.sosfilt(signal.butter(4, [300, 4000], 'band', fs=RATE, output='sos'), x, axis=0)
     sung = np.abs(vocal) > 1e-3
     if sung.any():
-        vr = math.sqrt(float(np.mean(vocal[sung] ** 2))); br = math.sqrt(float(np.mean(band[sung] ** 2)) + 1e-12)
-        vocal *= (br * 10 ** (-1 / 20)) / (vr + 1e-9)
-    wet = room(vocal) * .9
+        vr = math.sqrt(float(np.mean(mids(vocal)[sung] ** 2))); br = math.sqrt(float(np.mean(mids(band.mean(1))[sung] ** 2)) + 1e-12)
+        vocal *= (br * 10 ** (5 / 20)) / (vr + 1e-9)
+    # Mentre canta la veu, els greus de la banda (baix i bombo per sota de 250 Hz) baixen 4 dB.
+    env = signal.sosfiltfilt(signal.butter(1, 4, 'low', fs=RATE, output='sos'), (np.abs(vocal) > 2e-3).astype(np.float32))
+    duck = (1 - (1 - 10 ** (-4 / 20)) * np.clip(env * 1.5, 0, 1)).astype(np.float32)
+    low = signal.sosfiltfilt(signal.butter(4, 250, 'low', fs=RATE, output='sos'), band, axis=0).astype(np.float32)
+    band = band - low + low * duck[:, None]
+    wet = room(vocal) * (.35 if fx == 'megaphone' else .9)
     mix = band.copy()
     mix[:, 0] += vocal + wet * .9; mix[:, 1] += vocal + wet * 1.1
+    if limit:  # tros de mostra: fos de sortida als 2 últims segons
+        fade = min(len(mix), 2 * RATE); mix[-fade:] *= np.linspace(1, 0, fade)[:, None]
     peak = float(np.abs(mix).max())
     if peak > .97: mix *= .97 / peak
     base = os.path.splitext(out_path)[0]
@@ -280,4 +343,14 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40):
     os.remove(base + '.wav')
 
 if __name__ == '__main__':
-    main(*sys.argv[1:5])
+    import argparse
+    ap = argparse.ArgumentParser(description='Fa cantar una partitura amb una veu DiffSinger i la mescla amb la banda.')
+    ap.add_argument('voice'); ap.add_argument('score'); ap.add_argument('band'); ap.add_argument('out')
+    ap.add_argument('--speaker', help='timbre de la veu (nom o part del nom)')
+    ap.add_argument('--vocoder', help='carpeta amb un vocoder ONNX per a veus que no en porten')
+    ap.add_argument('--limit', type=float, help='només els primers N segons (mostres)')
+    ap.add_argument('--fx', choices=['megaphone'], help='efecte de la veu')
+    ap.add_argument('--gender', type=float, default=0.0, help='-1 més greu … +1 més aguda (si el model ho admet)')
+    ap.add_argument('--steps', type=int, default=40)
+    a = ap.parse_args()
+    main(a.voice, a.score, a.band, a.out, a.speaker, a.steps, a.vocoder, a.limit, a.fx, a.gender)
