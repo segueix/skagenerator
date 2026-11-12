@@ -339,16 +339,25 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
         notes = [n for n in notes if n['t'] < limit]
         band = band[:int((limit + 3) * RATE)]
     vocal = np.zeros(len(band) + RATE * 2, np.float32)
-    started = time.time()
-    for k, phrase in enumerate([] if external_vocal else phrases(notes)):
-        start, wave = sing_one(phrase)
+    # Cors a la tornada (només amb Matxa): altres veus canten la mateixa lletra, una a cada banda.
+    choir_names = [v for v in os.environ.get('MATXA_CHOIR', 'pere,quim').split(',') if v] if matxa and not external_vocal else []
+    choir = [np.zeros(len(vocal), np.float32) for _ in choir_names]
+    choir_singers = [speech2sing.MatxaSinger(v, cache=singer.cache) for v in choir_names]
+    def lay(target, start, wave):
         a = int(round(start * RATE))
         if a < 0: wave = wave[-a:]; a = 0
-        end = min(len(vocal), a + len(wave))
+        end = min(len(target), a + len(wave))
         # Fos curt als extrems de cada frase per evitar clics.
         fade = min(256, len(wave) // 4)
         w = wave[:end - a].copy(); w[:fade] *= np.linspace(0, 1, fade); w[-fade:] *= np.linspace(1, 0, fade)
-        vocal[a:end] += w
+        target[a:end] += w
+    started = time.time()
+    for k, phrase in enumerate([] if external_vocal else phrases(notes)):
+        start, wave = sing_one(phrase)
+        lay(vocal, start, wave)
+        if choir_names and phrase[0].get('section') == 'chorus':
+            for buf, other in zip(choir, choir_singers):
+                lay(buf, *other._sing_take(phrase, 12 * round((other.note - median) / 12), catalan.syllables, 0))
         print(f'  frase {k + 1}: {len(phrase)} síl·labes, {len(wave) / RATE:.1f} s')
     print(f'Veu feta en {time.time() - started:.0f} s (to {shift:+d}, timbre {speaker if (voicebank or matxa or external_vocal) else voice.speaker_name})')
     vocal = vocal[:len(band)]
@@ -370,7 +379,16 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     sung = np.abs(vocal) > 1e-3
     if sung.any():
         vr = math.sqrt(float(np.mean(mids(vocal)[sung] ** 2))); br = math.sqrt(float(np.mean(mids(band.mean(1))[sung] ** 2)) + 1e-12)
-        vocal *= (br * 10 ** (5 / 20)) / (vr + 1e-9)
+        scale_v = (br * 10 ** (5 / 20)) / (vr + 1e-9)
+        vocal *= scale_v
+        # Cors: cada veu al nivell de la principal menys 7 dB (es compara el volum de cada una).
+        for c in range(len(choir)):
+            cv = signal.sosfilt(signal.butter(2, 110, 'high', fs=RATE, output='sos'), choir[c][:len(band)])
+            on = np.abs(cv) > 1e-3
+            if on.any():
+                cr = math.sqrt(float(np.mean(mids(cv)[on] ** 2)) + 1e-12)
+                cv *= (br * 10 ** (5 / 20)) * 10 ** (-7 / 20) / cr
+            choir[c] = cv.astype(np.float32)
     # Mentre canta la veu, els greus de la banda (baix i bombo per sota de 250 Hz) baixen 4 dB.
     env = signal.sosfiltfilt(signal.butter(1, 4, 'low', fs=RATE, output='sos'), (np.abs(vocal) > 2e-3).astype(np.float32))
     duck = (1 - (1 - 10 ** (-4 / 20)) * np.clip(env * 1.5, 0, 1)).astype(np.float32)
@@ -379,6 +397,9 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     wet = room(vocal) * float(os.environ.get('VOCAL_WET', .35 if fx == 'megaphone' else .9))
     mix = band.copy()
     mix[:, 0] += vocal + wet * .9; mix[:, 1] += vocal + wet * 1.1
+    for c, cv in enumerate(choir):
+        cw = room(cv) * .9
+        mix[:, c % 2] += (cv + cw)[:len(mix)] * .95; mix[:, 1 - c % 2] += (cv + cw)[:len(mix)] * .35
     if os.environ.get('VOCAL_DOUBLE', '1' if matxa else '0') == '1':
         # Veu doblada, com als discos de punk i ska: dues còpies a banda i banda, uns mil·lisegons tard i amb
         # l'afinació que es mou molt lentament (retard variable), 8 dB per sota de la veu principal.

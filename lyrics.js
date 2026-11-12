@@ -54,15 +54,15 @@
   // Català: mateixa estructura (famílies de rima; versos de 5 a 9 síl·labes comptades com l'app).
   const POOLS_CA = {
     ska: [
-      { hooks: ["Ballem a la ciutat", "Ningú no s'ha cansat"], lines: ["el barri s'ha despertat", "el ritme ens ha atrapat", "la trompeta ha començat", "dissabte ja ha arribat", "el sol ja s'ha amagat"] },
+      { hooks: ["Ballem a la ciutat", "Ningú no s'ha cansat"], lines: ["el barri s'ha despertat", "el ritme s'ha quedat", "les trompetes han sonat", "dissabte tan esperat", "el sol ja s'ha colgat"] },
       { hooks: ["Vine a ballar", "A la vora del mar"], lines: ["ningú no vol parar", "la nit no ha d'acabar", "el baix comença a sonar", "ens tornem a trobar", "deixa la feina per demà"] },
       { hooks: ["Fins que surti el sol", "Ballem sota el sol"], lines: ["tothom balla com vol", "ningú no està tot sol", "les sabates de xarol", "el cel és un llençol"] },
       { hooks: ["A contratemps", "Tota la gent"], lines: ["la plaça plena de gent", "la música dins del vent", "ballem tots en un moment", "el món sembla diferent"] },
       { hooks: ["Festa tot el dia", "Quina alegria"], lines: ["la banda fa harmonia", "la nit sembla un nou dia", "som una gran companyia", "ningú no se n'aniria"] },
-      { hooks: ["Ritme i calor", "Amb tot el cor"], lines: ["la plaça bull de calor", "la trompeta i el tambor", "la nit fa olor de flor", "ballem amb tot el cor"] }
+      { hooks: ["Ritme i calor", "Amb tot el cor"], lines: ["la plaça bull de calor", "trompetes i tambor", "la nit fa olor de flor", "ballem amb tot el cor"] }
     ],
     punk: [
-      { hooks: ["Ens volen fer callar", "Tot ho farem petar"], lines: ["no ens deixaran parlar", "el barri vol cridar", "res no ens farà aturar", "tornem a començar"] },
+      { hooks: ["Ens volen fer callar", "Tot ho farem petar"], lines: ["no volen deixar parlar", "el barri vol cridar", "mai no podran guanyar", "tornem a començar"] },
       { hooks: ["Volem llibertat", "Ningú ens ha comprat"], lines: ["ens han tancat la ciutat", "el lloguer s'ha disparat", "el silenci s'ha trencat", "som el barri revoltat"] },
       { hooks: ["Som la gent", "Contra el vent"], lines: ["la tele sempre ens ment", "ningú no és innocent", "cridem tots al mateix temps", "la ràbia creix lentament"] },
       { hooks: ["Sense sortida", "És la nostra vida"], lines: ["la ràbia no s'oblida", "el carrer és una ferida", "la lluita està decidida", "la nit és una crida"] },
@@ -106,10 +106,15 @@
     const used = new Set();
     // Un vers que encara no ha sortit: de la família demanada o, si ja s'ha gastat, d'una altra.
     const unused = family => family.lines.filter(line => !used.has(line));
+    // Xocs de vocals entre paraules («la trompeta escalfa»): cantats es fonen i s'entenen pitjor.
+    const clashes = line => { const w = line.toLowerCase().replace(/[’']/g, ' ').split(/\s+/); let c = 0;
+      for (let i = 0; i + 1 < w.length; i++) if ('aeiouàèéíïòóú'.includes(w[i].at(-1)) && 'aeiouàèéíïòóúüh'.includes(w[i + 1][0])) c++; return c; };
+    // Tria un vers: els que no tenen cap xoc de vocals surten tres vegades més sovint.
+    const choose = list => { const best = list.filter(line => !clashes(line)); return pick(best.length && r() < .75 ? best : list); };
     const fresh = family => {
       let left = unused(family);
       if (!left.length) { const other = families.filter(f => f !== chorusFamily && unused(f).length); left = other.length ? unused(pick(other)) : family.lines; }
-      const line = pick(left); used.add(line); return line;
+      const line = choose(left); used.add(line); return line;
     };
     // La tornada: una família pròpia amb el seu hook.
     const chorusFamily = pick(families), hook = pick(chorusFamily.hooks);
@@ -139,7 +144,8 @@
           const family = i % 4 < 2 ? a : b;
           if (!wide) { lines.push(fresh(family)); continue; }
           const filler = pick(families.filter(f => f !== family && f !== chorusFamily && unused(f).length).concat([b === family ? a : b]));
-          lines.push(`${fresh(filler)}, ${fresh(family)}`);
+          // En català (es canta amb veu sintètica) un sol vers per frase llarga: les síl·labes tenen més temps.
+          lines.push(lang === 'ca' ? fresh(family) : `${fresh(filler)}, ${fresh(family)}`);
         }
         return { text: lines.map(capital).join('\n'), phraseBars };
       };
