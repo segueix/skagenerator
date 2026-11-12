@@ -84,7 +84,7 @@ jobs:
             case "$score" in *.meta.json) continue ;; esac
             base="${score%.json}"; name=$(basename "$base")
             # 1. Matxa canta (veu Grau) i es desa la veu seca.
-            VOCAL_DRY=1 python singing/sing.py none "$score" "$base.band.wav" "out/$name-matxa.mp3" --matxa grau --fx megaphone
+            VOCAL_DRY=1 python singing/sing.py none "$score" "$base.band.wav" "out/$name-matxa.mp3" --matxa grau
             [ -f singing/samples/veu-referencia.wav ] || continue
             # 2. Seed-VC la converteix al timbre de la referència (mantenint la melodia).
             (cd seedvc && python inference.py --source "../out/$name-matxa.dry.wav" --target ../singing/samples/veu-referencia.wav \
