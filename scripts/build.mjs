@@ -18,6 +18,9 @@ client = client.replace(/sample-worker\.js\?v=[^']+/, `sample-worker.js?v=${awai
 client = client.replace(/generaluser-ska-punk\.sf2\?v=[^']+/, `generaluser-ska-punk.sf2?v=${await hash('assets/generaluser-ska-punk.sf2')}`);
 client = client.replace(/extra-instruments\.sf2\?v=[^']+/, `extra-instruments.sf2?v=${await hash('assets/extra-instruments.sf2')}`);
 await writeFile('dist/sample-audio.js', client);
+let singer = await readFile('dist/browser-singing.js', 'utf8');
+singer = singer.replaceAll('browser-singing-worker.js', `browser-singing-worker.js?v=${await hash('browser-singing-worker.js')}`);
+await writeFile('dist/browser-singing.js', singer);
 let html = await readFile('dist/index.html', 'utf8');
 for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'browser-singing.js'])
   html = html.replaceAll(`"${file}"`, `"${file}?v=${await hash(file)}` + '"');
