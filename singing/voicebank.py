@@ -121,86 +121,195 @@ def frames_between(u, a, b):
     return u.sp[a:b], u.ap[a:b], u.f0[a:b]
 
 def stretch(u, length):
-    """Vocal estable de `length` frames: s'estira fins a 3 vegades i, si cal més, es fa anar i tornar."""
-    idx = np.arange(u.s0, u.s1)
-    if length <= 0 or len(idx) == 0: return np.zeros(0, int)
-    if length <= 3 * len(idx): return idx[np.clip(np.round(np.linspace(0, len(idx) - 1, length)).astype(int), 0, len(idx) - 1)]
-    cycle = np.concatenate([idx, idx[::-1]])
-    return cycle[np.arange(length) % len(cycle)]
+    """Vocal estable de `length` fotogrames: s'estira de manera contínua sobre tota la part estable
+    (índexs fraccionaris, interpolats en col·locar-los). Si cal molt més, va i torna a poc a poc."""
+    lo, hi = u.s0, max(u.s0 + 1, u.s1 - 1)
+    if length <= 0: return np.zeros(0)
+    span = hi - lo
+    if length <= 3 * max(1, span): return np.linspace(lo, hi, length)
+    # Molt llarga: anada i tornada lenta (cada passada dura 3 vegades la gravació).
+    period = 2 * 3 * span
+    phase = (np.arange(length) % period) / period
+    return lo + span * (1 - np.abs(1 - 2 * phase))
+
+# Durada típica de cada consonant (s): garanteix que no quedi reduïda a res quan la detecció
+# automàtica no troba el límit amb la vocal (sobretot amb les consonants sonores: m, n, l…).
+CONS_SECONDS = {'p': .07, 't': .07, 'k': .07, 'b': .06, 'd': .06, 'g': .06, 'f': .11, 's': .12, 'z': .1, 'S': .12, 'Z': .1,
+                'tS': .11, 'dZ': .1, 'm': .08, 'n': .08, 'J': .1, 'l': .08, 'L': .1, 'r': .09, 'R': .035, 'j': .06, 'w': .06}
+import os
+CONS_BOOST = 10 ** (float(os.environ.get('VB_CONS_DB', 3)) / 10)   # +3 dB a les consonants: s'entenen millor dins de la banda
+
+def onset_frames(u, cons):
+    """Índexs de la consonant d'inici d'una gravació CV/CCV (fins on comença la vocal)."""
+    need = int(round(sum(CONS_SECONDS.get(c, .07) for c in cons) * FPS))
+    v0 = max(u.v0, min(u.v1 - 8, u.start + need))
+    c0 = max(u.start, v0 - int(.22 * FPS))
+    return np.arange(c0, v0), v0
+
+def coda_frames(u, cons):
+    """Índexs del final d'una gravació VC: 30 ms de transició des de la vocal i la consonant."""
+    need = int(round(CONS_SECONDS.get(cons, .08) * FPS))
+    c1 = u.end
+    c0 = max(u.s0 + 4, min(u.v1, c1 - need))
+    return np.arange(max(u.s0, c0 - 6), c1)
+
+def squeeze(idx, length):
+    """Escurça (o allarga una mica) una seqüència de fotogrames a `length` fotogrames."""
+    if length <= 0 or not len(idx): return idx[:0]
+    if length >= len(idx): return idx
+    return idx[np.round(np.linspace(0, len(idx) - 1, length)).astype(int)]
+
+# Consonants sordes fabricades: soroll amb l'espectre de cada consonant (en la mateixa escala de potència
+# que la vocal de la síl·laba). Fricatives: [banda baixa, banda alta, fracció de potència, fotogrames].
+# Oclusives: tancament (silenci), explosió curta i aspiració.
+SYNTH = {'s': ('fric', 4500, 10500, .14, 20), 'S': ('fric', 2000, 6500, .16, 22), 'f': ('fric', 1200, 9000, .035, 18),
+         'tS': ('aff', 2000, 6500, .16, 14), 't': ('stop', 3000, 8000, .35, 0), 'k': ('stop', 1500, 4500, .3, 0), 'p': ('stop', 500, 3000, .15, 0)}
+
+def power_of(u):
+    return float(np.mean(np.sum(u.sp[u.s0:u.s1], axis=1))) if u.s1 > u.s0 else float(np.mean(np.sum(u.sp, axis=1)))
+
+def band(bins, lo, hi):
+    f = np.linspace(1, RATE / 2, bins)
+    centre, width = math.sqrt(lo * hi), math.log(hi / lo) / 3
+    shape = np.exp(-.5 * ((np.log(f) - math.log(centre)) / width) ** 2) + 1e-4
+    return shape / shape.sum()
+
+def synth(c, bins, ref, where):
+    kind, lo, hi, frac, frames = SYNTH[c]
+    rows = []
+    if kind in ('stop', 'aff'):
+        rows += [np.full(bins, 1e-12)] * (6 if where == 'coda' else 8)          # tancament
+    if kind == 'stop':
+        shape = band(bins, lo, hi)
+        rows += [shape * ref * frac] * 2                                         # explosió
+        asp = band(bins, lo * .8, hi * 1.2)
+        rows += [asp * ref * frac * .25 * (1 - k / 5) for k in range(2 if where == 'coda' else 4)]  # aspiració
+    else:
+        shape = band(bins, lo, hi)
+        env = np.sin(np.linspace(0, math.pi, frames)) ** .5
+        rows += [shape * ref * frac * e + 1e-12 for e in env]
+    sp = np.array(rows) + 1e-12
+    return sp, np.ones_like(sp), np.zeros(len(sp), bool)
+
+def take(u, idx, boost=1.0):
+    """Fotogrames d'una gravació (índexs fraccionaris interpolats; l'espectre, en logaritme)."""
+    idx = np.asarray(idx, float)
+    if not len(idx): return np.zeros((0, u.sp.shape[1])), np.zeros((0, u.sp.shape[1])), np.zeros(0, bool)
+    i0 = np.clip(np.floor(idx).astype(int), 0, len(u.sp) - 1); i1 = np.minimum(i0 + 1, len(u.sp) - 1)
+    w = (idx - np.floor(idx))[:, None]
+    sp = np.exp(np.log(u.sp[i0]) * (1 - w) + np.log(u.sp[i1]) * w) * boost
+    ap = u.ap[i0] * (1 - w) + u.ap[i1] * w
+    return sp, ap, u.f0[np.rint(idx).astype(int).clip(0, len(u.f0) - 1)] > 0
+
+def join(segs, bins):
+    if not segs: return np.zeros((0, bins)), np.zeros((0, bins)), np.zeros(0, bool)
+    return tuple(np.concatenate([s[k] for s in segs]) for k in range(3))
+
+def squeeze_seg(seg, length):
+    n = len(seg[0])
+    if length >= n: return seg
+    if length <= 0: return tuple(a[:0] for a in seg)
+    idx = np.round(np.linspace(0, n - 1, length)).astype(int)
+    return tuple(a[idx] for a in seg)
 
 def sing_phrase(bank, notes, shift, syllables_of):
     """Notes d'una frase → (inici en segons, ona). syllables_of(paraula) → [(inici, vocal, final)] de catalan.py."""
-    # Paraules: notes consecutives de la mateixa paraula; cada nota rep les seves síl·labes.
+    # 1. Síl·labes amb les seves notes (una síl·laba pot ocupar diverses notes: melisma).
     words, i = [], 0
     while i < len(notes):
         group = [notes[i]]; i += 1
         while i < len(notes) and notes[i]['syllable'] > 0 and notes[i]['word'] == group[0]['word']:
             group.append(notes[i]); i += 1
         words.append(group)
-    plan = []  # (nota, [síl·labes convertides]); [] = melisma
+    sylls = []   # {onset, vowel, coda, notes:[...], a, b}
     for group in words:
-        sylls = [convert(*s) for s in syllables_of(group[0]['word'])]
-        per = [[s] for s in sylls[:len(group)]]
-        for extra in sylls[len(group):]: per[-1].append(extra)
+        parts = [convert(*x) for x in syllables_of(group[0]['word'])]
+        per = [[x] for x in parts[:len(group)]]
+        for extra in parts[len(group):]: per[-1].append(extra)
         while len(per) < len(group): per.append([])
-        plan.extend(zip(group, per))
-    start = plan[0][0]['t'] - .35
-    end = max(n['t'] + n['d'] for n, _ in plan) + .25
+        for note, ps in zip(group, per):
+            if not ps:
+                if sylls: sylls[-1]['notes'].append(note)
+                continue
+            for k, (onset, vowel, coda) in enumerate(ps):
+                share = note['d'] / len(ps)
+                sylls.append({'onset': onset, 'vowel': vowel, 'coda': coda, 'notes': [dict(note, t=note['t'] + k * share, d=share)]})
+    if not sylls: return 0.0, np.zeros(1, np.float32)
+    start = sylls[0]['notes'][0]['t'] - .4
+    end = max(n['t'] + n['d'] for x in sylls for n in x['notes']) + .3
     total = int(math.ceil((end - start) * FPS))
-    bins = bank.unit(next(iter(bank.files))).sp.shape[1]
-    SP = np.full((total, bins), 1e-12); AP = np.ones((total, bins)); F0 = np.zeros(total)
-    target = np.zeros(total)             # nota (midi) de cada frame, per a l'entonació
-    filled = np.zeros(total, bool)
-    def place(at, sp, ap, f0, midi, unit, fade=3):
-        n = min(len(sp), total - at)
+    fr = lambda t: int(round((t - start) * FPS))
+    # 2. Peces de cada síl·laba. Les consonants sordes (s, x, f, t, k, p, tx) es fabriquen: a les gravacions
+    #    de síl·labes soltes gairebé no hi són. Les sonores (l, m, n, r, b…) surten de la gravació.
+    bins = next(u for u in (bank.onset_unit(x['onset'], x['vowel']) or bank.find('V', None, x['vowel']) for x in sylls) if u is not None).sp.shape[1]
+    for x in sylls:
+        x['a'] = fr(x['notes'][0]['t']); x['b'] = fr(x['notes'][-1]['t'] + x['notes'][-1]['d'])
+        src = bank.onset_unit(x['onset'], x['vowel'])
+        x['src'] = src; x['vsrc'] = src or bank.find('V', None, x['vowel'])
+        ref = power_of(x['vsrc']) if x['vsrc'] is not None else 1e-6
+        syn, rest = [], list(x['onset'])
+        while rest and rest[0] in SYNTH: syn.append(rest.pop(0))
+        segs = [synth(c, bins, ref, 'onset') for c in syn]
+        if src is not None and rest:
+            idx, x['v0'] = onset_frames(src, rest)
+            segs.append(take(src, idx, CONS_BOOST))
+        else:
+            x['v0'] = x['vsrc'].v0 if x['vsrc'] is not None else 0
+        x['on'] = join(segs, bins)
+        x['tails'] = []
+        for c in x['coda']:
+            if c in SYNTH: x['tails'].append(synth(c, bins, ref, 'coda')); continue
+            u = bank.find('VC', c, x['vowel'])
+            if u is not None: x['tails'].append(take(u, coda_frames(u, c), CONS_BOOST))
+    seglen = lambda seg: len(seg[0])
+    # 3. Temps: la vocal comença a la nota; la consonant d'inici just abans; el final de la síl·laba i la
+    #    consonant de la següent es reparteixen el temps entre una vocal i l'altra (abans es trepitjaven).
+    for k, x in enumerate(sylls):
+        nxt = sylls[k + 1] if k + 1 < len(sylls) else None
+        limit = x['b']
+        if nxt is not None and nxt['a'] - x['b'] < int(.15 * FPS):
+            limit = min(limit, nxt['a'] - seglen(nxt['on']))
+        coda_len = sum(seglen(t) for t in x['tails'])
+        room = limit - x['a']
+        min_vowel = max(4, int((x['b'] - x['a']) * .35))
+        if coda_len and room - coda_len < min_vowel:
+            scale = max(0.0, (room - min_vowel) / coda_len)
+            x['tails'] = [squeeze_seg(t, int(seglen(t) * scale)) for t in x['tails']]
+            coda_len = sum(seglen(t) for t in x['tails'])
+        x['vend'] = max(x['a'] + 1, limit - coda_len)
+        # La consonant d'inici no pot començar abans que acabi la síl·laba anterior.
+        prev_end = sylls[k - 1]['vend'] + sum(seglen(t) for t in sylls[k - 1]['tails']) if k else 0
+        room_on = x['a'] - max(prev_end, 0)
+        if seglen(x['on']) > room_on: x['on'] = squeeze_seg(x['on'], max(0, room_on))
+    # 4. Paràmetres WORLD de la frase.
+    SP = np.full((total, bins), 1e-12); AP = np.ones((total, bins)); VOICED = np.zeros(total, bool)
+    target = np.zeros(total); filled = np.zeros(total, bool)
+    def place(at, seg, midi, fade=4):
+        sp, ap, voiced = seg; n = min(len(sp), total - at)
         if n <= 0 or at < 0: return
-        sl = slice(at, at + n)
-        w = np.ones(n)
-        k = min(fade, n)
-        overlap = filled[sl].copy()
-        if overlap[:k].any(): w[:k] = np.linspace(0, 1, k + 2)[1:-1]
-        lsp = np.log(SP[sl]); lap = AP[sl]
-        SP[sl] = np.exp(lsp * (1 - w[:, None]) + np.log(sp[:n]) * w[:, None])
-        AP[sl] = lap * (1 - w[:, None]) + ap[:n] * w[:, None]
-        # f0 de la gravació (relatiu a la nota on es va cantar): conserva què és sonor i què no.
-        F0[sl] = np.where(w > .5, f0[:n] > 0, F0[sl] > 0)
+        sl = slice(at, at + n); w = np.ones(n); k = min(fade, n)
+        if filled[sl][:k].any(): w[:k] = np.linspace(0, 1, k + 2)[1:-1]
+        SP[sl] = np.exp(np.log(SP[sl]) * (1 - w[:, None]) + np.log(sp[:n]) * w[:, None])
+        AP[sl] = AP[sl] * (1 - w[:, None]) + ap[:n] * w[:, None]
+        VOICED[sl] = np.where(w > .5, voiced[:n], VOICED[sl])
         target[sl] = midi; filled[sl] = True
-    prev_vowel_unit = None
-    for note, parts in plan:
-        midi = note['midi'] + shift
-        a = int(round((note['t'] - start) * FPS)); b = int(round((note['t'] + note['d'] - start) * FPS))
-        if not parts:  # melisma: la vocal anterior continua a la nota nova
-            if prev_vowel_unit:
-                idx = stretch(prev_vowel_unit, b - a)
-                place(a, prev_vowel_unit.sp[idx], prev_vowel_unit.ap[idx], prev_vowel_unit.f0[idx], midi, prev_vowel_unit)
-            continue
-        slot = max(1, (b - a) // len(parts))
-        for k, (onset, vowel, coda) in enumerate(parts):
-            va, vb = a + k * slot, a + (k + 1) * slot if k < len(parts) - 1 else b
-            src = bank.onset_unit(onset, vowel)
-            vsrc = src or bank.find('V', None, vowel)
-            if vsrc is None: continue
-            # Consonants finals: el tros final de la síl·laba VC (com a molt el 40 % de la nota).
-            tails = []
-            for c in coda:
-                u = bank.find('VC', c, vowel)
-                if u is not None and u.end > u.v1: tails.append((u, u.v1, u.end))
-            coda_len = min(sum(e - s for _, s, e in tails), int((vb - va) * .4))
-            # Inici: consonant(s) abans de la nota (com a molt 180 ms).
-            if src is not None:
-                c0 = max(src.start, src.v0 - int(.18 * FPS))
-                place(va - (src.v0 - c0), *frames_between(src, c0, src.v0), midi, src)
-            # Vocal: transició des de la consonant i després la part estable.
-            length = max(1, vb - va - coda_len)
-            head = list(range(vsrc.v0, min(vsrc.s0, vsrc.v0 + length)))
-            idx = np.concatenate([np.array(head, int), stretch(vsrc, length - len(head))])
-            place(va, vsrc.sp[idx], vsrc.ap[idx], vsrc.f0[idx], midi, vsrc)
-            prev_vowel_unit = vsrc
-            at = va + length
-            for u, s, e in tails:
-                n = min(e - s, max(0, coda_len - (at - (va + length))))
-                place(at, *frames_between(u, s, s + n), midi, u); at += n
-    # Entonació: la melodia amb vibrato suau a les notes llargues i portament de 40 ms entre notes.
+    for x in sylls:
+        midi0 = x['notes'][0]['midi'] + shift
+        if seglen(x['on']): place(x['a'] - seglen(x['on']), x['on'], midi0)
+        u = x['vsrc']
+        if u is None: continue
+        length = x['vend'] - x['a']
+        head = np.arange(x['v0'], min(u.s0, x['v0'] + length))
+        idx = np.concatenate([head.astype(float), stretch(u, length - len(head))])
+        place(x['a'], take(u, idx), midi0)
+        # Melisma: la mateixa vocal canvia de nota.
+        for n in x['notes'][1:]:
+            a = fr(n['t']); target[a:min(x['vend'], fr(n['t'] + n['d']))] = n['midi'] + shift
+        at = x['vend']
+        last = x['notes'][-1]['midi'] + shift
+        for tail in x['tails']:
+            place(at, tail, last, fade=6); at += seglen(tail)
+    # 5. Entonació: la melodia amb vibrato suau a les notes llargues i portament de 40 ms entre notes.
     semis = np.zeros(total); prev, run = None, 0
     for f in range(total):
         if not filled[f]: prev, run = None, 0; continue
@@ -211,6 +320,6 @@ def sing_phrase(bank, notes, shift, syllables_of):
     kernel = np.ones(8) / 8
     inside = np.convolve(filled.astype(float), kernel, mode='same') > .99
     semis = np.where(inside, np.convolve(semis, kernel, mode='same'), semis)
-    f0 = np.where((F0 > 0) & filled, 440 * 2 ** ((semis - 69) / 12), 0.0)
+    f0 = np.where(VOICED & filled, 440 * 2 ** ((semis - 69) / 12), 0.0)
     wave = pw.synthesize(np.ascontiguousarray(f0), np.ascontiguousarray(SP), np.ascontiguousarray(AP), RATE, PERIOD)
     return start, wave.astype(np.float32)

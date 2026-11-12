@@ -346,7 +346,7 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     duck = (1 - (1 - 10 ** (-4 / 20)) * np.clip(env * 1.5, 0, 1)).astype(np.float32)
     low = signal.sosfiltfilt(signal.butter(4, 250, 'low', fs=RATE, output='sos'), band, axis=0).astype(np.float32)
     band = band - low + low * duck[:, None]
-    wet = room(vocal) * (.35 if fx == 'megaphone' else .9)
+    wet = room(vocal) * float(os.environ.get('VOCAL_WET', .35 if fx == 'megaphone' else .9))
     mix = band.copy()
     mix[:, 0] += vocal + wet * .9; mix[:, 1] += vocal + wet * 1.1
     if limit:  # tros de mostra: fos de sortida als 2 últims segons

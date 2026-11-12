@@ -98,7 +98,8 @@ def syllables(raw):
         elif c in 'fklmnp': units.append(('C', c))
         i += 1
     # Síl·labes: les consonants entre dues vocals van a la síl·laba següent (una, o dues si fan grup: pr, bl…).
-    groups = {('p', 'dx'), ('b', 'dx'), ('t', 'dx'), ('d', 'dx'), ('k', 'dx'), ('g', 'dx'), ('f', 'dx'), ('p', 'l'), ('b', 'l'), ('k', 'l'), ('g', 'l'), ('f', 'l')}
+    groups = {('p', 'dx'), ('b', 'dx'), ('t', 'dx'), ('d', 'dx'), ('k', 'dx'), ('g', 'dx'), ('f', 'dx'), ('p', 'l'), ('b', 'l'), ('k', 'l'), ('g', 'l'), ('f', 'l'),
+              ('l', 'y'), ('n', 'y')}  # ll i ny són un sol so: van junts a la síl·laba següent
     vidx = [k for k, u in enumerate(units) if u[0] == 'V']
     sylls = []
     for s, v in enumerate(vidx):
