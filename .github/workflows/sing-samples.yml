@@ -1,0 +1,84 @@
+name: Mostres de veus (timbres, altres veus i efectes)
+
+# Torna a cantar una cançó ja feta («All is well») amb tots els timbres de TIGER, amb la
+# veu Canary i amb efecte megàfon, per triar d'oïda. Només deixa un artefacte: no publica res.
+# Veus: TIGER DS i Canary DS (tigermeat / JAE VOCAL PROJECT), CC BY-NC-ND 4.0 + Commons Clause
+# (només ús no comercial); es baixen a cada execució i no es redistribueixen.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['singing/**', '.github/workflows/sing-samples.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  samples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Dependències
+        run: |
+          npm ci
+          npm i --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+          pip install onnxruntime==1.17.3 'numpy<2' onnx pyyaml scipy soundfile cmudict
+          sudo apt-get install -y ffmpeg >/dev/null
+      - name: Recuperar els bancs de mostres descarregats
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs', 'extra-instruments.json', 'scripts/extra-instruments.mjs', 'round-robin.json') }}
+          restore-keys: soundbanks-
+      - name: Construir la web
+        run: npm run build
+      - name: Baixar les veus i el vocoder d'OpenVPI (no es redistribueixen)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v102 --repo spicytigermeat/tiger_diffsinger -D voice/raw-tiger
+          gh release view --repo spicytigermeat/canary_diffsinger --json tagName,assets --jq '.tagName, (.assets[] | "\(.name) \(.size)")'
+          gh release download --repo spicytigermeat/canary_diffsinger -p '*.zip' -D voice/raw-canary
+          gh release download pc-nsf-hifigan-44.1k-hop512-128bin-2025.02 --repo openvpi/vocoders -p '*.oudep' -D voice/raw-vocoder
+          python singing/unzip_all.py voice/raw-tiger/*.zip voice/tiger
+          for z in voice/raw-canary/*.zip; do python singing/unzip_all.py "$z" voice/canary; done
+          cp voice/raw-vocoder/*.oudep voice/vocoder.zip && python singing/unzip_all.py voice/vocoder.zip voice/vocoder
+          rm -rf voice/raw-* voice/vocoder.zip
+          find voice/canary voice/vocoder -name 'dsconfig.yaml' -o -name '*.onnx' -o -name 'vocoder.yaml' | head -30
+      - name: Exportar la banda de «All is well»
+        run: |
+          (cd dist && python -m http.server 8000 >/dev/null 2>&1 &)
+          sleep 1
+          node singing/export.cjs http://localhost:8000/ out --song singing/samples/all-is-well.json
+      - name: Cantar les mostres
+        run: |
+          mkdir -p mostres
+          id=2026-11-12-jamaican-273377106
+          sing() { name="$1"; shift; python singing/sing.py "$@" "out/$id.json" "out/$id.band.wav" "mostres/$name.mp3" || echo "FALLA $name"; }
+          # Megàfon: la cançó sencera, tal com va sonar (TIGER Vinyl).
+          sing "all-is-well-megafon" voice/tiger --speaker tiger_vinyl --fx megaphone
+          # Timbres de TIGER: els primers 45 s de la mateixa cançó.
+          for sp in vinyl fresh disco electric mystic falsetto cetera; do sing "tiger-$sp" voice/tiger --speaker "tiger_$sp" --limit 45; done
+          # Canary: tots els seus timbres.
+          for sp in $(python - <<'PY'
+          import glob, os, yaml
+          for p in sorted(glob.glob('voice/canary/**/dsconfig.yaml', recursive=True), key=len)[:1]:
+              cfg = yaml.safe_load(open(p, encoding='utf-8')) or {}
+              print(' '.join(os.path.basename(str(s)) for s in (cfg.get('speakers') or ['única'])[:6]))
+          PY
+          ); do sing "canary-$sp" voice/canary --speaker "$sp" --vocoder voice/vocoder --limit 45; done
+          ls -la mostres
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mostres-de-veus
+          path: mostres/*.mp3
+          retention-days: 14

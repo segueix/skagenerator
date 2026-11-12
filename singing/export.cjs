@@ -2,6 +2,7 @@
 // i la partitura de la veu (una nota per síl·laba, amb la paraula i el temps en segons).
 // Fa servir l'app mateixa en un Chromium sense pantalla: així la banda sona exactament
 // com a la ràdio. Ús: node singing/export.cjs <url de dist> <carpeta de sortida> <quantes> [llavor]
+// o, per tornar a fer una cançó concreta: node singing/export.cjs <url> <carpeta> --song <fitxer.json amb «song»>
 'use strict';
 const { chromium } = require('playwright');
 const fs = require('node:fs');
@@ -12,7 +13,8 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
 
 (async () => {
   const [url, outDir, countArg, seedArg] = process.argv.slice(2);
-  const count = Number(countArg) || 1, seed0 = Number(seedArg) || Date.now() % 1000000;
+  const fixed = countArg === '--song' ? JSON.parse(fs.readFileSync(seedArg, 'utf8')) : null;
+  const count = fixed ? 1 : Number(countArg) || 1, seed0 = fixed ? 0 : Number(seedArg) || Date.now() % 1000000;
   fs.mkdirSync(outDir, { recursive: true });
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -20,11 +22,11 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
   await page.goto(url);
   await page.waitForFunction(() => window.SkaStudio && window.SkaSampleAudio && window.SkaLyrics);
   for (let i = 0; i < count; i++) {
-    const subgenre = STYLES[(seed0 + i) % STYLES.length], seed = (seed0 * 7919 + i * 104729) % 4294967291 + 1;
+    const subgenre = fixed ? fixed.song.settings.subgenre : STYLES[(seed0 + i) % STYLES.length], seed = fixed ? fixed.song.settings.seed : (seed0 * 7919 + i * 104729) % 4294967291 + 1;
     const started = Date.now();
-    const result = await page.evaluate(async ({ subgenre, seed }) => {
+    const result = await page.evaluate(async ({ subgenre, seed, fixedSong }) => {
       const engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder, studio = window.SkaStudio, utils = window.SkaAudioUtils, RATE = studio.RATE;
-      const song = studio.validateSong(builder.createAutoSong(engine, subgenre, { minutes: 2.25 + (seed % 4) * .25, vocal: true, autoLyrics: 'en', seed, vary: true, recent: [], liked: [] }));
+      const song = fixedSong ? studio.validateSong(fixedSong) : studio.validateSong(builder.createAutoSong(engine, subgenre, { minutes: 2.25 + (seed % 4) * .25, vocal: true, autoLyrics: 'en', seed, vary: true, recent: [], liked: [] }));
       const band = { ...song, clips: song.clips.filter(c => c.instrument !== 'vocal') };
       const parts = [], lengths = [], notes = [], lines = [];
       let at = 0;
@@ -61,8 +63,8 @@ const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'ska
       let binary = '';
       for (let i = 0; i < wav.length; i += 0x8000) binary += String.fromCharCode.apply(null, wav.subarray(i, i + 0x8000));
       return { wav: btoa(binary), song, notes, lines, seconds: mixed[0].length / RATE };
-    }, { subgenre, seed });
-    const id = `${new Date().toISOString().slice(0, 10)}-${subgenre}-${seed}`;
+    }, { subgenre, seed, fixedSong: fixed?.song || null });
+    const id = fixed?.id || `${new Date().toISOString().slice(0, 10)}-${subgenre}-${seed}`;
     fs.writeFileSync(path.join(outDir, `${id}.band.wav`), Buffer.from(result.wav, 'base64'));
     fs.writeFileSync(path.join(outDir, `${id}.json`), JSON.stringify({ id, subgenre, title: result.song.title, seconds: result.seconds, notes: result.notes, song: result.song }));
     // Fitxa per a la ràdio: el que cal per mostrar-la, votar-la i seguir la lletra.
