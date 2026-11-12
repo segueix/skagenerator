@@ -1,4 +1,20 @@
-# Ska Generator
+# Radio Spam
+
+Una ràdio de ska i punk que compon cada cançó al navegador. A sota hi continua havent el taller de cançons (l’antic Ska Generator).
+
+## La ràdio
+
+- **Dues emissores**: Ska (jamaicà, rocksteady, 2-tone, ska-punk) i Punk (punk del 77, hardcore, pop-punk, horror punk). En triar-ne una s’obre el reproductor, es compon la primera cançó i comença a sonar sola.
+- **Cada cançó és nova**: subgènere a l’atzar dins de l’emissora (diferent del de la cançó anterior), tonalitat i durada (2–3,5 min) a l’atzar, i l’estructura s’allunya de les 12 últimes cançons de l’historial (l’opció «Estructura diferent de les últimes cançons» del taller). Al punk també varia el nombre de guitarres.
+- **La següent es prepara en segon pla** mentre sona l’actual i comença **2 segons** després que acabi. El silenci forma part del fitxer d’àudio, de manera que el canvi també funciona amb la pantalla del mòbil apagada. «Següent cançó» hi salta quan ja és a punt.
+- **👍 / 👎 i comentari** a cada cançó, des del reproductor o des de l’historial.
+- **Preferides**: de tant en tant (com a molt una de cada quatre cançons, amb un 30 % de probabilitat) torna a sonar una cançó amb 👍 de la mateixa emissora que no hagi sonat fa poc. Les cançons amb 👍 també inspiren les noves del mateix subgènere.
+- **Historial** (fins a 300 cançons, desat al navegador) amb filtres per emissora, vot i comentari. **«Exporta per millorar»** baixa un JSON (`radiospam-feedback`) amb les cançons votades o comentades: vot, comentari, vegades que ha sonat, resum de les decisions de composició i projecte complet. «Exporta-ho tot» inclou també les que no tenen vot.
+- **Interfície antiga**: a l’ordinador (pantalles de 900 px o més), el botó «✎ Interfície antiga» obre el taller de cançons i «📻 Torna a la ràdio» hi torna. Al mòbil sempre s’obre la ràdio.
+
+La ràdio és a `radio.js` i `radio.css`. Fa servir el mateix compositor (`song-builder.js`), el mateix motor i les mateixes mostres que el taller; cada cançó es grava tram a tram al worker, es mescla i es reprodueix com a WAV en un element `<audio>` (amb Media Session per als controls de la pantalla de bloqueig).
+
+# Taller de cançons (Ska Generator)
 
 Taller web en català per compondre cançons instrumentals, secció per secció.
 

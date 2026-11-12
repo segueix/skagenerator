@@ -2540,6 +2540,9 @@
   }
   $('voice-eq-reset').addEventListener('click', () => updateVoiceProcessing(voice => { voice.eq = flatVoiceEq(); }));
   window.addEventListener('pagehide', stop);
+  // La ràdio (radio.js) compon i grava cançons senceres amb les mateixes peces del taller.
+  window.SkaStudio = { RATE, segmentsOf, partFor, validateSong, newSeed, uid, download,
+    stop() { if (playing || recording) { stop(); render(); } }, refresh() { applyZoom(); measureDock(); paintTheme(); } };
   let firstTab = song.base.generated ? (song.sections.length ? 'line' : 'line') : 'song';
   try { firstTab = sessionStorage.getItem('skagenerator.tab') || firstTab; } catch {}
   setTab(firstTab, false);

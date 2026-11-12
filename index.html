@@ -2,18 +2,92 @@
 <html lang="ca">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#151325" id="theme-color">
+  <meta name="theme-color" content="#0c0b12" id="theme-color">
   <meta name="color-scheme" content="light dark">
   <script>try{const t=localStorage.getItem('skagenerator.theme');if(t=='dark'||t=='light')document.documentElement.dataset.theme=t}catch{}</script>
-  <meta name="description" content="Compon una cançó instrumental, part per part. Genera, escolta i treballa cada secció al teu ritme.">
-  <title>Ska Generator · Nova cançó</title>
+  <meta name="description" content="Radio Spam: una ràdio de ska i punk que compon cada cançó en directe al teu navegador. Vota-les, comenta-les i exporta l’historial.">
+  <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Radio Spam">
+  <title>Radio Spam</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23172c28'/%3E%3Cpath d='M12 28V15l16-4v13M12 19l16-4' stroke='%23d5f28b' stroke-width='3' fill='none'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="song-builder.js"></script><script defer src="app.js"></script>
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="radio.css">
+  <script>try{if(!(localStorage.getItem('radiospam.view')=='studio'&&matchMedia('(min-width: 900px)').matches))document.documentElement.classList.add('radio-on')}catch{document.documentElement.classList.add('radio-on')}</script>
+  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="song-builder.js"></script><script defer src="app.js"></script><script defer src="radio.js"></script>
 </head>
 <body>
+  <div class="radio" id="radio">
+    <header class="radio-top">
+      <button type="button" class="radio-icon" id="radio-back" aria-label="Canvia d’emissora" hidden>‹</button>
+      <div class="radio-logo" aria-label="Radio Spam"><span class="radio-logo-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>RADIO <b>SPAM</b></span></div>
+      <button type="button" class="radio-chip radio-desktop" id="radio-studio" title="Torna a l’editor de cançons">✎ Interfície antiga</button>
+      <button type="button" class="radio-chip" id="radio-history-open"><span aria-hidden="true">☰</span> Historial <b id="radio-history-count"></b></button>
+    </header>
+
+    <section class="radio-screen radio-home" id="radio-home" aria-labelledby="radio-home-title">
+      <p class="radio-kicker">CANÇONS ACABADES DE FER · SENSE REPETIR</p>
+      <h1 id="radio-home-title">Què vols<br>escoltar?</h1>
+      <div class="radio-stations">
+        <button type="button" class="radio-station ska" data-station="ska"><span class="station-art" aria-hidden="true"></span><span class="station-name">SKA</span><span class="station-sub">Jamaicà · Rocksteady · 2-tone · Ska-punk</span><span class="station-go" aria-hidden="true">▶</span></button>
+        <button type="button" class="radio-station punk" data-station="punk"><span class="station-art" aria-hidden="true"></span><span class="station-name">PUNK</span><span class="station-sub">Punk del 77 · Hardcore · Pop-punk · Horror punk</span><span class="station-go" aria-hidden="true">▶</span></button>
+      </div>
+      <p class="radio-foot">Cada cançó es compon i es grava al teu dispositiu mentre sona l’anterior. La primera vegada es baixen els instruments (uns 40 MB): millor amb wifi.</p>
+    </section>
+
+    <section class="radio-screen radio-player" id="radio-player" aria-label="Reproductor" hidden>
+      <div class="player-stage">
+        <div class="player-disc" id="radio-disc" aria-hidden="true"><span class="disc-label" id="radio-disc-label">SKA</span></div>
+        <div class="player-loading" id="radio-loading" role="status" aria-live="polite">
+          <strong id="radio-loading-title">Afinant la banda…</strong>
+          <div class="radio-bar"><i id="radio-loading-bar"></i></div>
+          <small id="radio-loading-detail"></small>
+          <button type="button" class="radio-button" id="radio-retry" hidden>↻ Torna-ho a provar</button>
+        </div>
+      </div>
+      <div class="player-info" id="radio-info">
+        <p class="player-tag"><span id="radio-subgenre">—</span><span class="player-replay" id="radio-replay" hidden>👍 De les teves preferides</span></p>
+        <h2 id="radio-title">Radio Spam</h2>
+        <p class="player-meta" id="radio-meta"></p>
+        <p class="player-section" id="radio-section" aria-live="off"></p>
+      </div>
+      <div class="player-progress">
+        <input type="range" id="radio-seek" min="0" max="1000" step="1" value="0" aria-label="Posició de la cançó" disabled>
+        <div class="player-times"><span id="radio-time">0:00</span><span id="radio-duration">0:00</span></div>
+      </div>
+      <div class="player-controls">
+        <button type="button" class="vote down" id="radio-down" aria-label="No m’agrada" aria-pressed="false" disabled>👎</button>
+        <button type="button" class="player-play" id="radio-play" aria-label="Pausa" disabled><span aria-hidden="true">❚❚</span></button>
+        <button type="button" class="vote up" id="radio-up" aria-label="M’agrada" aria-pressed="false" disabled>👍</button>
+      </div>
+      <button type="button" class="radio-button player-skip" id="radio-skip" disabled>Següent cançó ⏭</button>
+      <label class="player-comment"><span>COMENTARI <em id="radio-comment-state"></em></span>
+        <textarea id="radio-comment" rows="2" maxlength="1000" placeholder="Què t’agrada o què milloraries d’aquesta cançó?" disabled></textarea></label>
+      <p class="player-next" id="radio-next" role="status"></p>
+      <audio id="radio-audio" preload="auto" playsinline></audio>
+    </section>
+
+    <section class="radio-screen radio-history" id="radio-history" aria-labelledby="radio-history-title" hidden>
+      <div class="history-head"><h2 id="radio-history-title">Historial</h2><button type="button" class="radio-icon" id="radio-history-close" aria-label="Tanca l’historial">×</button></div>
+      <p class="history-summary" id="radio-history-summary"></p>
+      <div class="history-filters" role="group" aria-label="Filtre de l’historial">
+        <button type="button" class="radio-chip" data-filter="all" aria-pressed="true">Totes</button>
+        <button type="button" class="radio-chip" data-filter="ska" aria-pressed="false">Ska</button>
+        <button type="button" class="radio-chip" data-filter="punk" aria-pressed="false">Punk</button>
+        <button type="button" class="radio-chip" data-filter="up" aria-pressed="false">👍</button>
+        <button type="button" class="radio-chip" data-filter="down" aria-pressed="false">👎</button>
+        <button type="button" class="radio-chip" data-filter="comment" aria-pressed="false">💬</button>
+      </div>
+      <div class="history-actions">
+        <button type="button" class="radio-button primary" id="radio-export">⇩ Exporta per millorar</button>
+        <button type="button" class="radio-button" id="radio-export-all">Exporta-ho tot</button>
+      </div>
+      <p class="history-hint">«Exporta per millorar» baixa un fitxer JSON amb les cançons votades o comentades: el vot, el comentari, el resum de com és cada cançó i el projecte sencer.</p>
+      <ol class="history-list" id="radio-history-list"></ol>
+      <p class="history-empty" id="radio-history-empty" hidden>Encara no ha sonat cap cançó. Tria una emissora i comença a escoltar.</p>
+    </section>
+    <p class="radio-toast" id="radio-toast" role="status" aria-live="polite"></p>
+  </div>
   <header class="topbar">
-    <a class="brand" href="./" aria-label="Ska Generator, inici"><span class="brand-icon" aria-hidden="true">♫</span><span>ska<span class="brand-light">generator</span><small>EL TEU TALLER DE CANÇONS</small></span></a>
+    <a class="brand" href="./" aria-label="Radio Spam, taller de cançons"><span class="brand-icon" aria-hidden="true">♫</span><span>radio<span class="brand-light">spam</span><small>EL TALLER DE CANÇONS</small></span></a>
+    <button class="button to-radio" id="to-radio" type="button">📻 <span>Torna a la ràdio</span></button>
     <span class="top-note"><span class="live-dot"></span> Fet al teu navegador</span>
     <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Canvia entre mode clar i fosc" title="Mode clar o fosc"><span aria-hidden="true">☾</span></button>
     <button class="button new-song" id="new-song"><span aria-hidden="true">＋</span> <span class="new-song-label">Nova cançó</span></button>
