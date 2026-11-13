@@ -297,8 +297,43 @@
     return peaks;
   }
   // Text que diu Matxa per a un vers: les paraules de la partitura, amb majúscula i punt (_line_text).
-  function lineText(notes) {
-    const text = notes.filter(n => n.syllable === 0).map(n => n.word).join(' ');
+  // Amb «stretch», les vocals de les síl·labes que es canten llargues s'escriuen repetides («caaasa»):
+  // Matxa mateixa les allarga de manera natural (fins a un 50–75 %) i WORLD les ha d'estirar menys, amb
+  // les consonants intactes. Més de tres lletres per vocal ja li fa dir coses rares (mesurat).
+  const VOWELS = 'aeiouàèéíïòóúü';
+  function vowelNuclei(word) {   // [inici, final] de cada nucli, com catalan.nuclei (amb la u muda de «que», «gui»)
+    const out = [];
+    for (let i = 0; i < word.length; i++) {
+      if (!VOWELS.includes(word[i])) continue;
+      if (word[i] === 'u' && i && 'qg'.includes(word[i - 1]) && 'eiéèí'.includes(word[i + 1] || '')) continue;
+      let j = i + 1;
+      if (j < word.length && 'iu'.includes(word[j]) && !'iu'.includes(word[i])) j++;
+      out.push([i, j]); i = j - 1;
+    }
+    return out;
+  }
+  function stretchWord(word, durations, minSeconds) {
+    const nuclei = vowelNuclei(word);
+    if (nuclei.length !== durations.length) return word;   // sinalefes i casos estranys: tal com és
+    let out = '', at = 0;
+    nuclei.forEach(([a], k) => {
+      const plain = { à: 'a', è: 'e', é: 'e', í: 'i', ï: 'i', ò: 'o', ó: 'o', ú: 'u', ü: 'u' }[word[a]] || word[a];
+      out += word.slice(at, a + 1) + (durations[k] >= minSeconds ? plain + plain : ''); at = a + 1;
+    });
+    return out + word.slice(at);
+  }
+  function lineText(notes, { stretch = false, minSeconds = .3 } = {}) {
+    const words = [];
+    for (let i = 0; i < notes.length;) {
+      let j = i + 1;
+      while (j < notes.length && notes[j].syllable > 0 && notes[j].word === notes[i].word) j++;
+      const group = notes.slice(i, j), word = notes[i].word;
+      // Durada de cada síl·laba: fins a la nota següent si hi va enganxada.
+      const durations = group.map((n, k) => { const next = notes[i + k + 1]; return next && next.t - (n.t + n.d) < .09 ? next.t - n.t : n.d; });
+      words.push(stretch && !word.includes(' ') ? stretchWord(word, durations, minSeconds) : word);
+      i = j;
+    }
+    const text = words.join(' ');
     return text.slice(0, 1).toUpperCase() + text.slice(1) + '.';
   }
   // Un vers cantat → { start (segons), wave (Float32 a 44,1 kHz) }  (MatxaSinger._sing_take)
@@ -495,5 +530,5 @@
 
   return { SPEECH, TIMBRES, timbreFor, noteOf, lineText, phrasesOf, shiftFor, analyse, singLine, lay, mixSong, applyTimbre,
     // Per a les proves.
-    butter, sosfilt, sosfiltfilt, savgol7, findPeaks, findNuclei, upsample, convolveLong, rng };
+    stretchWord, butter, sosfilt, sosfiltfilt, savgol7, findPeaks, findNuclei, upsample, convolveLong, rng };
 });
