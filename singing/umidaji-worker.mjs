@@ -3,6 +3,9 @@ import { RATE, phrasesOf, phraseInput } from './umidaji-score.mjs';
 
 const ROOT = 'Umidaji_DS_v110/';
 const EMBEDDING_SIZE = 384;
+// Amb WebAssembly la CPU del navegador comparteix temps amb el reproductor.
+const PITCH_STEPS = 5;
+const ACOUSTIC_STEPS = 6;
 const FILES = {
   acoustic: 'dsmain/acoustic.onnx', pitch: 'dspitch/files/pitch.onnx',
   linguistic: 'dspitch/files/linguistic.onnx', vocoder: 'dsvocoder/tgm_hifigan_v110.onnx'
@@ -67,30 +70,42 @@ async function singPhrase(notes, voice, speaker, shift) {
   const { pitch_pred } = await sessions.pitch.run({
     encoder_out, ph_dur: durations, note_midi: f32(input.notesMidi), note_rest: bool(input.notesRest),
     note_dur: i64(input.notesDuration), pitch: f32(input.pitch), expr: f32(constant(1)),
-    retake: bool(constant(1)), spk_embed: embed(speakers[speaker].pitch), steps: scalar(10)
+    retake: bool(constant(1)), spk_embed: embed(speakers[speaker].pitch), steps: scalar(PITCH_STEPS)
   });
   const f0 = f32(pitch_pred.data.map(p => 440 * 2 ** ((p - 69) / 12)));
   const { mel } = await sessions.acoustic.run({
     tokens: tokenTensor, languages: languageTensor, durations, f0, gender: f32(constant(0)),
-    velocity: f32(constant(1)), spk_embed: embed(speakers[speaker].acoustic), steps: scalar(20)
+    velocity: f32(constant(1)), spk_embed: embed(speakers[speaker].acoustic), steps: scalar(ACOUSTIC_STEPS)
   });
   const { waveform } = await sessions.vocoder.run({ mel, f0 });
   return { wave: waveform.data, start: input.start };
 }
 
-async function synthesize(notes, speaker) {
+async function synthesize(notes, speaker, onProgress) {
   if (!model) throw new Error('Carrega el ZIP d’Umidaji per generar la veu.');
   const pitches = notes.map(n => n.midi).sort((a, b) => a - b);
   const middle = pitches.length >> 1;
   const median = pitches.length % 2 ? pitches[middle] : (pitches[middle - 1] + pitches[middle]) / 2;
   const shift = 12 * Math.floor((64 - median) / 12 + .5);
   const pcm = new Float32Array(Math.ceil((notes.at(-1).t + notes.at(-1).d + .5) * RATE));
-  for (const phrase of phrasesOf(notes)) {
-    const { wave, start } = await singPhrase(phrase, model, speaker, shift);
-    const offset = Math.round(start * RATE), fade = Math.min(256, wave.length >> 2);
+  const rendered = new Map();
+  const phrases = phrasesOf(notes);
+  for (const [index, phrase] of phrases.entries()) {
+    const first = phrase[0].t;
+    const relative = phrase.map(note => ({ ...note, t: note.t - first }));
+    // Mateixa lletra, notes i ritme en una tornada: es pot reutilitzar exactament la presa.
+    const key = JSON.stringify(relative.map(n => [n.word, n.syllable, n.midi, Math.round(n.t * RATE), Math.round(n.d * RATE)]));
+    let take = rendered.get(key);
+    if (!take) {
+      take = await singPhrase(relative, model, speaker, shift);
+      rendered.set(key, take);
+    }
+    const { wave, start } = take;
+    const offset = Math.round((first + start) * RATE), fade = Math.min(256, wave.length >> 2);
     for (let i = Math.max(0, -offset); i < wave.length && offset + i < pcm.length; i++) {
       pcm[offset + i] += wave[i] * Math.min(1, i / fade, (wave.length - 1 - i) / fade);
     }
+    onProgress((index + 1) / phrases.length);
   }
   if (pcm.some(x => !Number.isFinite(x)) || !pcm.some(x => Math.abs(x) > .001)) {
     throw new Error('Umidaji ha retornat una pista de veu buida o no vàlida.');
@@ -111,7 +126,7 @@ self.onmessage = ({ data }) => {
         }
         self.postMessage({ id });
       } else if (type === 'sing') {
-        const pcm = await synthesize(notes, speaker);
+        const pcm = await synthesize(notes, speaker, progress => self.postMessage({ id, progress }));
         self.postMessage({ id, pcm }, [pcm.buffer]);
       }
     } catch (error) {

@@ -212,11 +212,17 @@
     });
     at = 0;
     // Umidaji canta la partitura mentre es renderitza la banda.
-    let job = null;
+    let job = null, voiceProgress = null;
     if (browserSinger?.available && song.settings.lang === 'ca' && plan.some(p => p.vocal)) {
       const notes = window.SkaBrowserSinging.scoreNotes(plan.filter(p => p.vocal).map(p => ({ at: p.at, bpm: p.bpm, text: p.lyrics, melody: p.spec.lines.vocal, type: p.seg.section.type })),
         engine.lyricWords, song.settings.swing || 0);
-      if (notes.length) job = browserSinger.start({ notes, subgenre: song.settings.subgenre, signal: controller.signal });
+      if (notes.length) job = browserSinger.start({
+        notes, subgenre: song.settings.subgenre, signal: controller.signal,
+        onProgress: value => {
+          voiceProgress = value;
+          if (mine === session && prep?.stage === 'voice') setPrep({ stage: 'voice', value, title: song.title });
+        }
+      });
     }
     for (const { seg, spec, bpm, frames, vocal } of plan) {
       if (mine !== session) throw CANCELLED;
@@ -242,7 +248,7 @@
     const offsets = lengths.reduce((list, n, i) => (list.push(i ? list[i - 1] + lengths[i - 1] : 0), list), []);
     let mixed = audioUtils.mixSections(parts, lengths), sung = false; parts.length = 0;
     if (job) {
-      setPrep({ stage: 'voice', value: null, title: song.title });
+      setPrep({ stage: 'voice', value: voiceProgress, title: song.title });
       try {
         mixed = await browserSinger.finish(job, mixed);
         sung = true;
@@ -409,7 +415,7 @@
     if (prep.stage === 'bank') return [`Baixant els instruments${prep.value === null ? '…' : ` · ${Math.round(prep.value * 100)} %`}`, prep.value];
     if (prep.stage === 'compose') return ['Component una cançó nova…', 0];
     if (prep.stage === 'download') return ['Baixant una cançó cantada…', null];
-    if (prep.stage === 'voice') return ['Umidaji canta la lletra…', null];
+    if (prep.stage === 'voice') return [`Umidaji canta la lletra${prep.value === null ? '…' : ' · ' + Math.round(prep.value * 100) + ' %'}`, prep.value];
     if (prep.stage === 'mix') return ['Fent la mescla final…', 1];
     return [`Gravant la banda · ${Math.round(prep.value * 100)} %`, prep.value];
   }

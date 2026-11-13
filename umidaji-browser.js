@@ -41,13 +41,17 @@
       for (const job of pending.values()) job.reject(error);
       pending.clear();
     }
-    function call(message) {
+    function call(message, onProgress) {
       return new Promise((resolve, reject) => {
         if (!worker) {
           worker = new Worker(workerUrl);
           worker.onmessage = ({ data }) => {
             const job = pending.get(data.id);
             if (!job) return;
+            if (Number.isFinite(data.progress)) {
+              job.onProgress?.(data.progress);
+              return;
+            }
             pending.delete(data.id);
             if (data.error) job.reject(new Error(data.error));
             else job.resolve(data.pcm);
@@ -56,7 +60,7 @@
           worker.onmessageerror = () => dispose(new Error('No s’ha pogut rebre la veu d’Umidaji.'));
         }
         const id = ++sequence;
-        pending.set(id, { resolve, reject });
+        pending.set(id, { resolve, reject, onProgress });
         try { worker.postMessage({ ...message, id }); }
         catch (error) { pending.delete(id); reject(error); }
       });
@@ -86,7 +90,7 @@
         try { await storedZip('readwrite', zip); return true; }
         catch { return false; }
       },
-      start({ notes, subgenre, signal }) {
+      start({ notes, subgenre, signal, onProgress }) {
         const speaker = SPEAKERS[subgenre] || 'rainbow';
         const abort = () => dispose();
         const result = (async () => {
@@ -95,7 +99,7 @@
           try {
             await load(file);
             if (signal?.aborted) throw cancelled();
-            return await call({ type: 'sing', notes, speaker });
+            return await call({ type: 'sing', notes, speaker }, onProgress);
           } catch (error) {
             if (!signal?.aborted) {
               retryAt = Date.now() + 60_000;
