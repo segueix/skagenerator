@@ -71,8 +71,8 @@ async function loadModel(file) {
   }
 }
 
-async function singPhrase(notes, voice, speaker, shift) {
-  const { ort, sessions, tokens, language, speakers } = voice;
+async function singPhrase(notes, voice, timbre, shift) {
+  const { ort, sessions, tokens, language } = voice;
   const input = phraseInput(notes, shift), { frames } = input;
   const i64 = values => new ort.Tensor('int64', BigInt64Array.from(values, x => BigInt(x)), [1, values.length]);
   const f32 = values => new ort.Tensor('float32', Float32Array.from(values), [1, values.length]);
@@ -96,23 +96,39 @@ async function singPhrase(notes, voice, speaker, shift) {
   const { pitch_pred } = await sessions.pitch.run({
     encoder_out, ph_dur: durations, note_midi: f32(input.notesMidi), note_rest: bool(input.notesRest),
     note_dur: i64(input.notesDuration), pitch: f32(input.pitch), expr: f32(constant(1)),
-    retake: bool(constant(1)), spk_embed: embed(speakers[speaker].pitch), steps: scalar(PITCH_STEPS)
+    retake: bool(constant(1)), spk_embed: embed(timbre.pitch), steps: scalar(PITCH_STEPS)
   });
   const f0 = f32(pitch_pred.data.map(p => 440 * 2 ** ((p - 69) / 12)));
   const { mel } = await sessions.acoustic.run({
-    tokens: tokenTensor, languages: languageTensor, durations, f0, gender: f32(constant(0)),
-    velocity: f32(constant(1)), spk_embed: embed(speakers[speaker].acoustic), steps: scalar(ACOUSTIC_STEPS)
+    tokens: tokenTensor, languages: languageTensor, durations, f0, gender: f32(constant(timbre.gender)),
+    velocity: f32(constant(timbre.velocity)), spk_embed: embed(timbre.acoustic), steps: scalar(ACOUSTIC_STEPS)
   });
   const { waveform } = await sessions.vocoder.run({ mel, f0 });
   return { wave: waveform.data, start: input.start };
 }
 
-async function synthesize(notes, speaker, onProgress) {
+// Timbre d'una cançó: barreja dels cinc timbres del banc (per exemple { moon: .7, snow: .3 }), caràcter de la
+// veu (gender: −1 a 1), articulació (velocity: 1 és la normal) i nota central del registre (center, MIDI).
+function timbreOf(voice = {}) {
+  const mix = Object.entries(voice.mix || { rainbow: 1 }).filter(([name, w]) => model.speakers[name] && w > 0);
+  if (!mix.length) mix.push(['rainbow', 1]);
+  const total = mix.reduce((sum, [, w]) => sum + w, 0);
+  const blend = kind => {
+    const out = new Float32Array(EMBEDDING_SIZE);
+    for (const [name, w] of mix) { const e = model.speakers[name][kind]; for (let i = 0; i < out.length; i++) out[i] += e[i] * w / total; }
+    return out;
+  };
+  const clamp = (x, lo, hi, fallback) => Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : fallback;
+  return { acoustic: blend('acoustic'), pitch: blend('pitch'), gender: clamp(voice.gender, -1, 1, 0), velocity: clamp(voice.velocity, .5, 2, 1), center: clamp(voice.center, 48, 76, 64) };
+}
+
+async function synthesize(notes, voice, onProgress) {
   if (!model) throw new Error('Carrega el ZIP d’Umidaji per generar la veu.');
+  const timbre = timbreOf(voice);
   const pitches = notes.map(n => n.midi).sort((a, b) => a - b);
   const middle = pitches.length >> 1;
   const median = pitches.length % 2 ? pitches[middle] : (pitches[middle - 1] + pitches[middle]) / 2;
-  const shift = 12 * Math.floor((64 - median) / 12 + .5);
+  const shift = 12 * Math.floor((timbre.center - median) / 12 + .5);
   const pcm = new Float32Array(Math.ceil((notes.at(-1).t + notes.at(-1).d + .5) * RATE));
   const rendered = new Map();
   const phrases = phrasesOf(notes);
@@ -123,7 +139,7 @@ async function synthesize(notes, speaker, onProgress) {
     const key = JSON.stringify(relative.map(n => [n.word, n.syllable, n.midi, Math.round(n.t * RATE), Math.round(n.d * RATE)]));
     let take = rendered.get(key);
     if (!take) {
-      take = await singPhrase(relative, model, speaker, shift);
+      take = await singPhrase(relative, model, timbre, shift);
       rendered.set(key, take);
     }
     const { wave, start } = take;
@@ -142,7 +158,7 @@ async function synthesize(notes, speaker, onProgress) {
 let tail = Promise.resolve();
 self.onmessage = ({ data }) => {
   tail = tail.then(async () => {
-    const { id, type, file, notes, speaker } = data;
+    const { id, type, file, notes, voice } = data;
     try {
       if (type === 'load') {
         if (!model) {
@@ -152,7 +168,7 @@ self.onmessage = ({ data }) => {
         }
         self.postMessage({ id });
       } else if (type === 'sing') {
-        const pcm = await synthesize(notes, speaker, progress => self.postMessage({ id, progress }));
+        const pcm = await synthesize(notes, voice, progress => self.postMessage({ id, progress }));
         self.postMessage({ id, pcm }, [pcm.buffer]);
       }
     } catch (error) {
