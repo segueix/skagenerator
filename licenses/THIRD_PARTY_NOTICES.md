@@ -38,3 +38,9 @@ Les dependències són reproduïdes al bundle local sample-worker.js. Les llicè
 
 - Tone.js 14.8.49, Yotam Mann i col·laboradors: https://github.com/Tonejs/Tone.js
   MIT; biblioteca carregada externament des de jsDelivr per al reproductor de l'editor, no inclosa dins del bundle local.
+
+## WORLD (analitzador i sintetitzador de veu)
+
+`vendor/world/world.wasm` és WORLD (Masanori Morise), en la versió que inclou pyworld 0.3.5, compilat a
+WebAssembly sense canvis al codi de l'analitzador ni del sintetitzador. Llicència BSD modificada:
+vegeu `WORLD-LICENSE.txt`.

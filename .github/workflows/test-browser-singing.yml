@@ -2,10 +2,13 @@ name: Provar el cant Matxa al navegador
 
 on:
   push:
-    branches: ['feat/browser-matxa-singing']
+    branches: [main, 'claude/**', 'feat/**']
     paths:
       - 'browser-singing.js'
-      - 'browser-singing-worker.js'
+      - 'matxa-singer.js'
+      - 'matxa-worker.js'
+      - 'world.js'
+      - 'vendor/world/**'
       - 'radio.js'
       - 'audio-utils.js'
       - 'scripts/build.mjs'
@@ -31,10 +34,12 @@ jobs:
       - name: Comprovar els mòduls
         run: |
           node --check browser-singing.js
-          node --check browser-singing-worker.js
+          node --check matxa-singer.js
+          node --check matxa-worker.js
+          node --check world.js
           node --check radio.js
           node --check scripts/build.mjs
-      - name: Provar síl·labes, afinació, timbres i cancel·lació
+      - name: Provar WORLD, el cant de Matxa, la mescla i la cancel·lació
         run: node --test tests/browser-singing.test.cjs
       - name: Recuperar els bancs d'instruments
         uses: actions/cache@v4
@@ -47,6 +52,8 @@ jobs:
           npm ci
           npm run build
           test -s dist/browser-singing.js
-          test -s dist/browser-singing-worker.js
+          test -s dist/matxa-worker.js
           grep -q 'browser-singing.js?v=' dist/index.html
-          grep -q 'browser-singing-worker.js?v=' dist/browser-singing.js
+          grep -q 'matxa-worker.js?v=' dist/browser-singing.js
+          grep -q 'world.wasm?v=' dist/matxa-worker.js
+          test -s dist/vendor/world/world.wasm

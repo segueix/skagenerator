@@ -335,10 +335,10 @@ test('el motiu es desenvolupa: A, A\' (final obert), B (contrast) i A\'\' (final
 test('la veu canta igual els versos repetits i posa les síl·labes tòniques a temps', () => {
   const lyrics = 'Rude boys del Raval\nballant a contratemps\nrude boys del Raval\nningú no ens atura avui';
   const info = engine.analyzeLyrics(lyrics);
-  assert.deepEqual(info.syllables, [6, 6, 6, 10]); // mateix recompte que l’app
+  assert.deepEqual(info.syllables, [6, 6, 6, 8]); // amb sinalefes: «no‿ens» i «atura‿avui»
   assert.deepEqual(info.stress.slice(0, 2), [[0, 2, 5], [1, 5]]);
   assert.deepEqual(info.repeats, [-1, -1, 0, -1]);
-  assert.deepEqual(engine.analyzeLyrics('La ciutat fa olor de cafè').stress, [[3, 4, 6, 9]]);
+  assert.deepEqual(engine.analyzeLyrics('La ciutat fa olor de cafè').stress, [[3, 4, 5, 8]]);
   const vocal = engine.composeSongPart({ ...settings, instruments: ['vocal'] }, { ...part('chorus', 8), layers: { vocal: 5 }, ...info }).lines.vocal;
   const phrase = p => vocal.filter(n => Math.floor(n[0] / 2) === p);
   assert.deepEqual(phrase(0).map(n => [n[0] % 2, n[1], n[2], n[3]]), phrase(2).map(n => [n[0] % 2, n[1], n[2], n[3]]), 'vers repetit, mateixa melodia');
@@ -382,4 +382,19 @@ test('silencis al mig, tancaments de la cançó i entrades per capes', () => {
   assert(outro('ring').filter(e => e.channel === 9 && e.time > 2 * bar && e.time < 3 * bar).length >= 16, 'redoble llarg');
   for (const bad of [{ ending: 'x' }, { closing: 'x' }, { entrance: { bass: 4 } }, { exit: { bass: 0 } }, { entrance: { bass: 2 }, exit: { bass: 2 } }, { entrance: { kazoo: 1 } }])
     assert.throws(() => notes(bad), /no vàlid/);
+});
+
+test('sinalefes: les vocals que es troben entre paraules comparteixen síl·laba, com en parlar', () => {
+  const count = line => engine.analyzeLyrics(line).syllables[0];
+  assert.equal(count('Que arribi el matí'), 5);
+  assert.equal(count('La trompeta escalfa'), 6);
+  assert.equal(count('Serà alt'), 3, 'dues tòniques no es fonen');
+  assert.equal(count('Ballem tota la nit'), 6);
+  // Les paraules foses formen una sola unitat cantada i el total quadra amb el recompte del vers.
+  const units = engine.lyricWords('Que arribi el matí');
+  assert.deepEqual(units.map(u => [u.word, u.count]), [['que arribi el', 3], ['matí', 2]]);
+  for (const line of ['Tu i jo ens estimàvem', 'Hi ha una ombra allargada', 'Porto oberta la ferida'])
+    assert.equal(engine.lyricWords(line).reduce((n, u) => n + u.count, 0), count(line), line);
+  // En anglès no n'hi ha.
+  assert.deepEqual(engine.analyzeLyrics('Dance into the night', 'en').syllables, [5]);
 });

@@ -4,31 +4,12 @@
   else root.SkaBrowserSinging = api;
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  // La conversió de parla a cant i els filtres s'executen al navegador.
-  // La parla Matxa encara prové del seu servei públic de Gradio: NO és inferència local.
+  // Veu cantada al navegador amb el mateix procés que l'acció de GitHub (matxa-singer.js i WORLD en
+  // WebAssembly, en un Web Worker). La parla de Matxa prové del seu servei públic de Gradio (no és local).
   const BASE = 'https://projecte-aina-matxa-alvocat-tts-ca.hf.space';
   const ACCENTS = { elia: 'central', grau: 'central', emma: 'nord-occidental',
     pere: 'nord-occidental', gina: 'valencia', lluc: 'valencia',
     olga: 'balear', quim: 'balear' };
-  const PRESETS = Object.freeze({
-    jamaican: { name: 'Ska jamaicà càlid', speaker: 'grau', effect: 'warm', eq: { low: 2, mid: 0, high: 1 }, gainDb: 0 },
-    rocksteady: { name: 'Rocksteady vellutat', speaker: 'olga', effect: 'warm', eq: { low: 3, mid: -2, high: -2 }, gainDb: 0 },
-    twotone: { name: '2 Tone nasal', speaker: 'pere', effect: 'clean', eq: { low: -2, mid: 3, high: 2 }, gainDb: 1 },
-    nutty: { name: 'Nutty teatral', speaker: 'quim', effect: 'radio', eq: { low: 0, mid: 3, high: 2 }, gainDb: 0 },
-    bossreggae: { name: 'Boss reggae de vinil', speaker: 'lluc', effect: 'warm', eq: { low: 2, mid: -1, high: -3 }, gainDb: 0 },
-    skaswing: { name: 'Ska-swing brillant', speaker: 'elia', effect: 'clean', eq: { low: 0, mid: 1, high: 3 }, gainDb: 0 },
-    skapunk: { name: 'Ska-punk estrident', speaker: 'pere', effect: 'radio', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
-    punk77: { name: 'Punk 77 cru', speaker: 'grau', effect: 'radio', eq: { low: -1, mid: 4, high: 1 }, gainDb: 0 },
-    oi: { name: 'Oi! aspre', speaker: 'quim', effect: 'warm', eq: { low: 3, mid: 3, high: -1 }, gainDb: 1 },
-    skatepunk: { name: 'Skate punk tens', speaker: 'lluc', effect: 'radio', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
-    garage: { name: 'Garage lo-fi', speaker: 'grau', effect: 'lofi', eq: { low: 1, mid: 2, high: -2 }, gainDb: 0 },
-    postpunk: { name: 'Post-punk fosc', speaker: 'grau', effect: 'warm', eq: { low: 3, mid: -2, high: -3 }, gainDb: 0 },
-    hardcore: { name: 'Hardcore agressiu', speaker: 'pere', effect: 'megaphone', eq: { low: -1, mid: 3, high: 1 }, gainDb: 0 },
-    poppunk: { name: 'Pop-punk brillant', speaker: 'gina', effect: 'clean', eq: { low: -2, mid: 1, high: 4 }, gainDb: 1 },
-    horrorpunk: { name: 'Horror punk espectral', speaker: 'quim', effect: 'radio', eq: { low: 3, mid: 1, high: -3 }, gainDb: 0 }
-  });
-  const DEFAULT = PRESETS.jamaican;
-  const presetFor = subgenre => PRESETS[subgenre] || DEFAULT;
   const aborted = () => { const e = new Error('Generació de veu cancel·lada'); e.name = 'AbortError'; return e; };
 
   // Protocol Gradio de Matxa: fn 3 selecciona accent, fn 0 retorna un WAV.
@@ -77,36 +58,60 @@
     return url.href;
   }
 
+  // Matxa sintetitza a 22.050 Hz: la veu es descodifica i es canta a aquesta freqüència (la meitat de
+  // càlcul) i només al final es passa a la de la cançó.
+  const SPEECH_RATE = 22050, REQUEST_TIMEOUT = 45000, BREAK_MS = 180000, SPEECH = { lengthScale: 1.1, temperature: .2 };
+  // Un context fora de línia descodifica directament a la freqüència demanada i no manté el maquinari
+  // d'àudio despert (un AudioContext normal gasta bateria i al mòbil pot quedar suspès en segon pla).
+  function decodeAudio(bytes, rate) {
+    const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = Offline ? new Offline(1, 1, rate) : new (window.AudioContext || window.webkitAudioContext)();
+    return new Promise((resolve, reject) => {
+      const done = ctx.decodeAudioData(bytes, resolve, reject);
+      if (done?.then) done.then(resolve, reject);
+    }).finally(() => { if (!Offline) ctx.close?.(); });
+  }
   // Un mateix text de tornada i la mateixa veu només es demanen un cop per sessió.
   class MatxaClient {
-    constructor() { this.cache = new Map(); this.sessions = new Map(); this.ctx = null; }
+    constructor() { this.cache = new Map(); this.active = 0; this.waiting = []; }
+    // Com a molt dues peticions alhora: la demo pública de Matxa és compartida.
+    async _slot(signal) {
+      if (this.active >= 2) await new Promise((resolve, reject) => {
+        const entry = { resolve, reject };
+        this.waiting.push(entry);
+        signal?.addEventListener('abort', () => { const i = this.waiting.indexOf(entry); if (i >= 0) { this.waiting.splice(i, 1); reject(aborted()); } }, { once: true });
+      });
+      else this.active++;
+    }
+    _release() { const next = this.waiting.shift(); if (next) next.resolve(); else this.active--; }
     async speak(text, speaker, rate, signal) {
       if (!ACCENTS[speaker]) throw new Error('Veu de Matxa desconeguda');
       if (signal?.aborted) throw aborted();
-      const key = speaker + '|' + text;
+      const key = speaker + '|' + rate + '|' + text;
       if (!this.cache.has(key)) {
         const task = this._request(text, speaker, rate, signal).catch(e => { this.cache.delete(key); throw e; });
         this.cache.set(key, task);
-        if (this.cache.size > 32) this.cache.delete(this.cache.keys().next().value);
+        if (this.cache.size > 48) this.cache.delete(this.cache.keys().next().value);
       }
       return this.cache.get(key);
     }
     async _request(text, speaker, rate, signal) {
+      await this._slot(signal);
       // Un timeout evita que la cua de la ràdio quedi penjada si la demo s'atura.
       const controller = new AbortController();
       const onAbort = () => controller.abort();
       signal?.addEventListener('abort', onAbort, { once: true });
-      const timer = setTimeout(() => controller.abort(), 100000);
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
       try {
         // S'usa una sessió per consulta per evitar confondre esdeveniments SSE simultanis.
         const session = 'ska' + Math.random().toString(36).slice(2, 12);
         await gradio(3, [ACCENTS[speaker]], session, controller.signal);
-        const result = await gradio(0, [text, ACCENTS[speaker], speaker, .25, 1.08], session, controller.signal);
+        // Mateixos paràmetres que l'acció: temperatura 0,2 i escala de durada 1,1 (síl·labes més clares).
+        const result = await gradio(0, [text, ACCENTS[speaker], speaker, SPEECH.temperature, SPEECH.lengthScale], session, controller.signal);
         const audio = await fetch(extractAudioUrl(result), { signal: controller.signal });
         if (!audio.ok) throw new Error('No s’ha pogut descarregar el WAV de Matxa');
         const bytes = await audio.arrayBuffer();
-        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const decoded = await this.ctx.decodeAudioData(bytes);
+        const decoded = await decodeAudio(bytes, rate);
         const mono = new Float32Array(decoded.length);
         for (let c = 0; c < decoded.numberOfChannels; c++) {
           const ch = decoded.getChannelData(c);
@@ -119,136 +124,40 @@
       } finally {
         clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);
+        this._release();
       }
     }
   }
 
-  function scoreLines(text, counts, vocalNotes, bpm) {
-    const names = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
-    if (!Array.isArray(counts) || !Array.isArray(vocalNotes) || !Number.isFinite(bpm) || bpm <= 0) return [];
-    const notes = vocalNotes.slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
-    if (!names.length || names.length !== counts.length ||
-      counts.reduce((sum, n) => sum + n, 0) !== notes.length) return [];
-    let index = 0;
-    const beat = 60 / bpm;
-    return names.map((name, i) => {
-      const noteGroup = notes.slice(index, index + counts[i]).map(([bar, b, midi, dur]) => ({
-        at: (bar * 4 + b) * beat, dur: dur * beat, midi
-      }));
-      index += counts[i];
-      return { text: name, notes: noteGroup };
-    });
+  // swing: el mateix desplaçament de les corxeres a contratemps que fa servir la banda (audio/performance.cjs).
+  // Notes de veu d'una cançó, com les exporta singing/export.cjs: una per síl·laba, amb el temps en segons
+  // des del començament de la cançó, la unitat cantada (paraula o paraules foses per sinalefa) i l'inici de vers.
+  // sections: [{ at (s), bpm, text, melody: [[compàs, temps, midi, durada]], type }]
+  function scoreNotes(sections, lyricWords, swing = 0) {
+    const notes = [];
+    for (const { at, bpm, text, melody, type } of sections) {
+      const beat = 60 / bpm, swung = beats => Math.abs(beats % 1 - .5) < .04 ? beats + swing / 6 : beats;
+      const sorted = melody.slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
+      const words = String(text || '').split('\n').map(l => l.trim()).filter(Boolean)
+        .flatMap((line, li) => lyricWords(line, 'ca').map((w, wi) => ({ word: w.word.replace(/’/g, "'"), line: li, first: wi === 0, count: Math.max(1, w.count) })));
+      let n = 0;
+      for (const w of words) for (let s = 0; s < w.count && n < sorted.length; s++, n++) {
+        const [bar, b, pitch, dur] = sorted[n], start = swing ? swung(bar * 4 + b) : bar * 4 + b;
+        notes.push({ t: at + start * beat, d: dur * beat, midi: pitch, word: w.word.toLowerCase(), syllable: s, syllables: w.count, line: w.line, lineStart: w.first && s === 0, section: type });
+      }
+    }
+    return notes;
   }
 
-  // Un segment de veu parlada per síl·laba, ajustat a la durada i la nota musical.
-  // És cant aproximat amb granulat: no és el model WORLD/Matxa que funciona en Python.
-  function estimatePitch(samples, rate) {
-    const start = Math.max(0, Math.floor(samples.length * .25));
-    const windowSize = Math.min(2300, samples.length - start);
-    if (windowSize < 300) return 180;
-    const step = 2, minLag = Math.floor(rate / 410 / step), maxLag = Math.min(Math.floor(rate / 85 / step), Math.floor(windowSize / 3 / step));
-    const length = Math.floor(windowSize / step);
-    let bestLag = 0, bestScore = 0, firstReliable = 0;
-    for (let lag = minLag; lag <= maxLag; lag++) {
-      let a = 0, b = 0, corr = 0;
-      for (let i = 0; i < length - lag; i++) {
-        const x = samples[start + i * step], y = samples[start + (i + lag) * step];
-        corr += x * y; a += x * x; b += y * y;
-      }
-      const score = corr / (Math.sqrt(a * b) + 1e-8);
-      if (score > bestScore) { bestScore = score; bestLag = lag; }
-      // El màxim global sol caure a dues vegades el període (una octava falsa).
-      // Prioritzem el primer període amb una correlació clarament fiable.
-      if (!firstReliable && score > .965) firstReliable = lag;
-    }
-    const chosen = firstReliable || bestLag;
-    return chosen && bestScore > .27 ? rate / (chosen * step) : 180;
-  }
-  function boundaries(samples, count, rate) {
-    const out = [0], step = Math.max(1, Math.round(rate * .01)), sums = [];
-    let peak = 0;
-    for (let i = 0; i < samples.length; i += step) {
-      let sum = 0;
-      for (let j = i; j < Math.min(samples.length, i + step); j++) sum += samples[j] * samples[j];
-      const rms = Math.sqrt(sum / step);
-      sums.push(rms); peak = Math.max(peak, rms);
-    }
-    // Alineació aproximada: busca un mínim de volum al voltant de cada tall esperat.
-    for (let i = 1; i < count; i++) {
-      const target = Math.floor(sums.length * i / count);
-      const radius = Math.max(2, Math.min(12, Math.floor(sums.length / count / 3)));
-      let best = target, value = Infinity;
-      for (let j = Math.max(1, target - radius); j <= Math.min(sums.length - 2, target + radius); j++) {
-        const cost = sums[j] / (peak + 1e-9) + Math.abs(j - target) / (radius + 1) * .15;
-        if (cost < value) { best = j; value = cost; }
-      }
-      out.push(Math.max(out[out.length - 1] + 1, Math.min(samples.length - 1, best * step)));
-    }
-    out.push(samples.length);
-    return out;
-  }
-  function singNote(source, targetLength, midi, rate) {
-    const out = new Float32Array(targetLength);
-    if (!source.length || !targetLength) return out;
-    const sourcePitch = estimatePitch(source, rate);
-    let hz = 440 * 2 ** ((midi - 69) / 12), ratio = hz / sourcePitch;
-    // Una octava no canvia l'harmonia: es tria la més propera al registre de la veu.
-    while (ratio > 1.7) ratio /= 2;
-    while (ratio < .68) ratio *= 2;
-    const size = Math.min(1536, Math.max(128, Math.floor(source.length / 2)));
-    const hop = Math.max(32, Math.floor(size / 4));
-    const accum = new Float32Array(targetLength), weights = new Float32Array(targetLength);
-    const inner = Math.max(1, source.length - size);
-    for (let dst = 0; dst < targetLength; dst += hop) {
-      const srcAt = inner === 1 ? 0 : Math.floor((dst * ratio) % inner);
-      const n = Math.min(size, targetLength - dst);
-      for (let i = 0; i < n; i++) {
-        const win = .5 - .5 * Math.cos((2 * Math.PI * i) / size);
-        const position = srcAt + i * ratio;
-        const a = Math.floor(position) % source.length, b = (a + 1) % source.length;
-        const sample = source[a] + (source[b] - source[a]) * (position - Math.floor(position));
-        accum[dst + i] += sample * win;
-        weights[dst + i] += win;
-      }
-    }
-    const fade = Math.min(Math.floor(rate * .02), Math.floor(targetLength / 4));
-    for (let i = 0; i < targetLength; i++) {
-      let gain = weights[i] ? accum[i] / weights[i] : 0;
-      if (fade) gain *= Math.min(1, i / fade, (targetLength - 1 - i) / fade);
-      out[i] = gain;
-    }
-    return out;
-  }
-
-  function renderPCM(speech, lines, frames, rate) {
-    if (!(speech instanceof Float32Array) || !Array.isArray(lines) ||
-      !Number.isInteger(frames) || frames < 0 || !Number.isFinite(rate)) throw new Error('Partitura de cant no vàlida');
-    const out = new Float32Array(frames);
-    const all = lines.flatMap(l => l.notes || []);
-    if (!all.length || speech.length < 256) return out;
-    const lineCount = lines.reduce((n, l) => n + l.notes.length, 0);
-    const lineBreaks = boundaries(speech, lineCount, rate);
-    let index = 0;
-    for (const line of lines) {
-      for (const note of line.notes) {
-        const start = Math.max(0, Math.floor(note.at * rate));
-        const length = Math.max(0, Math.min(frames - start, Math.floor(note.dur * rate)));
-        if (length && start < frames) {
-          const source = speech.subarray(lineBreaks[index], lineBreaks[index + 1]);
-          const sung = singNote(source, length, note.midi, rate);
-          for (let k = 0; k < length; k++) out[start + k] += sung[k];
-        }
-        index++;
-      }
-    }
-    return out;
-  }
-
-  // La petició de Matxa és asíncrona; el càlcul de nota i filtre passa a un Web Worker.
+  // Cantant del navegador. Per a cada cançó:
+  //   const job = singer.start({ notes, subgenre, signal });   // demana la parla de cada vers i l'analitza
+  //   … es grava la banda …
+  //   const mix = await singer.finish(job, band);              // canta, mescla i retorna [L, R]
   function createBrowserSinger(options = {}) {
-    const rate = options.rate || 44100, client = options.client || new MatxaClient();
-    const makeWorker = options.makeWorker || (() => new Worker(new URL('browser-singing-worker.js', document.currentScript?.src || document.baseURI)));
-    let worker = null, serial = 0;
+    const client = options.client || new MatxaClient();
+    const base = typeof document !== 'undefined' ? (document.currentScript?.src || document.baseURI) : '';
+    const makeWorker = options.makeWorker || (() => new Worker(new URL('matxa-worker.js', base)));
+    let worker = null, serial = 0, brokenUntil = 0;
     const pending = new Map();
     function ensureWorker() {
       if (worker) return worker;
@@ -257,25 +166,53 @@
         const p = pending.get(data.id);
         if (!p) return;
         pending.delete(data.id);
-        if (data.error) p.reject(new Error(data.error)); else p.resolve(data.voice);
+        if (data.error && !data.band) p.reject(new Error(data.error)); else p.resolve(data);
       };
-      worker.onerror = () => {
-        for (const p of pending.values()) p.reject(new Error('El motor de veu del navegador ha fallat'));
+      worker.onerror = event => {
+        for (const p of pending.values()) p.reject(new Error('El motor de veu del navegador ha fallat' + (event?.message ? ': ' + event.message : '')));
         pending.clear(); worker?.terminate(); worker = null;
       };
       return worker;
     }
+    const call = (message, transfer = []) => new Promise((resolve, reject) => {
+      const id = ++serial;
+      pending.set(id, { resolve, reject });
+      try { ensureWorker().postMessage({ ...message, id }, transfer); } catch (error) { pending.delete(id); reject(error); }
+    });
     return {
-      async renderSection({ text, lines, subgenre, frames, signal }) {
-        if (!lines?.length || !lines.some(l => l.notes.length)) return new Float32Array(frames);
-        const preset = presetFor(subgenre);
-        const pcm = await client.speak(text.replace(/\n+/g, '. '), preset.speaker, rate, signal);
-        if (signal?.aborted) throw aborted();
+      get available() { return Date.now() >= brokenUntil; },
+      start({ notes, subgenre, signal }) {
+        const timbre = window.SkaMatxaSinger.timbreFor(subgenre), speaker = timbre.speaker;
+        const phrases = window.SkaMatxaSinger.phrasesOf(notes), song = ++serial;
+        // Una locució per vers diferent (la tornada es demana un sol cop); s'analitza en arribar.
+        const units = new Map();
+        for (const phrase of phrases) {
+          const text = window.SkaMatxaSinger.lineText(phrase), key = text + '|' + phrase.length;
+          if (units.has(key)) continue;
+          units.set(key, client.speak(text, speaker, SPEECH_RATE, signal).then(pcm => {
+            if (signal?.aborted) throw aborted();
+            const copy = pcm.slice();
+            return call({ type: 'analyse', song, key, speech: copy, rate: SPEECH_RATE, count: phrase.length }, [copy.buffer]);
+          }));
+        }
+        const ready = Promise.all(units.values()).catch(error => {
+          if (!signal?.aborted) brokenUntil = Date.now() + BREAK_MS;
+          call({ type: 'forget', song }).catch(() => {});
+          throw error;
+        });
+        ready.catch(() => {});
+        return { song, notes, subgenre, speaker, timbre, ready };
+      },
+      // La banda es passa al worker sense copiar-la (són desenes de MB): si el cant falla, el worker la
+      // retorna intacta a «error.band» perquè la ràdio hi pugui posar la guia.
+      async finish(job, band) {
+        await job.ready;
+        const id = ++serial;
         return new Promise((resolve, reject) => {
-          const id = ++serial;
-          pending.set(id, { resolve, reject });
-          try { ensureWorker().postMessage({ id, type: 'sing', pcm: pcm.slice(), lines, frames, rate, preset }); }
-          catch (error) { pending.delete(id); reject(error); }
+          const fail = data => { const error = new Error(data.error); error.band = data.band; reject(error); };
+          pending.set(id, { resolve: data => data.error ? fail(data) : resolve(data.mix), reject });
+          try { ensureWorker().postMessage({ type: 'sing', id, song: job.song, notes: job.notes, subgenre: job.subgenre, speaker: job.speaker, band }, band.map(c => c.buffer)); }
+          catch (error) { pending.delete(id); error.band = band; reject(error); }
         });
       },
       dispose() {
@@ -286,6 +223,5 @@
     };
   }
 
-  return { PRESETS, ACCENTS, presetFor, renderPCM, estimatePitch, boundaries,
-    MatxaClient, createBrowserSinger, extractAudioUrl, scoreLines };
+  return { ACCENTS, MatxaClient, createBrowserSinger, extractAudioUrl, scoreNotes, SPEECH_RATE };
 });

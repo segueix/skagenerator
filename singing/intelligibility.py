@@ -16,7 +16,7 @@ def words_of(notes):
     out = []
     for n in notes:
         if n['syllable'] == 0:
-            out += [norm(p) for p in re.split(r"['’-]", n['word']) if norm(p)]
+            out += [norm(p) for p in re.split(r"['’\s-]", n['word']) if norm(p)]
     return out
 
 def lines_of(score):

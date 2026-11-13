@@ -3,7 +3,9 @@ name: Cançons en català amb la teva veu (Matxa + Seed-VC)
 # Compon cançons amb lletra en català (alternant un ska i un punk), les fa cantar a Matxa
 # (veu neuronal catalana del Projecte Aina, a través del seu espai públic) i les converteix al
 # timbre de singing/samples/veu-referencia.wav amb Seed-VC (GPL-3.0, versió fixada). De moment
-# només en deixa un artefacte per escoltar-les: no publica res.
+# només en deixa un artefacte per escoltar-les: no publica res. La conversió de timbre és lenta
+# sense GPU (uns deu minuts per cançó amb deu passos de difusió), per això només s'engega a mà
+# o quan canvia aquest fitxer.
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +14,7 @@ on:
         default: '2'
   push:
     branches: ['claude/**']
-    paths: ['singing/**', 'lyrics.js', '.github/workflows/sing-catala.yml']
+    paths: ['.github/workflows/sing-catala.yml']
 
 permissions:
   contents: read
@@ -27,7 +29,7 @@ env:
 jobs:
   sing:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -88,14 +90,14 @@ jobs:
             [ -f singing/samples/veu-referencia.wav ] || continue
             # 2. Seed-VC la converteix al timbre de la referència (mantenint la melodia).
             (cd seedvc && python inference.py --source "../out/$name-matxa.dry.wav" --target ../singing/samples/veu-referencia.wav \
-              --output ../out/vc --diffusion-steps 25 --f0-condition True --auto-f0-adjust False --fp16 False)
+              --output ../out/vc --diffusion-steps 10 --f0-condition True --auto-f0-adjust False --fp16 False)
             vc=$(ls -t out/vc/vc_"$name"-matxa*.wav | head -1)
-            # 3. Mescla amb la banda: amb megàfon i sense.
-            python singing/sing.py none "$score" "$base.band.wav" "out/$name-la-meva-veu-megafon.mp3" --vocal "$vc" --fx megaphone
-            python singing/sing.py none "$score" "$base.band.wav" "out/$name-la-meva-veu.mp3" --vocal "$vc"
+            # 3. Mescla amb la banda (sense filtre de subgènere: el timbre ja és el de la mostra).
+            python singing/sing.py none "$score" "$base.band.wav" "out/$name-la-meva-veu.mp3" --vocal "$vc" --timbre none
           done
           ls -la out
       - uses: actions/upload-artifact@v4
+        if: always()   # si s'acaba el temps, es conserven les cançons que ja estiguin fetes
         with:
           name: cancons-en-catala
           path: |

@@ -384,7 +384,7 @@
       const writer = lyricsModule?.();
       if (writer) {
         const singer = sec => !roles.get(sec) && (['verse', 'prechorus', 'chorus'].includes(sec.type) || key === 'horrorpunk' && sec.type === 'bridge');
-        const written = writer.writeLyrics({ subgenre: key, style: sg.style, seed: (seed ^ 0x5bd1e995) >>> 0, sections, sung: type => true, lang: options.autoLyrics });
+        const written = writer.writeLyrics({ subgenre: key, style: sg.style, seed: (seed ^ 0x5bd1e995) >>> 0, sections, sung: type => true, lang: options.autoLyrics, avoid: options.avoidTitles || [] });
         written.sections.forEach((entry, i) => {
           const sec = sections[i];
           if (!singer(sec) || !entry.text) return;

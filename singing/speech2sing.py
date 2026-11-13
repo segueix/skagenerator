@@ -25,6 +25,28 @@ def _line_text(notes):
     text = ' '.join(out)
     return text[:1].upper() + text[1:] + '.'
 
+def unit_phones(unit, count):
+    """Paraules d'una unitat cantada amb els nuclis vocàlics de cada una, ajustats a `count` síl·labes:
+    a la sinalefa l'última vocal d'una paraula i la primera de la següent fan una sola síl·laba (el nucli
+    de la segona paraula queda buit i el de la primera s'allarga fins a la paraula següent)."""
+    import catalan, unicodedata
+    words = []
+    for raw in unit.split():
+        word = catalan.clean(raw).replace('·', '')
+        plain = ''.join(c for c in unicodedata.normalize('NFD', word.replace('ç', 'c')) if 'a' <= c <= 'z')
+        nuc = catalan.nuclei(word)
+        if len(plain) != len(word) or not nuc: return None
+        words.append([plain, list(nuc), raw])
+    joins = len(sum((w[1] for w in words), [])) - count
+    if joins < 0: return None
+    cands = [k for k in range(len(words) - 1)
+             if words[k][1][-1][1] == len(words[k][0]) and (words[k + 1][1][0][0] == 0 or words[k + 1][0][:words[k + 1][1][0][0]] == 'h')]
+    if len(cands) > joins:   # dues tòniques no es fonen
+        tonic = lambda w, k: catalan.stress_of(catalan.clean(w[2]), len(w[1]), w[2].split("'")[-1]) == k
+        cands = [k for k in cands if not (tonic(words[k], len(words[k][1]) - 1) and tonic(words[k + 1], 0))][:joins] if joins else []
+    if len(cands) != joins: return None
+    return [(plain, nuc, k in cands) for k, (plain, nuc, _) in enumerate(words)]
+
 class MatxaSinger:
     # Centre del registre cantat: veus masculines al voltant de Fa♯3 i femenines una octava amunt.
     MALE = {'grau', 'pere', 'lluc', 'quim'}
@@ -102,29 +124,40 @@ class MatxaSinger:
         unvoiced = np.zeros(n, bool)
         if phones and os.environ.get('MATXA_ALIGN', '1') == '1':
             # phones: paraules del vers (netes, només a-z) amb els nuclis vocàlics de cada una.
-            times = self._char_times(x, rate, [w for w, _ in phones])
+            times = self._char_times(x, rate, [w for w, _, _ in phones])
             if times:
                 centre = [int(round(tt * FPS)) for word in times for tt in word]
                 # Límit entre dues lletres: el punt mig entre els seus centres.
                 edge = [s0] + [(centre[i] + centre[i + 1]) // 2 for i in range(len(centre) - 1)] + [s1]
                 edge = list(np.maximum.accumulate(np.clip(edge, s0, s1)))
                 # Lletres sordes (s, x, f, p, t, k…): el detector de to les marcava com a sonores i sonaven brunzides.
-                letters = ''.join(w for w, _ in phones)
+                letters = ''.join(w for w, _, _ in phones)
                 for ci, ch in enumerate(letters):
                     if ch in 'sxfptkcq': unvoiced[edge[ci]:edge[ci + 1]] = True
-                pos = 0
-                for word, nuc in phones:
-                    base = pos; pos += len(word)
+                # Nuclis de tot el vers (índexs de lletra); a la sinalefa, la vocal final d'una paraula i la inicial
+                # de la següent fan un sol nucli.
+                starts, glob, pos = [], [], 0
+                for word, nuc, join in phones:
+                    starts.append(pos)
+                    merge = bool(glob) and glob[-1][2]
                     for k, (na, nb) in enumerate(nuc):
-                        # Consonants abans de la vocal: l'última (o les dues últimes si fan grup) són d'aquesta síl·laba.
-                        prev_end = nuc[k - 1][1] if k else 0
-                        cons = word[prev_end:na]
-                        take = len(cons) if k == 0 else (0 if not cons else 2 if len(cons) >= 2 and (cons[-2:] in ('ll', 'ny', 'rr', 'ss', 'tx', 'tj', 'tg') or (cons[-1] in 'rl' and cons[-2] in 'pbtdcgf')) else 1)
-                        o0 = edge[base + na - take]
-                        nxt = nuc[k + 1][0] if k + 1 < len(nuc) else len(word)
-                        tail = word[nb:nxt]
-                        keep = len(tail) if k + 1 == len(nuc) else len(tail) - (0 if not tail else 2 if len(tail) >= 2 and (tail[-2:] in ('ll', 'ny', 'rr', 'ss', 'tx', 'tj', 'tg') or (tail[-1] in 'rl' and tail[-2] in 'pbtdcgf')) else 1)
-                        sylls.append((int(o0), int(edge[base + na]), int(edge[base + nb]), int(edge[base + nb + keep])))
+                        if k == 0 and merge: glob[-1][1] = pos + nb; glob[-1][2] = False; continue
+                        glob.append([pos + na, pos + nb, False])
+                    if join and glob: glob[-1][2] = True
+                    pos += len(word)
+                group = lambda c: len(c) >= 2 and (c[-2:] in ('ll', 'ny', 'rr', 'ss', 'tx', 'tj', 'tg') or (c[-1] in 'rl' and c[-2] in 'pbtdcgf'))
+                onset = []
+                for k, (na, nb, _) in enumerate(glob):
+                    prev_end = glob[k - 1][1] if k else 0
+                    inside = [w for w in starts if prev_end <= w <= na]
+                    if not k: onset.append(0)
+                    elif inside: onset.append(inside[-1])   # consonants a l'inici de paraula: totes d'aquesta síl·laba
+                    else:
+                        cons = letters[prev_end:na]
+                        onset.append(na - (0 if not cons else 2 if group(cons) else 1))
+                for k, (na, nb, _) in enumerate(glob):
+                    coda_end = onset[k + 1] if k + 1 < len(glob) else len(letters)
+                    sylls.append((int(edge[onset[k]]), int(edge[na]), int(edge[nb]), int(edge[coda_end])))
                 bounds = []
         for k, (a, b) in enumerate(bounds):
             if k == 0: o0 = s0
@@ -177,11 +210,10 @@ class MatxaSinger:
             while i < len(notes):
                 j = i + 1
                 while j < len(notes) and notes[j]['syllable'] > 0 and notes[j]['word'] == notes[i]['word']: j += 1
-                word = catalan.clean(notes[i]['word']).replace('·', '')
-                nuc = catalan.nuclei(word)
-                plain = ''.join(c for c in unicodedata.normalize('NFD', word.replace('ç', 'c')) if 'a' <= c <= 'z')
-                if len(nuc) != j - i or len(plain) != len(word): ok = False; break
-                phones.append((plain, nuc)); i = j
+                # Una unitat pot ser més d'una paraula fosa per sinalefa («que arribi el»): tres síl·labes.
+                group = unit_phones(notes[i]['word'], j - i)
+                if group is None: ok = False; break
+                phones += group; i = j
             unit = self.analyse(_line_text(notes), len(notes), phones if ok else None, take)
             plan = [(n, unit, k) for k, n in enumerate(notes)]
         else:
