@@ -12,7 +12,7 @@ test('quinze timbres diferents i totes les veus Matxa vàlides', () => {
   assert.equal(new Set(Object.values(singer.PRESETS).map(v => v.name)).size, 15);
   for (const preset of Object.values(singer.PRESETS)) {
     assert(preset.name && singer.ACCENTS[preset.speaker]);
-    assert(['clean','warm','radio','lofi'].includes(preset.effect), 'sense megàfon: tapa les consonants');
+    assert(['clean','warm','lofi'].includes(preset.effect), 'sense megàfon ni filtre de ràdio: retallen les consonants');
     assert(!['quim', 'olga'].includes(preset.speaker), 'veus que cantades s’entenen poc');
     for (const value of Object.values(preset.eq)) assert(Math.abs(value) <= 12);
   }

@@ -68,8 +68,9 @@ const LANG = process.env.EXPORT_LANG || 'ca';
           const melody = (vspec.lines?.vocal || []).slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
           const swing = song.settings.swing || 0, swung = beats => Math.abs(beats % 1 - .5) < .04 ? beats + swing / 6 : beats;
           const words = text.split('\n').map(l => l.trim()).filter(Boolean)
-            .flatMap((line, li) => (line.toLowerCase().match(english ? /[a-z'’]+/g : /[a-zàèéíïòóúüç·'’-]+/g) || [])
-              .map((w, wi) => ({ word: w.replace(/’/g, "'"), line: li, first: wi === 0, count: Math.max(1, counter(w).count) })));
+            // Les mateixes síl·labes que compta la melodia (amb sinalefes: «que arribi» és una sola unitat de tres notes).
+            .flatMap((line, li) => engine.lyricWords(line, english ? 'en' : 'ca')
+              .map((w, wi) => ({ word: w.word.replace(/’/g, "'"), line: li, first: wi === 0, count: Math.max(1, w.count) })));
           const lineTexts = text.split('\n').map(l => l.trim()).filter(Boolean);
           let n = 0;
           for (const w of words) for (let s = 0; s < w.count && n < melody.length; s++, n++) {

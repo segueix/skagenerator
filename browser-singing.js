@@ -11,23 +11,23 @@
     pere: 'nord-occidental', gina: 'valencia', lluc: 'valencia',
     olga: 'balear', quim: 'balear' };
   // Les veus «quim» i «olga» no s'hi fan servir: cantades són les que menys s'entenen (mesurat amb un
-  // reconeixedor de veu). Tampoc el megàfon, que tapa les consonants.
+  // reconeixedor de veu). Tampoc el megàfon ni el filtre de ràdio, que retallen les consonants.
   const PRESETS = Object.freeze({
     jamaican: { name: 'Ska jamaicà càlid', speaker: 'grau', effect: 'warm', eq: { low: 2, mid: 0, high: 1 }, gainDb: 0 },
     rocksteady: { name: 'Rocksteady vellutat', speaker: 'emma', effect: 'warm', eq: { low: 3, mid: -2, high: -2 }, gainDb: 0 },
     twotone: { name: '2 Tone nasal', speaker: 'pere', effect: 'clean', eq: { low: -2, mid: 3, high: 2 }, gainDb: 1 },
-    nutty: { name: 'Nutty teatral', speaker: 'lluc', effect: 'radio', eq: { low: 0, mid: 3, high: 2 }, gainDb: 0 },
+    nutty: { name: 'Nutty teatral', speaker: 'lluc', effect: 'clean', eq: { low: 0, mid: 3, high: 2 }, gainDb: 0 },
     bossreggae: { name: 'Boss reggae de vinil', speaker: 'lluc', effect: 'warm', eq: { low: 2, mid: -1, high: -3 }, gainDb: 0 },
     skaswing: { name: 'Ska-swing brillant', speaker: 'elia', effect: 'clean', eq: { low: 0, mid: 1, high: 3 }, gainDb: 0 },
-    skapunk: { name: 'Ska-punk estrident', speaker: 'pere', effect: 'radio', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
-    punk77: { name: 'Punk 77 cru', speaker: 'grau', effect: 'radio', eq: { low: -1, mid: 4, high: 1 }, gainDb: 0 },
+    skapunk: { name: 'Ska-punk estrident', speaker: 'pere', effect: 'clean', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
+    punk77: { name: 'Punk 77 cru', speaker: 'grau', effect: 'clean', eq: { low: -1, mid: 4, high: 1 }, gainDb: 0 },
     oi: { name: 'Oi! aspre', speaker: 'grau', effect: 'warm', eq: { low: 3, mid: 3, high: -1 }, gainDb: 1 },
-    skatepunk: { name: 'Skate punk tens', speaker: 'lluc', effect: 'radio', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
+    skatepunk: { name: 'Skate punk tens', speaker: 'lluc', effect: 'clean', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
     garage: { name: 'Garage lo-fi', speaker: 'grau', effect: 'lofi', eq: { low: 1, mid: 2, high: -2 }, gainDb: 0 },
     postpunk: { name: 'Post-punk fosc', speaker: 'grau', effect: 'warm', eq: { low: 3, mid: -2, high: -3 }, gainDb: 0 },
     hardcore: { name: 'Hardcore agressiu', speaker: 'pere', effect: 'clean', eq: { low: -1, mid: 4, high: 2 }, gainDb: 0 },
     poppunk: { name: 'Pop-punk brillant', speaker: 'gina', effect: 'clean', eq: { low: -2, mid: 1, high: 4 }, gainDb: 1 },
-    horrorpunk: { name: 'Horror punk espectral', speaker: 'pere', effect: 'radio', eq: { low: 3, mid: 1, high: -3 }, gainDb: 0 }
+    horrorpunk: { name: 'Horror punk espectral', speaker: 'pere', effect: 'warm', eq: { low: 3, mid: 1, high: -3 }, gainDb: 0 }
   });
   const DEFAULT = PRESETS.jamaican;
   const presetFor = subgenre => PRESETS[subgenre] || DEFAULT;
@@ -420,11 +420,16 @@
       const pieces = notes.map((note, i) => {
         const o0 = note.at * sr, next = notes[i + 1];
         const o1 = next && next.at - (note.at + note.dur) < .09 ? next.at * sr : (note.at + note.dur) * sr;
-        const fa = bounds[i], fb = bounds[i + 1], stretch = (o1 - o0) / Math.max(1, (fb - fa) * hop);
-        // El temps que sobra va sobretot a les vocals (trames sonores i fortes); les consonants gairebé no s'estiren.
-        const alpha = Math.max(0, Math.min(10, (stretch - 1) * 4)), cum = new Float32Array(fb - fa + 1);
-        let top = 1e-9; for (let f = fa; f < fb; f++) if (info.f0[f] && info.energy[f] > top) top = info.energy[f];
-        for (let f = fa; f < fb; f++) cum[f - fa + 1] = cum[f - fa] + 1 + (info.f0[f] ? alpha * (info.energy[f] / top) ** 2 : 0);
+        const fa = bounds[i], fb = bounds[i + 1];
+        // Les consonants conserven la durada que tenen en parlar; el que sobra o falta de la nota ho
+        // absorbeixen les vocals (trames sonores i fortes), que es poden allargar tant com calgui i
+        // escurçar fins a un terç. Només si ni així hi cap, s'escurça tot per igual.
+        const cum = new Float32Array(fb - fa + 1), elastic = new Float32Array(fb - fa);
+        let top = 1e-9, give = 0;
+        for (let f = fa; f < fb; f++) if (info.f0[f] && info.energy[f] > top) top = info.energy[f];
+        for (let f = fa; f < fb; f++) { elastic[f - fa] = info.f0[f] ? (info.energy[f] / top) ** 2 : 0; give += elastic[f - fa]; }
+        const lambda = give > 1e-6 ? Math.max(-.67, ((o1 - o0) / hop - (fb - fa)) / give) : 0;
+        for (let f = fa; f < fb; f++) cum[f - fa + 1] = cum[f - fa] + 1 + lambda * elastic[f - fa];
         return { o0, o1, fa, fb, cum, hz: hzOf(note.midi) * shift, start: note.at, dur: note.dur };
       });
       let t = pieces[0].o0, p = 0, cursor = 0, lastNoise = -1;

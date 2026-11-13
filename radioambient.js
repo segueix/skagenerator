@@ -2280,6 +2280,30 @@
         return { count, stress: EN_SECOND.has(word) ? 1 : /(tion|sion)s?$/.test(word) ? count - 2 : 0 };
     }
     // lang: 'ca' (per defecte) o 'en'.
+    // Unitats cantades d'un vers amb les seves síl·labes. En català es fa sinalefa, com en parlar: la
+    // vocal final d'una paraula i la inicial de la següent comparteixen síl·laba («que‿arribi‿el matí»
+    // en fa cinc, no set), tret que totes dues siguin tòniques («serà alt»). Les paraules que es fonen
+    // formen una sola unitat («que arribi el», tres síl·labes); «stresses» són les seves síl·labes tòniques.
+    function lyricWords(line, lang = 'ca') {
+        const english = lang === 'en', VOWELS = 'aeiouàèéíïòóúü', out = [];
+        let lastTonic = false;   // l'última síl·laba de la unitat anterior és tònica
+        for (const raw of String(line || '').toLowerCase().match(english ? /[a-z'’]+/g : /[a-zàèéíïòóúüç·'’-]+/g) || []) {
+            const w = english ? englishWord(raw) : wordStress(raw), prev = out[out.length - 1];
+            if (!english && prev && w.count > 0) {
+                const end = prev.word.replace(/[^a-zàèéíïòóúüç]/g, ''), start = raw.replace(/^[^a-zàèéíïòóúüç]+/, '').replace(/^h/, '');
+                if (end && start && VOWELS.includes(end[end.length - 1]) && VOWELS.includes(start[0]) && !(lastTonic && w.stress === 0)) {
+                    const base = prev.count - 1;
+                    if (w.stress >= 0 && !prev.stresses.includes(base + w.stress)) prev.stresses.push(base + w.stress);
+                    prev.word += ' ' + raw; prev.count += w.count - 1; prev.stress = prev.stresses.length ? prev.stresses[0] : -1;
+                    lastTonic = w.stress === w.count - 1 && w.stress >= 0 || w.count === 1 && lastTonic;
+                    continue;
+                }
+            }
+            out.push({ word: raw, count: w.count, stress: w.stress, stresses: w.stress >= 0 ? [w.stress] : [] });
+            lastTonic = w.stress >= 0 && w.stress === w.count - 1;
+        }
+        return out;
+    }
     function analyzeLyrics(text, lang = 'ca') {
         const english = lang === 'en';
         const lines = String(text || '').split(/\n/).map(l => l.trim()).filter(l => l && /[a-zàèéíòóúïü]/i.test(l)).slice(0, 32);
@@ -2287,9 +2311,8 @@
         for (const line of lines) {
             let total = 0;
             const stress = [];
-            for (const word of line.toLowerCase().match(english ? /[a-z'’]+/g : /[a-zàèéíïòóúüç·'’-]+/g) || []) {
-                const w = english ? englishWord(word) : wordStress(word);
-                if (w.stress >= 0) stress.push(total + w.stress);
+            for (const w of lyricWords(line, lang)) {
+                for (const k of w.stresses) stress.push(total + k);
                 total += w.count;
             }
             const count = Math.max(1, Math.min(24, total));
@@ -2791,7 +2814,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
