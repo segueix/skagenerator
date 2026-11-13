@@ -24,10 +24,27 @@ RATE, HOP = 44100, 512
 FPS = RATE / HOP
 
 def load_phonemes(path):
+    # Llista de text (un fonema per línia) o JSON {fonema: índex} (veus multilingües).
+    if path.endswith('.json'): return json.load(open(path, encoding='utf-8'))
     return [line.strip() for line in open(path, encoding='utf-8') if line.strip()]
 
 def token_map(phonemes):
-    return {p: i for i, p in enumerate(phonemes)}
+    return dict(phonemes) if isinstance(phonemes, dict) else {p: i for i, p in enumerate(phonemes)}
+
+# Català → fonemes del portuguès (veus amb fonemes «pt/…»): té els sons que l'anglès no té (vocal neutra,
+# e i o obertes, ll, ny, j, x). Entrada: els símbols de catalan.syllables.
+PT_VOWELS = {'a', 'ae', 'an', 'ax', 'e', 'eh', 'en', 'i', 'i0', 'in', 'o', 'oh', 'on', 'u', 'u0', 'un'}
+CA_TO_PT = {'aa': 'a', 'ax': 'ax', 'eh': 'eh', 'ey': 'e', 'iy': 'i', 'ao': 'oh', 'ow': 'o', 'uw': 'u', 'y': 'y', 'w': 'w',
+            'sh': 'sh', 'zh': 'j', 'ch': 'ch', 'jh': 'dj', 'dx': 'r', 'r': 'rr', 'dh': 'd'}
+
+def catalan_to_pt(sylls):
+    def cons(seq):
+        out, i = [], 0
+        while i < len(seq):
+            if i + 1 < len(seq) and seq[i] in ('n', 'l') and seq[i + 1] == 'y': out.append('nh' if seq[i] == 'n' else 'lh'); i += 2; continue
+            out.append(CA_TO_PT.get(seq[i], seq[i])); i += 1
+        return out
+    return [(cons(o), CA_TO_PT.get(v, v), cons(c)) for o, v, c in sylls]
 
 def emb(path):
     return np.fromfile(path, dtype=np.float32).reshape(256)
@@ -48,6 +65,9 @@ class Voice:
         sess = lambda p: ort.InferenceSession(p, so, providers=['CPUExecutionProvider'])
         self.acoustic = sess(d(cfg['acoustic']))
         self.ac_tokens = token_map(load_phonemes(d(cfg['phonemes'])))
+        # Veus multilingües: fonemes amb prefix de llengua i un identificador de llengua per fonema.
+        self.lang_ids = json.load(open(d(cfg['languages']), encoding='utf-8')) if cfg.get('languages') else {}
+        self.prefix = 'pt' if any(str(k).startswith('pt/') for k in self.ac_tokens) and os.environ.get('SING_PHONES', 'pt') == 'pt' else None
         self.speakers = [str(x) for x in cfg.get('speakers') or []]
         chosen = next((x for x in self.speakers if speaker and speaker.lower() in os.path.basename(x).lower()), self.speakers[0] if self.speakers else None)
         self.speaker_name = os.path.basename(chosen) if chosen else 'única'
@@ -79,6 +99,7 @@ class Voice:
         dic = yaml.safe_load(open(dicts[0], encoding='utf-8')) if dicts else {}
         self.vowels = {s['symbol'] for s in dic.get('symbols', []) if s.get('type') == 'vowel'} - {'AP', 'SP'}
         if not self.vowels: self.vowels = {'aa', 'ae', 'ah', 'ao', 'aw', 'ax', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw'}
+        if self.prefix: self.vowels = set(PT_VOWELS)
         self.words = {}
         for e in dic.get('entries', []) or []:
             self.words.setdefault(str(e['grapheme']).lower(), e['phonemes'] if isinstance(e['phonemes'], list) else str(e['phonemes']).split())
@@ -92,9 +113,14 @@ class Voice:
               f'diccionari {len(self.words)} paraules · entrades acústiques {names(self.acoustic)} · pitch {"sí" if self.pitch else "no"}')
 
     def token(self, table, p):
-        for cand in (p, f'en/{p}', p.upper(), p.lower()):
+        for cand in ([f'{self.prefix}/{p}'] if self.prefix else []) + [p, f'en/{p}', p.upper(), p.lower()]:
             if cand in table: return table[cand]
         return table.get('SP', 0)
+
+    def language(self, table, p):
+        if self.prefix and f'{self.prefix}/{p}' in table: return int(self.lang_ids.get(self.prefix, 0))
+        if p not in table and f'en/{p}' in table: return int(self.lang_ids.get('en', 0))
+        return 0
 
     def phonemes_of(self, word):
         w = word.lower().strip("'")
@@ -113,7 +139,12 @@ class Voice:
     def syllables_of(self, word):
         if getattr(self, 'lang', 'en') == 'ca':
             import catalan
-            return catalan.syllables(word)
+            # Una unitat pot ser diverses paraules foses per sinalefa («que arribi el»).
+            out = []
+            for part in word.split():
+                sylls = catalan_to_pt(catalan.syllables(part)) if self.prefix else catalan.syllables(part)
+                out += [(o, v, c, k == 0) for k, (o, v, c) in enumerate(sylls)]
+            return out
         return self.syllables(word)
 
     def syllables(self, word):
@@ -155,6 +186,14 @@ def build_phrase(voice, notes, shift):
     last_vowel = -1e9  # inici de l'última vocal: les consonants següents no se la poden menjar
     for group in words:
         sylls = voice.syllables_of(group[0]['word'])
+        if sylls and len(sylls[0]) == 4:
+            # Sinalefa: mentre sobrin síl·labes, la vocal inicial d'una paraula es fon amb la final de l'anterior.
+            sylls = [list(x) for x in sylls]; k = 1
+            while len(sylls) > len(group) and k < len(sylls):
+                if sylls[k][3] and not sylls[k][0] and not sylls[k - 1][2]:
+                    sylls[k - 1][2] = [sylls[k][1]] + list(sylls[k][2]); del sylls[k]
+                else: k += 1
+            sylls = [tuple(x[:3]) for x in sylls]
         # Ajusta síl·labes fonètiques a notes: sobren → s'ajunten a l'última nota; falten → la vocal s'allarga.
         per_note = [[s] for s in sylls[:len(group)]]
         for extra in sylls[len(group):]: per_note[-1].append(extra)
@@ -232,7 +271,7 @@ def sing_phrase(voice, notes, shift, steps, gender=0.0):
         if voice.pitch is None: raise RuntimeError('la veu no té model de pitch')
         tokens = i64([voice.token(voice.pitch_tokens, p) for p in names])
         lwanted = {i.name for i in voice.pitch_ling.get_inputs()}
-        enc = voice.pitch_ling.run(None, {k: v for k, v in {'tokens': tokens, 'ph_dur': i64(durs), 'languages': np.zeros_like(tokens)}.items() if k in lwanted})[0]
+        enc = voice.pitch_ling.run(None, {k: v for k, v in {'tokens': tokens, 'ph_dur': i64(durs), 'languages': i64([voice.language(voice.pitch_tokens, p) for p in names])}.items() if k in lwanted})[0]
         if voice.pitch is None: raise RuntimeError('la veu no té model de pitch')
         feed = {'encoder_out': enc, 'ph_dur': i64(durs), 'note_midi': np.array([note_midi], np.float32),
             'note_rest': np.array([note_rest], bool), 'note_dur': i64(note_dur), 'pitch': base[None, :],
@@ -247,7 +286,7 @@ def sing_phrase(voice, notes, shift, steps, gender=0.0):
     tokens = i64([voice.token(voice.ac_tokens, p) for p in names])
     feed = {'tokens': tokens, 'durations': i64(durs), 'f0': f0[None, :], 'gender': np.full((1, n_frames), gender, np.float32),
         'velocity': np.ones((1, n_frames), np.float32), 'depth': np.array(int(voice.max_depth), np.int64),
-        'speedup': np.array(max(1, int(voice.max_depth) // steps), np.int64), 'steps': np.array(steps, np.int64), 'languages': np.zeros_like(tokens),
+        'speedup': np.array(max(1, int(voice.max_depth) // steps), np.int64), 'steps': np.array(steps, np.int64), 'languages': i64([voice.language(voice.ac_tokens, p) for p in names]),
         'key_shift': np.zeros((1, n_frames), np.float32), 'speed': np.ones((1, n_frames), np.float32),
         'energy': np.zeros((1, n_frames), np.float32), 'breathiness': np.zeros((1, n_frames), np.float32),
         'voicing': np.zeros((1, n_frames), np.float32), 'tension': np.zeros((1, n_frames), np.float32)}
@@ -306,6 +345,8 @@ def main(voice_dir, score_path, band_path, out_path, speaker=None, steps=40, voc
     # TIGER és una veu masculina: si la melodia va alta, una octava avall (l'harmonia no canvia).
     median = float(np.median([n['midi'] for n in notes]))
     shift = -12 if median > 60 else 0
+    # Altres veus: SING_CENTER és la nota (MIDI) al voltant de la qual canten còmodes.
+    if os.environ.get('SING_CENTER'): shift = 12 * round((float(os.environ['SING_CENTER']) - median) / 12)
     speaker = speaker or {'rocksteady': 'tiger_vinyl', 'bossreggae': 'tiger_vinyl', 'jamaican': 'tiger_vinyl', 'poppunk': 'tiger_electric'}.get(score.get('subgenre'), 'tiger_fresh')
     phrases = plan_phrases
     if external_vocal:

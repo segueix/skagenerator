@@ -45,7 +45,8 @@ VOWEL_SOUND = {'a': ('aa', 'ax'), 'à': ('aa', 'aa'), 'e': ('eh', 'ax'), 'è': (
 
 def syllables(raw):
     """[(inici, vocal, final)] amb una síl·laba per cada nucli que compta l'app."""
-    word = clean(raw)
+    # «gue», «gui»: la g és forta (es marca abans de treure la u muda; si no, «guitarra» sonava «jitarra»).
+    word = clean(re.sub(r'[gG]u(?=[eiéèí])', 'ĝ', raw))
     nuc = nuclei(word)
     if not nuc: return [([], 'ax', [])]
     bare = raw.lower().replace('’', "'").split("'")[-1]
@@ -79,6 +80,7 @@ def syllables(raw):
         elif c == 'ç': units.append(('C', 's'))
         elif c == 'q': units.append(('C', 'k'))
         elif c == 'g': units.append(('C', 'zh' if nxt in 'eiéèí' else 'g'))
+        elif c == 'ĝ': units.append(('C', 'g'))
         elif c == 'j': units.append(('C', 'zh'))
         elif c == 'x': units.append(('C', 'sh'))
         elif c in 'bv':
