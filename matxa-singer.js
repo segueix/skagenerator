@@ -336,6 +336,9 @@
     const text = words.join(' ');
     return text.slice(0, 1).toUpperCase() + text.slice(1) + '.';
   }
+  // El que es demana a Matxa a la ràdio: vocals triplicades a les síl·labes de 0,3 s o més. Mesurat amb
+  // quatre cançons: de 40 % a 44 % de paraules enteses de mitjana, i el punk ràpid de 16 % a 36 %.
+  const spokenText = notes => lineText(notes, { stretch: true, minSeconds: .3 });
   // Un vers cantat → { start (segons), wave (Float32 a 44,1 kHz) }  (MatxaSinger._sing_take)
   function singLine(world, notes, shift, unit, seed = 0) {
     const { rate, bins, n: unitFrames } = unit;
@@ -528,7 +531,7 @@
     return out;
   }
 
-  return { SPEECH, TIMBRES, timbreFor, noteOf, lineText, phrasesOf, shiftFor, analyse, singLine, lay, mixSong, applyTimbre,
+  return { SPEECH, TIMBRES, timbreFor, noteOf, lineText, spokenText, phrasesOf, shiftFor, analyse, singLine, lay, mixSong, applyTimbre,
     // Per a les proves.
     stretchWord, butter, sosfilt, sosfiltfilt, savgol7, findPeaks, findNuclei, upsample, convolveLong, rng };
 });

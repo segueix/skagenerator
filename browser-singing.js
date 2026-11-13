@@ -187,7 +187,7 @@
         // Una locució per vers diferent (la tornada es demana un sol cop); s'analitza en arribar.
         const units = new Map();
         for (const phrase of phrases) {
-          const text = window.SkaMatxaSinger.lineText(phrase), key = text + '|' + phrase.length;
+          const text = window.SkaMatxaSinger.spokenText(phrase), key = text + '|' + phrase.length;
           if (units.has(key)) continue;
           units.set(key, client.speak(text, speaker, SPEECH_RATE, signal).then(pcm => {
             if (signal?.aborted) throw aborted();
