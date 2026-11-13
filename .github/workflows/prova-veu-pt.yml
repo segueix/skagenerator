@@ -1,0 +1,31 @@
+name: Prova privada d'un cantant en portuguès (no publica res)
+
+# Prova d'ús personal: baixa el cantant Umidaji (Team BRAPA; ús personal permès, ús comercial amb
+# llicència, sense contingut polític ni religiós) i en mostra l'estructura. No es desa ni es publica.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/prova-veu-pt.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Baixar i inspeccionar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view --repo Team-BRAPA/Umidaji-DiffSinger --json tagName,assets -q '.tagName, (.assets[] | "\(.name) \(.size)")'
+          mkdir vb && cd vb
+          gh release download --repo Team-BRAPA/Umidaji-DiffSinger
+          ls -la
+          for f in *.zip; do unzip -q -o "$f" -d x || true; done
+          find x -type f | sed 's/^/  /' | head -200
+          echo "=== fitxers de text i configuració ==="
+          find x -type f \( -iname '*.yaml' -o -iname '*.yml' -o -iname '*.txt' -o -iname '*.md' -o -iname '*.json' \) -size -200k | while read -r f; do
+            echo "──────── $f ($(wc -l < "$f") línies)"; head -c 6000 "$f"; echo; done
