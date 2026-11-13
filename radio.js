@@ -10,7 +10,7 @@
   const browserSinger = window.SkaUmidaji?.createSinger({ audioUtils });
   let generationController = null;
   // Cançó que Umidaji està cantant a part: mentrestant la cua s'omple amb cançons de guia i no hi ha silencis.
-  let parked = null;
+  let parked = null, historyVoice = null, historyPlayback = null;
   // Veus ja cantades i desades al dispositiu (per identificador de cançó). Les cançons amb 👍 que en tenen
   // formen el repertori: quan n'hi ha prou, omplen la cua en lloc de les cançons noves sense veu.
   const REPERTOIRE_MIN = 8, TAKES_UNVOTED = 12, TAKES_LIKED = 60;
@@ -22,11 +22,12 @@
     const history = readHistory(), known = new Map(history.map(e => [e.id, e])), drop = [];
     // Les que encara no han sonat (acabades de cantar o a la cua) no són a l'historial: no es toquen.
     const pending = new Set([fresh, current?.id, ...queue.map(t => t.id)]);
-    const age = id => known.get(id).lastPlayed || known.get(id).created || 0;
+    const age = id => Math.max(known.get(id).voiceCreated || 0, known.get(id).lastPlayed || known.get(id).created || 0);
+    const keepLonger = id => known.get(id).vote === 1 || !!known.get(id).voiceCreated;
     const ids = [...savedTakes].filter(id => !pending.has(id));
-    for (const id of ids) if (!known.has(id) || known.get(id).vote === -1) drop.push(id);
+    for (const id of ids) if (!known.has(id) || (known.get(id).vote === -1 && !known.get(id).voiceCreated)) drop.push(id);
     const keep = ids.filter(id => !drop.includes(id));
-    for (const [list, max] of [[keep.filter(id => known.get(id).vote !== 1), TAKES_UNVOTED], [keep.filter(id => known.get(id).vote === 1), TAKES_LIKED]])
+    for (const [list, max] of [[keep.filter(id => !keepLonger(id)), TAKES_UNVOTED], [keep.filter(keepLonger), TAKES_LIKED]])
       drop.push(...list.sort((a, b) => age(b) - age(a)).slice(max));
     for (const id of drop) { savedTakes.delete(id); browserSinger?.takes.remove(id).catch(() => {}); }
     showRepertoire();
@@ -85,7 +86,6 @@
     if (!entry) return null;
     change(entry); writeHistory(list); return entry;
   }
-  const secondsOf = s => { let t = 0; for (let b = 0; b < s.settings.bars; b++) t += 240 / (s.sections.find(x => b >= x.start && b < x.start + x.bars)?.bpm || s.settings.bpm); return t; };
 
   // ── Tria de la cançó següent ─────────────────────────────────────────
   // Sempre hi ha dues cançons a punt per endavant: amb la pantalla apagada el mòbil va més lent
@@ -164,6 +164,11 @@
     return sungLoading;
   }
   const sungById = id => sungCatalog?.find(s => s.id === id);
+  function historyChoice(entry) {
+    const sung = sungById(entry.id);
+    return { id: entry.id, replay: true, take: savedTakes.has(entry.id), sung,
+      song: studio.validateSong(JSON.parse(JSON.stringify(entry.song))) };
+  }
   // filler: cal una cançó per omplir la cua mentre Umidaji en canta una altra (o no hi ha banc de veu).
   function chooseSong(filler = false) {
     const history = readHistory(), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
@@ -173,7 +178,7 @@
     if (filler && repertoire.length >= REPERTOIRE_MIN && rested.length) {
       rested.sort((a, b) => (a.lastPlayed || 0) - (b.lastPlayed || 0));
       const entry = pickOne(rested.slice(0, Math.max(1, Math.ceil(rested.length / 2))));
-      try { return { id: entry.id, replay: true, take: true, song: studio.validateSong(JSON.parse(JSON.stringify(entry.song))) }; }
+      try { return historyChoice(entry); }
       catch (error) { console.warn('Cançó de l’historial no vàlida', error); }
     }
     const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id));
@@ -181,9 +186,7 @@
       // Entre les preferides, les que fa més que no sonen.
       liked.sort((a, b) => (a.lastPlayed || 0) - (b.lastPlayed || 0));
       const entry = pickOne(liked.slice(0, Math.max(1, Math.ceil(liked.length / 2))));
-      // Una cantada que encara és al catàleg torna a sonar cantada; si no, en versió instrumental.
-      const sung = entry.sung ? sungById(entry.id) : null;
-      try { return { id: entry.id, replay: true, take: savedTakes.has(entry.id), ...(sung ? { sung } : {}), song: studio.validateSong(JSON.parse(JSON.stringify(entry.song))) }; }
+      try { return historyChoice(entry); }
       catch (error) { console.warn('Cançó de l’historial no vàlida', error); }
     }
     // Cançó nova: subgènere a l'atzar (diferent de l'anterior) i estructura que s'allunya de les últimes.
@@ -233,39 +236,25 @@
     }
     return new Blob([header.buffer, pcm.buffer], { type: 'audio/wav' });
   }
-  async function prepare(mine) {
-    setPrep({ stage: 'compose', value: 0 });
-    await breathe();
-    await restoringBank;
-    await takesReady;
-    await bankImport?.catch(() => {});
-    if (sungCatalog === null) await loadSung();
-    if (mine !== session) throw CANCELLED;
-    const controller = new AbortController();
-    generationController = controller;
-    const choice = chooseSong(!canSing()), song = choice.song, segs = studio.segmentsOf(song), parts = [], lengths = [];
-    if (choice.sung) {
-      // Cançó cantada: ja està feta, es baixa sencera abans que soni (també amb la pantalla apagada).
-      setPrep({ stage: 'download', value: 0, title: song.title });
-      const response = await fetch(new URL(`cantades/${choice.sung.file}`, document.baseURI), { signal: controller.signal });
-      if (!response.ok) throw new Error(`No s’ha pogut baixar la cançó cantada (error ${response.status})`);
-      const blob = await response.blob();
-      if (mine !== session) throw CANCELLED;
-      // Seccions i lletra per al reproductor, amb els temps de la partitura.
-      const timeline = []; let at = 0;
-      const lines = Array.isArray(choice.sung.lines) ? choice.sung.lines.filter(l => l && Number.isFinite(l.at) && typeof l.text === 'string') : [];
-      for (const seg of segs) {
-        const bpm = seg.section?.bpm ?? song.settings.bpm, length = seg.bars * 240 / bpm;
-        timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lines.filter(l => l.at >= at && l.at < at + length) });
-        at += length;
-      }
-      return { id: choice.id, replay: choice.replay, sung: true, voiceTimbre: choice.sung.voiceTimbre,
-        song, seconds: Number(choice.sung.seconds) || at, timeline, url: URL.createObjectURL(blob) };
-    }
-    const bars = segs.reduce((n, seg) => n + seg.bars, 0); let done = 0;
-    const timeline = []; let at = 0;
-    // Cada secció es compon un cop; les que porten lletra i melodia de veu es canten.
-    const plan = segs.map(seg => {
+  async function downloadTrack(choice, signal) {
+    const { song, sung } = choice;
+    const response = await fetch(new URL(`cantades/${sung.file}`, document.baseURI), { signal });
+    if (!response.ok) throw new Error(`No s’ha pogut baixar la cançó cantada (error ${response.status})`);
+    const blob = await response.blob();
+    const lines = Array.isArray(sung.lines) ? sung.lines.filter(l => l && Number.isFinite(l.at) && typeof l.text === 'string') : [];
+    let at = 0;
+    const timeline = studio.segmentsOf(song).map(seg => {
+      const bpm = seg.section?.bpm ?? song.settings.bpm, length = seg.bars * 240 / bpm;
+      const mark = { at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lines.filter(l => l.at >= at && l.at < at + length) };
+      at += length;
+      return mark;
+    });
+    return { ...choice, sung: true, voiceTimbre: sung.voiceTimbre, seconds: Number(sung.seconds) || at, timeline, url: URL.createObjectURL(blob) };
+  }
+
+  function renderPlan(song) {
+    let at = 0;
+    return studio.segmentsOf(song).map(seg => {
       const spec = engine.composeSongPart(song.settings, studio.partFor(song, seg)), bpm = seg.section?.bpm ?? song.settings.bpm;
       const frames = Math.round(seg.bars * 240 / bpm * RATE), lyrics = seg.section?.lyrics?.trim();
       const vocal = !!lyrics && spec.instruments.includes('vocal') && !!spec.lines?.vocal?.length;
@@ -273,83 +262,125 @@
       at += frames / RATE;
       return item;
     });
-    at = 0;
-    // Umidaji canta la partitura a part (una cançó cada vegada): pot trigar minuts, sobretot al mòbil.
-    let job = null, stored = null;
-    const voiceController = new AbortController();
-    // Una cançó que ja té la veu desada no s'ha de tornar a cantar.
-    if (choice.take && plan.some(p => p.vocal)) {
-      stored = await browserSinger.takes.load(choice.id).catch(() => null);
-      if (!stored) savedTakes.delete(choice.id);
-    }
-    if (!stored && canSing() && song.settings.lang === 'ca' && plan.some(p => p.vocal)) {
-      const notes = window.SkaBrowserSinging.scoreNotes(plan.filter(p => p.vocal).map(p => ({ at: p.at, bpm: p.bpm, text: p.lyrics, melody: p.spec.lines.vocal, type: p.seg.section.type })),
-        engine.lyricWords, song.settings.swing || 0);
-      if (notes.length) job = browserSinger.start({
-        notes, subgenre: song.settings.subgenre, signal: voiceController.signal,
-        onProgress: value => { if (parked?.controller === voiceController) { parked.progress = value; renderPrep(); } }
-      });
-      if (job) parked = { controller: voiceController, title: song.title, progress: 0 };
-    }
-    try {
-    for (const { seg, spec, bpm, frames, vocal } of plan) {
-      if (mine !== session) throw CANCELLED;
-      // Si es canta, la banda es grava sense la melodia de guia.
-      const renderSpec = (job || stored) && vocal ? { ...spec, instruments: spec.instruments.filter(name => name !== 'vocal'), lines: { ...spec.lines, vocal: [] } } : spec;
+  }
+
+  function scoreNotes(song, plan) {
+    return window.SkaBrowserSinging.scoreNotes(plan.filter(p => p.vocal).map(p => ({
+      at: p.at, bpm: p.bpm, text: p.lyrics, melody: p.spec.lines.vocal, type: p.seg.section.type
+    })), engine.lyricWords, song.settings.swing || 0);
+  }
+
+  async function loadTake(choice, plan) {
+    if (!choice.take || !plan.some(p => p.vocal)) return null;
+    const stored = await browserSinger.takes.load(choice.id).catch(() => null);
+    if (!stored) savedTakes.delete(choice.id);
+    return stored;
+  }
+
+  async function renderBand(song, plan, withVoice, active, progress) {
+    const bars = plan.reduce((n, { seg }) => n + seg.bars, 0), parts = [], lengths = [], timeline = [];
+    let done = 0;
+    for (const { seg, spec, bpm, frames, vocal, at } of plan) {
+      if (!active()) throw CANCELLED;
+      const renderSpec = withVoice && vocal ? { ...spec, instruments: spec.instruments.filter(name => name !== 'vocal'), lines: { ...spec.lines, vocal: [] } } : spec;
       let data;
       if (renderSpec.instruments.length) {
-        data = await sampleAudio.render(renderSpec, RATE, { onProgress: progress => {
-          if (mine !== session) return;
-          if (progress.stage === 'loading') setPrep({ stage: 'bank', value: progress.value, title: song.title });
-          else setPrep({ stage: 'render', value: (done + seg.bars * (progress.stage === 'rendering' ? progress.value || 0 : 0)) / bars, title: song.title });
+        data = await sampleAudio.render(renderSpec, RATE, { onProgress: update => {
+          if (!active()) return;
+          if (update.stage === 'loading') progress('bank', update.value);
+          else progress('render', (done + seg.bars * (update.stage === 'rendering' ? update.value || 0 : 0)) / bars);
         } });
-      } else { const empty = Math.round((spec.seconds + TAIL_SECONDS) * RATE); data = [new Float32Array(empty), new Float32Array(empty)]; }
+      } else {
+        const empty = Math.round((spec.seconds + TAIL_SECONDS) * RATE);
+        data = [new Float32Array(empty), new Float32Array(empty)];
+      }
+      if (!active()) throw CANCELLED;
       if (seg.section?.fade) data = audioUtils.applyFade(data, Math.min(frames, data[0].length), seg.section.fade);
       parts.push(data); lengths.push(Math.min(frames, data[0].length));
       timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lyricLines(song, seg, spec, at) });
-      at += frames / RATE; done += seg.bars;
-      setPrep({ stage: 'render', value: done / bars, title: song.title });
+      done += seg.bars;
+      progress('render', done / bars);
     }
-    if (mine !== session) throw CANCELLED;
-    setPrep({ stage: 'mix', value: 1, title: song.title });
+    progress('mix', 1);
     await breathe();
-    const offsets = lengths.reduce((list, n, i) => (list.push(i ? list[i - 1] + lengths[i - 1] : 0), list), []);
-    const band = audioUtils.mixSections(parts, lengths); parts.length = 0;
-    if (!job) {
-      const mixed = stored ? browserSinger.mix(stored, band, song.settings.subgenre) : band;
-      const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
-      return { id: choice.id, replay: choice.replay, sung: !!stored, voiceTimbre: stored ? browserSinger.timbreName(song.settings.subgenre) : null, song, seconds, timeline, url: URL.createObjectURL(blob) };
+    if (!active()) throw CANCELLED;
+    return { band: audioUtils.mixSections(parts, lengths), timeline };
+  }
+
+  async function renderTrack(choice, { band, timeline }, pcm) {
+    const subgenre = choice.song.settings.subgenre;
+    const mixed = pcm ? browserSinger.mix(pcm, band, subgenre) : band;
+    const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
+    return { ...choice, sung: !!pcm, voiceTimbre: pcm ? browserSinger.timbreName(subgenre) : null, seconds, timeline, url: URL.createObjectURL(blob) };
+  }
+
+  async function prepare(mine) {
+    setPrep({ stage: 'compose', value: 0 });
+    await breathe();
+    await restoringBank;
+    await takesReady;
+    await bankImport?.catch(() => {});
+    if (sungCatalog === null) await loadSung();
+    const active = () => mine === session;
+    if (!active()) throw CANCELLED;
+    const controller = new AbortController();
+    generationController = controller;
+    const choice = chooseSong(!canSing()), song = choice.song;
+    const progress = (stage, value) => setPrep({ stage, value, title: song.title });
+    if (choice.sung) {
+      progress('download', 0);
+      return downloadTrack(choice, controller.signal);
     }
-    // La banda ja és feta (sense melodia de guia). Quan Umidaji acabi, la cançó passa al davant de la
-    // cua; mentrestant aquesta funció no retorna res i la ràdio continua preparant-ne d'altres.
-    (async () => {
-      try {
-        const pcm = await job.result;
-        // La veu es desa: si la cançó agrada, tornarà a sonar cantada sense haver-la de cantar de nou.
-        await browserSinger.takes.save(choice.id, pcm).then(() => { savedTakes.add(choice.id); pruneTakes(choice.id); }).catch(error => console.warn('No s’ha pogut desar la veu:', error));
-        if (mine !== session) return;
-        const mixed = browserSinger.mix(pcm, band, song.settings.subgenre);
-        const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
-        if (mine !== session) return;
-        queue.unshift({ id: choice.id, replay: choice.replay, sung: true, voiceTimbre: job.timbre.name, song, seconds, timeline, url: URL.createObjectURL(blob) });
-      } catch (error) {
-        if (mine !== session || voiceController.signal.aborted) return;
-        console.warn('Umidaji no ha pogut cantar «' + song.title + '»:', error);
-        toast('Umidaji no ha pogut cantar una cançó. La ràdio continua amb la melodia de guia.');
-      } finally {
-        if (parked?.controller === voiceController) parked = null;
-        if (mine === session && station) { if (queue.length && waiting) advance(); else renderPrep(); fill(session); }
+    const plan = renderPlan(song), stored = await loadTake(choice, plan);
+    if (!active()) throw CANCELLED;
+    // Umidaji canta a part: la ràdio continua preparant la cua mentrestant.
+    const voiceController = new AbortController();
+    let job = null, finishVoice;
+    if (!stored && canSing() && song.settings.lang === 'ca') {
+      const notes = scoreNotes(song, plan);
+      if (notes.length) {
+        job = browserSinger.start({
+          notes, subgenre: song.settings.subgenre, signal: voiceController.signal,
+          onProgress: value => { if (parked?.controller === voiceController) { parked.progress = value; renderPrep(); } }
+        });
+        const finished = new Promise(resolve => { finishVoice = resolve; });
+        parked = { controller: voiceController, title: song.title, progress: 0, finished };
       }
-    })();
-    return null;
+    }
+    try {
+      const rendered = await renderBand(song, plan, !!(job || stored), active, progress);
+      if (!job) return renderTrack(choice, rendered, stored);
+      // Quan Umidaji acabi, la cançó passa al davant de la cua.
+      // Mentrestant la ràdio continua preparant-ne d'altres.
+      (async () => {
+        try {
+          const pcm = await job.result;
+          // La veu es desa: si la cançó agrada, tornarà a sonar cantada sense haver-la de cantar de nou.
+          await browserSinger.takes.save(choice.id, pcm).then(() => { savedTakes.add(choice.id); pruneTakes(choice.id); }).catch(error => console.warn('No s’ha pogut desar la veu:', error));
+          if (mine !== session) return;
+          const track = await renderTrack(choice, rendered, pcm);
+          if (!active()) { URL.revokeObjectURL(track.url); return; }
+          queue.unshift(track);
+        } catch (error) {
+          if (mine !== session || voiceController.signal.aborted) return;
+          console.warn('Umidaji no ha pogut cantar «' + song.title + '»:', error);
+          toast('Umidaji no ha pogut cantar una cançó. La ràdio continua amb la melodia de guia.');
+        } finally {
+          if (parked?.controller === voiceController) parked = null;
+          finishVoice();
+          if (mine === session && station) { if (queue.length && waiting) advance(); else renderPrep(); fill(session); }
+        }
+      })();
+      return null;
     } catch (error) {
       // Si la banda no s'ha pogut fer, la veu que s'estava cantant ja no serveix.
       if (parked?.controller === voiceController) { parked = null; voiceController.abort(); }
+      finishVoice?.();
       throw error;
     }
   }
   // Es pot posar una cançó a cantar: hi ha el banc de veu i Umidaji no en canta cap altra.
-  const canSing = () => !!browserSinger?.available && !parked;
+  const canSing = () => !!browserSinger?.available && !parked && !historyVoice;
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
   // (cada síl·laba és una nota, en ordre).
   function lyricLines(song, seg, spec, at) {
@@ -416,15 +447,21 @@
       waiting = true; if (current) { URL.revokeObjectURL(current.url); current = null; }
       playSilence(); renderPlayer(); fill(session); return;
     }
+    playTrack(queue.shift());
+  }
+  function playTrack(track) {
     waiting = false;
-    if (current) URL.revokeObjectURL(current.url);
-    current = queue.shift();
+    if (current && current !== track) URL.revokeObjectURL(current.url);
+    current = track;
     const now = Date.now(), list = readHistory(), old = list.find(e => e.id === current.id);
-    if (old) { old.plays = (old.plays || 1) + 1; old.lastPlayed = now; }
+    if (old) {
+      old.plays = (old.plays || 1) + 1; old.lastPlayed = now;
+      if (current.sung) old.sung = true;
+    }
     else list.unshift({ id: current.id, title: current.song.title, style: current.song.settings.style, subgenre: current.song.settings.subgenre || '',
       seconds: Math.floor(current.seconds), created: now, lastPlayed: now, plays: 1, vote: 0, comment: '', ...(current.sung ? { sung: true } : {}), song: current.song });
     writeHistory(list);
-    played.push(current.id); sinceReplay = current.replay ? 0 : sinceReplay + 1;
+    if (station) { played.push(current.id); sinceReplay = current.replay ? 0 : sinceReplay + 1; }
     onTrack = true; userPaused = false; needsTap = false; audio.loop = false; audio.src = current.url; audio.currentTime = 0;
     audio.play().catch(() => { if (onTrack && audio.paused) { needsTap = true; renderPlayer(); } });
     mediaMetadata(); renderPlayer(); renderHistory();
@@ -432,6 +469,7 @@
   }
   function chooseStation(style) {
     if (!STATIONS[style]) return;
+    cancelHistoryPlayback();
     studio.stop();
     generationController?.abort();
     parked?.controller.abort(); parked = null;
@@ -450,7 +488,8 @@
   function leaveStation() {
     generationController?.abort();
     parked?.controller.abort(); parked = null;
-    browserSinger?.dispose();
+    cancelHistoryPlayback();
+    if (!historyVoice && !bankImport) browserSinger?.dispose();
     session++; station = null; waiting = false; onTrack = false;
     clearTimeout(retryTimer); releaseLock?.(); releaseLock = null;
     audio.pause(); audio.removeAttribute('src'); audio.load();
@@ -463,11 +502,12 @@
     else { userPaused = true; audio.pause(); }
   }
   function skip() { if (queue.length) advance(); }
-  audio.addEventListener('ended', () => { if (onTrack) advance(); });
+  audio.addEventListener('ended', () => { if (onTrack && station) advance(); else renderPlayer(); });
   audio.addEventListener('error', () => {
-    if (!onTrack || !station) return;
-    console.error(audio.error); toast('Aquesta cançó no s’ha pogut reproduir. Passem a la següent.');
-    onTrack = false; advance();
+    if (!onTrack) return;
+    console.error(audio.error); toast('Aquesta cançó no s’ha pogut reproduir.');
+    onTrack = false;
+    if (station) advance(); else renderPlayer();
   });
   for (const type of ['play', 'pause', 'playing']) audio.addEventListener(type, () => renderPlayer());
   audio.addEventListener('timeupdate', renderProgress);
@@ -475,7 +515,7 @@
   function mediaMetadata() {
     if (!('mediaSession' in navigator) || !current) return;
     try {
-      if (window.MediaMetadata) navigator.mediaSession.metadata = new window.MediaMetadata({ title: current.song.title, artist: `Radio Spam · ${subgenreName(current.song.settings.subgenre)}`, album: `Emissora ${STATIONS[station]}` });
+      if (window.MediaMetadata) navigator.mediaSession.metadata = new window.MediaMetadata({ title: current.song.title, artist: `Radio Spam · ${subgenreName(current.song.settings.subgenre)}`, album: station ? `Emissora ${STATIONS[station]}` : 'Historial' });
     } catch {}
   }
   if ('mediaSession' in navigator) {
@@ -488,7 +528,8 @@
   function showScreen(name) {
     $('radio-home').hidden = name !== 'home'; $('radio-player').hidden = name !== 'player';
     $('radio-back').hidden = name !== 'player';
-    $('radio').dataset.station = name === 'player' ? station : '';
+    $('radio-back').setAttribute('aria-label', station ? 'Canvia d’emissora' : 'Torna a les emissores');
+    $('radio').dataset.station = name === 'player' ? station || current?.song.settings.style || '' : '';
   }
   function setPrep(value) { prep = value; renderPrep(); }
   function prepText() {
@@ -516,6 +557,7 @@
     else next.textContent = text ? `A continuació: ${text[0].toLowerCase()}${text.slice(1)}` : '';
     if (parked && !waiting) next.textContent += `${next.textContent ? ' · ' : ''}Umidaji canta «${parked.title}» · ${Math.round(parked.progress * 100)} %`;
     next.classList.toggle('ready', !!upcoming);
+    $('radio-skip').hidden = !station;
     $('radio-skip').disabled = !upcoming;
   }
   function renderPlayer() {
@@ -523,9 +565,9 @@
     const isPlaying = !!current && onTrack && !audio.paused;
     player.classList.toggle('is-playing', isPlaying);
     player.classList.toggle('is-waiting', waiting || !current);
-    $('radio-disc-label').textContent = STATIONS[station] ? STATIONS[station].toUpperCase() : '';
+    $('radio-disc-label').textContent = (STATIONS[station || current?.song.settings.style] || '').toUpperCase();
     $('radio-subgenre').textContent = current ? subgenreName(current.song.settings.subgenre) : `Emissora ${STATIONS[station] || ''}`;
-    $('radio-replay').hidden = !current?.replay;
+    $('radio-replay').hidden = !current?.replay || entry?.vote !== 1;
     $('radio-sung').hidden = !current?.sung;
     $('radio-title').textContent = current ? current.song.title : '';
     $('radio-meta').textContent = current ? `${keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}${current.voiceTimbre ? ' · ' + current.voiceTimbre : ''}` : '';
@@ -596,6 +638,137 @@
   const FILTERS = { all: () => true, ska: e => e.style === 'ska', punk: e => e.style === 'punk', up: e => e.vote === 1, down: e => e.vote === -1, comment: e => !!e.comment?.trim() };
   const dateText = ms => { try { return new Date(ms).toLocaleString('ca', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
   function make(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; }
+  function historyStatus(action, label) {
+    if (action) action.label = label;
+    const visible = historyPlayback || historyVoice;
+    $('radio-history-status').textContent = visible ? `«${visible.title}» · ${visible.label}` : '';
+  }
+  function cancelHistoryPlayback() {
+    historyPlayback?.controller.abort();
+    historyPlayback = null;
+    historyStatus();
+  }
+  async function playHistory(entry) {
+    cancelHistoryPlayback();
+    const controller = new AbortController(), action = { id: entry.id, title: entry.title, controller };
+    historyPlayback = action;
+    const active = () => historyPlayback === action;
+    // Desbloqueja el reproductor amb el toc encara que vinguem de la pantalla d'emissores.
+    if (!station && !current) playSilence();
+    historyStatus(action, 'Preparant la reproducció…');
+    try {
+      await takesReady;
+      entry = readHistory().find(e => e.id === entry.id) || entry;
+      if (entry.sung && sungCatalog === null && !savedTakes.has(entry.id)) await loadSung();
+      if (!active()) return;
+      let track;
+      if (current?.id === entry.id && onTrack && (current.sung || !savedTakes.has(entry.id))) {
+        track = current;
+      } else {
+        const choice = historyChoice(entry);
+        const plan = renderPlan(choice.song), stored = await loadTake(choice, plan);
+        if (!active()) return;
+        if (choice.sung && !stored) {
+          track = await downloadTrack(choice, controller.signal).catch(error => {
+            if (controller.signal.aborted) throw error;
+            console.warn('La versió cantada del catàleg no està disponible:', error);
+            return null;
+          });
+        }
+        if (!track) {
+          const progress = (stage, value) => {
+            const label = stage === 'bank' ? 'Carregant els instruments' : stage === 'mix' ? 'Fent la mescla' : 'Gravant la banda';
+            historyStatus(action, stage === 'render' ? `${label} · ${Math.round(value * 100)} %` : `${label}…`);
+          };
+          const rendered = await renderBand(choice.song, plan, !!stored, active, progress);
+          track = await renderTrack(choice, rendered, stored);
+        }
+      }
+      if (!active()) { if (track !== current) URL.revokeObjectURL(track.url); return; }
+      studio.stop();
+      historyPlayback = null;
+      historyStatus();
+      queue = queue.filter(queued => {
+        if (queued.id !== track.id) return true;
+        URL.revokeObjectURL(queued.url);
+        return false;
+      });
+      openHistory(false);
+      playTrack(track);
+      showScreen('player');
+      $('radio-play').focus();
+    } catch (error) {
+      if (!active()) return;
+      if (!station && !current) audio.pause();
+      toast(`No s’ha pogut reproduir «${entry.title}». ${reasonOf(error)}`);
+    } finally {
+      if (active()) {
+        historyPlayback = null;
+        historyStatus();
+        renderHistory();
+      }
+    }
+  }
+  function addHistoryLyrics(song) {
+    if (song.settings.lang !== 'en' && song.sections.some(sec => sec.lyrics?.trim())) return;
+    const { subgenre, style, seed } = song.settings;
+    const eligible = song.sections.filter(sec => song.clips.some(clip =>
+      clip.instrument === 'vocal' && clip.generated && clip.start < sec.start + sec.bars && clip.start + clip.bars > sec.start));
+    const written = window.SkaLyrics.writeLyrics({ subgenre, style, seed: (seed ^ 0x5bd1e995) >>> 0, sections: eligible, lang: 'ca' });
+    eligible.forEach((sec, index) => {
+      const line = written.sections[index];
+      sec.lyrics = line.text;
+      if (line.phraseBars === 4) sec.phraseBars = 4;
+      else delete sec.phraseBars;
+    });
+    song.settings.lang = 'ca';
+  }
+  async function generateHistoryVoice(entry) {
+    if (historyVoice) { toast('Umidaji ja prepara una cançó de l’historial.'); return; }
+    if (!browserSinger) { toast('Umidaji no està disponible en aquest navegador.'); return; }
+    const action = { id: entry.id, title: entry.title };
+    historyVoice = action;
+    renderHistory();
+    try {
+      historyStatus(action, 'Preparant Umidaji…');
+      await restoringBank;
+      await bankImport?.catch(() => {});
+      await takesReady;
+      if (!bankReady) throw new Error('Carrega el ZIP d’Umidaji a la pantalla de les emissores.');
+      if (parked) {
+        historyStatus(action, 'Esperant que Umidaji acabi la cançó anterior…');
+        await parked.finished;
+      }
+      if (savedTakes.has(entry.id)) return;
+      if (!browserSinger.available) throw new Error('Umidaji encara s’està recuperant. Torna-ho a provar d’aquí a un minut.');
+      const { song } = historyChoice(entry);
+      addHistoryLyrics(song);
+      const notes = scoreNotes(song, renderPlan(song));
+      if (!notes.length) throw new Error('La cançó no té cap melodia de veu que es pugui cantar.');
+      historyStatus(action, 'Umidaji està preparant la veu…');
+      const job = browserSinger.start({
+        notes, subgenre: song.settings.subgenre,
+        onProgress: value => historyStatus(action, `Umidaji està cantant · ${Math.round(value * 100)} %`)
+      });
+      const pcm = await job.result;
+      historyStatus(action, 'Desant la veu…');
+      await browserSinger.takes.save(entry.id, pcm);
+      if (!updateEntry(entry.id, e => { e.song = song; e.sung = true; e.voiceCreated = Date.now(); })) {
+        await browserSinger.takes.remove(entry.id);
+        throw new Error('La cançó ja no és a l’historial.');
+      }
+      savedTakes.add(entry.id);
+      pruneTakes(entry.id);
+      toast(`Veu desada per a «${entry.title}». Ja la pots reproduir des de l’historial.`);
+    } catch (error) {
+      toast(`No s’ha pogut generar la veu de «${entry.title}». ${reasonOf(error)}`);
+    } finally {
+      historyVoice = null;
+      historyStatus();
+      renderHistory();
+      if (station) fill(session);
+    }
+  }
   function renderHistory() {
     const all = readHistory();
     $('radio-history-count').textContent = all.length || '';
@@ -611,7 +784,7 @@
       const head = make('div', 'history-row'), text = make('div', 'history-text');
       text.append(make('strong', '', entry.title || 'Sense títol'),
         make('small', '', [subgenreName(entry.subgenre || entry.style), clock(entry.seconds || 0), entry.song?.settings ? keyName(entry.song) : '', dateText(entry.lastPlayed || entry.created),
-          entry.sung ? '🎤 cantada' : '', entry.plays > 1 ? `sonada ${entry.plays} cops` : '', current?.id === entry.id ? 'sonant ara' : ''].filter(Boolean).join(' · ')));
+          entry.plays > 1 ? `sonada ${entry.plays} cops` : '', current?.id === entry.id ? 'sonant ara' : ''].filter(Boolean).join(' · ')));
       const votes = make('div', 'history-votes');
       for (const [value, icon, label] of [[1, '👍', 'M’agrada'], [-1, '👎', 'No m’agrada']]) {
         const button = make('button', `vote small ${value === 1 ? 'up' : 'down'}`, icon); button.type = 'button';
@@ -620,11 +793,28 @@
       }
       const remove = make('button', 'history-remove', '×'); remove.type = 'button'; remove.setAttribute('aria-label', `Esborra de l’historial: ${entry.title}`);
       remove.addEventListener('click', () => {
-        if (current?.id === entry.id) { toast('Aquesta cançó està sonant: espera que acabi per esborrar-la.'); return; }
+        if (current?.id === entry.id || historyVoice?.id === entry.id || historyPlayback?.id === entry.id) {
+          toast('Espera que acabi la reproducció o la generació de veu per esborrar aquesta cançó.'); return;
+        }
         if (!window.confirm(`Esborrar «${entry.title}» de l’historial?`)) return;
         writeHistory(readHistory().filter(e => e.id !== entry.id)); renderHistory();
       });
       head.append(text, votes, remove);
+      const actions = make('div', 'history-song-actions');
+      const hasVoice = savedTakes.has(entry.id) || !!sungById(entry.id) || (current?.id === entry.id && current.sung);
+      const play = make('button', 'radio-button', hasVoice ? '▶ Reprodueix cantada' : '▶ Reprodueix');
+      play.type = 'button';
+      play.setAttribute('aria-label', `${play.textContent}: ${entry.title}`);
+      play.addEventListener('click', () => playHistory(entry));
+      actions.append(play);
+      if (!hasVoice) {
+        const voice = make('button', 'radio-button', historyVoice?.id === entry.id ? 'Generant veu…' : '🎤 Genera veu');
+        voice.type = 'button';
+        voice.disabled = !!historyVoice;
+        voice.setAttribute('aria-label', `${voice.textContent}: ${entry.title}`);
+        voice.addEventListener('click', () => generateHistoryVoice(entry));
+        actions.append(voice);
+      }
       const comment = make('textarea', 'history-comment'); comment.rows = 1; comment.maxLength = 1000; comment.value = entry.comment || '';
       comment.placeholder = 'Afegeix un comentari…'; comment.setAttribute('aria-label', `Comentari de ${entry.title}`);
       const grow = () => { comment.style.height = 'auto'; comment.style.height = `${Math.min(160, comment.scrollHeight + 2)}px`; };
@@ -634,7 +824,7 @@
         if (current?.id === entry.id) { $('radio-comment').value = comment.value; }
         toast('Comentari desat.');
       });
-      item.append(head, comment); box.append(item);
+      item.append(head, actions, comment); box.append(item);
       if (comment.value) requestAnimationFrame(grow);
     }
     $('radio-history-empty').hidden = list.length > 0;
@@ -643,7 +833,14 @@
   }
   function openHistory(open) {
     historyOpen = open; $('radio-history').hidden = !open; $('radio').classList.toggle('history-open', open);
-    if (open) { renderHistory(); $('radio-history').scrollTop = 0; }
+    if (open) {
+      renderHistory();
+      $('radio-history').scrollTop = 0;
+      if (sungCatalog === null) Promise.all([takesReady, loadSung()]).then(renderHistory);
+    } else if (historyPlayback) {
+      cancelHistoryPlayback();
+      if (!station && !current) audio.pause();
+    }
   }
   function exportHistory(everything) {
     const list = readHistory().filter(e => everything || e.vote || e.comment?.trim());
