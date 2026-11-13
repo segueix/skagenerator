@@ -157,7 +157,6 @@
     const controller = new AbortController();
     generationController = controller;
     const choice = chooseSong(), song = choice.song, segs = studio.segmentsOf(song), parts = [], lengths = [];
-    let sungCount = 0, vocalCount = 0, voiceError = false;
     if (choice.sung) {
       // Cançó cantada: ja està feta, es baixa sencera abans que soni (també amb la pantalla apagada).
       setPrep({ stage: 'download', value: 0, title: song.title });
@@ -178,41 +177,28 @@
     }
     const bars = segs.reduce((n, seg) => n + seg.bars, 0); let done = 0;
     const timeline = []; let at = 0;
-    // La parla de tots els versos es demana ara, en paral·lel amb la gravació de la banda.
-    if (browserSinger?.available && song.settings.lang === 'ca') browserSinger.prefetch(
-      segs.filter(seg => seg.section?.lyrics?.trim() && song.clips.some(c => c.instrument === 'vocal' && c.start < seg.start + seg.bars && seg.start < c.start + c.bars))
-        .map(seg => seg.section.lyrics.trim()), song.settings.subgenre, controller.signal);
-    for (const seg of segs) {
+    // Cada secció es compon un cop; les que porten lletra i melodia de veu es canten.
+    const plan = segs.map(seg => {
+      const spec = engine.composeSongPart(song.settings, studio.partFor(song, seg)), bpm = seg.section?.bpm ?? song.settings.bpm;
+      const frames = Math.round(seg.bars * 240 / bpm * RATE), lyrics = seg.section?.lyrics?.trim();
+      const vocal = !!lyrics && spec.instruments.includes('vocal') && !!spec.lines?.vocal?.length;
+      const item = { seg, spec, bpm, frames, lyrics, vocal, at };
+      at += frames / RATE;
+      return item;
+    });
+    at = 0;
+    // Veu cantada amb el mateix procés que l'acció: Matxa diu cada vers (ara, mentre es grava la banda)
+    // i un worker el fa cantar amb WORLD i el mescla. Matxa només parla català.
+    let job = null;
+    if (browserSinger?.available && song.settings.lang === 'ca' && window.SkaMatxaSinger && plan.some(p => p.vocal)) {
+      const notes = window.SkaBrowserSinging.scoreNotes(plan.filter(p => p.vocal).map(p => ({ at: p.at, bpm: p.bpm, text: p.lyrics, melody: p.spec.lines.vocal, type: p.seg.section.type })),
+        engine.lyricWords, song.settings.swing || 0);
+      if (notes.length) job = browserSinger.start({ notes, subgenre: song.settings.subgenre, signal: controller.signal });
+    }
+    for (const { seg, spec, bpm, frames, vocal } of plan) {
       if (mine !== session) throw CANCELLED;
-      const spec = engine.composeSongPart(song.settings, studio.partFor(song, seg));
-      const frames = Math.round(seg.bars * 240 / (seg.section?.bpm ?? song.settings.bpm) * RATE);
-      const lyrics = seg.section?.lyrics?.trim();
-      const hasVocal = !!lyrics && spec.instruments.includes('vocal') && !!spec.lines?.vocal?.length;
-      let voice = null;
-      // Matxa només parla català: una cançó amb lletra en anglès conserva la melodia de guia.
-      if (hasVocal && browserSinger && song.settings.lang === 'ca' && browserSinger.available) {
-        vocalCount++;
-        try {
-          const lines = singingLines(song, seg, spec);
-          if (!lines.length) throw new Error('No quadren les síl·labes amb les notes');
-          setPrep({ stage: 'voice', value: done / bars, title: song.title });
-          voice = await browserSinger.renderSection({
-            text: lyrics, lines, subgenre: song.settings.subgenre, frames, signal: controller.signal, song: choice.id
-          });
-          if (mine !== session) throw CANCELLED;
-          if (!voice.some(x => Math.abs(x) > .0001)) throw new Error('Matxa ha retornat silenci');
-          sungCount++;
-        } catch (error) {
-          if (mine !== session || controller.signal.aborted) throw CANCELLED;
-          console.warn('La veu Matxa no està disponible; es conserva la melodia de guia:', error);
-          voiceError = true;
-        }
-      }
-      // La guia MIDI només es manté en aquelles seccions en què Matxa falla.
-      const renderSpec = voice ? {
-        ...spec, instruments: spec.instruments.filter(name => name !== 'vocal'),
-        lines: { ...spec.lines, vocal: [] }
-      } : spec;
+      // Si es canta, la banda es grava sense la melodia de guia.
+      const renderSpec = job && vocal ? { ...spec, instruments: spec.instruments.filter(name => name !== 'vocal'), lines: { ...spec.lines, vocal: [] } } : spec;
       let data;
       if (renderSpec.instruments.length) {
         data = await sampleAudio.render(renderSpec, RATE, { onProgress: progress => {
@@ -221,34 +207,41 @@
           else setPrep({ stage: 'render', value: (done + seg.bars * (progress.stage === 'rendering' ? progress.value || 0 : 0)) / bars, title: song.title });
         } });
       } else { const empty = Math.round((spec.seconds + TAIL_SECONDS) * RATE); data = [new Float32Array(empty), new Float32Array(empty)]; }
-      if (voice) data = audioUtils.mixVoice(data, voice, { processed: true, rate: RATE, gainDb: -2 });
       if (seg.section?.fade) data = audioUtils.applyFade(data, Math.min(frames, data[0].length), seg.section.fade);
       parts.push(data); lengths.push(Math.min(frames, data[0].length));
-      timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm: seg.section?.bpm ?? song.settings.bpm, lines: lyricLines(song, seg, spec, at) });
+      timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lyricLines(song, seg, spec, at) });
       at += frames / RATE; done += seg.bars;
       setPrep({ stage: 'render', value: done / bars, title: song.title });
     }
     if (mine !== session) throw CANCELLED;
     setPrep({ stage: 'mix', value: 1, title: song.title });
     await breathe();
-    const mixed = audioUtils.mixSections(parts, lengths); parts.length = 0;
+    const offsets = lengths.reduce((list, n, i) => (list.push(i ? list[i - 1] + lengths[i - 1] : 0), list), []);
+    let mixed = audioUtils.mixSections(parts, lengths), sung = false; parts.length = 0;
+    if (job) {
+      setPrep({ stage: 'voice', value: null, title: song.title });
+      try {
+        mixed = await browserSinger.finish(job, mixed);
+        sung = true;
+      } catch (error) {
+        if (mine !== session || controller.signal.aborted) throw CANCELLED;
+        console.warn('La veu Matxa no està disponible; es posa la melodia de guia:', error);
+        if (error.band) mixed = error.band;
+        // Sense veu cantada, la melodia de guia torna a les seccions que n'havien de tenir.
+        for (let i = 0; i < plan.length; i++) {
+          const { spec, vocal, seg, frames } = plan[i];
+          if (!vocal) continue;
+          let guide = await sampleAudio.render({ ...spec, instruments: ['vocal'] }, RATE);
+          if (seg.section?.fade) guide = audioUtils.applyFade(guide, Math.min(frames, guide[0].length), seg.section.fade);
+          for (let ch = 0; ch < 2; ch++) for (let k = 0; k < guide[ch].length && offsets[i] + k < mixed[ch].length; k++) mixed[ch][offsets[i] + k] += guide[ch][k];
+        }
+        toast('Ara mateix Matxa no respon: aquesta cançó porta la melodia de guia en lloc de veu cantada.');
+      }
+    }
+    if (mine !== session) throw CANCELLED;
     const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
-    if (voiceError) toast('No s’ha pogut obtenir tota la veu de Matxa: s’ha conservat la guia musical en les parts afectades.');
-    const fullySung = sungCount > 0 && sungCount === vocalCount && !voiceError;
-    return { id: choice.id, replay: choice.replay, sung: fullySung, 
-      voiceTimbre: sungCount ? window.SkaBrowserSinging.presetFor(song.settings.subgenre).name : null,
+    return { id: choice.id, replay: choice.replay, sung, voiceTimbre: sung ? job.timbre.name : null,
       song, seconds, timeline, url: URL.createObjectURL(blob) };
-  }
-  // Prepara les síl·labes per a les notes (compta la mateixa mètrica que el motor musical).
-  function singingLines(song, seg, spec) {
-    const text = seg.section?.lyrics?.trim() || '';
-    return window.SkaBrowserSinging.scoreLines(
-      text,
-      engine.analyzeLyrics(text, song.settings.lang).syllables,
-      spec.lines?.vocal || [],
-      seg.section?.bpm ?? song.settings.bpm,
-      song.settings.swing || 0
-    );
   }
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
   // (cada síl·laba és una nota, en ordre).
@@ -393,7 +386,7 @@
     if (prep.stage === 'bank') return [`Baixant els instruments${prep.value === null ? '…' : ` · ${Math.round(prep.value * 100)} %`}`, prep.value];
     if (prep.stage === 'compose') return ['Component una cançó nova…', 0];
     if (prep.stage === 'download') return ['Baixant una cançó cantada…', null];
-    if (prep.stage === 'voice') return ['Matxa prepara la veu · el navegador la farà cantar i hi aplicarà el timbre…', null];
+    if (prep.stage === 'voice') return ['Matxa canta la lletra (el navegador la fa cantar amb WORLD i la mescla)…', null];
     if (prep.stage === 'mix') return ['Fent la mescla final…', 1];
     return [`Gravant la banda · ${Math.round(prep.value * 100)} %`, prep.value];
   }

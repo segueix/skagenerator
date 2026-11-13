@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.cjs tests/*.test.mjs",
-    "check": "node --check app.js && node --check radioambient.js && node --check sample-audio.js && node --check audio-utils.js && node --check song-builder.js && node --check lyrics-ca.js && node --check lyrics.js && node scripts/check-lyrics.cjs >/dev/null && node --check veu.js && node --check radio.js && node --check browser-singing.js && node --check browser-singing-worker.js && node --check audio/worker.mjs && node --check audio/render.mjs",
+    "check": "node --check app.js && node --check radioambient.js && node --check sample-audio.js && node --check audio-utils.js && node --check song-builder.js && node --check lyrics-ca.js && node --check lyrics.js && node scripts/check-lyrics.cjs >/dev/null && node --check veu.js && node --check radio.js && node --check browser-singing.js && node --check matxa-singer.js && node --check world.js && node --check matxa-worker.js && node --check audio/worker.mjs && node --check audio/render.mjs",
     "pretest": "node scripts/prepare-soundbank.mjs"
   },
   "dependencies": {
