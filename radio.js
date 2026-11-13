@@ -9,6 +9,8 @@
   const $ = id => document.getElementById(id), root = document.documentElement;
   const browserSinger = window.SkaUmidaji?.createSinger({ audioUtils });
   let generationController = null;
+  // Cançó que Umidaji està cantant a part: mentrestant la cua s'omple amb cançons de guia i no hi ha silencis.
+  let parked = null;
   if (!studio || !engine || !builder || !audioUtils || !sampleAudio || !$('radio')) return;
 
   const RATE = studio.RATE, GAP_SECONDS = 2, TAIL_SECONDS = 1.5;
@@ -211,19 +213,19 @@
       return item;
     });
     at = 0;
-    // Umidaji canta la partitura mentre es renderitza la banda.
-    let job = null, voiceProgress = null;
-    if (browserSinger?.available && song.settings.lang === 'ca' && plan.some(p => p.vocal)) {
+    // Umidaji canta la partitura a part (una cançó cada vegada): pot trigar minuts, sobretot al mòbil.
+    let job = null;
+    const voiceController = new AbortController();
+    if (canSing() && song.settings.lang === 'ca' && plan.some(p => p.vocal)) {
       const notes = window.SkaBrowserSinging.scoreNotes(plan.filter(p => p.vocal).map(p => ({ at: p.at, bpm: p.bpm, text: p.lyrics, melody: p.spec.lines.vocal, type: p.seg.section.type })),
         engine.lyricWords, song.settings.swing || 0);
       if (notes.length) job = browserSinger.start({
-        notes, subgenre: song.settings.subgenre, signal: controller.signal,
-        onProgress: value => {
-          voiceProgress = value;
-          if (mine === session && prep?.stage === 'voice') setPrep({ stage: 'voice', value, title: song.title });
-        }
+        notes, subgenre: song.settings.subgenre, signal: voiceController.signal,
+        onProgress: value => { if (parked?.controller === voiceController) { parked.progress = value; renderPrep(); } }
       });
+      if (job) parked = { controller: voiceController, title: song.title, progress: 0 };
     }
+    try {
     for (const { seg, spec, bpm, frames, vocal } of plan) {
       if (mine !== session) throw CANCELLED;
       // Si es canta, la banda es grava sense la melodia de guia.
@@ -246,32 +248,38 @@
     setPrep({ stage: 'mix', value: 1, title: song.title });
     await breathe();
     const offsets = lengths.reduce((list, n, i) => (list.push(i ? list[i - 1] + lengths[i - 1] : 0), list), []);
-    let mixed = audioUtils.mixSections(parts, lengths), sung = false; parts.length = 0;
-    if (job) {
-      setPrep({ stage: 'voice', value: voiceProgress, title: song.title });
-      try {
-        mixed = await browserSinger.finish(job, mixed);
-        sung = true;
-      } catch (error) {
-        if (mine !== session || controller.signal.aborted) throw CANCELLED;
-        console.warn('La veu Umidaji no està disponible; es posa la melodia de guia:', error);
-        if (error.band) mixed = error.band;
-        // Sense veu cantada, la melodia de guia torna a les seccions que n'havien de tenir.
-        for (let i = 0; i < plan.length; i++) {
-          const { spec, vocal, seg, frames } = plan[i];
-          if (!vocal) continue;
-          let guide = await sampleAudio.render({ ...spec, instruments: ['vocal'] }, RATE);
-          if (seg.section?.fade) guide = audioUtils.applyFade(guide, Math.min(frames, guide[0].length), seg.section.fade);
-          for (let ch = 0; ch < 2; ch++) for (let k = 0; k < guide[ch].length && offsets[i] + k < mixed[ch].length; k++) mixed[ch][offsets[i] + k] += guide[ch][k];
-        }
-        toast('Umidaji no ha pogut cantar aquesta cançó. Hi sona la melodia de guia.');
-      }
+    const band = audioUtils.mixSections(parts, lengths); parts.length = 0;
+    if (!job) {
+      const seconds = band[0].length / RATE, blob = await wavBlob(band, GAP_SECONDS);
+      return { id: choice.id, replay: choice.replay, sung: false, voiceTimbre: null, song, seconds, timeline, url: URL.createObjectURL(blob) };
     }
-    if (mine !== session) throw CANCELLED;
-    const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
-    return { id: choice.id, replay: choice.replay, sung, voiceTimbre: sung ? job.timbre.name : null,
-      song, seconds, timeline, url: URL.createObjectURL(blob) };
+    // La banda ja és feta (sense melodia de guia). Quan Umidaji acabi, la cançó passa al davant de la
+    // cua; mentrestant aquesta funció no retorna res i la ràdio continua preparant-ne d'altres.
+    (async () => {
+      try {
+        const mixed = await browserSinger.finish(job, band);
+        if (mine !== session) return;
+        const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
+        if (mine !== session) return;
+        queue.unshift({ id: choice.id, replay: choice.replay, sung: true, voiceTimbre: job.timbre.name, song, seconds, timeline, url: URL.createObjectURL(blob) });
+      } catch (error) {
+        if (mine !== session || voiceController.signal.aborted) return;
+        console.warn('Umidaji no ha pogut cantar «' + song.title + '»:', error);
+        toast('Umidaji no ha pogut cantar una cançó. La ràdio continua amb la melodia de guia.');
+      } finally {
+        if (parked?.controller === voiceController) parked = null;
+        if (mine === session && station) { if (queue.length && waiting) advance(); else renderPrep(); fill(session); }
+      }
+    })();
+    return null;
+    } catch (error) {
+      // Si la banda no s'ha pogut fer, la veu que s'estava cantant ja no serveix.
+      if (parked?.controller === voiceController) { parked = null; voiceController.abort(); }
+      throw error;
+    }
   }
+  // Es pot posar una cançó a cantar: hi ha el banc de veu i Umidaji no en canta cap altra.
+  const canSing = () => !!browserSinger?.available && !parked;
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
   // (cada síl·laba és una nota, en ordre).
   function lyricLines(song, seg, spec, at) {
@@ -295,9 +303,11 @@
     let fatal = null;
     try {
       clearTimeout(retryTimer);
-      while (mine === session && station && queue.length < AHEAD) {
+      // A més de les cançons de la cua, sempre n'hi ha una cantant-se si hi ha veu (i la cua no és plena de més).
+      while (mine === session && station && (queue.length < AHEAD || canSing() && queue.length <= AHEAD)) {
         try {
           const track = await prepare(mine);
+          if (!track) continue;   // s'està cantant a part: arribarà a la cua quan estigui
           if (mine !== session) { URL.revokeObjectURL(track.url); break; }
           queue.push(track); failures = 0;
           if (waiting) advance(); else renderPrep();
@@ -354,6 +364,7 @@
     if (!STATIONS[style]) return;
     studio.stop();
     generationController?.abort();
+    parked?.controller.abort(); parked = null;
     session++; station = style; waiting = true; failures = 0; played = []; sinceReplay = REPLAY_EVERY; lastSubgenre = null;
     dropTracks();
     // Mentre la ràdio està engegada, el navegador no ha de congelar la pàgina en segon pla.
@@ -368,6 +379,7 @@
   }
   function leaveStation() {
     generationController?.abort();
+    parked?.controller.abort(); parked = null;
     browserSinger?.dispose();
     session++; station = null; waiting = false; onTrack = false;
     clearTimeout(retryTimer); releaseLock?.(); releaseLock = null;
@@ -432,6 +444,7 @@
     if (upcoming) next.textContent = `A continuació: «${upcoming.song.title}» · ${subgenreName(upcoming.song.settings.subgenre)}${upcoming.replay ? ' · 👍' : ''}${queue.length > 1 ? ` · i ${queue.length - 1} més a punt` : ''}`;
     else if (waiting) next.textContent = '';
     else next.textContent = text ? `A continuació: ${text[0].toLowerCase()}${text.slice(1)}` : '';
+    if (parked && !waiting) next.textContent += `${next.textContent ? ' · ' : ''}Umidaji canta «${parked.title}» · ${Math.round(parked.progress * 100)} %`;
     next.classList.toggle('ready', !!upcoming);
     $('radio-skip').disabled = !upcoming;
   }
@@ -619,5 +632,5 @@
   $('radio-history-count').textContent = readHistory().length || '';
   if (root.classList.contains('radio-on')) $('theme-color').content = '#0c0b12';
   showScreen('home');
-  window.RadioSpam = { get state() { return { station, waiting, filling, current: current && { id: current.id, title: current.song.title, seconds: current.seconds, replay: current.replay }, queued: queue.length, upcoming: queue[0] && { id: queue[0].id, title: queue[0].song.title }, prep }; } };
+  window.RadioSpam = { get state() { return { station, waiting, filling, current: current && { id: current.id, title: current.song.title, seconds: current.seconds, replay: current.replay }, queued: queue.length, singing: parked && { title: parked.title, progress: parked.progress }, upcoming: queue[0] && { id: queue[0].id, title: queue[0].song.title }, prep }; } };
 })();

@@ -1,4 +1,4 @@
-import { unzipSync } from 'fflate';
+import { Unzip, UnzipInflate } from 'fflate';
 import { RATE, phrasesOf, phraseInput } from './umidaji-score.mjs';
 
 const ROOT = 'Umidaji_DS_v110/';
@@ -18,8 +18,34 @@ let model = null;
 
 async function loadModel(file) {
   const names = new Set([...Object.values(FILES), ...META, ...SPEAKERS.flatMap(s => [embedPath(s), pitchEmbedPath(s)])]);
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const files = unzipSync(bytes, { filter: entry => entry.name.startsWith(ROOT) && names.has(entry.name.slice(ROOT.length)) });
+  // El ZIP (273 MiB) es llegeix a trossos i només es guarden els fitxers que calen: tenir-lo tot a la
+  // memòria a més dels models descomprimits fa caure el navegador del mòbil.
+  const files = {};
+  await new Promise((resolve, reject) => {
+    const unzip = new Unzip(entry => {
+      if (!entry.name.startsWith(ROOT) || !names.has(entry.name.slice(ROOT.length))) return;
+      const whole = Number.isFinite(entry.originalSize) && entry.originalSize > 0 ? new Uint8Array(entry.originalSize) : null, chunks = [];
+      let at = 0;
+      entry.ondata = (error, chunk, final) => {
+        if (error) { reject(error); return; }
+        if (whole && at + chunk.length <= whole.length) whole.set(chunk, at); else chunks.push(chunk.slice());
+        at += chunk.length;
+        if (!final) return;
+        if (whole && !chunks.length) files[entry.name] = at === whole.length ? whole : whole.subarray(0, at);
+        else { const all = new Uint8Array(at); let o = 0; if (whole) { all.set(whole.subarray(0, Math.min(at, whole.length))); o = Math.min(at, whole.length); } for (const c of chunks) { all.set(c, o); o += c.length; } files[entry.name] = all; }
+      };
+      entry.start();
+    });
+    unzip.register(UnzipInflate);
+    (async () => {
+      const reader = file.stream().getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) { unzip.push(new Uint8Array(0), true); break; }
+        unzip.push(value, false);
+      }
+    })().then(resolve, reject);
+  });
   for (const name of names) if (!files[ROOT + name]) throw new Error('Cal el ZIP oficial d’Umidaji DS v110.');
   const json = name => JSON.parse(new TextDecoder().decode(files[ROOT + name]));
   const tokens = json(META[0]), languages = json(META[1]);
