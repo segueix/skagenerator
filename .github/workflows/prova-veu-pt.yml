@@ -22,7 +22,7 @@ jobs:
         run: |
           gh release view --repo Team-BRAPA/Umidaji-DiffSinger --json tagName,assets -q '.tagName, (.assets[] | "\(.name) \(.size)")'
           mkdir vb && cd vb
-          gh release download --repo Team-BRAPA/Umidaji-DiffSinger
+          gh release download v110 --repo Team-BRAPA/Umidaji-DiffSinger -p '*.zip'
           ls -la
           for f in *.zip; do unzip -q -o "$f" -d x || true; done
           find x -type f | sed 's/^/  /' | head -200
