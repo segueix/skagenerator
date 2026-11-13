@@ -11,6 +11,7 @@ Passos per a cada frase (tros de cançó entre respiracions):
 Després la veu es comprimeix, se li posa una mica de sala i es mescla amb la banda.
 """
 import glob, json, math, os, subprocess, sys, time
+import warnings
 import numpy as np
 try:
     import onnxruntime as ort   # només cal per a les veus DiffSinger (TIGER)
@@ -115,6 +116,7 @@ class Voice:
     def token(self, table, p):
         for cand in ([f'{self.prefix}/{p}'] if self.prefix else []) + [p, f'en/{p}', p.upper(), p.lower()]:
             if cand in table: return table[cand]
+        warnings.warn(f'El banc de veu no té el fonema {p!r}. Es farà servir un silenci.')
         return table.get('SP', 0)
 
     def language(self, table, p):
@@ -183,7 +185,7 @@ def build_phrase(voice, notes, shift):
             group.append(notes[i]); i += 1
         words.append(group)
     segs = []  # [fonema, inici, final]
-    last_vowel = -1e9  # inici de l'última vocal: les consonants següents no se la poden menjar
+    last_vowel = None  # índex de l'última vocal, seguit de les seves consonants finals
     for group in words:
         sylls = voice.syllables_of(group[0]['word'])
         if sylls and len(sylls[0]) == 4:
@@ -201,23 +203,42 @@ def build_phrase(voice, notes, shift):
         for note, parts in zip(group, per_note):
             t0, t1 = note['t'], note['t'] + note['d']
             if not parts:  # melisma: la vocal anterior continua
-                if segs: segs[-1][2] = max(segs[-1][2], t1)
+                if last_vowel is not None:
+                    extension = max(0, t1 - segs[-1][2])
+                    segs[last_vowel][2] += extension
+                    for final_phone in segs[last_vowel + 1:]:
+                        final_phone[1] += extension
+                        final_phone[2] += extension
                 continue
             slot = (t1 - t0) / len(parts)
             for k, (onset, vowel, coda) in enumerate(parts):
                 vs, ve = t0 + k * slot, t0 + (k + 1) * slot
-                # Consonants d'inici abans de la vocal; si trepitgen la nota anterior, l'escurcen.
-                # Com a molt el 40 % de la nota anterior (si les notes són seguides).
-                cs = vs - min(sum(CONS_DUR['default'] for _ in onset), max(.03 * len(onset), (vs - last_vowel) * .4))
-                if segs and segs[-1][2] > cs:
-                    # La nota anterior (vocal o consonants finals) s'escurça fins on comença aquesta.
-                    while segs and segs[-1][1] >= cs - .02 and segs[-1][0] not in voice.vowels and segs[-1][0] not in ('y', 'w'): segs.pop()
-                    if segs: segs[-1][2] = min(segs[-1][2], cs)
+                cs = vs - CONS_DUR['default'] * len(onset)
+                if last_vowel is not None:
+                    previous_vowel = segs[last_vowel]
+                    distance = max(0, vs - previous_vowel[1])
+                    cs = max(cs, vs - max(.02 * len(onset), distance * .4))
+                    if segs[-1][2] > cs:
+                        # Reservem temps per a la vocal i els sons finals i comprimim la coda
+                        # sencera si cal. La consonant inicial següent no n'esborra cap.
+                        ending = segs[last_vowel + 1:]
+                        ending_duration = segs[-1][2] - previous_vowel[2]
+                        minimum_vowel = distance * .3
+                        minimum_ending = min(.02 * len(ending), distance * .3)
+                        cs = max(cs, previous_vowel[1] + minimum_vowel + minimum_ending)
+                        length = min(ending_duration, cs - previous_vowel[1] - minimum_vowel)
+                        previous_vowel[2] = cs - length
+                        cursor = previous_vowel[2]
+                        for phone in ending:
+                            duration = (phone[2] - phone[1]) * length / ending_duration
+                            phone[1], phone[2] = cursor, cursor + duration
+                            cursor += duration
                 t = cs
                 for c in onset:
                     step = (vs - cs) / max(1, len(onset)); segs.append([c, t, t + step]); t += step
                 coda_len = min(.08 * len(coda), (ve - vs) * .4)
-                segs.append([vowel, vs, ve - coda_len]); last_vowel = vs
+                last_vowel = len(segs)
+                segs.append([vowel, vs, ve - coda_len])
                 t = ve - coda_len
                 for c in coda:
                     step = coda_len / len(coda); segs.append([c, t, t + step]); t += step

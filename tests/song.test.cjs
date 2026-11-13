@@ -335,10 +335,10 @@ test('el motiu es desenvolupa: A, A\' (final obert), B (contrast) i A\'\' (final
 test('la veu canta igual els versos repetits i posa les síl·labes tòniques a temps', () => {
   const lyrics = 'Rude boys del Raval\nballant a contratemps\nrude boys del Raval\nningú no ens atura avui';
   const info = engine.analyzeLyrics(lyrics);
-  assert.deepEqual(info.syllables, [6, 6, 6, 8]); // amb sinalefes: «no‿ens» i «atura‿avui»
+  assert.deepEqual(info.syllables, [6, 6, 6, 7]); // «a-vui» té dues síl·labes, amb sinalefes a «no‿ens» i «atura‿avui».
   assert.deepEqual(info.stress.slice(0, 2), [[0, 2, 5], [1, 5]]);
   assert.deepEqual(info.repeats, [-1, -1, 0, -1]);
-  assert.deepEqual(engine.analyzeLyrics('La ciutat fa olor de cafè').stress, [[3, 4, 5, 8]]);
+  assert.deepEqual(engine.analyzeLyrics('La ciutat fa olor de cafè').stress, [[2, 3, 4, 7]]); // «ciu-tat»
   const vocal = engine.composeSongPart({ ...settings, instruments: ['vocal'] }, { ...part('chorus', 8), layers: { vocal: 5 }, ...info }).lines.vocal;
   const phrase = p => vocal.filter(n => Math.floor(n[0] / 2) === p);
   assert.deepEqual(phrase(0).map(n => [n[0] % 2, n[1], n[2], n[3]]), phrase(2).map(n => [n[0] % 2, n[1], n[2], n[3]]), 'vers repetit, mateixa melodia');

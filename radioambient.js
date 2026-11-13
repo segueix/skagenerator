@@ -2231,13 +2231,18 @@
     const ATONES = new Set(['el', 'la', 'els', 'les', 'lo', 'un', 'una', 'uns', 'unes', 'de', 'del', 'dels', 'a', 'al', 'als', 'i', 'o', 'en', 'em', 'et',
         'es', 'ens', 'us', 'li', 'hi', 'ho', 'que', 'per', 'pel', 'pels', 'amb', 'com', 'si', 'ma', 'ta', 'sa', 'mon', 'ton', 'son', 'me', 'te', 'se', 'ne', 'ni', 'can']);
     function wordStress(word) {
-        const clean = word.replace(/(q|g)u(?=[eiéèí])/g, '$1');
-        let count = 0, accent = -1;
+        const clean = word.replace(/([qg])u(?=[eiéèíï])/g, '$1')
+            .replace(/([qg])[uü](?=[aeiouàèéíïòóúü])/g, '$1')
+            .replace(/([aeouàèéòóú])ix/g, '$1x')
+            .replace(/([aeouàèéòóú])ig(?=s?$)/g, '$1g');
+        let count = 0, accent = -1, lastDiphthong = false;
         for (const group of clean.match(/[aeiouàèéíïòóúü]+/g) || []) {
             for (let i = 0; i < group.length; i++) {
                 let text = group[i];
                 const next = group[i + 1];
-                if (next && 'iu'.includes(next) && !'iu'.includes(group[i])) { text += next; i++; }
+                const hiatus = group[i] === 'u' && next === 'i' && /ui(?:r|nt)$/.test(clean);
+                lastDiphthong = Boolean(!hiatus && next && 'iu'.includes(next) && next !== group[i] && !'ïü'.includes(group[i]));
+                if (lastDiphthong) { text += next; i++; }
                 if (/[àèéíòóú]/.test(text)) accent = count;
                 count++;
             }
@@ -2246,7 +2251,7 @@
         const bare = word.split(/['’]/).pop();
         if (accent >= 0) return { count, stress: accent };
         if (count === 1) return { count, stress: ATONES.has(bare) ? -1 : 0 };
-        return { count, stress: /([aeiou]s?|[ei]n)$/.test(bare) ? count - 2 : count - 1 };
+        return { count, stress: !lastDiphthong && /([aeiou]s?|[ei]n)$/.test(bare) ? count - 2 : count - 1 };
     }
     // ── Anglès: síl·labes i síl·laba tònica de cada paraula ─────────────
     // Regles d'ortografia (grups de vocals, «e» muda, -ed i -es) amb excepcions per a
