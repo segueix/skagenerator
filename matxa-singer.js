@@ -281,7 +281,10 @@
     const voiced = new Uint8Array(n); for (let i = 0; i < n; i++) voiced[i] = f0[i] > 0 ? 1 : 0;
     // L'envolupant es guarda en logaritme (Float32): ocupa la meitat i s'interpola directament.
     const logSp = new Float32Array(sp.length); for (let i = 0; i < sp.length; i++) logSp[i] = Math.log(sp[i]);
-    return { logSp, ap: Float32Array.from(ap), bins, fft: fftSize, voiced, sylls, n, rate };
+    // Per a la veu més natural: l'ona original (consonants sordes tal com les diu Matxa), el to de la
+    // parla (ondulacions dins de cada síl·laba) i quines trames tenen so.
+    const loud = new Uint8Array(n); for (let i = 0; i < n; i++) loud[i] = rms[i] > top * .02 ? 1 : 0;
+    return { logSp, ap: Float32Array.from(ap), bins, fft: fftSize, voiced, sylls, n, rate, x: Float32Array.from(x), f0: Float32Array.from(f0), loud };
   }
   function findNuclei(env, count) {
     let top = 0; for (const v of env) top = Math.max(top, v);
@@ -340,15 +343,25 @@
   // quatre cançons: de 40 % a 44 % de paraules enteses de mitjana, i el punk ràpid de 16 % a 36 %.
   const spokenText = notes => lineText(notes, { stretch: true, minSeconds: .3 });
   // Un vers cantat → { start (segons), wave (Float32 a 44,1 kHz) }  (MatxaSinger._sing_take)
-  function singLine(world, notes, shift, unit, seed = 0) {
+  // natural (per defecte): retocs contra el so robòtic que l'acció no fa sense alineador:
+  //   · la vocal estirada no es queda quieta: el punt de la parla que sona es passeja uns mil·lisegons
+  //     endavant i enrere, amb una mica més d'aire i petites variacions de volum;
+  //   · a la nota s'hi suma una part de les ondulacions de to que Matxa fa dins de cada síl·laba.
+  // splice (desactivat): copia les consonants sordes de l'ona original de Matxa. Sense alineador, el que
+  // WORLD marca com a sord no sempre és una consonant i en una de les cançons de prova s'entenia pitjor.
+  function singLine(world, notes, shift, unit, seed = 0, { natural = true, splice = false, alive = natural, bends = natural } = {}) {
     const { rate, bins, n: unitFrames } = unit;
     const start = notes[0].t - .45, end = notes[notes.length - 1].t + notes[notes.length - 1].d + .4;
     const total = Math.ceil((end - start) * FPS);
     const logSp = new Float64Array(total * bins).fill(Math.log(1e-12)), AP = new Float64Array(total * bins).fill(1);
     const V = new Uint8Array(total), have = new Uint8Array(total), midi = new Float64Array(total);
+    const life = (splice || alive || bends) && unit.x ? rng((hashText(lineText(notes)) ^ 0x51ED270B) >>> 0) : null;
+    const bend = new Float64Array(total), splices = [], vowels = [], owner = new Int32Array(total);
+    let piece = 0;
     const fr = t => Math.round((t - start) * FPS);
     const put = (at, idx, m) => {
       const n = Math.min(idx.length, total - at);
+      piece++;
       if (n <= 0 || at < 0) return;
       for (let k = 0; k < n; k++) {
         const f = idx[k], i0 = Math.min(unitFrames - 1, Math.max(0, Math.floor(f))), i1 = Math.min(i0 + 1, unitFrames - 1), w = f - Math.floor(f), o = (at + k) * bins;
@@ -356,7 +369,7 @@
           logSp[o + j] = unit.logSp[i0 * bins + j] * (1 - w) + unit.logSp[i1 * bins + j] * w;
           AP[o + j] = unit.ap[i0 * bins + j] * (1 - w) + unit.ap[i1 * bins + j] * w;
         }
-        V[at + k] = unit.voiced[Math.min(unitFrames - 1, Math.max(0, Math.round(f)))]; have[at + k] = 1; midi[at + k] = m;
+        V[at + k] = unit.voiced[Math.min(unitFrames - 1, Math.max(0, Math.round(f)))]; have[at + k] = 1; midi[at + k] = m; owner[at + k] = piece;
       }
     };
     const range = (a, b) => { const r = []; for (let i = a; i < b; i++) r.push(i); return r; };
@@ -372,13 +385,32 @@
         nb = Math.min(nb, Math.max(na + 3, fr(notes[k + 1].t) - Math.min(naa - no0, maxOn)));
       }
       const ve = Math.max(na + 2, nb - coda.length);
-      if (on.length) put(na - on.length, on, m);
+      if (on.length) { put(na - on.length, on, m); splices.push([na - on.length, on, piece]); }
       // Vocal: els extrems (30 ms) a velocitat natural i el centre estirat.
       const length = ve - na, edge = Math.max(0, Math.min(6, Math.trunc((b - a) / 3), Math.trunc(length / 3)));
       const midCount = Math.max(0, length - 2 * edge), from = a + edge, to = Math.max(a + edge, b - edge - 1), idx = range(a, a + edge);
       for (let i = 0; i < midCount; i++) idx.push(midCount === 1 ? from : from + (to - from) * i / (midCount - 1));
       idx.push(...range(b - edge, b));
+      if (life && alive && midCount > 1.4 * (to - from + 1) && to - from >= 4) {
+        // Vocal estirada: un passeig suau (±15 ms com a molt) al voltant del recorregut lineal.
+        const reach = Math.min(3, (to - from) / 3), walk = new Float64Array(midCount + 24);
+        for (let i = 0; i < walk.length; i++) walk[i] = life.normal();
+        const smooth = convolveSame(walk, new Float64Array(24).fill(1 / 24));
+        let top = 1e-9; for (const v of smooth) top = Math.max(top, Math.abs(v));
+        for (let i = 0; i < midCount; i++) { const fade = Math.min(1, i / 8, (midCount - 1 - i) / 8); idx[edge + i] = Math.min(to, Math.max(from, idx[edge + i] + reach * fade * smooth[i + 12] / top)); }
+      }
       put(na, idx, m);
+      if (life) {
+        // Ondulació de to de la parla dins de la síl·laba (respecte de la seva mediana), a un 40 % i fins a ±1,5 semitons.
+        const tones = []; for (let f = a; f < b; f++) if (unit.f0[f] > 0) tones.push(unit.f0[f]);
+        tones.sort((p, q) => p - q);
+        const centre = tones.length ? tones[tones.length >> 1] : 0;
+        if (centre && bends) for (let i = 0; i < idx.length && na + i < total; i++) {
+          const hz = unit.f0[Math.min(unitFrames - 1, Math.max(0, Math.round(idx[i])))];
+          if (hz > 0 && na + i >= 0) bend[na + i] = .4 * Math.max(-1.5, Math.min(1.5, 12 * Math.log2(hz / centre)));
+        }
+        vowels.push([na, Math.min(total, ve)]);
+      }
       vstart.push([na, ve, k === 0 || !have[Math.max(0, na - on.length - 2)]]);
       // Dinàmica: atac de 30 ms, una mica de caiguda a les notes llargues i ±1 dB d'una nota a l'altra.
       const level = 10 ** (r.uniform(-1, 1) / 20), att = Math.min(6, length);
@@ -388,8 +420,17 @@
         if (length > 60 && i >= 60) g *= length - 60 === 1 ? 1 : 1 - .18 * (i - 60) / (length - 61);
         gain[na + i] = g;
       }
-      if (coda.length) put(ve, coda.slice(0, Math.max(0, total - ve)), m);
+      if (coda.length) { const tail = coda.slice(0, Math.max(0, total - ve)); put(ve, tail, m); splices.push([ve, tail, piece]); }
     });
+    if (life && alive) {
+      // Volum que respira (±0,7 dB, lent) i una mica més d'aire a les vocals llargues.
+      const raw = new Float64Array(total + 60); for (let i = 0; i < raw.length; i++) raw[i] = life.normal();
+      const slow = convolveSame(raw, new Float64Array(30).fill(1 / 30)); let top = 1e-9; for (const v of slow) top = Math.max(top, Math.abs(v));
+      for (const [va, vb] of vowels) for (let f = Math.max(0, va); f < vb; f++) {
+        gain[f] *= 10 ** (.7 * slow[f + 30] / top / 20);
+        if (vb - va > 40) for (let j = 0; j < bins; j++) AP[f * bins + j] = Math.min(1, AP[f * bins + j] * 1.25 + .004);
+      }
+    }
     for (let f = 0; f < total; f++) { const g = Math.log(gain[f] * gain[f]); if (g) for (let j = 0; j < bins; j++) logSp[f * bins + j] += g; }
     // Entonació de cantant.
     const semis = Float64Array.from(midi), noise = new Float64Array(total + 400);
@@ -407,7 +448,7 @@
         semis[na + t] += v;
       }
     });
-    for (let i = 0; i < total; i++) semis[i] += r.normal() * .03;
+    for (let i = 0; i < total; i++) semis[i] += r.normal() * .03 + bend[i];
     const kern = new Float64Array(15); let ks = 0;
     for (let i = 0; i < 15; i++) { kern[i] = .5 - .5 * Math.cos(2 * Math.PI * i / 14); ks += kern[i]; }
     for (let i = 0; i < 15; i++) kern[i] /= ks;
@@ -421,6 +462,24 @@
     }
     for (let i = 0; i < SP.length; i++) SP[i] = Math.exp(logSp[i]);
     const y = world.synthesize(F0, SP, AP, unit.fft, rate, PERIOD);
+    if (life && splice) {
+      // Consonants sordes (s, f, x, p, t, k…): l'ona original de Matxa, amb fosos de 3 ms.
+      const spf = rate * PERIOD / 1000, fade = Math.trunc(rate * .003);
+      for (const [at, idx, id] of splices) {
+        // Només on aquest tros és el que finalment sona (un altre de posterior el pot haver trepitjat).
+        const sordes = idx.map((f, j) => !unit.voiced[f] && unit.loud[f] && at + j >= 0 && at + j < total && owner[at + j] === id);
+        for (let j = 0; j < idx.length;) {
+          if (!sordes[j]) { j++; continue; }
+          let e = j; while (e < idx.length && sordes[e]) e++;
+          const d0 = Math.round((at + j) * spf), s0 = Math.round(idx[j] * spf), count = Math.min(Math.round((e - j) * spf), y.length - d0, unit.x.length - s0);
+          if (d0 >= 0 && count > 2 * fade) for (let i = 0; i < count; i++) {
+            const w = Math.min(1, i / fade, (count - 1 - i) / fade);
+            y[d0 + i] = y[d0 + i] * (1 - w) + unit.x[s0 + i] * w;
+          }
+          j = e;
+        }
+      }
+    }
     const up = Math.round(OUT_RATE / rate), wave = up >= 1 && OUT_RATE % rate === 0 ? upsample(y, up) : linear(y, rate, OUT_RATE);
     return { start, wave: Float32Array.from(wave) };
   }
