@@ -47,7 +47,7 @@ def catalan_to_pt(sylls):
     return [(cons(o), CA_TO_PT.get(v, v), cons(c)) for o, v, c in sylls]
 
 def emb(path):
-    return np.fromfile(path, dtype=np.float32).reshape(256)
+    return np.fromfile(path, dtype=np.float32)   # 256 valors, o 384 a les veus noves
 
 class Voice:
     """Qualsevol veu DiffSinger en format OpenUtau (dsconfig.yaml, dsacoustic, dspitch, dsdict).
@@ -276,7 +276,7 @@ def sing_phrase(voice, notes, shift, steps, gender=0.0):
         feed = {'encoder_out': enc, 'ph_dur': i64(durs), 'note_midi': np.array([note_midi], np.float32),
             'note_rest': np.array([note_rest], bool), 'note_dur': i64(note_dur), 'pitch': base[None, :],
             'expr': np.ones((1, n_frames), np.float32), 'retake': np.ones((1, n_frames), bool), 'speedup': np.array(10, np.int64), 'steps': np.array(10, np.int64)}
-        if voice.pitch_speaker is not None: feed['spk_embed'] = np.broadcast_to(voice.pitch_speaker, (1, n_frames, 256)).astype(np.float32)
+        if voice.pitch_speaker is not None: feed['spk_embed'] = np.broadcast_to(voice.pitch_speaker, (1, n_frames, len(voice.pitch_speaker))).astype(np.float32)
         wanted = {i.name for i in voice.pitch.get_inputs()}
         f0_midi = voice.pitch.run(None, {k: v for k, v in feed.items() if k in wanted})[0][0]
     except Exception as error:
@@ -290,7 +290,7 @@ def sing_phrase(voice, notes, shift, steps, gender=0.0):
         'key_shift': np.zeros((1, n_frames), np.float32), 'speed': np.ones((1, n_frames), np.float32),
         'energy': np.zeros((1, n_frames), np.float32), 'breathiness': np.zeros((1, n_frames), np.float32),
         'voicing': np.zeros((1, n_frames), np.float32), 'tension': np.zeros((1, n_frames), np.float32)}
-    if voice.speaker is not None: feed['spk_embed'] = np.broadcast_to(voice.speaker, (1, n_frames, 256)).astype(np.float32)
+    if voice.speaker is not None: feed['spk_embed'] = np.broadcast_to(voice.speaker, (1, n_frames, len(voice.speaker))).astype(np.float32)
     types = {i.name: i.type for i in voice.acoustic.get_inputs()}
     missing = set(types) - set(feed)
     if missing: raise SystemExit(f'El model acústic demana entrades desconegudes: {sorted(missing)}')
