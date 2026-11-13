@@ -308,6 +308,20 @@
       text: `Inici: ${OPENINGS[opening]}. Final: ${CLOSINGS[closing]}.${middle !== 'none' ? ` Al mig: ${MIDDLES[middle]}${where}.` : ''}` };
   }
 
+  function balanceProminentBass(settings) {
+    const { subgenre, style, groove } = settings;
+    const mutedWinds = subgenre === 'rocksteady' || subgenre === 'bossreggae';
+    const leadBass = subgenre === 'jamaican' || subgenre === 'postpunk';
+    const melodicSka = style === 'ska' && [1, 3].includes(groove?.bass);
+    if (!mutedWinds && !leadBass && !melodicSka) return;
+    const bass = mutedWinds ? -21 : leadBass ? -17 : -15;
+    settings.baseVolume = { drums: 0, ...settings.baseVolume, bass: Math.min(settings.baseVolume?.bass ?? 0, bass) };
+    if (style !== 'ska') return;
+    const volumes = { ...settings.volumes }, wind = mutedWinds ? 6 : 5;
+    for (const instrument of ['trumpet', 'trombone', 'sax']) volumes[instrument] = Math.max(volumes[instrument] ?? 0, wind);
+    settings.volumes = volumes;
+  }
+
   function composeAuto(engine, key, options = {}) {
     const sg = engine.SUBGENRES[key];
     if (!sg) throw new Error('Subgènere desconegut');
@@ -332,21 +346,16 @@
     // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
     if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
-    // Ska jamaicà: el baix tapava els vents (comentaris de les cançons): baix més suau i vents més presents.
-    if (key === 'jamaican') { settings.baseVolume = { drums: 0, bass: -3 }; settings.volumes = { trumpet: 2, trombone: 2, sax: 2 }; }
+    // El baix manté el paper melòdic amb marge perquè destaquin la veu i els vents.
+    balanceProminentBass(settings);
     // Punk: la veu solista una mica per davant de les guitarres.
     if (punk) settings.volumes = { ...(settings.volumes || {}), vocal: 2 };
     // Hardcore: el baix Growlybass saturava el limitador i enterrava les guitarres (comentaris de la ràdio):
     // baix 4 dB avall i guitarres rítmiques 2 dB amunt.
     if (key === 'hardcore') { settings.baseVolume = { drums: 0, bass: -4 }; settings.volumes = { ...settings.volumes, guitar: 2, guitar2: 2 }; }
-    // Post-punk: el baix porta la cançó.
-    if (key === 'postpunk') settings.baseVolume = { drums: 0, bass: 2 };
     if (!punk) {
       // Ska: el clarinet que fa la melodia de veu és el solista i ha de quedar per davant de la banda.
       settings.volumes = { ...(settings.volumes || {}), vocal: 3 };
-      // On el baix és el protagonista (rocksteady, early reggae, o línies «dub» i melòdiques) es modera perquè no tapi la resta.
-      if (key === 'rocksteady' || key === 'bossreggae') settings.baseVolume = { drums: 0, bass: -3 };
-      else if (key !== 'jamaican' && [1, 3].includes(groove.bass)) settings.baseVolume = { drums: 0, bass: -2 };
     }
     for (const option of ['drumTune', 'humanize', 'cymbals', 'countIn']) if (sg[option] !== undefined) settings[option] = sg[option];
     if (settings.swing === 0) delete settings.swing;
@@ -939,5 +948,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

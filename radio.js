@@ -166,8 +166,10 @@
   const sungById = id => sungCatalog?.find(s => s.id === id);
   function historyChoice(entry) {
     const sung = sungById(entry.id);
-    return { id: entry.id, replay: true, take: savedTakes.has(entry.id), sung,
-      song: studio.validateSong(JSON.parse(JSON.stringify(entry.song))) };
+    const song = studio.validateSong(JSON.parse(JSON.stringify(entry.song)));
+    // Les cançons antigues recuperen el balanç nou quan es tornen a gravar.
+    builder.balanceProminentBass(song.settings);
+    return { id: entry.id, replay: true, take: savedTakes.has(entry.id), sung, song };
   }
   // filler: cal una cançó per omplir la cua mentre Umidaji en canta una altra (o no hi ha banc de veu).
   function chooseSong(filler = false) {

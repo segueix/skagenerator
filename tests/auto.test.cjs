@@ -469,14 +469,22 @@ test('el piano té canal propi, cinc patrons diferents i no trepitja les preses 
   assert.equal(takes.channels.find(c => c.instrument === 'piano').channel, 19);
 });
 
-test('ska: el clarinet solista puja i el baix es modera on és el protagonista; al punk puja la veu', () => {
+test('el baix protagonista queda clarament per sota de la veu solista i els vents', () => {
   for (const key of Object.keys(engine.SUBGENRES)) for (const seed of [5, 60, 700]) {
     const { settings } = builder.createAutoSong(engine, key, { minutes: 2, seed, recent: [], liked: [] });
-    // Punk: la veu també va una mica per davant; només el post-punk toca el baix (cap amunt: porta la cançó).
-    if (settings.style === 'punk') { assert.equal(settings.volumes.vocal, 2); assert.equal(settings.baseVolume?.bass, key === 'postpunk' ? 2 : key === 'hardcore' ? -4 : undefined); continue; }
-    assert.equal(settings.volumes.vocal, 3);
-    const prominent = ['jamaican', 'rocksteady', 'bossreggae'].includes(key) || [1, 3].includes(settings.groove.bass);
-    assert.equal((settings.baseVolume?.bass ?? 0) < 0, prominent, `${key}: baix`);
+    const ska = settings.style === 'ska';
+    assert.equal(settings.volumes.vocal, ska ? 3 : 2);
+    if (['rocksteady', 'bossreggae'].includes(key)) {
+      assert.equal(settings.baseVolume.bass, -21, key);
+      for (const instrument of ['trumpet', 'trombone', 'sax']) assert.equal(settings.volumes[instrument], 6, key);
+    } else if (key === 'postpunk') {
+      assert.equal(settings.baseVolume.bass, -17, key);
+    } else if (key === 'jamaican' || (ska && [1, 3].includes(settings.groove.bass))) {
+      assert.equal(settings.baseVolume.bass, key === 'jamaican' ? -17 : -15, key);
+      for (const instrument of ['trumpet', 'trombone', 'sax']) assert.equal(settings.volumes[instrument], 5, key);
+    } else {
+      assert.equal(settings.baseVolume?.bass, key === 'hardcore' ? -4 : undefined, key);
+    }
   }
 });
 
