@@ -176,6 +176,10 @@
     }
     const bars = segs.reduce((n, seg) => n + seg.bars, 0); let done = 0;
     const timeline = []; let at = 0;
+    // La parla de tots els versos es demana ara, en paral·lel amb la gravació de la banda.
+    if (browserSinger?.available && song.settings.lang === 'ca') browserSinger.prefetch(
+      segs.filter(seg => seg.section?.lyrics?.trim() && song.clips.some(c => c.instrument === 'vocal' && c.start < seg.start + seg.bars && seg.start < c.start + c.bars))
+        .map(seg => seg.section.lyrics.trim()), song.settings.subgenre, controller.signal);
     for (const seg of segs) {
       if (mine !== session) throw CANCELLED;
       const spec = engine.composeSongPart(song.settings, studio.partFor(song, seg));
@@ -183,14 +187,15 @@
       const lyrics = seg.section?.lyrics?.trim();
       const hasVocal = !!lyrics && spec.instruments.includes('vocal') && !!spec.lines?.vocal?.length;
       let voice = null;
-      if (hasVocal && browserSinger) {
+      // Matxa només parla català: una cançó amb lletra en anglès conserva la melodia de guia.
+      if (hasVocal && browserSinger && song.settings.lang === 'ca' && browserSinger.available) {
         vocalCount++;
         try {
           const lines = singingLines(song, seg, spec);
           if (!lines.length) throw new Error('No quadren les síl·labes amb les notes');
           setPrep({ stage: 'voice', value: done / bars, title: song.title });
           voice = await browserSinger.renderSection({
-            text: lyrics, lines, subgenre: song.settings.subgenre, frames, signal: controller.signal
+            text: lyrics, lines, subgenre: song.settings.subgenre, frames, signal: controller.signal, song: choice.id
           });
           if (mine !== session) throw CANCELLED;
           if (!voice.some(x => Math.abs(x) > .0001)) throw new Error('Matxa ha retornat silenci');
@@ -239,7 +244,8 @@
       text,
       engine.analyzeLyrics(text, song.settings.lang).syllables,
       spec.lines?.vocal || [],
-      seg.section?.bpm ?? song.settings.bpm
+      seg.section?.bpm ?? song.settings.bpm,
+      song.settings.swing || 0
     );
   }
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta

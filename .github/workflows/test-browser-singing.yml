@@ -2,7 +2,7 @@ name: Provar el cant Matxa al navegador
 
 on:
   push:
-    branches: ['feat/browser-matxa-singing']
+    branches: [main, 'claude/**', 'feat/**']
     paths:
       - 'browser-singing.js'
       - 'browser-singing-worker.js'

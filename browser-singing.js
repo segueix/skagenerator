@@ -10,22 +10,24 @@
   const ACCENTS = { elia: 'central', grau: 'central', emma: 'nord-occidental',
     pere: 'nord-occidental', gina: 'valencia', lluc: 'valencia',
     olga: 'balear', quim: 'balear' };
+  // Les veus «quim» i «olga» no s'hi fan servir: cantades són les que menys s'entenen (mesurat amb un
+  // reconeixedor de veu). Tampoc el megàfon, que tapa les consonants.
   const PRESETS = Object.freeze({
     jamaican: { name: 'Ska jamaicà càlid', speaker: 'grau', effect: 'warm', eq: { low: 2, mid: 0, high: 1 }, gainDb: 0 },
-    rocksteady: { name: 'Rocksteady vellutat', speaker: 'olga', effect: 'warm', eq: { low: 3, mid: -2, high: -2 }, gainDb: 0 },
+    rocksteady: { name: 'Rocksteady vellutat', speaker: 'emma', effect: 'warm', eq: { low: 3, mid: -2, high: -2 }, gainDb: 0 },
     twotone: { name: '2 Tone nasal', speaker: 'pere', effect: 'clean', eq: { low: -2, mid: 3, high: 2 }, gainDb: 1 },
-    nutty: { name: 'Nutty teatral', speaker: 'quim', effect: 'radio', eq: { low: 0, mid: 3, high: 2 }, gainDb: 0 },
+    nutty: { name: 'Nutty teatral', speaker: 'lluc', effect: 'radio', eq: { low: 0, mid: 3, high: 2 }, gainDb: 0 },
     bossreggae: { name: 'Boss reggae de vinil', speaker: 'lluc', effect: 'warm', eq: { low: 2, mid: -1, high: -3 }, gainDb: 0 },
     skaswing: { name: 'Ska-swing brillant', speaker: 'elia', effect: 'clean', eq: { low: 0, mid: 1, high: 3 }, gainDb: 0 },
     skapunk: { name: 'Ska-punk estrident', speaker: 'pere', effect: 'radio', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
     punk77: { name: 'Punk 77 cru', speaker: 'grau', effect: 'radio', eq: { low: -1, mid: 4, high: 1 }, gainDb: 0 },
-    oi: { name: 'Oi! aspre', speaker: 'quim', effect: 'warm', eq: { low: 3, mid: 3, high: -1 }, gainDb: 1 },
+    oi: { name: 'Oi! aspre', speaker: 'grau', effect: 'warm', eq: { low: 3, mid: 3, high: -1 }, gainDb: 1 },
     skatepunk: { name: 'Skate punk tens', speaker: 'lluc', effect: 'radio', eq: { low: -1, mid: 3, high: 2 }, gainDb: 1 },
     garage: { name: 'Garage lo-fi', speaker: 'grau', effect: 'lofi', eq: { low: 1, mid: 2, high: -2 }, gainDb: 0 },
     postpunk: { name: 'Post-punk fosc', speaker: 'grau', effect: 'warm', eq: { low: 3, mid: -2, high: -3 }, gainDb: 0 },
-    hardcore: { name: 'Hardcore agressiu', speaker: 'pere', effect: 'megaphone', eq: { low: -1, mid: 3, high: 1 }, gainDb: 0 },
+    hardcore: { name: 'Hardcore agressiu', speaker: 'pere', effect: 'clean', eq: { low: -1, mid: 4, high: 2 }, gainDb: 0 },
     poppunk: { name: 'Pop-punk brillant', speaker: 'gina', effect: 'clean', eq: { low: -2, mid: 1, high: 4 }, gainDb: 1 },
-    horrorpunk: { name: 'Horror punk espectral', speaker: 'quim', effect: 'radio', eq: { low: 3, mid: 1, high: -3 }, gainDb: 0 }
+    horrorpunk: { name: 'Horror punk espectral', speaker: 'pere', effect: 'radio', eq: { low: 3, mid: 1, high: -3 }, gainDb: 0 }
   });
   const DEFAULT = PRESETS.jamaican;
   const presetFor = subgenre => PRESETS[subgenre] || DEFAULT;
@@ -77,13 +79,36 @@
     return url.href;
   }
 
+  // Matxa sintetitza a 22.050 Hz: la veu es descodifica i es canta a aquesta freqüència (la meitat de
+  // càlcul) i només al final es passa a la de la cançó.
+  const SPEECH_RATE = 22050, REQUEST_TIMEOUT = 45000, BREAK_MS = 180000;
+  // Un context fora de línia descodifica directament a la freqüència demanada i no manté el maquinari
+  // d'àudio despert (un AudioContext normal gasta bateria i al mòbil pot quedar suspès en segon pla).
+  function decodeAudio(bytes, rate) {
+    const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = Offline ? new Offline(1, 1, rate) : new (window.AudioContext || window.webkitAudioContext)();
+    return new Promise((resolve, reject) => {
+      const done = ctx.decodeAudioData(bytes, resolve, reject);
+      if (done?.then) done.then(resolve, reject);
+    }).finally(() => { if (!Offline) ctx.close?.(); });
+  }
   // Un mateix text de tornada i la mateixa veu només es demanen un cop per sessió.
   class MatxaClient {
-    constructor() { this.cache = new Map(); this.sessions = new Map(); this.ctx = null; }
+    constructor() { this.cache = new Map(); this.active = 0; this.waiting = []; }
+    // Com a molt dues peticions alhora: la demo pública de Matxa és compartida.
+    async _slot(signal) {
+      if (this.active >= 2) await new Promise((resolve, reject) => {
+        const entry = { resolve, reject };
+        this.waiting.push(entry);
+        signal?.addEventListener('abort', () => { const i = this.waiting.indexOf(entry); if (i >= 0) { this.waiting.splice(i, 1); reject(aborted()); } }, { once: true });
+      });
+      else this.active++;
+    }
+    _release() { const next = this.waiting.shift(); if (next) next.resolve(); else this.active--; }
     async speak(text, speaker, rate, signal) {
       if (!ACCENTS[speaker]) throw new Error('Veu de Matxa desconeguda');
       if (signal?.aborted) throw aborted();
-      const key = speaker + '|' + text;
+      const key = speaker + '|' + rate + '|' + text;
       if (!this.cache.has(key)) {
         const task = this._request(text, speaker, rate, signal).catch(e => { this.cache.delete(key); throw e; });
         this.cache.set(key, task);
@@ -92,11 +117,12 @@
       return this.cache.get(key);
     }
     async _request(text, speaker, rate, signal) {
+      await this._slot(signal);
       // Un timeout evita que la cua de la ràdio quedi penjada si la demo s'atura.
       const controller = new AbortController();
       const onAbort = () => controller.abort();
       signal?.addEventListener('abort', onAbort, { once: true });
-      const timer = setTimeout(() => controller.abort(), 100000);
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
       try {
         // S'usa una sessió per consulta per evitar confondre esdeveniments SSE simultanis.
         const session = 'ska' + Math.random().toString(36).slice(2, 12);
@@ -105,8 +131,7 @@
         const audio = await fetch(extractAudioUrl(result), { signal: controller.signal });
         if (!audio.ok) throw new Error('No s’ha pogut descarregar el WAV de Matxa');
         const bytes = await audio.arrayBuffer();
-        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const decoded = await this.ctx.decodeAudioData(bytes);
+        const decoded = await decodeAudio(bytes, rate);
         const mono = new Float32Array(decoded.length);
         for (let c = 0; c < decoded.numberOfChannels; c++) {
           const ch = decoded.getChannelData(c);
@@ -119,11 +144,13 @@
       } finally {
         clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);
+        this._release();
       }
     }
   }
 
-  function scoreLines(text, counts, vocalNotes, bpm) {
+  // swing: el mateix desplaçament de les corxeres a contratemps que fa servir la banda (audio/performance.cjs).
+  function scoreLines(text, counts, vocalNotes, bpm, swing = 0) {
     const names = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
     if (!Array.isArray(counts) || !Array.isArray(vocalNotes) || !Number.isFinite(bpm) || bpm <= 0) return [];
     const notes = vocalNotes.slice().sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
@@ -132,9 +159,11 @@
     let index = 0;
     const beat = 60 / bpm;
     return names.map((name, i) => {
-      const noteGroup = notes.slice(index, index + counts[i]).map(([bar, b, midi, dur]) => ({
-        at: (bar * 4 + b) * beat, dur: dur * beat, midi
-      }));
+      const swung = beats => swing && Math.abs(beats % 1 - .5) < .04 ? beats + swing / 6 : beats;
+      const noteGroup = notes.slice(index, index + counts[i]).map(([bar, b, midi, dur]) => {
+        const start = swung(bar * 4 + b), end = swung(bar * 4 + b + dur);
+        return { at: start * beat, dur: Math.max(.03, (end - start) * beat), midi };
+      });
       index += counts[i];
       return { text: name, notes: noteGroup };
     });
@@ -187,61 +216,264 @@
     out.push(samples.length);
     return out;
   }
-  function singNote(source, targetLength, midi, rate) {
-    const out = new Float32Array(targetLength);
-    if (!source.length || !targetLength) return out;
-    const sourcePitch = estimatePitch(source, rate);
-    let hz = 440 * 2 ** ((midi - 69) / 12), ratio = hz / sourcePitch;
-    // Una octava no canvia l'harmonia: es tria la més propera al registre de la veu.
-    while (ratio > 1.7) ratio /= 2;
-    while (ratio < .68) ratio *= 2;
-    const size = Math.min(1536, Math.max(128, Math.floor(source.length / 2)));
-    const hop = Math.max(32, Math.floor(size / 4));
-    const accum = new Float32Array(targetLength), weights = new Float32Array(targetLength);
-    const inner = Math.max(1, source.length - size);
-    for (let dst = 0; dst < targetLength; dst += hop) {
-      const srcAt = inner === 1 ? 0 : Math.floor((dst * ratio) % inner);
-      const n = Math.min(size, targetLength - dst);
-      for (let i = 0; i < n; i++) {
-        const win = .5 - .5 * Math.cos((2 * Math.PI * i) / size);
-        const position = srcAt + i * ratio;
-        const a = Math.floor(position) % source.length, b = (a + 1) % source.length;
-        const sample = source[a] + (source[b] - source[a]) * (position - Math.floor(position));
-        accum[dst + i] += sample * win;
-        weights[dst + i] += win;
+  // ── De parla a cant (PSOLA) ───────────────────────────────────────────
+  // La parla de Matxa es converteix en cant sense tallar-la a trossos: se'n segueix el to (f0),
+  // se'n marquen els polsos de la veu i es torna a sintetitzar pols a pols (TD-PSOLA) amb el to de
+  // la melodia. Així es conserven les formants (no sona «d'heli») i les consonants. Cada vers es
+  // localitza per les pauses que Matxa fa als punts, i dins del vers el temps s'estira sobretot a
+  // les vocals perquè cada síl·laba ocupi la seva nota.
+  const HOP_SECONDS = .005;
+  function analyseSpeech(x, rate) {
+    const hop = Math.max(1, Math.round(HOP_SECONDS * rate)), count = Math.floor(x.length / hop);
+    // Senyal suavitzat i delmat (~11 kHz) per seguir el to amb poc càlcul.
+    const dec = Math.max(1, Math.round(rate / 11025)), r = rate / dec, n = Math.floor(x.length / dec);
+    const low = new Float32Array(x.length), y = new Float32Array(n);
+    const k = 1 - Math.exp(-2 * Math.PI * 900 / rate);
+    let state = 0;
+    for (let i = 0; i < x.length; i++) { state += k * (x[i] - state); low[i] = state; }
+    for (let i = 0; i < n; i++) y[i] = low[i * dec];
+    const energy = new Float32Array(count);
+    let peak = 0;
+    for (let f = 0; f < count; f++) {
+      let sum = 0; const a = Math.max(0, (f - 1) * hop), b = Math.min(x.length, (f + 2) * hop);
+      for (let i = a; i < b; i++) sum += x[i] * x[i];
+      energy[f] = Math.sqrt(sum / Math.max(1, b - a)); if (energy[f] > peak) peak = energy[f];
+    }
+    // Candidats de to per trama: màxims de l'autocorrelació normalitzada entre 70 i 400 Hz.
+    const minLag = Math.floor(r / 400), maxLag = Math.ceil(r / 70), win = Math.round(.03 * r), CAND = 4;
+    const candLag = new Float32Array(count * CAND), candScore = new Float32Array(count * CAND), scores = new Float32Array(maxLag + 2);
+    for (let f = 0; f < count; f++) {
+      const c = Math.round(f * hop / dec), a = c - (win >> 1);
+      if (energy[f] < peak * .03 || a < 0 || a + win + maxLag >= n) continue;
+      let e0 = 0;
+      for (let i = 0; i < win; i++) e0 += y[a + i] * y[a + i];
+      if (e0 < 1e-9) continue;
+      let eL = 0;
+      for (let i = 0; i < win; i++) eL += y[a + minLag - 1 + i] * y[a + minLag - 1 + i];
+      for (let lag = minLag - 1; lag <= maxLag + 1; lag++) {
+        let corr = 0;
+        for (let i = 0; i < win; i++) corr += y[a + i] * y[a + i + lag];
+        scores[lag] = corr / Math.sqrt(e0 * eL + 1e-12);
+        eL += y[a + lag + win] * y[a + lag + win] - y[a + lag] * y[a + lag];
+      }
+      let found = 0;
+      for (let lag = minLag; lag <= maxLag; lag++) {
+        const s = scores[lag];
+        if (s < .3 || s < scores[lag - 1] || s <= scores[lag + 1]) continue;
+        // Interpolació parabòlica del màxim.
+        const d = scores[lag - 1] - 2 * s + scores[lag + 1], fine = lag + (d ? .5 * (scores[lag - 1] - scores[lag + 1]) / d : 0);
+        let slot = found < CAND ? found++ : -1;
+        if (slot < 0) { let worst = 0; for (let j = 1; j < CAND; j++) if (candScore[f * CAND + j] < candScore[f * CAND + worst]) worst = j; if (candScore[f * CAND + worst] < s) slot = worst; }
+        if (slot >= 0) { candLag[f * CAND + slot] = fine; candScore[f * CAND + slot] = s; }
       }
     }
-    const fade = Math.min(Math.floor(rate * .02), Math.floor(targetLength / 4));
-    for (let i = 0; i < targetLength; i++) {
-      let gain = weights[i] ? accum[i] / weights[i] : 0;
-      if (fade) gain *= Math.min(1, i / fade, (targetLength - 1 - i) / fade);
-      out[i] = gain;
+    // Camí més coherent (Viterbi): evita salts d'octava i decideix quines trames són sonores.
+    const STATES = CAND + 1, UNVOICED = CAND, cost = new Float32Array(count * STATES), back = new Int8Array(count * STATES);
+    for (let f = 0; f < count; f++) for (let s = 0; s < STATES; s++) {
+      const score = s === UNVOICED ? 0 : candScore[f * CAND + s];
+      const local = s === UNVOICED ? .5 : score ? 1 - score : Infinity;
+      let best = 0, from = 0;
+      if (f) {
+        best = Infinity;
+        for (let p = 0; p < STATES; p++) {
+          const prev = cost[(f - 1) * STATES + p];
+          if (prev === Infinity) continue;
+          let move;
+          if (s === UNVOICED || p === UNVOICED) move = s === p ? 0 : .12;
+          else move = 1.4 * Math.abs(Math.log2(candLag[f * CAND + s] / candLag[(f - 1) * CAND + p]));
+          if (prev + move < best) { best = prev + move; from = p; }
+        }
+      }
+      cost[f * STATES + s] = local === Infinity ? Infinity : best + local; back[f * STATES + s] = from;
     }
+    const f0 = new Float32Array(count);
+    if (count) {
+      let s = 0;
+      for (let j = 1; j < STATES; j++) if (cost[(count - 1) * STATES + j] < cost[(count - 1) * STATES + s]) s = j;
+      for (let f = count - 1; f >= 0; f--) { f0[f] = s === UNVOICED ? 0 : r / candLag[f * CAND + s]; s = back[f * STATES + s]; }
+    }
+    // Polsos: a les trames sonores, un per període (al pic del senyal suavitzat); a la resta, cada 5 ms.
+    const marks = [], periods = [], voiced = [];
+    let at = 0;
+    while (at < x.length - 1) {
+      const hz = f0[Math.min(count - 1, Math.floor(at / hop))] || 0;
+      if (!hz) { marks.push(Math.round(at)); periods.push(hop); voiced.push(0); at += hop; continue; }
+      const period = rate / hz;
+      let centre = at;
+      if (marks.length && voiced[voiced.length - 1]) {
+        // Segueix el pic més proper a un període de distància de l'anterior.
+        const a = Math.max(0, Math.round(at - period * .25)), b = Math.min(x.length - 1, Math.round(at + period * .25));
+        let top = -Infinity; for (let i = a; i <= b; i++) if (low[i] > top) { top = low[i]; centre = i; }
+      } else {
+        const a = Math.round(at), b = Math.min(x.length - 1, Math.round(at + period));
+        let top = -Infinity; for (let i = a; i <= b; i++) if (low[i] > top) { top = low[i]; centre = i; }
+      }
+      marks.push(Math.round(centre)); periods.push(period); voiced.push(1);
+      at = centre + period;
+    }
+    const pitched = Array.from(f0).filter(Boolean).sort((a, b) => a - b);
+    return { hop, count, energy, peak, f0, marks, periods, voiced, median: pitched.length ? pitched[pitched.length >> 1] : 0 };
+  }
+  // Trossos de parla (en trames) separats per les pauses més llargues: un per vers.
+  function splitSpeech(info, lineCount, weights) {
+    const { energy, count, peak } = info, quiet = peak * .045, loud = f => energy[f] > quiet;
+    let first = 0, last = count - 1;
+    while (first < last && !loud(first)) first++;
+    while (last > first && !loud(last)) last--;
+    const pauses = [];
+    for (let f = first; f <= last; f++) {
+      if (loud(f)) continue;
+      let end = f; while (end <= last && !loud(end)) end++;
+      if (end - f >= 24) pauses.push([f, end]);   // 120 ms o més
+      f = end;
+    }
+    let cuts;
+    if (pauses.length >= lineCount - 1) {
+      cuts = pauses.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0])).slice(0, lineCount - 1).sort((a, b) => a[0] - b[0]);
+    } else {
+      // No s'han trobat prou pauses: es reparteix segons les síl·labes de cada vers.
+      const total = weights.reduce((a, b) => a + b, 0); let acc = 0; cuts = [];
+      for (let i = 0; i < lineCount - 1; i++) { acc += weights[i]; const f = Math.round(first + (last - first) * acc / total); cuts.push([f, f]); }
+    }
+    const spans = []; let from = first;
+    for (const [a, b] of cuts) { spans.push([from, Math.max(from + 1, a)]); from = b; }
+    spans.push([from, Math.max(from + 1, last + 1)]);
+    return spans;
+  }
+  // Límits de síl·laba dins d'un vers: repartiment uniforme ajustat al mínim de volum més proper.
+  function syllableFrames(info, [from, to], syllables) {
+    const out = [from], length = to - from, radius = Math.max(1, Math.min(14, Math.floor(length / syllables / 2.5)));
+    for (let i = 1; i < syllables; i++) {
+      const target = from + Math.round(length * i / syllables);
+      let best = target, value = Infinity;
+      for (let f = Math.max(out[out.length - 1] + 1, target - radius); f <= Math.min(to - 1, target + radius); f++) {
+        const c = info.energy[f] / (info.peak + 1e-9) + Math.abs(f - target) / (radius + 1) * .12;
+        if (c < value) { value = c; best = f; }
+      }
+      out.push(Math.max(out[out.length - 1] + 1, Math.min(to - 1, best)));
+    }
+    out.push(Math.max(out[out.length - 1] + 1, to));
     return out;
   }
-
-  function renderPCM(speech, lines, frames, rate) {
+  // Límits de síl·laba pels nuclis vocàlics: cada pic de l'energia sonora és una vocal i el tall cau a la
+  // vall que el separa del següent (on hi ha la consonant). Si la lletra té més síl·labes que no pas
+  // vocals pronunciades (sinalefes: «que‿arribi»), es parteix el nucli més llarg; si en té menys, es
+  // fonen els dos pics més enganxats.
+  function nucleusFrames(info, [from, to], syllables) {
+    const length = to - from;
+    if (length < syllables * 2) return syllableFrames(info, [from, to], syllables);
+    const env = new Float32Array(length);
+    let top = 0;
+    for (let i = 0; i < length; i++) {
+      let sum = 0, n = 0;
+      for (let f = Math.max(from, from + i - 3); f <= Math.min(to - 1, from + i + 3); f++) { sum += info.f0[f] ? info.energy[f] : info.energy[f] * .15; n++; }
+      env[i] = sum / n; if (env[i] > top) top = env[i];
+    }
+    let peaks = [];
+    for (let i = 0; i < length; i++) {
+      if (env[i] < top * .1) continue;
+      let isPeak = true;
+      for (let j = Math.max(0, i - 4); j <= Math.min(length - 1, i + 4) && isPeak; j++) if (env[j] > env[i] || (env[j] === env[i] && j < i)) isPeak = false;
+      if (isPeak) peaks.push(i);
+    }
+    if (!peaks.length) return syllableFrames(info, [from, to], syllables);
+    const valley = (a, b) => { let at = a, low = Infinity; for (let i = a; i <= b; i++) if (env[i] < low) { low = env[i]; at = i; } return at; };
+    // Dos pics sense una vall clara entremig són la mateixa vocal.
+    const depth = k => { const v = env[valley(peaks[k], peaks[k + 1])]; return 1 - v / Math.min(env[peaks[k]], env[peaks[k + 1]]); };
+    const merge = k => peaks.splice(env[peaks[k]] >= env[peaks[k + 1]] ? k + 1 : k, 1);
+    for (let k = 0; k < peaks.length - 1;) if (depth(k) < .12) merge(k); else k++;
+    while (peaks.length > syllables) { let k = 0; for (let j = 1; j < peaks.length - 1; j++) if (depth(j) < depth(k)) k = j; merge(k); }
+    let cuts = [0];
+    for (let k = 0; k < peaks.length - 1; k++) cuts.push(valley(peaks[k], peaks[k + 1]));
+    cuts.push(length);
+    while (cuts.length - 1 < syllables) {
+      let k = 0; for (let j = 1; j < cuts.length - 1; j++) if (cuts[j + 1] - cuts[j] > cuts[k + 1] - cuts[k]) k = j;
+      if (cuts[k + 1] - cuts[k] < 2) return syllableFrames(info, [from, to], syllables);
+      cuts.splice(k + 1, 0, (cuts[k] + cuts[k + 1]) >> 1);
+    }
+    return cuts.map(c => from + c);
+  }
+  // speech: parla mono a «speechRate» (per defecte, «rate»). lines: [{ notes: [{ at, dur, midi }] }] (segons).
+  // state (opcional) guarda l'octava triada perquè totes les seccions d'una cançó cantin a la mateixa.
+  function renderPCM(speech, lines, frames, rate, options = {}) {
     if (!(speech instanceof Float32Array) || !Array.isArray(lines) ||
       !Number.isInteger(frames) || frames < 0 || !Number.isFinite(rate)) throw new Error('Partitura de cant no vàlida');
-    const out = new Float32Array(frames);
-    const all = lines.flatMap(l => l.notes || []);
-    if (!all.length || speech.length < 256) return out;
-    const lineCount = lines.reduce((n, l) => n + l.notes.length, 0);
-    const lineBreaks = boundaries(speech, lineCount, rate);
-    let index = 0;
-    for (const line of lines) {
-      for (const note of line.notes) {
-        const start = Math.max(0, Math.floor(note.at * rate));
-        const length = Math.max(0, Math.min(frames - start, Math.floor(note.dur * rate)));
-        if (length && start < frames) {
-          const source = speech.subarray(lineBreaks[index], lineBreaks[index + 1]);
-          const sung = singNote(source, length, note.midi, rate);
-          for (let k = 0; k < length; k++) out[start + k] += sung[k];
-        }
-        index++;
-      }
+    const sr = options.speechRate || rate, state = options.state || {};
+    const sung = lines.filter(l => l.notes?.length);
+    if (!sung.length || speech.length < 256 || !frames) return new Float32Array(frames);
+    const info = analyseSpeech(speech, sr), hop = info.hop;
+    const length = Math.ceil(frames * sr / rate), out = new Float32Array(length);
+    // Una sola octava per a tota la cançó: la que deixa la melodia més a prop del to natural de la veu.
+    const hzOf = midi => 440 * 2 ** ((midi - 69) / 12);
+    if (state.octave === undefined) {
+      const targets = sung.flatMap(l => l.notes.map(n => hzOf(n.midi))).sort((a, b) => a - b);
+      state.octave = info.median ? Math.round(Math.log2(info.median * 1.12 / targets[targets.length >> 1])) : 0;
     }
-    return out;
+    const shift = 2 ** state.octave;
+    const spans = splitSpeech(info, sung.length, sung.map(l => l.notes.length));
+    let seed = 12345; const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+    const nearest = pos => { let a = 0, b = info.marks.length - 1; while (a < b) { const m = (a + b) >> 1; if (info.marks[m] < pos) a = m + 1; else b = m; }
+      return a && pos - info.marks[a - 1] < info.marks[a] - pos ? a - 1 : a; };
+    sung.forEach((line, li) => {
+      const notes = line.notes, bounds = (options.uniform ? syllableFrames : nucleusFrames)(info, spans[li], notes.length);
+      // Trossos consecutius: cada síl·laba dura fins a la nota següent si hi és enganxada (legato).
+      const pieces = notes.map((note, i) => {
+        const o0 = note.at * sr, next = notes[i + 1];
+        const o1 = next && next.at - (note.at + note.dur) < .09 ? next.at * sr : (note.at + note.dur) * sr;
+        const fa = bounds[i], fb = bounds[i + 1], stretch = (o1 - o0) / Math.max(1, (fb - fa) * hop);
+        // El temps que sobra va sobretot a les vocals (trames sonores i fortes); les consonants gairebé no s'estiren.
+        const alpha = Math.max(0, Math.min(10, (stretch - 1) * 4)), cum = new Float32Array(fb - fa + 1);
+        let top = 1e-9; for (let f = fa; f < fb; f++) if (info.f0[f] && info.energy[f] > top) top = info.energy[f];
+        for (let f = fa; f < fb; f++) cum[f - fa + 1] = cum[f - fa] + 1 + (info.f0[f] ? alpha * (info.energy[f] / top) ** 2 : 0);
+        return { o0, o1, fa, fb, cum, hz: hzOf(note.midi) * shift, start: note.at, dur: note.dur };
+      });
+      let t = pieces[0].o0, p = 0, cursor = 0, lastNoise = -1;
+      while (p < pieces.length && t < length) {
+        let piece = pieces[p];
+        if (t >= piece.o1) { p++; cursor = 0; if (p < pieces.length && t < pieces[p].o0) t = pieces[p].o0; continue; }
+        // Posició a la parla que correspon a aquest instant.
+        const want = (t - piece.o0) / (piece.o1 - piece.o0) * piece.cum[piece.cum.length - 1];
+        while (cursor < piece.cum.length - 2 && piece.cum[cursor + 1] < want) cursor++;
+        const span = piece.cum[cursor + 1] - piece.cum[cursor];
+        const src = (piece.fa + cursor + (span ? (want - piece.cum[cursor]) / span : 0)) * hop;
+        let m = nearest(src);
+        const isVoiced = info.voiced[m];
+        let sign = 1;
+        if (!isVoiced && m <= lastNoise) {
+          // Soroll estirat (s, f, x…): en repetir un gra es barreja amb els veïns perquè no brunzeixi.
+          // Sense estirament els grans es copien tal qual, i les oclusives (p, t, k) queden intactes.
+          const other = m + Math.floor(random() * 3) - 1;
+          if (other >= 0 && other < info.marks.length && !info.voiced[other]) m = other;
+          if (random() < .5) sign = -1;
+        } else if (!isVoiced) lastNoise = m;
+        const half = Math.max(8, Math.round(info.periods[m])), centre = info.marks[m], to = Math.round(t);
+        // To de la nota, amb un lliscament curt des de la nota anterior i un vibrato suau a les notes llargues.
+        let hz = piece.hz; const into = t / sr - piece.start;
+        if (p && into < .04 && pieces[p - 1].o1 >= piece.o0 - 1) hz = pieces[p - 1].hz * (piece.hz / pieces[p - 1].hz) ** (into / .04);
+        if (piece.dur > .4 && into > .18) hz *= 2 ** (Math.min(1, (into - .18) / .25) * .018 * Math.sin(2 * Math.PI * 5.4 * into));
+        const step = isVoiced ? sr / hz : info.periods[m];
+        const gain = sign * (isVoiced ? Math.min(1.6, Math.sqrt(step / info.periods[m])) : 1);
+        for (let i = -half; i <= half; i++) {
+          const a = centre + i, b = to + i;
+          if (a < 0 || a >= speech.length || b < 0 || b >= length) continue;
+          out[b] += speech[a] * (.5 + .5 * Math.cos(Math.PI * i / half)) * gain;
+        }
+        t += Math.max(16, step);
+      }
+      // Entrades i sortides suaus als silencis (no dins del legato).
+      const fade = Math.round(sr * .008);
+      pieces.forEach((piece, i) => {
+        const a = Math.round(piece.o0), b = Math.min(length, Math.round(piece.o1));
+        const opens = !i || pieces[i - 1].o1 < piece.o0 - 1, closes = i === pieces.length - 1 || pieces[i + 1].o0 > piece.o1 + 1;
+        if (opens) { for (let k = Math.max(0, a - 4 * fade); k < a; k++) out[k] = 0; for (let k = 0; k < fade && a + k < length; k++) out[a + k] *= k / fade; }
+        if (closes) { for (let k = 0; k < fade && b - 1 - k >= 0; k++) out[b - 1 - k] *= k / fade; for (let k = b; k < Math.min(length, b + 4 * fade); k++) out[k] = 0; }
+      });
+    });
+    if (sr === rate) return out;
+    // De la freqüència de la parla a la de la cançó.
+    const result = new Float32Array(frames), ratio = sr / rate;
+    for (let i = 0; i < frames; i++) { const pos = i * ratio, k = Math.floor(pos), f = pos - k; result[i] = (out[k] || 0) * (1 - f) + (out[k + 1] || 0) * f; }
+    return result;
   }
 
   // La petició de Matxa és asíncrona; el càlcul de nota i filtre passa a un Web Worker.
@@ -265,16 +497,31 @@
       };
       return worker;
     }
+    // Si Matxa falla, durant uns minuts no s'hi torna a insistir: la cua de la ràdio no s'ha d'esperar
+    // a un servei caigut a cada secció.
+    let brokenUntil = 0;
+    const spoken = text => text.replace(/\n+/g, '. ');
+    const speak = async (text, subgenre, signal) => {
+      if (Date.now() < brokenUntil) throw new Error('Matxa no respon: es reprendrà d’aquí a uns minuts');
+      try { return await client.speak(spoken(text), presetFor(subgenre).speaker, SPEECH_RATE, signal); }
+      catch (error) { if (!signal?.aborted) brokenUntil = Date.now() + BREAK_MS; throw error; }
+    };
     return {
-      async renderSection({ text, lines, subgenre, frames, signal }) {
+      // Demana per endavant la parla de totes les seccions (les repetides, un sol cop) mentre es grava
+      // la banda: quan toca cantar-les ja són a la memòria.
+      prefetch(texts, subgenre, signal) {
+        for (const text of new Set(texts)) speak(text, subgenre, signal).catch(() => {});
+      },
+      get available() { return Date.now() >= brokenUntil; },
+      async renderSection({ text, lines, subgenre, frames, signal, song, swing }) {
         if (!lines?.length || !lines.some(l => l.notes.length)) return new Float32Array(frames);
         const preset = presetFor(subgenre);
-        const pcm = await client.speak(text.replace(/\n+/g, '. '), preset.speaker, rate, signal);
+        const pcm = await speak(text, subgenre, signal);
         if (signal?.aborted) throw aborted();
         return new Promise((resolve, reject) => {
-          const id = ++serial;
+          const id = ++serial, copy = pcm.slice();
           pending.set(id, { resolve, reject });
-          try { ensureWorker().postMessage({ id, type: 'sing', pcm: pcm.slice(), lines, frames, rate, preset }); }
+          try { ensureWorker().postMessage({ id, type: 'sing', pcm: copy, speechRate: SPEECH_RATE, song, lines, frames, rate, preset }, [copy.buffer]); }
           catch (error) { pending.delete(id); reject(error); }
         });
       },
@@ -287,5 +534,5 @@
   }
 
   return { PRESETS, ACCENTS, presetFor, renderPCM, estimatePitch, boundaries,
-    MatxaClient, createBrowserSinger, extractAudioUrl, scoreLines };
+    MatxaClient, createBrowserSinger, extractAudioUrl, scoreLines, analyseSpeech, splitSpeech, SPEECH_RATE };
 });

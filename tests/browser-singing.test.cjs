@@ -12,7 +12,8 @@ test('quinze timbres diferents i totes les veus Matxa vàlides', () => {
   assert.equal(new Set(Object.values(singer.PRESETS).map(v => v.name)).size, 15);
   for (const preset of Object.values(singer.PRESETS)) {
     assert(preset.name && singer.ACCENTS[preset.speaker]);
-    assert(['clean','warm','radio','lofi','megaphone'].includes(preset.effect));
+    assert(['clean','warm','radio','lofi'].includes(preset.effect), 'sense megàfon: tapa les consonants');
+    assert(!['quim', 'olga'].includes(preset.speaker), 'veus que cantades s’entenen poc');
     for (const value of Object.values(preset.eq)) assert(Math.abs(value) <= 12);
   }
   assert.equal(singer.presetFor('punk77').name, 'Punk 77 cru');
@@ -162,4 +163,69 @@ test('el worker aplica el preset i lliura una veu processada', async () => {
   assert.equal(output.voice.length, rate);
   assert(output.voice.some(x => Math.abs(x) > .001));
   assert(output.voice.every(x => Number.isFinite(x) && Math.abs(x) <= 1));
+});
+
+// ── Parla de prova: «vocals» amb harmònics a 120 Hz separades per silencis ──
+const voicedBurst = (hz, seconds) => Float32Array.from({ length: Math.round(rate * seconds) }, (_, i) => {
+  const t = i / rate, env = Math.min(1, t / .02, (seconds - t) / .02);
+  return env * .2 * (Math.sin(2 * Math.PI * hz * t) + .5 * Math.sin(4 * Math.PI * hz * t) + .3 * Math.sin(6 * Math.PI * hz * t));
+});
+const join = (...parts) => { const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
+const pause = seconds => new Float32Array(Math.round(rate * seconds));
+
+test('el seguiment de to troba la veu i els versos se separen per les pauses', () => {
+  const speech = join(pause(.1), voicedBurst(120, .5), pause(.3), voicedBurst(150, .4), pause(.1));
+  const info = singer.analyseSpeech(speech, rate);
+  assert(Math.abs(info.median - 120) < 8 || Math.abs(info.median - 150) < 8, String(info.median));
+  const spans = singer.splitSpeech(info, 2, [3, 3]).map(([a, b]) => [a * info.hop / rate, b * info.hop / rate]);
+  assert(Math.abs(spans[0][0] - .1) < .03 && Math.abs(spans[0][1] - .6) < .03, JSON.stringify(spans));
+  assert(Math.abs(spans[1][0] - .9) < .03 && Math.abs(spans[1][1] - 1.3) < .03, JSON.stringify(spans));
+  // Sense prou pauses, es reparteix segons les síl·labes.
+  assert.equal(singer.splitSpeech(info, 3, [2, 2, 2]).length, 3);
+});
+
+test('canta el to de la melodia, a la mateixa octava a tota la cançó, i respecta la freqüència de sortida', () => {
+  const speech = join(pause(.05), voicedBurst(120, .6), pause(.05));
+  const state = {}, lines = [{ text: 'La', notes: [{ at: .1, dur: .5, midi: 57 }] }];   // la3 = 220 Hz
+  const out = singer.renderPCM(speech, lines, rate, rate, { state });
+  assert.equal(state.octave, -1, 'la melodia baixa una octava cap al to natural de la veu');
+  const sung = singer.analyseSpeech(out, rate).median;
+  assert(Math.abs(sung - 110) < 4, `canta a ${sung.toFixed(1)} Hz`);
+  // Una altra secció de la mateixa cançó conserva l'octava encara que la seva melodia sigui més greu.
+  const low = singer.renderPCM(speech, [{ text: 'La', notes: [{ at: .1, dur: .5, midi: 50 }] }], rate, rate, { state });
+  assert(Math.abs(singer.analyseSpeech(low, rate).median - 73.4) < 4);
+  // Parla a 22.050 Hz i cançó a 44.100 Hz: la sortida fa exactament els fotogrames demanats.
+  const hi = singer.renderPCM(speech, lines, rate * 2, rate * 2, { speechRate: rate, state: {} });
+  assert.equal(hi.length, rate * 2);
+  assert(Math.abs(singer.analyseSpeech(hi, rate * 2).median - 110) < 4);
+});
+
+test('el swing desplaça les síl·labes a contratemps igual que la banda', () => {
+  const notes = [[0, 0, 60, .5], [0, .5, 62, .5], [0, 1, 64, 1]];
+  const [straight] = singer.scoreLines('la la la', [3], notes, 120), [swung] = singer.scoreLines('la la la', [3], notes, 120, .6);
+  assert.equal(swung.notes[0].at, straight.notes[0].at);
+  assert(Math.abs(swung.notes[1].at - (straight.notes[1].at + .6 / 6 * .5)) < 1e-9);
+  assert.equal(swung.notes[2].at, straight.notes[2].at);
+  assert(Math.abs(swung.notes[0].dur - (.25 + .05)) < 1e-9 && Math.abs(swung.notes[1].dur - (.25 - .05)) < 1e-9);
+});
+
+test('la parla es demana per endavant un sol cop i, si Matxa cau, no s’hi insisteix', async () => {
+  let calls = 0, fail = false;
+  const client = { speak: async text => { calls++; if (fail) throw new Error('caigut'); return voicedBurst(120, .3); } };
+  const worker = { onmessage: null, terminate() {}, postMessage(data) { queueMicrotask(() => this.onmessage({ data: { id: data.id, voice: new Float32Array(data.frames).fill(.1) } })); } };
+  const cached = new Map(), caching = { speak: (text, ...rest) => { if (!cached.has(text)) cached.set(text, client.speak(text, ...rest)); return cached.get(text); } };
+  const renderer = singer.createBrowserSinger({ rate, client: caching, makeWorker: () => worker });
+  renderer.prefetch(['Vine a ballar', 'Vine a ballar', 'Fins demà'], 'twotone');
+  assert.equal(calls, 2, 'els versos repetits es demanen un cop');
+  const section = { text: 'Vine a ballar', subgenre: 'twotone', frames: 2000, lines: [{ text: 'Vine a ballar', notes: [{ at: 0, dur: .05, midi: 60 }] }] };
+  await renderer.renderSection(section);
+  assert.equal(calls, 2, 'la secció aprofita la parla ja demanada');
+  assert.equal(renderer.available, true);
+  fail = true;
+  await assert.rejects(renderer.renderSection({ ...section, text: 'Una altra' }), /caigut/);
+  assert.equal(renderer.available, false);
+  const before = calls;
+  await assert.rejects(renderer.renderSection({ ...section, text: 'I una altra' }), /no respon/);
+  assert.equal(calls, before, 'amb Matxa caigut no es fa cap més petició durant uns minuts');
+  renderer.dispose();
 });

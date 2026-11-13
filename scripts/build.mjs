@@ -18,12 +18,15 @@ client = client.replace(/sample-worker\.js\?v=[^']+/, `sample-worker.js?v=${awai
 client = client.replace(/generaluser-ska-punk\.sf2\?v=[^']+/, `generaluser-ska-punk.sf2?v=${await hash('assets/generaluser-ska-punk.sf2')}`);
 client = client.replace(/extra-instruments\.sf2\?v=[^']+/, `extra-instruments.sf2?v=${await hash('assets/extra-instruments.sf2')}`);
 await writeFile('dist/sample-audio.js', client);
+// El worker de cant carrega el motor i les utilitats amb la seva versió, i la versió del worker en depèn:
+// així un canvi del motor no es queda a mitges amb un worker antic a la memòria cau.
+let singWorker = await readFile('dist/browser-singing-worker.js', 'utf8');
+for (const file of ['audio-utils.js', 'browser-singing.js']) singWorker = singWorker.replace(`'${file}'`, `'${file}?v=${await hash(file)}'`);
+await writeFile('dist/browser-singing-worker.js', singWorker);
 let singer = await readFile('dist/browser-singing.js', 'utf8');
 singer = singer.replaceAll('browser-singing-worker.js', `browser-singing-worker.js?v=${await hash('browser-singing-worker.js')}`);
 await writeFile('dist/browser-singing.js', singer);
 let html = await readFile('dist/index.html', 'utf8');
 for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'browser-singing.js'])
   html = html.replaceAll(`"${file}"`, `"${file}?v=${await hash(file)}` + '"');
-// El worker de cant usa les versions de scripts incloses al dist del mateix desplegament.
-await writeFile('dist/browser-singing-worker.js', await readFile('dist/browser-singing-worker.js', 'utf8'));
 await writeFile('dist/index.html', html);
