@@ -1,0 +1,83 @@
+name: Prova privada d'un cantant en portuguès (no publica res)
+
+# Prova d'ús personal i no comercial: una cançó de ska cantada per Umidaji (Team BRAPA), un cantant
+# sintètic de debò (DiffSinger) amb fonemes portuguesos, als quals es tradueix la lletra catalana.
+# Condicions del cantant: ús personal no comercial, amb crèdit; sense contingut polític, religiós,
+# violent ni per a adults. Per això només es fa amb una cançó de ska i només se'n deixa un artefacte.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/prova-veu-pt.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prova-veu-pt
+  cancel-in-progress: true
+
+jobs:
+  sing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Dependències
+        run: |
+          npm ci
+          npm i --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+          pip install 'numpy<2' scipy soundfile pyyaml onnxruntime==1.17.3
+          sudo apt-get install -y ffmpeg >/dev/null
+      - name: Baixar el cantant (no es desa ni es redistribueix)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir vb && cd vb
+          gh release download v110 --repo Team-BRAPA/Umidaji-DiffSinger -p '*.zip'
+          unzip -q *.zip
+      - name: Recuperar els bancs de mostres
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: soundbanks-${{ hashFiles('soundbank-source.json', 'real-instruments.json', 'scripts/real-instruments.mjs', 'extra-instruments.json', 'scripts/extra-instruments.mjs', 'round-robin.json') }}
+          restore-keys: soundbanks-
+      - name: Construir la web
+        run: npm run build
+      - name: Compondre un ska amb lletra en català
+        env:
+          EXPORT_STYLES: ska,punk
+          EXPORT_LANG: ca
+        run: |
+          (cd dist && python -m http.server 8000 >/dev/null 2>&1 &)
+          sleep 1
+          node singing/export.cjs http://localhost:8000/ out 1 1
+      - name: Cantar
+        env:
+          SING_CENTER: '64'
+        run: |
+          set -euo pipefail
+          for score in out/*.json; do
+            case "$score" in *.meta.json) continue ;; esac
+            base="${score%.json}"
+            for timbre in rainbow moon; do
+              python singing/sing.py vb/Umidaji_DS_v110 "$score" "$base.band.wav" "$base-umidaji-$timbre.mp3" --speaker "$timbre" --steps 20
+            done
+            python -c "import json,sys; s=json.load(open(sys.argv[1])); print(s['title']); print(' '.join(n['word'] for n in s['notes'] if n['syllable']==0))" "$score"
+          done
+          ls -lh out/*.mp3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prova-veu-pt
+          path: out/*.mp3
+          retention-days: 7
+# reintent 1794579872

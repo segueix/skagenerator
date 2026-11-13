@@ -24,7 +24,7 @@ self.onmessage = async ({ data }) => {
         const notes = data.notes.slice().sort((a, b) => a.t - b.t), shift = M.shiftFor(notes, data.speaker);
         const vocal = new Float32Array(data.band[0].length + 2 * 44100);
         for (const phrase of M.phrasesOf(notes)) {
-          const unit = units.get(M.lineText(phrase) + '|' + phrase.length);
+          const unit = units.get(M.spokenText(phrase) + '|' + phrase.length);
           if (!unit) throw new Error('Falta la parla d’un vers');
           const { start, wave } = M.singLine(w, phrase, shift, unit);
           M.lay(vocal, start, wave);

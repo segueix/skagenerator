@@ -91,6 +91,13 @@ test('partitura com la de l’acció: unitats amb sinalefa, versos, swing i octa
   const phrases = M.phrasesOf(notes);
   assert.equal(phrases.length, 2);
   assert.equal(M.lineText(phrases[0]), 'Que arribi el matí.');
+  // Conversor de lletra: a les síl·labes llargues (0,3 s o més) la vocal s'escriu tres cops; les consonants,
+  // les síl·labes curtes i les unitats amb sinalefa no es toquen.
+  assert.equal(M.stretchWord('casa', [.5, .5], .3), 'caaasaaa');
+  assert.equal(M.stretchWord('guitarra', [.5, .2, .5], .3), 'guiiitarraaa');
+  assert.equal(M.stretchWord('matí', [.2, .6], .3), 'matíii');
+  assert.equal(M.stretchWord('quedat', [.2, .2], .3), 'quedat');
+  assert.equal(M.spokenText(phrases[0]), 'Que arribi el maaatíii.', 'les dues notes de «matí» duren mig segon o més');
   assert.equal(M.shiftFor(notes, 'grau'), -12); assert.equal(M.shiftFor(notes, 'emma'), 0);
 });
 
@@ -118,7 +125,7 @@ test('cantant del navegador: un sol cop per vers, la banda va i torna al worker,
       queueMicrotask(() => this.onmessage({ data: data.type === 'sing' ? { id: data.id, mix: data.band.map(c => c.map(v => v + 1)) } : { id: data.id } }));
     } };
     const s = singer.createBrowserSinger({ client, makeWorker: () => worker });
-    const line = (t, word) => [0, 1, 2].map(k => ({ t: t + k * .3, d: .25, midi: 60, word, syllable: k, lineStart: k === 0 }));
+    const line = (t, word) => [0, 1, 2].map(k => ({ t: t + k * .25, d: .2, midi: 60, word, syllable: k, lineStart: k === 0 }));
     const notes = [...line(0, 'tornada'), ...line(2, 'estrofa'), ...line(4, 'tornada')];
     const job = s.start({ notes, subgenre: 'oi' });
     await job.ready;
@@ -150,7 +157,7 @@ test('el worker canta i mescla una cançó, i si falla retorna la banda', async 
   const oldFetch = global.fetch; global.fetch = context.fetch;
   try {
     const notes = [0, 1, 2].map(k => ({ t: .6 + k * .4, d: .35, midi: 60, word: 'la', syllable: 0, lineStart: k === 0 }));
-    await context.self.onmessage({ data: { type: 'analyse', id: 1, song: 7, key: M.lineText(notes) + '|3', speech: syllables(3), rate, count: 3 } });
+    await context.self.onmessage({ data: { type: 'analyse', id: 1, song: 7, key: M.spokenText(notes) + '|3', speech: syllables(3), rate, count: 3 } });
     const n = 44100 * 3, music = () => Float32Array.from({ length: n }, (_, i) => .05 * Math.sin(2 * Math.PI * 1000 * i / 44100)), band = [music(), music()];
     await context.self.onmessage({ data: { type: 'sing', id: 2, song: 7, notes, subgenre: 'twotone', speaker: 'pere', band } });
     const done = out.find(m => m.id === 2);
