@@ -16,7 +16,8 @@ const embedPath = speaker => 'embeds/umidaji-' + speaker + '.emb';
 const pitchEmbedPath = speaker => 'dspitch/' + embedPath(speaker);
 let model = null;
 
-async function loadModel(file) {
+// report(fase, valor 0–1): «read» (llegint el ZIP) i «models» (preparant els models).
+async function loadModel(file, report = () => {}) {
   const names = new Set([...Object.values(FILES), ...META, ...SPEAKERS.flatMap(s => [embedPath(s), pitchEmbedPath(s)])]);
   // El ZIP (273 MiB) es llegeix a trossos i només es guarden els fitxers que calen: tenir-lo tot a la
   // memòria a més dels models descomprimits fa caure el navegador del mòbil.
@@ -38,11 +39,15 @@ async function loadModel(file) {
     });
     unzip.register(UnzipInflate);
     (async () => {
-      const reader = file.stream().getReader();
+      const reader = file.stream().getReader(), total = file.size || 1;
+      let read = 0, shown = -1;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) { unzip.push(new Uint8Array(0), true); break; }
         unzip.push(value, false);
+        read += value.length;
+        const step = Math.floor(read / total * 100);
+        if (step !== shown) { shown = step; report('read', Math.min(1, read / total)); }
       }
     })().then(resolve, reject);
   });
@@ -58,11 +63,13 @@ async function loadModel(file) {
   const ort = self.ort;
   ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, self.navigator.hardwareConcurrency || 1) : 1;
   ort.env.wasm.wasmPaths = new URL('vendor/ort/', self.location.href).href;
-  const sessions = {};
+  const sessions = {}, entries = Object.entries(FILES);
   try {
-    for (const [name, path] of Object.entries(FILES)) {
+    report('models', 0);
+    for (const [index, [name, path]] of entries.entries()) {
       sessions[name] = await ort.InferenceSession.create(files[ROOT + path], { executionProviders: ['wasm'] });
       delete files[ROOT + path];
+      report('models', (index + 1) / entries.length);
     }
     return { ort, sessions, tokens, language: languages.pt, speakers };
   } catch (error) {
@@ -164,7 +171,7 @@ self.onmessage = ({ data }) => {
         if (!model) {
           const runtime = new URL('vendor/ort/ort.wasm.min.js', self.location.href);
           self.importScripts(runtime.href);
-          model = await loadModel(file);
+          model = await loadModel(file, (phase, progress) => self.postMessage({ id, phase, progress }));
         }
         self.postMessage({ id });
       } else if (type === 'sing') {

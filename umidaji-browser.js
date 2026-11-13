@@ -73,7 +73,8 @@
   };
 
   function createSinger({ audioUtils }) {
-    let worker = null, file = null, ready = null, sequence = 0, retryAt = 0;
+    let worker = null, file = null, ready = null, sequence = 0, retryAt = 0, loadListener = null;
+    const LOAD_SILENCE = 180000, SING_SILENCE = 240000;
     const pending = new Map();
 
     function dispose(error = cancelled()) {
@@ -90,8 +91,9 @@
           worker.onmessage = ({ data }) => {
             const job = pending.get(data.id);
             if (!job) return;
+            job.seen = Date.now();
             if (Number.isFinite(data.progress)) {
-              job.onProgress?.(data.progress);
+              job.onProgress?.(data.progress, data.phase);
               return;
             }
             pending.delete(data.id);
@@ -102,14 +104,28 @@
           worker.onmessageerror = () => dispose(new Error('No s’ha pogut rebre la veu d’Umidaji.'));
         }
         const id = ++sequence;
-        pending.set(id, { resolve, reject, onProgress });
+        pending.set(id, { resolve, reject, onProgress, seen: Date.now(), quiet: message.type === 'load' ? LOAD_SILENCE : SING_SILENCE });
+        watch();
         try { worker.postMessage({ ...message, id }); }
         catch (error) { pending.delete(id); reject(error); }
       });
     }
-    function load(zip) {
+    // Si el navegador tanca el worker per manca de memòria, sovint no avisa: si una feina passa massa
+    // estona sense donar senyals, es dona per fallada.
+    let watcher = null;
+    function watch() {
+      if (watcher) return;
+      watcher = setInterval(() => {
+        if (!pending.size) { clearInterval(watcher); watcher = null; return; }
+        for (const job of pending.values()) if (Date.now() - job.seen > job.quiet) {
+          dispose(new Error('El dispositiu no respon: segurament no té prou memòria per a Umidaji (calen uns 700 MB lliures).'));
+          return;
+        }
+      }, 5000);
+    }
+    function load(zip, onProgress) {
       if (!ready) {
-        ready = call({ type: 'load', file: zip }).catch(error => {
+        ready = call({ type: 'load', file: zip }, (value, phase) => { loadListener?.(value, phase); onProgress?.(value, phase); }).catch(error => {
           ready = null;
           throw error;
         });
@@ -123,15 +139,20 @@
         if (saved && !file) file = saved;
         return !!file;
       },
-      async install(zip) {
+      // onProgress(valor 0–1, fase): «read», «models» i «store» (desant-lo al dispositiu).
+      async install(zip, onProgress) {
         dispose();
-        try { await load(zip); }
+        if (!/\.zip$/i.test(zip.name || '') || zip.size < 100e6) throw new Error('Aquest fitxer no és el ZIP d’Umidaji (Umidaji_DS_v110.zip, 273 MiB).');
+        try { await load(zip, onProgress); }
         catch (error) { dispose(); throw error; }
         file = zip;
         retryAt = 0;
-        try { await storedZip('readwrite', zip); return true; }
+        onProgress?.(0, 'store');
+        try { await storedZip('readwrite', zip); onProgress?.(1, 'store'); return true; }
         catch { return false; }
       },
+      // Avís de progrés quan els models es carreguen sols (en arrencar la ràdio amb el ZIP desat).
+      onLoad(listener) { loadListener = listener; },
       start({ notes, subgenre, signal, onProgress }) {
         const voice = voiceFor(subgenre);
         const abort = () => dispose();

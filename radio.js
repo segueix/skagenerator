@@ -99,27 +99,52 @@
   // Els enregistraments preproduïts continuen disponibles per a les preferides.
   // El banc Umidaji importat al dispositiu canta la partitura en un worker.
   let sungCatalog = null, sungLoading = null;
-  const bankStatus = $('radio-umidaji-status'), bankInput = $('radio-umidaji-file');
+  const bankStatus = $('radio-umidaji-status'), bankInput = $('radio-umidaji-file'), bankLoad = $('radio-umidaji-load'), bankBar = $('radio-umidaji-bar');
+  // Barra de càrrega: la lectura del ZIP és el 60 %, la preparació dels models el 35 % i desar-lo el 5 %.
+  const PHASES = { read: [0, .6, 'Llegint el fitxer'], models: [.6, .35, 'Preparant els models de veu'], store: [.95, .05, 'Desant-lo al dispositiu'] };
+  function showLoad(value, phase) {
+    const [from, span, label] = PHASES[phase] || PHASES.read, total = Math.max(0, Math.min(1, from + span * (value || 0)));
+    bankLoad.hidden = false; bankLoad.classList.remove('done', 'failed');
+    bankBar.style.width = `${Math.round(total * 100)}%`;
+    bankBar.parentElement.setAttribute('aria-valuenow', String(Math.round(total * 100)));
+    bankStatus.className = 'radio-foot radio-bank-status';
+    bankStatus.textContent = `${label}… ${Math.round(total * 100)} %`;
+  }
+  function endLoad(ok, message) {
+    bankLoad.hidden = false; bankLoad.classList.toggle('done', ok); bankLoad.classList.toggle('failed', !ok);
+    if (ok) bankBar.style.width = '100%';
+    bankStatus.className = `radio-foot radio-bank-status ${ok ? 'ok' : 'error'}`;
+    bankStatus.textContent = message;
+  }
+  // Amb el ZIP ja desat, els models es preparen sols quan cal la primera veu: també es veu el progrés.
+  let autoLoad = false;
+  browserSinger?.onLoad((value, phase) => {
+    if (bankImport) return;
+    autoLoad = true; showLoad(value, phase);
+    if (phase === 'models' && value >= 1) { autoLoad = false; endLoad(true, '✓ Umidaji carregat.'); setTimeout(showRepertoire, 2500); }
+  });
   let bankImport = null;
   let bankReady = false;
   function showRepertoire() {
     if (!bankReady || bankImport) return;
+    if (autoLoad) return;
     const n = likedSung();
-    bankStatus.textContent = `Umidaji a punt. Repertori cantat que t’agrada: ${n} ${n === 1 ? 'cançó' : 'cançons'}.`;
+    bankStatus.className = 'radio-foot radio-bank-status ok';
+    bankStatus.textContent = `✓ Umidaji a punt. Repertori cantat que t’agrada: ${n} ${n === 1 ? 'cançó' : 'cançons'}.`;
   }
   const restoringBank = browserSinger?.restore().then(found => { bankReady = !!found; return takesReady; }).then(showRepertoire).catch(() => {});
   bankInput.addEventListener('change', async () => {
     const file = bankInput.files[0];
     if (!file || !browserSinger) return;
     bankInput.disabled = true;
-    bankStatus.textContent = 'S’està carregant Umidaji…';
+    showLoad(0, 'read');
     try {
-      bankImport = browserSinger.install(file);
+      bankImport = browserSinger.install(file, showLoad);
       const stored = await bankImport;
       bankReady = true;
-      bankStatus.textContent = stored ? 'Umidaji a punt.' : 'Umidaji a punt per a aquesta sessió. El navegador no ha pogut desar el ZIP.';
+      endLoad(true, stored ? '✓ Umidaji carregat correctament. Ja pot cantar.' : '✓ Umidaji carregat per a aquesta sessió (el navegador no l’ha pogut desar: caldrà tornar-lo a carregar).');
     } catch (error) {
-      bankStatus.textContent = 'No s’ha pogut carregar Umidaji. ' + reasonOf(error);
+      endLoad(false, '✗ No s’ha pogut carregar Umidaji. ' + reasonOf(error));
     } finally {
       bankImport = null;
       bankInput.disabled = false;

@@ -184,3 +184,13 @@ html:not(.radio-on) .radio { display: none; }
 }
 @media (max-height: 640px) { .player-disc { --size: min(40vw, 22dvh); } .radio-player { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .radio *, .radio { animation-duration: 0s !important; transition-duration: 0s !important; } }
+
+/* Càrrega del banc de veu Umidaji: barra de progrés i missatge d'estat. */
+.radio-bank { margin: 2px 0 0; }
+.radio-bank-bar { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--r-muted) 25%, transparent); overflow: hidden; }
+.radio-bank-bar > span { display: block; height: 100%; width: 0; background: var(--st); border-radius: inherit; transition: width .25s ease; }
+.radio-bank.done .radio-bank-bar > span { background: #3fb950; }
+.radio-bank.failed .radio-bank-bar > span { background: #e5534b; }
+.radio-bank-status:empty { display: none; }
+.radio-bank-status.ok { color: #3fb950; font-weight: 700; }
+.radio-bank-status.error { color: #e5534b; font-weight: 700; }
