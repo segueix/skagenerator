@@ -104,3 +104,22 @@ test('800 cançons de prova: títols variats, lletres deterministes i cap vers d
     assert(titles.size >= 10, `${lang}/${subgenre}: poca varietat de títols`);
   }
 });
+
+test('vocabulari per subtemes: rimes i mètrica validades, 150 cançons seguides sense repetir títol', () => {
+  // El validador comprova rima dins de cada família, síl·labes i duplicats de lyrics-ca.js.
+  const { execFileSync } = require('node:child_process');
+  assert.match(execFileSync(process.execPath, [require.resolve('../scripts/check-lyrics.cjs')], { encoding: 'utf8' }), /; 0 problemes/);
+  assert(lyrics.POOLS_CA.ska.filter(f => f.sub).length >= 40 && lyrics.POOLS_CA.punk.filter(f => f.sub).length >= 40);
+  const sections = [{ type: 'verse', bars: 8 }, { type: 'chorus', bars: 8 }, { type: 'verse', bars: 8 }];
+  for (const [subgenre, style] of [['twotone', 'ska'], ['punk77', 'punk']]) {
+    const titles = [];
+    for (let seed = 1; seed <= 150; seed++) {
+      const song = lyrics.writeLyrics({ subgenre, style, sections, seed: seed * 7919, lang: 'ca', avoid: titles });
+      assert(!titles.includes(song.hook), `${subgenre}: títol repetit «${song.hook}» a la cançó ${seed}`);
+      titles.push(song.hook);
+    }
+  }
+  // Sense memòria també funciona, i amb tot el repertori vetat no es queda sense títol.
+  const all = Object.values(lyrics.POOLS_CA).flat().flatMap(f => f.hooks);
+  assert(lyrics.writeLyrics({ subgenre: 'twotone', style: 'ska', sections, seed: 3, lang: 'ca', avoid: all }).hook);
+});

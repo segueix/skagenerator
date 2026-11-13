@@ -1,7 +1,8 @@
 (function (root, factory) {
-  const api = factory();
+  // El vocabulari català per subtemes és a lyrics-ca.js (es carrega abans que aquest fitxer).
+  const api = factory(typeof module !== 'undefined' && module.exports ? require('./lyrics-ca.js') : root.SkaLyricsCa);
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SkaLyrics = api;
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (catalan) {
   'use strict';
   // Lletres automàtiques (en català o en anglès) per a la cançó automàtica i la ràdio.
   // Cada tema té famílies de rima: unes frases curtes per a la tornada (el «hook»,
@@ -474,6 +475,16 @@
   };
 
   for (const [theme, families] of Object.entries(EXTRA_CA)) POOLS_CA[theme].push(...families);
+  // Vocabulari per subtemes (festa, barri, mar…): cada família porta quatre tornades i sis versos que
+  // rimen, i recorda el seu subtema perquè les estrofes parlin del mateix que la tornada.
+  {
+    const seen = new Set(Object.values(POOLS_CA).flat().flatMap(f => [...f.hooks, ...f.lines]).map(x => x.toLocaleLowerCase()));
+    const fresh = list => list.map(x => x.trim()).filter(x => x && !seen.has(x.toLocaleLowerCase()) && seen.add(x.toLocaleLowerCase()));
+    for (const [theme, subs] of Object.entries(catalan?.DATA || {})) for (const [name, { fam }] of Object.entries(subs)) for (const text of fam) {
+      const [hooks, lines] = text.split(' ; ').map(part => fresh(part.split('|')));
+      if (hooks.length && lines.length >= 2) POOLS_CA[theme].push({ hooks, lines, sub: theme + '/' + name });
+    }
+  }
   for (const [theme, families] of Object.entries(EXTRA_EN)) POOLS[theme].push(...families);
 
   // Temes de cada subgènere (el primer pesa més).
@@ -490,7 +501,7 @@
 
   // sections: [{ type, bars }] → { hook, sections: [{ text, phraseBars }] } (text buit a les seccions que no es canten).
   // lang: 'en' (anglès) o 'ca' (català).
-  function writeLyrics({ subgenre, style, sections, seed = 1, sung, lang = 'en' } = {}) {
+  function writeLyrics({ subgenre, style, sections, seed = 1, sung, lang = 'en', avoid = [] } = {}) {
     const r = rng(seed), pick = list => list[Math.floor(r() * list.length)];
     const themes = themesOf(subgenre, style), pools = lang === 'ca' ? POOLS_CA : POOLS;
     // Famílies disponibles: les del tema principal dues vegades (pesen més).
@@ -510,10 +521,15 @@
       const line = choose(left); used.add(normalized(line)); return line;
     };
     // La tornada: una família pròpia amb el seu hook.
-    const chorusFamily = pick(families), hook = pick(chorusFamily.hooks);
+    // «avoid»: títols de cançons recents (la ràdio hi passa el seu historial) que no s'han de repetir.
+    const taken = new Set(avoid.map(normalized)), free = f => f.hooks.filter(h => !taken.has(normalized(h)));
+    const open = families.filter(f => free(f).length);
+    const chorusFamily = pick(open.length ? open : families), hook = pick(free(chorusFamily).length ? free(chorusFamily) : chorusFamily.hooks);
     const chorusAnswers = [fresh(chorusFamily), fresh(chorusFamily)];
     const verseFamilies = () => {
-      const others = families.filter(f => f !== chorusFamily);
+      // Si la tornada té subtema, les estrofes en parlen gairebé sempre.
+      const all = families.filter(f => f !== chorusFamily), same = all.filter(f => chorusFamily.sub && f.sub === chorusFamily.sub && unused(f).length >= 2);
+      const others = same.length >= 2 && r() < .75 ? same : all;
       const a = pick(others), rest = others.filter(f => f !== a);
       return [a, rest.length ? pick(rest) : a];
     };
