@@ -7,7 +7,7 @@
   const studio = window.SkaStudio, engine = window.ElTaulerRadioAmbient, builder = window.SkaSongBuilder,
     audioUtils = window.SkaAudioUtils, sampleAudio = window.SkaSampleAudio;
   const $ = id => document.getElementById(id), root = document.documentElement;
-  const browserSinger = studio && window.SkaBrowserSinging?.createBrowserSinger({ rate: studio.RATE });
+  const browserSinger = window.SkaUmidaji?.createSinger({ audioUtils });
   let generationController = null;
   if (!studio || !engine || !builder || !audioUtils || !sampleAudio || !$('radio')) return;
 
@@ -75,9 +75,30 @@
   // ── Cançons cantades ──────────────────────────────────────────────────
   // Per defecte la ràdio crea una cançó nova i la fa cantar al navegador.
   // Els enregistraments preproduïts continuen disponibles per a les preferides.
-  // Matxa proporciona la veu parlada des del servei extern; el navegador
-  // n'ajusta la melodia, hi aplica el timbre i fa la mescla completa.
+  // El banc Umidaji importat al dispositiu canta la partitura en un worker.
   let sungCatalog = null, sungLoading = null;
+  const bankStatus = $('radio-umidaji-status'), bankInput = $('radio-umidaji-file');
+  let bankImport = null;
+  const restoringBank = browserSinger?.restore().then(found => {
+    if (found && !bankImport) bankStatus.textContent = 'Umidaji a punt.';
+  }).catch(() => {});
+  bankInput.addEventListener('change', async () => {
+    const file = bankInput.files[0];
+    if (!file || !browserSinger) return;
+    bankInput.disabled = true;
+    bankStatus.textContent = 'S’està carregant Umidaji…';
+    try {
+      bankImport = browserSinger.install(file);
+      const stored = await bankImport;
+      bankStatus.textContent = stored ? 'Umidaji a punt.' : 'Umidaji a punt per a aquesta sessió. El navegador no ha pogut desar el ZIP.';
+    } catch (error) {
+      bankStatus.textContent = 'No s’ha pogut carregar Umidaji. ' + reasonOf(error);
+    } finally {
+      bankImport = null;
+      bankInput.disabled = false;
+      bankInput.value = '';
+    }
+  });
   function loadSung() {
     sungLoading ||= fetch(new URL('cantades/catalog.json', document.baseURI), { cache: 'no-cache' })
       .then(response => response.ok ? response.json() : { songs: [] })
@@ -153,14 +174,17 @@
   async function prepare(mine) {
     setPrep({ stage: 'compose', value: 0 });
     await breathe();
+    await restoringBank;
+    await bankImport?.catch(() => {});
     if (sungCatalog === null) await loadSung();
+    if (mine !== session) throw CANCELLED;
     const controller = new AbortController();
     generationController = controller;
     const choice = chooseSong(), song = choice.song, segs = studio.segmentsOf(song), parts = [], lengths = [];
     if (choice.sung) {
       // Cançó cantada: ja està feta, es baixa sencera abans que soni (també amb la pantalla apagada).
       setPrep({ stage: 'download', value: 0, title: song.title });
-      const response = await fetch(new URL(`cantades/${choice.sung.file}`, document.baseURI));
+      const response = await fetch(new URL(`cantades/${choice.sung.file}`, document.baseURI), { signal: controller.signal });
       if (!response.ok) throw new Error(`No s’ha pogut baixar la cançó cantada (error ${response.status})`);
       const blob = await response.blob();
       if (mine !== session) throw CANCELLED;
@@ -187,10 +211,9 @@
       return item;
     });
     at = 0;
-    // Veu cantada amb el mateix procés que l'acció: Matxa diu cada vers (ara, mentre es grava la banda)
-    // i un worker el fa cantar amb WORLD i el mescla. Matxa només parla català.
+    // Umidaji canta la partitura mentre es renderitza la banda.
     let job = null;
-    if (browserSinger?.available && song.settings.lang === 'ca' && window.SkaMatxaSinger && plan.some(p => p.vocal)) {
+    if (browserSinger?.available && song.settings.lang === 'ca' && plan.some(p => p.vocal)) {
       const notes = window.SkaBrowserSinging.scoreNotes(plan.filter(p => p.vocal).map(p => ({ at: p.at, bpm: p.bpm, text: p.lyrics, melody: p.spec.lines.vocal, type: p.seg.section.type })),
         engine.lyricWords, song.settings.swing || 0);
       if (notes.length) job = browserSinger.start({ notes, subgenre: song.settings.subgenre, signal: controller.signal });
@@ -225,7 +248,7 @@
         sung = true;
       } catch (error) {
         if (mine !== session || controller.signal.aborted) throw CANCELLED;
-        console.warn('La veu Matxa no està disponible; es posa la melodia de guia:', error);
+        console.warn('La veu Umidaji no està disponible; es posa la melodia de guia:', error);
         if (error.band) mixed = error.band;
         // Sense veu cantada, la melodia de guia torna a les seccions que n'havien de tenir.
         for (let i = 0; i < plan.length; i++) {
@@ -235,7 +258,7 @@
           if (seg.section?.fade) guide = audioUtils.applyFade(guide, Math.min(frames, guide[0].length), seg.section.fade);
           for (let ch = 0; ch < 2; ch++) for (let k = 0; k < guide[ch].length && offsets[i] + k < mixed[ch].length; k++) mixed[ch][offsets[i] + k] += guide[ch][k];
         }
-        toast('Ara mateix Matxa no respon: aquesta cançó porta la melodia de guia en lloc de veu cantada.');
+        toast('Umidaji no ha pogut cantar aquesta cançó. Hi sona la melodia de guia.');
       }
     }
     if (mine !== session) throw CANCELLED;
@@ -386,7 +409,7 @@
     if (prep.stage === 'bank') return [`Baixant els instruments${prep.value === null ? '…' : ` · ${Math.round(prep.value * 100)} %`}`, prep.value];
     if (prep.stage === 'compose') return ['Component una cançó nova…', 0];
     if (prep.stage === 'download') return ['Baixant una cançó cantada…', null];
-    if (prep.stage === 'voice') return ['Matxa canta la lletra (el navegador la fa cantar amb WORLD i la mescla)…', null];
+    if (prep.stage === 'voice') return ['Umidaji canta la lletra…', null];
     if (prep.stage === 'mix') return ['Fent la mescla final…', 1];
     return [`Gravant la banda · ${Math.round(prep.value * 100)} %`, prep.value];
   }

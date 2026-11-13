@@ -11,7 +11,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23172c28'/%3E%3Cpath d='M12 28V15l16-4v13M12 19l16-4' stroke='%23d5f28b' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="radio.css">
   <script>try{if(!(localStorage.getItem('radiospam.view')=='studio'&&matchMedia('(min-width: 900px)').matches))document.documentElement.classList.add('radio-on')}catch{document.documentElement.classList.add('radio-on')}</script>
-  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="lyrics-ca.js"></script><script defer src="lyrics.js"></script><script defer src="song-builder.js"></script><script defer src="app.js"></script><script defer src="matxa-singer.js"></script><script defer src="browser-singing.js"></script><script defer src="radio.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="lyrics-ca.js"></script><script defer src="lyrics.js"></script><script defer src="song-builder.js"></script><script defer src="app.js"></script><script defer src="browser-singing.js"></script><script defer src="umidaji-browser.js"></script><script defer src="radio.js"></script>
 </head>
 <body>
   <div class="radio" id="radio">
@@ -30,6 +30,13 @@
         <button type="button" class="radio-station punk" data-station="punk"><span class="station-art" aria-hidden="true"></span><span class="station-name">PUNK</span><span class="station-sub">Punk del 77 · Oi! · Garage · Post-punk · Skate punk · Hardcore · Pop-punk · Horror punk</span><span class="station-go" aria-hidden="true">▶</span></button>
         <button type="button" class="radio-station mix" data-station="mix"><span class="station-art" aria-hidden="true"></span><span class="station-name">SKA-PUNK</span><span class="station-sub">Totes dues barrejades: una de ska, una de punk</span><span class="station-go" aria-hidden="true">▶</span></button>
       </div>
+      <p class="radio-foot" id="radio-umidaji-setup">
+        Veu Umidaji DS v110 · Team BRAPA.
+        <a class="radio-voice-link" href="https://github.com/Team-BRAPA/Umidaji-DiffSinger/releases/tag/v110" target="_blank" rel="noopener">Baixa el ZIP oficial</a>
+        i carrega’l una vegada per cantar en català (273 MiB).
+        <input type="file" id="radio-umidaji-file" accept=".zip,application/zip" aria-label="Carrega el ZIP oficial d’Umidaji">
+        <span id="radio-umidaji-status" role="status"></span>
+      </p>
       <p class="radio-foot"><a class="radio-voice-link" href="veu.html">🎙 Grava la teva veu</a> perquè canti les cançons en català.</p>
       <p class="radio-foot">Cada cançó es compon i es grava al teu dispositiu mentre sona l’anterior. La primera vegada es baixen els instruments (uns 50 MB): millor amb wifi.</p>
     </section>

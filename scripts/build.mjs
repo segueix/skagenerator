@@ -3,12 +3,18 @@ import { mkdir, copyFile, cp, readFile, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { prepareSoundBank } from './prepare-soundbank.mjs';
 await mkdir('dist', { recursive: true });
-for (const file of ['veu.html', 'veu.js', 'index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'browser-singing.js', 'matxa-singer.js', 'world.js', 'matxa-worker.js']) await copyFile(file, `dist/${file}`);
+for (const file of ['veu.html', 'veu.js', 'index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'browser-singing.js', 'umidaji-browser.js', 'matxa-singer.js', 'world.js', 'matxa-worker.js']) await copyFile(file, `dist/${file}`);
 await mkdir('dist/vendor/world', { recursive: true });
 await copyFile('vendor/world/world.wasm', 'dist/vendor/world/world.wasm');
 await cp('licenses', 'dist/licenses', { recursive: true });
 await cp('exemples', 'dist/exemples', { recursive: true });
 await build({ entryPoints: ['audio/worker.mjs'], bundle: true, outfile: 'dist/sample-worker.js',
+  format: 'iife', platform: 'browser', target: 'es2022', minify: true, legalComments: 'external' });
+const ort = 'node_modules/onnxruntime-web/dist';
+await mkdir('dist/vendor/ort', { recursive: true });
+for (const file of ['ort.wasm.min.js', 'ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm'])
+  await copyFile(`${ort}/${file}`, `dist/vendor/ort/${file}`);
+await build({ entryPoints: ['singing/umidaji-worker.mjs'], bundle: true, outfile: 'dist/umidaji-worker.js',
   format: 'iife', platform: 'browser', target: 'es2022', minify: true, legalComments: 'external' });
 await prepareSoundBank();
 console.log('Web i instruments preparats a dist/');
@@ -29,7 +35,10 @@ await writeFile('dist/matxa-worker.js', singWorker);
 let singer = await readFile('dist/browser-singing.js', 'utf8');
 singer = singer.replaceAll('matxa-worker.js', `matxa-worker.js?v=${await hash('matxa-worker.js')}`);
 await writeFile('dist/browser-singing.js', singer);
+let umidaji = await readFile('dist/umidaji-browser.js', 'utf8');
+umidaji = umidaji.replace("'umidaji-worker.js'", "'umidaji-worker.js?v=" + await hash('umidaji-worker.js') + "'");
+await writeFile('dist/umidaji-browser.js', umidaji);
 let html = await readFile('dist/index.html', 'utf8');
-for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'matxa-singer.js', 'browser-singing.js'])
+for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'matxa-singer.js', 'browser-singing.js', 'umidaji-browser.js'])
   html = html.replaceAll(`"${file}"`, `"${file}?v=${await hash(file)}` + '"');
 await writeFile('dist/index.html', html);
