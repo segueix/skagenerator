@@ -90,12 +90,13 @@
   const validTimbres = input => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
     && Object.entries(input).every(([name, value]) => timbreOptions[name]?.some(([preset]) => preset === value));
   // Edició de la base per secció: instruments silenciats, so propi i patró (orgue i coixí).
-  const BASE_SOUNDS = ['drums', 'bass', 'guitar'], BASE_PATTERNS = {
+  // Sons per secció: els de la base (editables) i el trombó, que l'obertura de ska fixa al trombó gravat.
+  const BASE_SOUNDS = ['drums', 'bass', 'guitar'], SECTION_SOUNDS = [...BASE_SOUNDS, 'trombone'], BASE_PATTERNS = {
     organ: ['Contratemps', '«Bubble»', 'Sostingut', 'Blanques', 'Síncopa'],
     piano: ['Contratemps', '«Bounce» de music-hall', 'Boogie', 'Acords llargs', 'Corxeres martellejades'],
     synthPad: ['Sostingut', 'Blanques', 'Contratemps', 'Negres', 'Síncopa'] };
   const validBaseEdits = s => (s.mute === undefined || Array.isArray(s.mute) && s.mute.length <= Object.keys(INSTRUMENTS).length && new Set(s.mute).size === s.mute.length && s.mute.every(n => Object.hasOwn(INSTRUMENTS, n)))
-    && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => BASE_SOUNDS.includes(n)))
+    && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => SECTION_SOUNDS.includes(n)))
     && (s.patterns === undefined || !!s.patterns && typeof s.patterns === 'object' && !Array.isArray(s.patterns)
       && Object.entries(s.patterns).every(([n, i]) => Object.hasOwn(BASE_PATTERNS, n) && Number.isInteger(i) && i >= 0 && i < 5));
   const validGroove = (input, style) => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
