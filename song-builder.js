@@ -9,6 +9,8 @@
   // 2 a 4 minuts (estructura, harmonia, arranjament, riff, respostes, canvis
   // de tempo i de to) i tria les millors melodies.
   const MELODIC = ['vocal', 'trumpet', 'trombone', 'sax', 'synthLead'];
+  const SKA_OPENING_WINDS = ['sax', 'trombone'];
+  const SOLO_OPENINGS = ['drums', 'voice', 'riddim'];
   function rng(seed) {
     let a = seed >>> 0;
     return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -143,7 +145,7 @@
     const candidates = [];
     // Si la cançó comença directament per la tornada, no es buida: com a molt, compte de baquetes.
     const openTable = first.type === 'intro' ? fit.open : { countin: fit.open.countin || .5 };
-    const [opening, openValue] = best(openTable, name => ({
+    const [opening, openValue] = best(openTable, name => st.style === 'ska' && SOLO_OPENINGS.includes(name) ? 0 : ({
       fadein: first.bars >= 8 || st.bpm <= 125 ? 1 : .3, voice: options.vocal ? 1 : 0, countin: st.countIn ? 0 : 1,
       halftime: first.bpm ? 0 : 1, buildup: first.bars >= 4 ? 1 : .4 })[name] ?? 1);
     if (opening) candidates.push({ kind: 'opening', name: opening, value: openValue });
@@ -175,7 +177,7 @@
     // Efecte de color: un sol moment. L'intro amb el riff sol sona com un disc antic
     // o una ràdio i la banda entra neta; si no, un instrument del pont pel megàfon o el telèfon.
     if (chosen.length < budget) {
-      const riffer = punk ? 'guitar3' : 'trumpet';
+      const riffer = punk ? 'guitar3' : 'sax';
       const bridge = sections.find(s => s.type === 'bridge' || s.type === 'solo');
       const options2 = [
         ...(excluded.has(riffer) ? [] : [{ where: first, instrument: riffer, color: punk ? (r() < .5 ? 'radio' : 'megaphone') : (r() < .6 ? 'gramophone' : 'radio'),
@@ -223,6 +225,7 @@
       .sort((a, b) => LAYER_ORDER.indexOf(a) - LAYER_ORDER.indexOf(b));
     const drums = base.find(name => name === 'drums' || name === 'electronicDrums');
     const riffer = punk ? 'guitar3' : 'trumpet', voice = options.vocal ?? song.clips.some(c => c.instrument === 'vocal');
+    const openingRiff = punk ? [riffer] : SKA_OPENING_WINDS;
     // Només sonen els instruments triats. La bateria no calla del tot: entra a l'últim compàs amb
     // un redoble, perquè el pas a la secció següent no sigui brusc.
     const only = (sec, keep) => {
@@ -236,6 +239,7 @@
     const excluded = excludedBy(song);
     const ensure = (sec, instrument, extra = {}) => {
       if (excluded.has(instrument)) return false; // p. ex. punk sense guitarra solista
+      if (base.includes(instrument)) return true;
       const same = song.clips.filter(c => c.instrument === instrument && inside(c, sec));
       if (same.some(c => c.generated && c.start <= sec.start && c.start + c.bars >= sec.start + sec.bars)) return true;
       if (same.length) return false;
@@ -243,20 +247,25 @@
         revision: options.revisions?.[instrument] || 1, generated: true, edge: true, ...extra });
       return true;
     };
+    if (!punk) {
+      for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
+      // La segona veu de vent usa saxo per defecte; aquí ha de sonar un trombó real.
+      first.timbres = { ...first.timbres, trombone: 'vsco' };
+    }
     const outro = last.type === 'outro';
     const openings = {
       band: () => true,
       drums: () => !!drums && only(first, [drums]),
       buildup: () => {
-        const list = playing(first);
+        const list = playing(first).filter(name => punk || !['trumpet', ...SKA_OPENING_WINDS].includes(name));
         if (first.bars < 2 || list.length < 2) return false;
         first.entrance = {};
-        list.forEach((name, i) => { const at = Math.min(first.bars - 1, Math.floor(i * first.bars / list.length)); if (at > 0) first.entrance[name] = at; });
+        list.forEach((name, i) => { const at = name === drums ? 0 : Math.min(first.bars - 1, Math.floor((i + (punk ? 0 : 1)) * first.bars / list.length)); if (at > 0) first.entrance[name] = at; });
         return true;
       },
       countin: () => !st.countIn && first.start === 0 && (st.countIn = true),
       fadein: () => first.bars >= 2 && (first.fade = 'in', true),
-      riff: () => ensure(first, riffer, { line: 'riff' }) && only(first, [riffer]),
+      riff: () => openingRiff.every(name => ensure(first, name, { line: 'riff' })) && only(first, openingRiff),
       voice: () => voice && base.includes('guitar') && ensure(first, 'vocal') && only(first, ['vocal', 'guitar']),
       riddim: () => base.includes('bass') && !!drums && only(first, ['bass', drums]),
       halftime: () => {
@@ -292,7 +301,9 @@
       for (const key of order) if (table[key]()) return key;
       return Object.keys(table)[0];
     };
+    if (!punk) for (const name of SOLO_OPENINGS) delete openings[name];
     const opening = choose(openings, options.opening, previous.opening);
+    if (!punk) first.mute = [...new Set([...(first.mute || []), 'trumpet'])];
     const closing = choose(closings, options.closing, previous.closing);
     // Silenci al mig: la secció que porta a una tornada (preferiblement l'última) acaba
     // amb un cop i silenci, o amb un compàs sencer de silenci; la tornada entra amb més força.
@@ -446,12 +457,15 @@
     // ── Arranjament: el riff identifica la cançó; els vents responen a la veu ──
     const register = key === 'rocksteady' || key === 'horrorpunk' || key === 'postpunk' ? -1 : key === 'poppunk' ? 1 : 0;
     const base = sg.base, layersOf = [];
-    // Subgèneres lents: vents més escassos (sense saxo als riffs).
+    // Subgèneres lents: vents més escassos, excepte el duet inicial.
     const mellow = key === 'rocksteady' || key === 'bossreggae';
     // Punk: nombre de guitarres triat (1, 2 o 3); les que no hi són no s'afegeixen enlloc.
     if (punk) settings.guitars = [1, 2, 3].includes(Number(options.guitars)) ? Number(options.guitars) : 3;
     const excluded = excludedBy({ settings });
-    const add = (sec, instrument, extra = {}) => { if (!base.includes(instrument) && !excluded.has(instrument)) layersOf.push({ sec, instrument, ...extra }); };
+    const add = (sec, instrument, extra = {}) => {
+      if (!punk && sec === sections[0] && instrument === 'trumpet') return;
+      if (!base.includes(instrument) && !excluded.has(instrument)) layersOf.push({ sec, instrument, ...extra });
+    };
     let verses = 0;
     for (const sec of sections) {
       // Amb lletra, canten les seccions que en tenen; sense, les estrofes, pretornades i tornades.
@@ -465,7 +479,7 @@
       if (role === 'breakdown' && punk) { add(sec, 'guitar2', { revision: 2 }); continue; }
       if (sing) add(sec, 'vocal', register ? { register } : {});
       if (!punk) {
-        if (sec.type === 'intro' || sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow) add(sec, 'sax', { line: 'riff' }); }
+        if (sec.type === 'intro' || sec.type === 'outro') { if (sec.type === 'outro') add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' }); }
         // Nutty: el piano ja omple l'estrofa i hi respon el saxo; l'orgue entra a la tornada.
         if (sec.type === 'verse') { verses++; if (key !== 'nutty') add(sec, 'organ', { revision: 2 }); if (verses > 1) add(sec, key === 'nutty' ? 'sax' : 'trumpet', { line: 'answer' }); }
         if (sec.type === 'prechorus') add(sec, 'trombone', { line: 'answer' });
@@ -500,6 +514,10 @@
         }
         if (sec.type === 'outro') { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
       }
+    }
+    // També les formes que comencen directament per estrofa o tornada obren amb el duet.
+    if (!punk) for (const instrument of SKA_OPENING_WINDS) {
+      if (!layersOf.some(layer => layer.sec === sections[0] && layer.instrument === instrument)) add(sections[0], instrument, { line: 'riff' });
     }
     // ── Millor versió de cada línia pròpia (la mateixa per a seccions iguals) ──
     const partFor = (sec, layers, extra, h = harmony[sec.type] || 1) => {
