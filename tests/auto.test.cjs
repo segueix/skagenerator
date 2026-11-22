@@ -131,7 +131,7 @@ test('la cançó automàtica tria versions sense xocs i amb la veu de la tornada
 });
 
 test('inicis, finals i silencis: cada clic en tria uns altres i la cançó continua sent vàlida', () => {
-  const song = builder.createAutoSong(engine, 'twotone', { seed: 77 });
+  const song = builder.createAutoSong(engine, 'punk77', { seed: 77 });
   assert(song.edges && builder.OPENINGS[song.edges.opening] && builder.CLOSINGS[song.edges.closing], 'la cançó automàtica en porta');
   const seen = { opening: new Set(), closing: new Set(), middle: new Set() };
   let previous = song.edges;
