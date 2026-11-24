@@ -2487,7 +2487,8 @@
         if (part.countIn !== undefined && typeof part.countIn !== 'boolean') throw new Error('Compte d’entrada no vàlid');
         if (part.offbeat !== undefined && typeof part.offbeat !== 'boolean') throw new Error('Segona bateria no vàlida');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
-            || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name) || !['riff', 'answer'].includes(mode))))
+            || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name)
+                || !(['riff', 'answer'].includes(mode) || mode === 'lead' && name === 'guitar3'))))
             throw new Error('Mode de línia no vàlid');
         if (part.syllables !== undefined && (!Array.isArray(part.syllables) || part.syllables.length > 32
             || part.syllables.some(n => !Number.isInteger(n) || n < 1 || n > 24))) throw new Error('Síl·labes de la lletra no vàlides');
@@ -2632,8 +2633,17 @@
             throw new Error('Efecte de color no vàlid');
         const lines = {}, layerIndex = {};
         const rhythmPool = [RHYTHMS.r1, RHYTHMS.r2, RHYTHMS.r3, RHYTHMS.r4, RHYTHMS.r5, RHYTHMS.r6, RHYTHMS.r7, RHYTHMS.r9];
+        // Melodia pròpia d'un instrument solista: frases amb ritmes variats, desenvolupades.
+        const ownLine = (name, rev, salt, start) => {
+            const lr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
+            const lctx = { ...ctx, prev: nearestTone(start, chords[0].pcs, 64, 79) };
+            const lrhythms = phraseBars.map(() => rhythmPool[Math.floor(lr() * rhythmPool.length)]);
+            if (name === 'synthLead' && lr() < .5) lrhythms[lrhythms.length - 1] = RHYTHMS.r7;
+            return develop(composePhrase(lr, lctx, phraseBars, lrhythms).notes, lr, lctx, lrhythms);
+        };
+        const saltOf = name => name.split('').reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
         Object.keys(layers).forEach(name => {
-            const rev = layers[name], salt = name.split('').reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+            const rev = layers[name], salt = saltOf(name);
             layerIndex[name] = (rev - 1) % 5;
             if (name === 'vocal') {
                 const vr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
@@ -2641,11 +2651,7 @@
                 return;
             }
             if (!['trumpet', 'trombone', 'synthLead', 'sax'].includes(name)) return;
-            const lr = seededRng((seed ^ salt) + Math.imul(rev, 2654435761) >>> 0);
-            const lctx = { ...ctx, prev: nearestTone(name === 'trombone' ? 67 : 72, chords[0].pcs, 64, 79) };
-            const lrhythms = phraseBars.map(() => rhythmPool[Math.floor(lr() * rhythmPool.length)]);
-            if (name === 'synthLead' && lr() < .5) lrhythms[lrhythms.length - 1] = RHYTHMS.r7;
-            lines[name] = develop(composePhrase(lr, lctx, phraseBars, lrhythms).notes, lr, lctx, lrhythms);
+            lines[name] = ownLine(name, rev, salt, name === 'trombone' ? 67 : 72);
         });
         // El baix té un riff propi per a cada alternativa; una única partitura
         // alimenta tant el motor de mostres com el sintetitzador de reserva.
@@ -2692,6 +2698,8 @@
             const voiceLine = lines.vocal || null;
             for (const [name, how] of Object.entries(part.lineModes)) {
                 if (!(name in layers)) continue;
+                // Guitarra solista amb melodia pròpia (tema o solo), com un vent.
+                if (how === 'lead') { lines[name] = ownLine(name, layers[name], saltOf(name), 72); continue; }
                 const line = how === 'riff' ? realizeRiff(riff, chords, bars, ctx.scalePcs) : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine);
                 // Trombó/segona veu: el riff harmonitzat una tercera per sota.
                 lines[name] = name === 'trombone' && how === 'riff' ? harmonize(line, chords, ctx.scalePcs) : line;

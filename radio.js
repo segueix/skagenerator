@@ -212,7 +212,8 @@
       avoidTitles: [...queue.map(t => t.song.title), ...history.slice(0, 150).map(e => e.title)].filter(Boolean),
       liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
     // Punk: sobretot una guitarra, sovint dues i només excepcionalment tres.
-    if (style === 'punk') { const dice = Math.random(); options.guitars = dice < .5 ? 1 : dice < .92 ? 2 : 3; }
+    // A la ràdio instrumental hi ha d'haver guitarra solista: dues guitarres i, de vegades, tres.
+    if (style === 'punk') { const dice = Math.random(); options.guitars = instrumental ? (dice < .65 ? 2 : 3) : dice < .5 ? 1 : dice < .92 ? 2 : 3; }
     const song = studio.validateSong(builder.createAutoSong(engine, subgenre, options));
     lastSubgenre = subgenre;
     return { id: studio.uid(), replay: false, song };

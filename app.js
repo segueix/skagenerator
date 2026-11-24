@@ -19,6 +19,8 @@
   const SHORT = { guitar: 'Guitarra 1', guitar2: 'Guitarra 2', guitar3: 'Guitarra 3', trombone: '2a veu vent', sax: 'Saxo', synthLead: 'Sinte melodia', synthPad: 'Sinte acords', synthBass: 'Baix sinte', piano: 'Piano', electronicDrums: 'Bat. electr.', vocal: 'Veu (guia)' };
   const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
   const LINES = [['own', 'Pròpia'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu']];
+  // La guitarra solista: arpegis (per defecte), riff, resposta o melodia pròpia de solista.
+  const GUITAR_LINES = [['own', 'Arpegis'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu'], ['lead', 'Melodia de solista']];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
   const VOICE_EFFECTS = audioUtils.VOICE_EFFECTS, VOICE_EQ_KEYS = audioUtils.VOICE_EQ_KEYS;
   const flatVoiceEq = () => ({ low: 0, mid: 0, high: 0 });
@@ -210,7 +212,7 @@
       if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
       if (c.feel !== undefined && ![.5, 2].includes(c.feel)) fail('Ritme no vàlid');
       if (c.register !== undefined && (c.instrument !== 'vocal' || ![-1, 1].includes(c.register))) fail('Registre no vàlid');
-      if (c.line !== undefined && (!LINE_INSTRUMENTS.includes(c.instrument) || !['riff', 'answer'].includes(c.line))) fail('Línia no vàlida');
+      if (c.line !== undefined && (!LINE_INSTRUMENTS.includes(c.instrument) || !(['riff', 'answer'].includes(c.line) || c.line === 'lead' && c.instrument === 'guitar3'))) fail('Línia no vàlida');
       if (c.edge !== undefined && typeof c.edge !== 'boolean') fail('Instrument no vàlid');
       if (c.color !== undefined && (!engine.COLOR_INSTRUMENTS.includes(c.instrument) || !Object.hasOwn(engine.COLOR_FX, c.color))) fail('Efecte de color no vàlid');
       ids.add(c.id);
@@ -1656,7 +1658,7 @@
     };
     const feelSelect = select('RITME', FEELS, String(clip.feel ?? 1), value => changeClipTone(clip, { feel: Number(value) }));
     const lineSelect = LINE_INSTRUMENTS.includes(clip.instrument)
-      ? select('LÍNIA', LINES, clip.line || 'own', value => changeClipTone(clip, { line: value })) : null;
+      ? select('LÍNIA', clip.instrument === 'guitar3' ? GUITAR_LINES : LINES, clip.line || 'own', value => changeClipTone(clip, { line: value })) : null;
     if (clip.instrument === 'vocal') {
       box.classList.add('only-feel');
       box.append(feelSelect, select('REGISTRE', [['-1', 'Greu (veu d’home)'], ['0', 'Mitjà'], ['1', 'Agut (veu de dona)']], String(clip.register ?? 0),
