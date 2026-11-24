@@ -483,7 +483,9 @@ test('el baix protagonista queda clarament per sota de la veu solista i els vent
       assert.equal(settings.baseVolume.bass, key === 'jamaican' ? -17 : -15, key);
       for (const instrument of ['trumpet', 'trombone', 'sax']) assert.equal(settings.volumes[instrument], 5, key);
     } else {
-      assert.equal(settings.baseVolume?.bass, key === 'hardcore' ? -4 : undefined, key);
+      // La resta: el baix sempre una mica avall perquè no saturi (més al punk i amb el Growlybass).
+      const growly = settings.timbres.bass === 'growly';
+      assert.equal(settings.baseVolume.bass, ska ? (growly ? -6 : -4) : key === 'hardcore' ? -10 : growly ? -8 : -6, key);
     }
   }
 });

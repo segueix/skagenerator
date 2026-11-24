@@ -129,14 +129,25 @@
     postpunk: { open: { riddim: .85, drums: .7, buildup: .7, fadein: .5, riff: .5 }, close: { cold: .75, fadeout: .7, ring: .6, breakdown: .5 }, silence: .65, stop: .5, color: .65 },
     hardcore: { open: { countin: .8, drums: .7, riff: .5 }, close: { cold: .9, hit: .7, ring: .4 }, silence: .8, stop: .75, color: .25 },
     poppunk: { open: { riff: .8, voice: .7, buildup: .6, drums: .6, countin: .4 }, close: { ring: .8, hit: .7, cold: .55, riff: .5, ritard: .4 }, silence: .7, stop: .6, color: .55 },
-    eastbay: { open: { riff: .8, countin: .75, drums: .65, voice: .55, buildup: .45 }, close: { hit: .8, ring: .75, cold: .7, riff: .45 }, silence: .65, stop: .7, color: .4 },
+    eastbay: { open: { drums: .72, buildup: .68, voice: .62, riff: .5, countin: .75 }, close: { hit: .8, ring: .75, cold: .7, riff: .45 }, silence: .65, stop: .7, color: .4 },
     horrorpunk: { open: { drums: .7, riff: .7, voice: .6, buildup: .6, fadein: .5 }, close: { ring: .8, cold: .7, ritard: .6, breakdown: .5 }, silence: .6, stop: .55, color: .65 }
   };
   const THRESHOLD = .55;
+  // Sons de la guitarra solista del punk: efecte [tipus, guany, to] i, de vegades, una altra guitarra
+  // (les GM saturades porten la distorsió a la mostra: s'hi afegeix només un boost o res).
+  // Probabilitat que la guitarra solista toqui el riff a la intro (punk amb veu).
+  const LEAD_INTRO = { eastbay: .35, poppunk: .5, punk77: .55, oi: .45, skatepunk: .6, garage: .6, postpunk: .55, hardcore: .45, horrorpunk: .7 };
+  const PUNK_LEAD_TONES = [
+    { fx: ['overdrive', 82, 68] }, { fx: ['distortion', 72, 72] }, { fx: ['fuzz', 55, 56] }, { fx: ['crunch', 92, 74] },
+    { fx: ['tape', 80, 62] }, { fx: ['boost', 85, 70] }, { fx: ['metal', 45, 64] },
+    { sound: 'overdrive', fx: ['boost', 40, 62] }, { sound: 'distortion', fx: ['none', 50, 58] }, { sound: 'cleanGm', fx: ['overdrive', 70, 64] }
+  ];
   function planHighlights(song, key, r, options = {}) {
     const fit0 = FIT[key] || FIT.twotone, sections = song.sections, st = song.settings, excluded = excludedBy(song);
     // Sense guitarra solista (punk amb una o dues guitarres), no hi ha riff sol a l'inici ni al final.
-    const noRiff = st.style === 'punk' && excluded.has('guitar3');
+    // Si la intro no porta la solista, tampoc s'hi afegeix per obrir amb el riff sol.
+    const leadIntro = sections[0]?.type !== 'intro' || song.clips.some(c => c.instrument === 'guitar3' && c.start === sections[0].start);
+    const noRiff = st.style === 'punk' && (excluded.has('guitar3') || !leadIntro);
     const without = table => Object.fromEntries(Object.entries(table).filter(([name]) => !(noRiff && name === 'riff')));
     const fit = { ...fit0, open: without(fit0.open), close: without(fit0.close) };
     const first = sections[0], last = sections.at(-1), outro = last.type === 'outro', punk = st.style === 'punk';
@@ -182,7 +193,7 @@
       const riffer = punk ? 'guitar3' : 'sax';
       const bridge = sections.find(s => s.type === 'bridge' || s.type === 'solo');
       const options2 = [
-        ...(excluded.has(riffer) ? [] : [{ where: first, instrument: riffer, color: punk ? (r() < .5 ? 'radio' : 'megaphone') : (r() < .6 ? 'gramophone' : 'radio'),
+        ...(excluded.has(riffer) || (punk && noRiff) ? [] : [{ where: first, instrument: riffer, color: punk ? (r() < .5 ? 'radio' : 'megaphone') : (r() < .6 ? 'gramophone' : 'radio'),
           value: fit.color * (plan.opening === 'riff' ? 1.2 : first.bars >= 8 ? .8 : .6) * vary() }]),
         ...(bridge ? song.clips.filter(c => c.start === bridge.start && ['trumpet', 'trombone', 'sax', 'guitar3', 'guitar2'].includes(c.instrument) && !c.line).slice(0, 1)
           .map(c => ({ where: bridge, instrument: c.instrument, color: punk ? 'megaphone' : r() < .5 ? 'telephone' : 'radio', value: fit.color * .85 * vary() })) : [])
@@ -321,6 +332,11 @@
     const mutedWinds = subgenre === 'rocksteady' || subgenre === 'bossreggae';
     const leadBass = subgenre === 'jamaican' || subgenre === 'postpunk';
     const melodicSka = style === 'ska' && [1, 3].includes(groove?.bass);
+    // El baix saturava sovint la mescla i tapava les guitarres: sempre una mica avall
+    // (més al punk, i encara més amb el Growlybass o al hardcore).
+    const growly = settings.timbres?.bass === 'growly';
+    const general = style === 'punk' ? (subgenre === 'hardcore' ? -10 : growly ? -8 : -6) : growly ? -6 : -4;
+    settings.baseVolume = { drums: 0, ...settings.baseVolume, bass: Math.min(settings.baseVolume?.bass ?? 0, general) };
     if (!mutedWinds && !leadBass && !melodicSka) return;
     const bass = mutedWinds ? -21 : leadBass ? -17 : -15;
     settings.baseVolume = { drums: 0, ...settings.baseVolume, bass: Math.min(settings.baseVolume?.bass ?? 0, bass) };
@@ -354,6 +370,17 @@
     // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
     if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
+    // Punk: la segona rítmica no és un calc de la primera (una mica més o menys de guany i de to),
+    // i la solista té un so propi, diferent del de les rítmiques (l'horror punk manté el so Misfits).
+    let leadSound = null;
+    if (punk && fx && key !== 'horrorpunk') {
+      const nudge = (n, d) => Math.max(0, Math.min(100, n + Math.round((r() - .5) * 2 * d)));
+      settings.fx.guitar2 = { ...fx, drive: nudge(fx.drive, 12), tone: nudge(fx.tone, 10) };
+      const tones = PUNK_LEAD_TONES.filter(t => t.fx[0] !== fx.type);
+      const lead = pick(tones);
+      settings.fx.guitar3 = { type: lead.fx[0], drive: nudge(lead.fx[1], 6), tone: nudge(lead.fx[2], 6) };
+      leadSound = lead.sound || null;
+    }
     // El baix manté el paper melòdic amb marge perquè destaquin la veu i els vents.
     balanceProminentBass(settings);
     // Punk: la veu solista una mica per davant de les guitarres.
@@ -361,8 +388,8 @@
     // Punk instrumental: la guitarra solista porta el tema i ha de quedar per davant de les rítmiques.
     if (punk && !vocal) settings.volumes = { ...(settings.volumes || {}), guitar3: 2 };
     // Hardcore: el baix Growlybass saturava el limitador i enterrava les guitarres (comentaris de la ràdio):
-    // baix 4 dB avall i guitarres rítmiques 2 dB amunt.
-    if (key === 'hardcore') { settings.baseVolume = { drums: 0, bass: -4 }; settings.volumes = { ...settings.volumes, guitar: 2, guitar2: 2 }; }
+    // baix 10 dB avall (vegeu balanceProminentBass) i guitarres rítmiques 3 dB amunt.
+    if (key === 'hardcore') { settings.volumes = { ...settings.volumes, guitar: 3, guitar2: 3 }; }
     if (!punk && vocal) {
       // Ska: el clarinet que fa la melodia de veu és el solista i ha de quedar per davant de la banda.
       settings.volumes = { ...(settings.volumes || {}), vocal: 3 };
@@ -588,7 +615,8 @@
         }
         if (sec.type === 'bridge') { if (key === 'rocksteady') add(sec, 'synthPad', { revision: 1 }); else add(sec, 'trombone'); if (key === 'skapunk') add(sec, 'guitar3', { revision: 4, fx: { type: 'crunch', drive: 40, tone: 50 } }); }
       } else {
-        if (sec.type === 'intro') { add(sec, 'guitar3', { line: 'riff' }); if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 }); }
+        // La solista no sempre obre la cançó: sovint la intro és de les rítmiques, el baix i la bateria.
+        if (sec.type === 'intro') { if (r() < (LEAD_INTRO[key] ?? .55)) add(sec, 'guitar3', { line: 'riff' }); if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 }); }
         if (sec.type === 'verse') {
           verses++;
           // Reservem la segona rítmica per a la tornada; els estils més densos la mantenen.
@@ -690,6 +718,8 @@
     const highlights = planHighlights(song, key, r, { vocal });
     if (highlights.stop) highlights.stop.ending = 'stop';
     designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf, opening: highlights.opening, closing: highlights.closing, middle: highlights.middle });
+    // La solista amb una altra guitarra: tots els seus clips sense so ni efecte propis.
+    if (leadSound) for (const c of song.clips) if (c.instrument === 'guitar3' && !c.fx && !c.sound) c.sound = leadSound;
     if (highlights.color) {
       const clip = song.clips.find(c => c.instrument === highlights.color.instrument && c.start <= highlights.color.where.start && c.start + c.bars > highlights.color.where.start);
       if (clip) clip.color = highlights.color.color;
