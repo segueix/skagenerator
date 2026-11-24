@@ -2115,7 +2115,8 @@
                 prechorus: [['IV', 'V', 'vi', 'V']], bridge: [['ii', 'IV', 'vi', 'V'], ['IV', 'V', 'iii', 'vi']] } } },
         eastbay: { name: 'Punk californià (East Bay)', style: 'punk', bpm: [168, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [2, 'major'], [7, 'major'], [0, 'major'], [4, 'minor']],
             groove: { drums: [0, 3, 5], bass: [3, 0, 4], guitar: [0, 1, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'real', bass: 'pick', guitar: 'clean' }, humanize: .5, countIn: true,
-            fx: { type: 'crunch', drive: 75, tone: 60 }, fxChoices: [['crunch', 75, 60], ['distortion', 55, 62], ['overdrive', 75, 58]],
+            fx: { type: 'crunch', drive: 75, tone: 60 }, fxChoices: [['crunch', 75, 60], ['distortion', 55, 62], ['overdrive', 75, 58], ['crunch', 58, 48], ['crunch', 88, 70],
+                ['overdrive', 55, 66], ['distortion', 40, 52], ['tape', 85, 58], ['boost', 90, 64], ['fuzz', 35, 50]],
             description: 'El punk de l’East Bay dels 90 (a l’estil de Green Day i Rancid): acords amb crunch apagats a l’estrofa i oberts a la tornada, baix inquiet que fa melodia, tornades per cantar a cor i un pont a mig temps.',
             harmony: { major: {
                 verse: [['I', 'V', 'vi', 'iii'], ['I', 'IV', 'V', 'IV'], ['I', 'bVII', 'IV', 'I'], ['I', 'V', 'IV', 'V']],
