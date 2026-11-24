@@ -35,7 +35,11 @@
   if (!studio || !engine || !builder || !audioUtils || !sampleAudio || !$('radio')) return;
 
   const RATE = studio.RATE, GAP_SECONDS = 2, TAIL_SECONDS = 1.5;
-  const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', HISTORY_MAX = 300;
+  const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', INSTRUMENTAL_KEY = 'radiospam.instrumental', HISTORY_MAX = 300;
+  // Ràdio instrumental: cançons sense veu (ni lletra, ni melodia de guia, ni Umidaji); els vents fan el tema.
+  let instrumental = false;
+  try { instrumental = localStorage.getItem(INSTRUMENTAL_KEY) === '1'; } catch {}
+  const hasVoice = song => Array.isArray(song?.clips) && song.clips.some(c => c.instrument === 'vocal');
   // De tant en tant torna a sonar una cançó amb 👍 de la mateixa emissora.
   const REPLAY_CHANCE = .3, REPLAY_EVERY = 3, REPLAY_MEMORY = 5;
   // «mix»: emissora Ska-Punk, que barreja cançons de totes dues.
@@ -165,17 +169,17 @@
   }
   const sungById = id => sungCatalog?.find(s => s.id === id);
   function historyChoice(entry) {
-    const sung = sungById(entry.id);
+    const sung = instrumental ? undefined : sungById(entry.id);
     const song = studio.validateSong(JSON.parse(JSON.stringify(entry.song)));
     // Les cançons antigues recuperen el balanç nou quan es tornen a gravar.
     builder.balanceProminentBass(song.settings);
-    return { id: entry.id, replay: true, take: savedTakes.has(entry.id), sung, song };
+    return { id: entry.id, replay: true, take: !instrumental && savedTakes.has(entry.id), sung, song };
   }
   // filler: cal una cançó per omplir la cua mentre Umidaji en canta una altra (o no hi ha banc de veu).
   function chooseSong(filler = false) {
     const history = readHistory(), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
     // Amb prou repertori cantat, la cua s'omple amb cançons que t'han agradat i ja tenen veu.
-    const repertoire = history.filter(e => inStation(e.style) && e.vote === 1 && savedTakes.has(e.id));
+    const repertoire = instrumental ? [] : history.filter(e => inStation(e.style) && e.vote === 1 && savedTakes.has(e.id));
     const rested = repertoire.filter(e => !queued.includes(e.id));
     if (filler && repertoire.length >= REPERTOIRE_MIN && rested.length) {
       rested.sort((a, b) => (a.lastPlayed || 0) - (b.lastPlayed || 0));
@@ -183,7 +187,7 @@
       try { return historyChoice(entry); }
       catch (error) { console.warn('Cançó de l’historial no vàlida', error); }
     }
-    const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id));
+    const liked = history.filter(e => inStation(e.style) && e.vote === 1 && !queued.includes(e.id) && (!instrumental || !hasVoice(e.song)));
     if (liked.length && sinceReplay >= REPLAY_EVERY && !queue.some(t => t.replay) && Math.random() < REPLAY_CHANCE) {
       // Entre les preferides, les que fa més que no sonen.
       liked.sort((a, b) => (a.lastPlayed || 0) - (b.lastPlayed || 0));
@@ -202,7 +206,8 @@
     const recent = [...waitingSongs, ...history.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created))].slice(0, 12)
       .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
     // Cada cançó nova porta lletra en català; la melodia de veu la segueix.
-    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: true, autoLyrics: 'ca', seed: studio.newSeed(), vary: true, recent,
+    // A la ràdio instrumental no n'hi ha: els vents porten el tema.
+    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: !instrumental, ...(instrumental ? {} : { autoLyrics: 'ca' }), seed: studio.newSeed(), vary: true, recent,
       // Títols de les últimes 150 cançons (i de les que esperen a la cua): no es repeteixen.
       avoidTitles: [...queue.map(t => t.song.title), ...history.slice(0, 150).map(e => e.title)].filter(Boolean),
       liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
@@ -382,7 +387,7 @@
     }
   }
   // Es pot posar una cançó a cantar: hi ha el banc de veu i Umidaji no en canta cap altra.
-  const canSing = () => !!browserSinger?.available && !parked && !historyVoice;
+  const canSing = () => !instrumental && !!browserSinger?.available && !parked && !historyVoice;
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
   // (cada síl·laba és una nota, en ordre).
   function lyricLines(song, seg, spec, at) {
@@ -571,6 +576,7 @@
     $('radio-subgenre').textContent = current ? subgenreName(current.song.settings.subgenre) : `Emissora ${STATIONS[station] || ''}`;
     $('radio-replay').hidden = !current?.replay || entry?.vote !== 1;
     $('radio-sung').hidden = !current?.sung;
+    $('radio-instrumental-tag').hidden = !current || hasVoice(current.song);
     $('radio-title').textContent = current ? current.song.title : '';
     $('radio-meta').textContent = current ? `${keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}${current.voiceTimbre ? ' · ' + current.voiceTimbre : ''}` : '';
     const play = $('radio-play');
@@ -878,6 +884,12 @@
   $('to-radio').addEventListener('click', () => setView('radio'));
 
   for (const button of document.querySelectorAll('[data-station]')) button.addEventListener('click', () => chooseStation(button.dataset.station));
+  const instrumentalToggle = $('radio-instrumental');
+  instrumentalToggle.checked = instrumental;
+  instrumentalToggle.addEventListener('change', () => {
+    instrumental = instrumentalToggle.checked;
+    try { localStorage.setItem(INSTRUMENTAL_KEY, instrumental ? '1' : '0'); } catch {}
+  });
   for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { filter = button.dataset.filter; renderHistory(); });
   $('radio-back').addEventListener('click', () => { if (historyOpen) openHistory(false); else leaveStation(); });
   $('radio-play').addEventListener('click', togglePlay);
