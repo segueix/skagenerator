@@ -147,7 +147,8 @@ function createPerformance(spec) {
     drums: punk ? [-3, 5, 4.5, 11] : [0, 3, 2.6, 8], electronicDrums: [0, 0, .4, 3],
     bass: [spec.style === 'ska' ? 9 : punk ? -1 : 4, 4, 3.5, 8], synthBass: [0, .5, .5, 2],
     guitar: [punk ? -4 : 3, 4, 3.5, 9], guitar2: [punk ? -3 : 5, 4, 4.5, 9], guitar3: [2, 5, 6, 10], organ: [5, 4, 5, 8], piano: [4, 4, 5, 10],
-    trumpet: [punk ? 3 : 9, 7, 8, 9], trombone: [punk ? 4 : 11, 7, 8, 9], sax: [punk ? 4 : 10, 7, 8, 9], vocal: [12, 8, 9, 9],
+    // Vents: mateix retard (relaxat) per a tota la secció i variació de força moderada dins de la frase.
+    trumpet: [punk ? 3 : 10, 7, 8, 5], trombone: [punk ? 3 : 10, 7, 8, 5], sax: [punk ? 3 : 10, 7, 8, 5], vocal: [12, 8, 9, 9],
     synthLead: [0, 1, 1, 3], synthPad: [0, 0, 0, 0]
   };
   // Als tempos ràpids els músics han de ser més justos: les desviacions s'escalen amb el temps de negra.
@@ -164,8 +165,19 @@ function createPerformance(spec) {
     return (.55 * Math.sin(2 * Math.PI * .09 * t + a) + .3 * Math.sin(2 * Math.PI * .23 * t + b) + .15 * Math.sin(2 * Math.PI * .51 * t + c));
   }
   const gauss = () => (random() + random() + random() - 1.5) / .5; // aproximadament normal, σ ≈ 1
+  // Secció de vents (trompeta, trombó i saxo, amb els canals d'staccato): toquen junts com una
+  // secció real. Comparteixen la deriva i la variació de cada cop (una per moment de la partitura);
+  // cada músic només hi afegeix ±2 ms propis. Abans cada vent i cada canal d'staccato derivava per
+  // separat i els cops del riff sortien desajustats fins a 26 ms.
+  const HORNS = new Set([3, 4, 8, 12, 13]), sectionHit = new Map();
+  function hornJitter(start) {
+    const key = Math.round(start * 200);
+    if (!sectionHit.has(key)) { const r = rng(seedBase * 131 + key); sectionHit.set(key, (r() + r() + r() - 1.5) / .5); }
+    return sectionHit.get(key);
+  }
   function humanTime(channel, pitch, start) {
     const name = instrumentOf[channel], [offset, slow, jitter] = FEEL[name] || [0, 0, 0], member = limb(channel, pitch);
+    if (HORNS.has(channel)) return human * tempoScale * (offset + slow * drift(99, start) + jitter * .8 * hornJitter(start) + 2 * gauss()) / 1000;
     // El bombo és el més regular; la mà del charles és la que més respira.
     const limbScale = member === 1 ? .6 : member === 3 ? 1.2 : 1;
     return human * tempoScale * limbScale * (offset + slow * drift(channel * 8 + member, start) + jitter * gauss()) / 1000;
@@ -200,13 +212,15 @@ function createPerformance(spec) {
     events.push({ time: at, type: 'on', channel, note: midi, velocity: vel });
     events.push({ time: end, type: 'off', channel, note: midi });
   }
-  const control = (channel, time, controller, value) => { for (const [at] of feel(channel, swung(time), 0)) if (at < spec.seconds)
+  const control = (channel, time, controller, value) => {
+    if (!Number.isInteger(controller) || controller < 0 || controller > 119 || !Number.isFinite(value)) throw new Error('Control MIDI no vàlid');
+    for (const [at] of feel(channel, swung(time), 0)) if (at < spec.seconds)
     events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'cc', channel, controller, value: Math.round(Math.max(0, Math.min(127, value))) }); };
   const bend = (channel, time, value) => { for (const [at] of feel(channel, swung(time), 0)) if (at < spec.seconds)
     events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) }); };
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
-  function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false) {
+  function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false, connectedBefore = false) {
     // Només els accents curts separats fan servir les mostres de staccato.
     if (realBrass[channel] && duration < .3 && !connected) channel += 9;
     const at = Math.max(0, start), long = duration > beat * .9;
@@ -216,8 +230,14 @@ function createPerformance(spec) {
     bend(channel, at - .002, accent && random() < .55 ? 8192 - 700 - random() * 500 : 8192);
     if (accent) for (let k = 1; k <= 4; k++) bend(channel, at + k * .016, 8192 - (4 - k) * 260 * (1 - k / 5));
     // Crescendo subtil a les notes llargues (uns 2 dB): més fort sonava com si la nota s'apagués.
-    control(channel, at - .002, 11, long ? 112 : 124);
-    if (long) for (let k = 1; k <= 3; k++) control(channel, at + duration * .12 * k, 112 + k * 5);
+    // L'expressió és de tot el canal: dins d'una frase lligada no es toca, perquè cada canvi
+    // també movia la cua de la nota anterior i la frase sonava a batzegades.
+    if (!connectedBefore) {
+      control(channel, at - .002, 11, long ? 112 : 124);
+      // (Abans aquí faltava el número de control: s'enviaven els controls 117, 122 i 127 sense valor,
+      // i el 127 —«Poly Mode On»— apaga totes les notes del canal: les notes llargues es tallaven.)
+      if (long) for (let k = 1; k <= 3; k++) control(channel, at + duration * .12 * k, 11, 112 + k * 5);
+    }
     control(channel, at - .002, 1, 0);
     if (duration > .55) { control(channel, at + duration * .45, 1, 28); control(channel, at + duration * .7, 1, 46); }
     // Els metalls gravats tenen dues dinàmiques (canvi a 64). La força s'allunya
@@ -421,6 +441,17 @@ function createPerformance(spec) {
     if (!has(instrument)) continue;
     const own = Array.isArray(spec.lines?.[instrument]), line = own ? spec.lines[instrument] : spec.melody;
     const channel = { synthLead: 5, trumpet: 3, trombone: 4, sax: 8 }[instrument];
+    // Registre: tota la línia es mou la mateixa quantitat d'octaves (la que n'hi deixa més notes
+    // dins del registre preferit) i només es pleguen les notes que surten de l'extensió de l'instrument. Abans cada nota es
+    // plegava per separat i el riff saltava una octava enmig de la frase (p. ex. 74 → 65 en lloc de 77).
+    const fitOctave = (pitches, lo, hi) => {
+      let best = 0, inside = -1;
+      for (const k of [0, -1, 1, -2, 2, -3]) { const n = pitches.filter(p => p + 12 * k >= lo && p + 12 * k <= hi).length; if (n > inside) { best = k; inside = n; } }
+      return best * 12;
+    };
+    const fold = (p, lo, hi) => { while (p > hi) p -= 12; while (p < lo) p += 12; return p; };
+    const saxShift = instrument === 'sax' ? fitOctave(line.map(n => n[2]), 55, 74) : 0;
+    const tromboneShift = instrument === 'trombone' && own ? fitOctave(line.map(n => n[2]), 45, 67) : 0;
     for (const [index, [b, t, pitch, duration]] of line.entries()) {
       const at = b * bar + t * beat, last = finale && b === spec.chords.length - 1;
       if (last) continue;
@@ -442,19 +473,20 @@ function createPerformance(spec) {
       const nominalEnd = at + duration * beat, swingShift = (swung(nominalEnd) - nominalEnd) - (swung(at) - at);
       const length = Math.max(.025, duration * beat - gap + swingShift);
       const accent = !joinedPrevious && (t % 1 === 0 || duration >= 1);
+      // Lligat (sense cop de llengua) només quan canvia l'altura: una nota repetida es torna a articular.
+      const slurred = joinedPrevious && previous[2] !== pitch;
       if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0);
-      else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected, joinedPrevious);
+      else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected, slurred, joinedPrevious);
       else if (instrument === 'sax') {
         // El saxo toca la seva línia en el registre agut del tenor (55–74), per sobre
         // de la segona veu i de la guitarra, perquè no quedi tapat.
-        let high = pitch; while (high > 74) high -= 12; while (high < 55) high += 12;
-        horn(8, high, at + .004, length, velocity, accent, connected, joinedPrevious);
+        // Les notes que encara en queden fora només es pleguen si surten de l'extensió real del tenor.
+        horn(8, fold(pitch + saxShift, 46, 76), at, length, velocity, accent, connected, slurred, joinedPrevious);
       }
       else {
-        // Amb línia pròpia es toca tal com està composta (una octava avall, dins del
-        // registre del trombó); sense, harmonitza la melodia amb notes de l'acord.
-        let low = pitch - 12; while (low > 67) low -= 12; while (low < 45) low += 12;
-        horn(4, own ? low : nearest(pitch - 12, chord.pcs, 45, 67), at + .006, length, velocity - 5, accent, connected, joinedPrevious);
+        // Amb línia pròpia es toca tal com està composta (dins del registre del trombó);
+        // sense, harmonitza la melodia amb notes de l'acord.
+        horn(4, own ? fold(pitch + tromboneShift, 40, 72) : nearest(pitch - 12, chord.pcs, 45, 67), at, length, velocity - 5, accent, connected, slurred, joinedPrevious);
       }
     }
   }
