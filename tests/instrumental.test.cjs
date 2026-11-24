@@ -65,3 +65,40 @@ test('la ràdio té l’interruptor instrumental i no fa cantar les cançons ins
   assert.match(radio, /const canSing = \(\) => !instrumental &&/);
   assert.match(radio, /const repertoire = instrumental \? \[\]/);
 });
+
+const PUNK = Object.keys(engine.SUBGENRES).filter(key => engine.SUBGENRES[key].style === 'punk');
+
+test('punk instrumental: la guitarra solista fa un tema a l’estrofa, un altre a la tornada i els solos', () => {
+  for (const key of PUNK) for (const [seed, guitars] of [[3, 1], [14, 2], [15, 3], [92, 2]]) {
+    const song = builder.createAutoSong(engine, key, { seed, vocal: false, guitars, candidates: 1 });
+    const where = `${key} ${seed}`;
+    assert(!song.clips.some(c => c.instrument === 'vocal') && song.sections.every(s => !s.lyrics), `${where}: sense veu`);
+    assert(song.settings.guitars >= 2, `${where}: amb guitarra solista`);
+    const leadIn = sec => song.clips.find(c => inside(c, sec) && c.instrument === 'guitar3' && c.line === 'lead');
+    for (const sec of song.sections.filter(s => ['verse', 'chorus'].includes(s.type))) assert(leadIn(sec), `${where}: tema a ${sec.type}`);
+    const verse = song.sections.find(s => s.type === 'verse'), chorus = song.sections.find(s => s.type === 'chorus');
+    assert(song.sections.some(s => ['solo', 'bridge'].includes(s.type) && leadIn(s)) || !song.sections.some(s => ['solo', 'bridge'].includes(s.type)), `${where}: solo de guitarra`);
+    // El tema és una melodia de veritat (amb ritme i altures variats), no un arpegi.
+    const spec = engine.composeSongPart(song.settings, { type: chorus.type, bars: chorus.bars, energy: chorus.energy, revision: song.harmony.chorus,
+      instruments: [...song.base.instruments, 'guitar3'], layers: { guitar3: leadIn(chorus).revision }, lineModes: { guitar3: 'lead' } });
+    const line = spec.lines.guitar3;
+    assert(new Set(line.map(n => n[2])).size >= 4 && new Set(line.map(n => n[3])).size >= 2, `${where}: melodia variada`);
+    assert(verse && leadIn(verse));
+  }
+});
+
+test('el mode «solista» de la guitarra 3 només és vàlid per a la guitarra 3', () => {
+  const settings = { seed: 5, style: 'punk', bpm: 180, tonic: 2, mode: 'major' }, part = { type: 'chorus', bars: 4, energy: 80, revision: 1 };
+  assert.doesNotThrow(() => engine.composeSongPart(settings, { ...part, instruments: ['guitar3'], layers: { guitar3: 2 }, lineModes: { guitar3: 'lead' } }));
+  assert.throws(() => engine.composeSongPart(settings, { ...part, instruments: ['trumpet'], layers: { trumpet: 2 }, lineModes: { trumpet: 'lead' } }), /Mode de línia/);
+  const { createPerformance } = require('../audio/performance.cjs');
+  const spec = engine.composeSongPart(settings, { ...part, instruments: ['guitar', 'guitar3'], layers: { guitar3: 2 }, lineModes: { guitar3: 'lead' } });
+  const notes = createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 15);
+  assert.equal(notes.length, spec.lines.guitar3.length, 'la guitarra solista toca la melodia nota a nota');
+});
+
+test('amb veu, el punk no canvia', () => {
+  const song = builder.createAutoSong(engine, 'punk77', { seed: 5, guitars: 1, candidates: 1 });
+  assert.equal(song.settings.guitars, 1);
+  assert(!song.clips.some(c => c.line === 'lead'));
+});

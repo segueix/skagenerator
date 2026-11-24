@@ -356,7 +356,9 @@
     // El baix manté el paper melòdic amb marge perquè destaquin la veu i els vents.
     balanceProminentBass(settings);
     // Punk: la veu solista una mica per davant de les guitarres.
-    if (punk) settings.volumes = { ...(settings.volumes || {}), vocal: 2 };
+    if (punk && vocal) settings.volumes = { ...(settings.volumes || {}), vocal: 2 };
+    // Punk instrumental: la guitarra solista porta el tema i ha de quedar per davant de les rítmiques.
+    if (punk && !vocal) settings.volumes = { ...(settings.volumes || {}), guitar3: 2 };
     // Hardcore: el baix Growlybass saturava el limitador i enterrava les guitarres (comentaris de la ràdio):
     // baix 4 dB avall i guitarres rítmiques 2 dB amunt.
     if (key === 'hardcore') { settings.baseVolume = { drums: 0, bass: -4 }; settings.volumes = { ...settings.volumes, guitar: 2, guitar2: 2 }; }
@@ -377,11 +379,13 @@
       : chooseForm({ key, style: sg.style, bpm, target, r, recent: options.recent || [], vary: options.vary !== false });
     let plan = form.plan;
     const formPenalty = form.penalty;
-    // Ska instrumental: sense veu, sempre hi ha com a mínim un solo (el pont passa a ser-ho).
-    const instrumental = !vocal && !punk;
-    if (instrumental && !plan.some(([type, , role]) => type === 'solo' && !role)) {
+    // Sense veu, sempre hi ha com a mínim un solo: el pont passa a ser-ho o se n'afegeix un.
+    const instrumental = !vocal && !punk, instrumentalPunk = !vocal && punk;
+    if ((instrumental || instrumentalPunk) && !plan.some(([type, , role]) => type === 'solo' && !role)) {
       const bridge = plan.findIndex(([type, , role]) => type === 'bridge' && !role);
       if (bridge >= 0) plan = plan.map((entry, i) => i === bridge ? ['solo', ...entry.slice(1)] : entry);
+      // Sense pont: s'afegeix un solo de 8 compassos abans de l'última tornada.
+      else { const last = plan.map(([type]) => type).lastIndexOf('chorus'); if (last > 0) plan = [...plan.slice(0, last), ['solo', 8], ...plan.slice(last)]; }
     }
 
     const id = `auto-${seed.toString(36)}`, sections = [];
@@ -465,6 +469,8 @@
     const mellow = key === 'rocksteady' || key === 'bossreggae';
     // Punk: nombre de guitarres triat (1, 2 o 3); les que no hi són no s'afegeixen enlloc.
     if (punk) settings.guitars = [1, 2, 3].includes(Number(options.guitars)) ? Number(options.guitars) : 3;
+    // Sense veu cal una guitarra solista que faci el tema: com a mínim dues guitarres.
+    if (punk && !vocal && settings.guitars === 1) settings.guitars = 2;
     const excluded = excludedBy({ settings });
     const add = (sec, instrument, extra = {}) => {
       if (!punk && sec === sections[0] && instrument === 'trumpet') return;
@@ -515,6 +521,28 @@
         if (key === 'skapunk') add(sec, 'guitar3', { revision: 4, fx: { type: 'crunch', drive: 40, tone: 50 } });
       }
     };
+    // Punk instrumental (a l'estil del surf punk i dels instrumentals de garatge): la guitarra solista
+    // toca un tema a l'estrofa i un altre a la tornada, amb el riff a la intro, la pretornada i el final;
+    // els solos són seus i, si la guitarra 2 hi és, la doblen les rítmiques a la tornada final.
+    const instrumentalPunkSection = sec => {
+      if (sec.type === 'intro') { add(sec, 'guitar3', { line: 'riff' }); if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 }); }
+      if (sec.type === 'verse') {
+        verses++;
+        add(sec, 'guitar3', { line: 'lead' });
+        if (key === 'horrorpunk' || key === 'hardcore' || verses > 1) add(sec, 'guitar2', { revision: 2 });
+      }
+      if (sec.type === 'prechorus') { add(sec, 'guitar2', { revision: 2 }); add(sec, 'guitar3', { line: 'riff' }); }
+      if (sec.type === 'chorus') { add(sec, 'guitar2', { revision: 2 }); add(sec, 'guitar3', { line: 'lead' }); if (key === 'horrorpunk' || key === 'garage') add(sec, 'organ', { revision: key === 'garage' ? 4 : 3 }); }
+      if (sec.type === 'solo') { add(sec, 'guitar3', { line: 'lead' }); add(sec, 'guitar2', { revision: 2 }); if (key === 'garage') add(sec, 'organ', { revision: 2 }); }
+      if (sec.type === 'bridge') {
+        // Pont: la solista respon i les rítmiques canvien de so.
+        add(sec, 'guitar3', { line: 'answer' });
+        if (key === 'hardcore') add(sec, 'guitar2', { fx: { type: 'metal', drive: 80, tone: 50 } });
+        if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 });
+        if (key === 'poppunk') add(sec, 'guitar2', { revision: 3, fx: { type: 'none', drive: 50, tone: 50 } });
+      }
+      if (sec.type === 'outro') { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
+    };
     for (const sec of sections) {
       // Amb lletra, canten les seccions que en tenen; sense, les estrofes, pretornades i tornades.
       const sing = sheet.length ? !!sec.lyrics : vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
@@ -524,9 +552,15 @@
         else { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow) add(sec, 'sax', { line: 'riff' }); }
         continue;
       }
-      if (role === 'breakdown' && punk) { add(sec, 'guitar2', { revision: 2 }); continue; }
+      if (role === 'breakdown' && punk) {
+        add(sec, 'guitar2', { revision: 2 });
+        // Sense veu, la solista fa un solo damunt del pont trencat a mig temps.
+        if (instrumentalPunk) add(sec, 'guitar3', { line: 'lead' });
+        continue;
+      }
       if (sing) add(sec, 'vocal', register ? { register } : {});
       if (instrumental) instrumentalSka(sec);
+      else if (instrumentalPunk) instrumentalPunkSection(sec);
       else if (!punk) {
         if (sec.type === 'intro' || sec.type === 'outro') { if (sec.type === 'outro') add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' }); }
         // Nutty: el piano ja omple l'estrofa i hi respon el saxo; l'orgue entra a la tornada.
@@ -602,7 +636,7 @@
     let quality = 0, judged = 0;
     layersOf.forEach((layer, i) => {
       let revision = layer.revision;
-      if (revision === undefined && MELODIC.includes(layer.instrument) && !layer.line) {
+      if (revision === undefined && (MELODIC.includes(layer.instrument) && !layer.line || layer.line === 'lead')) {
         const memo = `${layer.instrument}:${layer.sec.type}`;
         if (chosen.has(memo)) revision = chosen.get(memo);
         else {
@@ -610,6 +644,7 @@
             && (MELODIC.includes(o.instrument) || o.line) && (o.line === 'riff' || j < i));
           const layers = Object.fromEntries(company.map(([o, j]) => [o.instrument, revisions[j] || 1]));
           const lineModes = Object.fromEntries(company.filter(([o]) => o.line).map(([o]) => [o.instrument, o.line]));
+          if (layer.line === 'lead') lineModes[layer.instrument] = 'lead';
           let best = -Infinity, bestLine = null;
           for (let rev = 1; rev <= 30; rev++) {
             const part = partFor(layer.sec, { ...layers, [layer.instrument]: rev }, layer);
