@@ -488,7 +488,7 @@
   for (const [theme, families] of Object.entries(EXTRA_EN)) POOLS[theme].push(...families);
 
   // Temes de cada subgènere (el primer pesa més).
-  const THEMES = { horrorpunk: ['horror'], poppunk: ['love', 'punk'], postpunk: ['dark'], skapunk: ['ska', 'punk'], oi: ['punk'], garage: ['punk', 'love'] };
+  const THEMES = { horrorpunk: ['horror'], poppunk: ['love', 'punk'], postpunk: ['dark'], skapunk: ['ska', 'punk'], oi: ['punk'], garage: ['punk', 'love'], eastbay: ['punk', 'love'] };
   const themesOf = (subgenre, style) => THEMES[subgenre] || (style === 'punk' ? ['punk'] : ['ska']);
   // Seccions que es canten (com a la cançó automàtica): estrofes, pretornades i tornades; a l'horror punk, també el pont.
   const SUNG = ['verse', 'prechorus', 'chorus'];

@@ -488,8 +488,8 @@ test('el baix protagonista queda clarament per sota de la veu solista i els vent
   }
 });
 
-test('subgèneres nous de punk: street punk, skate punk, garage i post-punk componen cançons vàlides amb 1, 2 o 3 guitarres', () => {
-  for (const key of ['oi', 'skatepunk', 'garage', 'postpunk']) {
+test('subgèneres nous de punk: street punk, skate punk, garage, post-punk i punk californià componen cançons vàlides amb 1, 2 o 3 guitarres', () => {
+  for (const key of ['oi', 'skatepunk', 'garage', 'postpunk', 'eastbay']) {
     const sg = engine.SUBGENRES[key];
     assert.equal(sg.style, 'punk');
     assert(sg.keys.every(([tonic, mode]) => engine.SONG_STYLES.punk.keys.some(([t, m]) => t === tonic && m === mode)), `${key}: tonalitats de l'estil`);

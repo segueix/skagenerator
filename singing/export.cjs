@@ -12,7 +12,7 @@ const path = require('node:path');
 const STYLES = ['jamaican', 'rocksteady', 'bossreggae', 'twotone', 'nutty', 'skaswing', 'poppunk'];
 // Amb EXPORT_STYLES=ska,punk les cançons alternen un subgènere d'ska i un de punk (els que canta bé la veu).
 const SKA = ['jamaican', 'rocksteady', 'twotone', 'nutty', 'bossreggae', 'skaswing', 'skapunk'];
-const PUNK = ['punk77', 'oi', 'skatepunk', 'garage', 'postpunk', 'hardcore', 'poppunk', 'horrorpunk'];
+const PUNK = ['punk77', 'oi', 'skatepunk', 'garage', 'postpunk', 'hardcore', 'poppunk', 'horrorpunk', 'eastbay'];
 // Llengua de la lletra automàtica: EXPORT_LANG=ca (per defecte) o en (la veu TIGER canta en anglès).
 const LANG = process.env.EXPORT_LANG || 'ca';
 
