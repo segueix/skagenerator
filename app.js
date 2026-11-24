@@ -94,8 +94,10 @@
     organ: ['Contratemps', '«Bubble»', 'Sostingut', 'Blanques', 'Síncopa'],
     piano: ['Contratemps', '«Bounce» de music-hall', 'Boogie', 'Acords llargs', 'Corxeres martellejades'],
     synthPad: ['Sostingut', 'Blanques', 'Contratemps', 'Negres', 'Síncopa'] };
+  // El compositor també fixa el trombó real a l'obertura de ska (duet de saxo i trombó).
+  const SECTION_SOUNDS = [...BASE_SOUNDS, 'trombone'];
   const validBaseEdits = s => (s.mute === undefined || Array.isArray(s.mute) && s.mute.length <= Object.keys(INSTRUMENTS).length && new Set(s.mute).size === s.mute.length && s.mute.every(n => Object.hasOwn(INSTRUMENTS, n)))
-    && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => BASE_SOUNDS.includes(n)))
+    && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => SECTION_SOUNDS.includes(n)))
     && (s.patterns === undefined || !!s.patterns && typeof s.patterns === 'object' && !Array.isArray(s.patterns)
       && Object.entries(s.patterns).every(([n, i]) => Object.hasOwn(BASE_PATTERNS, n) && Number.isInteger(i) && i >= 0 && i < 5));
   const validGroove = (input, style) => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
