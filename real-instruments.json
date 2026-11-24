@@ -313,5 +313,37 @@
         1.6
       ]
     }
+  },
+  "organ": {
+    "name": "Orgue de rodes (sintetitzat)",
+    "bank": 2,
+    "program": 16,
+    "about": "Orgue de rodes fòniques sintetitzat al build (sense mostres externes): tirants 888400000, percussió del 3r harmònic, clic de tecla i replegament dels harmònics aguts.",
+    "drawbars": [
+      8,
+      8,
+      8,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "percussion": {
+      "harmonic": 3,
+      "level": 0.55,
+      "decay": 0.09
+    },
+    "click": 0.12,
+    "notes": [
+      36,
+      96,
+      4
+    ],
+    "attackSeconds": 0.6,
+    "loopSeconds": 0.25,
+    "release": 0.04,
+    "levelDb": -13
   }
 }

@@ -24,9 +24,9 @@ function createPerformance(spec) {
     bass: { auto: null, finger: [2, 33], pick: [2, 34], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
     drums: { auto: null, real: [0, 69], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
-    // La segona veu de vent sona per defecte amb saxo tenor gravat: articulació més
-    // clara que la vara del trombó. El trombó gravat (VSCO) queda com a opció.
-    trombone: { auto: null, vsco: [2, 57], gm: [0, 57], warm: [1, 57] }
+    // La segona veu de vent és un trombó gravat (VSCO), com a les seccions de vent de ska
+    // (trompeta, trombó i saxo tenor). El saxo tenor gravat queda com a opció ('sax').
+    trombone: { auto: null, vsco: [2, 57], sax: [2, 66], gm: [0, 57], warm: [1, 57] }
   };
   // Les guitarres 2 i 3 tenen els mateixos sons que la primera.
   presets.guitar2 = presets.guitar; presets.guitar3 = presets.guitar;
@@ -55,7 +55,9 @@ function createPerformance(spec) {
   const isHorror = type => typeof type === 'string' && type.startsWith('horrorpunk');
   const amped = name => ['crunch', 'overdrive', 'distortion', 'metal', 'fuzz'].includes(spec.fx?.[name]?.type) || isHorror(spec.fx?.[name]?.type);
   const misfits = isHorror(spec.fx?.guitar?.type);
-  const realBrass = { 3: !chosen('trumpet'), 4: spec.timbres?.trombone === 'vsco' };
+  const tromboneSound = chosen('trombone') ?? [2, 57];
+  // Staccato gravat només amb els metalls de VSCO (el saxo i els sons GM no en tenen).
+  const realBrass = { 3: !chosen('trumpet'), 4: tromboneSound[0] === 2 && tromboneSound[1] === 57 };
   const guitarTakes = Array.isArray(spec.guitarTakes) ? spec.guitarTakes : [];
   // L'últim compàs de l'outro és el final de la cançó, tret que s'esvaeixi (el groove continua).
   const finale = spec.type === 'outro' && spec.closing !== 'fade';
@@ -65,13 +67,14 @@ function createPerformance(spec) {
     patch(1, chosen('guitar') ?? (amped('guitar') ? [2, 27] : punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
     patch(2, chosen('bass') ?? (punk ? [2, 34] : [2, 33]), 64, 115),
     patch(3, chosen('trumpet') ?? [2, 56], 50, 116),
-    patch(4, chosen('trombone') ?? [2, 66], 79, 112),
+    patch(4, tromboneSound, 79, 112),
     // Staccato gravat per a les notes curtes de trompeta i trombó.
     patch(12, [3, 56], 50, 116), patch(13, [3, 57], 79, 127),
     patch(16, chosen('vocal') ?? [2, 71], 64, 112),
     patch(14, chosen('guitar2') ?? (punk && !amped('guitar2') ? [0, 30] : [2, 27]), 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
     patch(8, [2, 66], 30, 94),
-    { channel: 11, program: 16, pan: 92, volume: 84 },
+    // Orgue de rodes sintetitzat (banc 2) amb altaveu rotatori: lent a les estrofes, ràpid a tornades i solos.
+    { channel: 11, bank: 2, program: 16, pan: 76, volume: 84, leslie: ['chorus', 'solo'].includes(spec.type) ? 'fast' : 'slow' },
     { channel: 5, program: 81, pan: 58, volume: 106 },
     { channel: 6, program: 89, pan: 76, volume: 90 },
     { channel: 7, program: 38, pan: 64, volume: 110 },
@@ -482,7 +485,7 @@ function createPerformance(spec) {
   // fa cas de les notes off, així que només cal canviar la tecla de cada cop.
   for (const e of events) if (e.type === 'on' && e.channel === 9) e.note = take(e.note);
   // Volums calibrats: els sons gravats sonen al mateix nivell que els GM equivalents.
-  const level = { '2:0': 94, '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
+  const level = { '2:16': 64, '2:0': 94, '2:66': 94, '2:71': 124, '2:27': 77, '2:33': 99, '2:34': 99, '2:56': 124, '3:56': 124, '2:57': 127 };
   // Guany fix (dB) dels kits i baixos gravats addicionals: calibrat amb parts reals
   // perquè sonin al mateix nivell que el kit GM i el baix amb dits.
   const boost = { '0:69': 7.4, '0:68': 7.2, '0:66': 6.8, '0:67': 8.1, '2:32': 1.2, '4:33': 5.5 };

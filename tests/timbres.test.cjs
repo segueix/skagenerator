@@ -83,7 +83,7 @@ test('per defecte sonen els instruments gravats i les notes curtes dels metalls 
     { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3, sax: 4 } });
   spec.lines.trumpet = [[0, 0, 67, .25], [0, 1, 69, 1]]; // accent aïllat i nota sostinguda
   const music = createPerformance(spec), entry = channel => music.channels.find(p => p.channel === channel);
-  assert.deepEqual([0, 2, 3, 4, 8, 12, 13].map(c => `${entry(c).bank}:${entry(c).program}`), ['2:27', '2:33', '2:56', '2:66', '2:66', '3:56', '3:57']);
+  assert.deepEqual([0, 2, 3, 4, 8, 12, 13].map(c => `${entry(c).bank}:${entry(c).program}`), ['2:27', '2:33', '2:56', '2:57', '2:66', '3:56', '3:57']);
   assert.equal(entry(9).program, 69);
   const notes = channel => music.events.filter(e => e.type === 'on' && e.channel === channel);
   const off = e => music.events.find(o => o.type === 'off' && o.channel === e.channel && o.note === e.note && o.time >= e.time);
@@ -201,20 +201,24 @@ test('el trombó toca la seva línia tal com està composta, una octava avall', 
   assert.deepEqual(notes, line);
 });
 
-test('la segona veu de vent sona amb saxo tenor gravat i el trombó és opcional', () => {
+test('la segona veu de vent és un trombó gravat amb staccato i el saxo tenor és opcional', () => {
   const sp = timbres => engine.composeSongPart({ ...config, instruments: ['trombone'], timbres }, { ...part, type: 'chorus', layers: { trombone: 3 } });
-  const music = createPerformance(sp(undefined)), entry = c => music.channels.find(p => p.channel === c);
-  assert.deepEqual([entry(4).bank, entry(4).program], [2, 66]);
+  for (const timbres of [undefined, { trombone: 'auto' }, { trombone: 'vsco' }]) {
+    const detached = sp(timbres);
+    detached.lines.trombone = [[0, 0, 67, .25], [0, 1, 69, 1]];
+    const trombone = createPerformance(detached), channel = trombone.channels.find(p => p.channel === 4);
+    assert.deepEqual([channel.bank, channel.program], [2, 57]);
+    assert(trombone.events.some(e => e.type === 'on' && e.channel === 13), 'el trombó gravat fa servir l’staccato');
+  }
+  const sax = sp({ trombone: 'sax' });
+  sax.lines.trombone = [[0, 0, 67, .25], [0, 1, 69, 1]];
+  const music = createPerformance(sax);
+  assert.deepEqual([music.channels.find(p => p.channel === 4).bank, music.channels.find(p => p.channel === 4).program], [2, 66]);
   assert(music.events.filter(e => e.type === 'on').every(e => e.channel === 4), 'el saxo no fa servir l’staccato del trombó');
-  const detached = sp({ trombone: 'vsco' });
-  detached.lines.trombone = [[0, 0, 67, .25], [0, 1, 69, 1]];
-  const trombone = createPerformance(detached);
-  assert.deepEqual([trombone.channels.find(p => p.channel === 4).bank, trombone.channels.find(p => p.channel === 4).program], [2, 57]);
-  assert(trombone.events.some(e => e.type === 'on' && e.channel === 13), 'el trombó gravat conserva l’staccato');
   assert.equal(createPerformance(sp({ trombone: 'gm' })).channels.find(p => p.channel === 4).bank, 0);
 });
 
-test('els dos saxos toquen en registres separats i amb volum suficient', () => {
+test('saxo i trombó toquen en registres separats i amb volum suficient', () => {
   const spec = engine.composeSongPart({ ...config, instruments: ['trombone', 'sax'] }, { ...part, type: 'chorus', layers: { trombone: 3, sax: 4 } });
   const music = createPerformance(spec), notes = c => music.events.filter(e => e.type === 'on' && e.channel === c).map(e => e.note);
   assert(notes(8).every(n => n >= 55 && n <= 74), 'saxo: registre agut del tenor');

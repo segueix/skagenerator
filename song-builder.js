@@ -247,11 +247,7 @@
         revision: options.revisions?.[instrument] || 1, generated: true, edge: true, ...extra });
       return true;
     };
-    if (!punk) {
-      for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
-      // La segona veu de vent usa saxo per defecte; aquí ha de sonar un trombó real.
-      first.timbres = { ...first.timbres, trombone: 'vsco' };
-    }
+    if (!punk) for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
     const outro = last.type === 'outro';
     const openings = {
       band: () => true,

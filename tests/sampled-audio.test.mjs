@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseSoundBank, renderSampledPart, baseVolumeDb, createEqualizer, INSTRUMENT_GAIN_DB, REVERB, TAIL_SECONDS } from '../audio/render.mjs';
+import { parseSoundBank, renderSampledPart, baseVolumeDb, createEqualizer, createLeslie, INSTRUMENT_GAIN_DB, REVERB, TAIL_SECONDS } from '../audio/render.mjs';
+import { tonewheelNote } from '../scripts/real-instruments.mjs';
+import real from '../real-instruments.json' with { type: 'json' };
 import { createPerformance } from '../audio/performance.cjs';
 import engine from '../radioambient.js';
 import audioUtils from '../audio-utils.js';
@@ -26,7 +28,7 @@ test('el banc conté les mostres enregistrades dels instruments i els tres kits 
   for (const program of [53, 73, 79]) assert(bank.presets.some(p => p.bankMSB === 0 && p.program === program), `veu GM ${program}`);
   assert(bank.presets.some(p => p.bankMSB === 2 && p.program === 71), 'clarinet gravat');
   // Instruments gravats: VSCO 2 CE (banc 2 i staccato al 3), FreePats (banc 2) i el kit Muldjord (64).
-  for (const [bankMSB, program] of [[2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57]])
+  for (const [bankMSB, program] of [[2, 16], [2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57]])
     assert(bank.presets.some(p => p.bankMSB === bankMSB && p.program === program && !p.isGMGSDrum), `${bankMSB}:${program}`);
   assert(bank.presets.some(p => p.program === 69 && p.isGMGSDrum));
   for (const program of [16, 27, 28, 29, 30, 33, 34, 38, 56, 57, 59, 66, 81, 89]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));
@@ -263,4 +265,28 @@ test('efectes de color: ràdio, megàfon, telèfon i gramòfon treuen greus i ma
   }
   assert.throws(() => engine.composeSongPart({ seed: 3, style: 'ska', bpm: 120, tonic: 0, mode: 'major' },
     { type: 'verse', bars: 2, energy: 70, revision: 1, instruments: ['bass'], colors: { bass: 'radio' } }), /color/);
+});
+
+test('orgue de rodes: bucles exactes, percussió que s’apaga i el Leslie gira el so d’un costat a l’altre', async () => {
+  for (let note = 36; note <= 96; note += 4) {
+    const { data, loop: [start, end] } = tonewheelNote(note, real.organ);
+    for (let k = 0; k < 8; k++) assert(Math.abs(data[end + k] - data[start + k]) < 1e-4, `bucle continu a la nota ${note}`);
+  }
+  const organ = (type, layer) => engine.composeSongPart({ seed: 5, style: 'ska', bpm: 128, tonic: 0, mode: 'major' },
+    { type, bars: 2, energy: 60, revision: 1, instruments: ['organ'], layers: { organ: layer } });
+  const channel = spec => createPerformance(spec).channels.find(c => c.channel === 11);
+  assert.deepEqual([channel(organ('verse', 2)).bank, channel(organ('verse', 2)).program, channel(organ('verse', 2)).leslie], [2, 16, 'slow']);
+  assert.equal(channel(organ('chorus', 2)).leslie, 'fast');
+  assert.equal(createLeslie(undefined, 44100), null);
+  // Un to fix surt modulat: el volum de cada costat oscil·la i els dos costats difereixen.
+  const leslie = createLeslie('fast', 44100), left = [], right = [];
+  for (let i = 0; i < 44100; i++) { const x = .3 * Math.sin(2 * Math.PI * 1500 * i / 44100); left.push(leslie.process(0, x)); right.push(leslie.process(1, x)); }
+  const envelope = side => Array.from({ length: 40 }, (_, w) => Math.sqrt(side.slice(4410 + w * 882, 4410 + (w + 1) * 882).reduce((a, v) => a + v * v, 0) / 882));
+  const l = envelope(left), r = envelope(right);
+  assert(Math.max(...l) / Math.min(...l) > 1.5, 'trèmolo audible');
+  assert(l.some((v, i) => Math.abs(v - r[i]) > .02), 'els micròfons esquerre i dret no sonen igual');
+  const [L, R] = await renderSampledPart(bank, organ('chorus', 2), 44100, { raw: true });
+  let lr = 0, ll = 0, rr = 0;
+  for (let i = 0; i < L.length; i++) { lr += L[i] * R[i]; ll += L[i] * L[i]; rr += R[i] * R[i]; }
+  assert(ll > 0 && lr / Math.sqrt(ll * rr) < .85, 'l’orgue sona obert en estèreo');
 });
