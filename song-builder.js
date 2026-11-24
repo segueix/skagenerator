@@ -9,7 +9,8 @@
   // 2 a 4 minuts (estructura, harmonia, arranjament, riff, respostes, canvis
   // de tempo i de to) i tria les millors melodies.
   const MELODIC = ['vocal', 'trumpet', 'trombone', 'sax', 'synthLead'];
-  const SKA_OPENING_WINDS = ['sax', 'trombone'];
+  // La intro de ska la fa la secció de vents sencera (trompeta, saxo i trombó) amb el riff de la cançó.
+  const SKA_OPENING_WINDS = ['trumpet', 'sax', 'trombone'];
   const SOLO_OPENINGS = ['drums', 'voice', 'riddim'];
   function rng(seed) {
     let a = seed >>> 0;
@@ -253,7 +254,7 @@
       band: () => true,
       drums: () => !!drums && only(first, [drums]),
       buildup: () => {
-        const list = playing(first).filter(name => punk || !['trumpet', ...SKA_OPENING_WINDS].includes(name));
+        const list = playing(first).filter(name => punk || !SKA_OPENING_WINDS.includes(name));
         if (first.bars < 2 || list.length < 2) return false;
         first.entrance = {};
         list.forEach((name, i) => { const at = name === drums ? 0 : Math.min(first.bars - 1, Math.floor((i + (punk ? 0 : 1)) * first.bars / list.length)); if (at > 0) first.entrance[name] = at; });
@@ -299,7 +300,6 @@
     };
     if (!punk) for (const name of SOLO_OPENINGS) delete openings[name];
     const opening = choose(openings, options.opening, previous.opening);
-    if (!punk) first.mute = [...new Set([...(first.mute || []), 'trumpet'])];
     const closing = choose(closings, options.closing, previous.closing);
     // Silenci al mig: la secció que porta a una tornada (preferiblement l'última) acaba
     // amb un cop i silenci, o amb un compàs sencer de silenci; la tornada entra amb més força.
@@ -473,7 +473,6 @@
     if (punk && !vocal && settings.guitars === 1) settings.guitars = 2;
     const excluded = excludedBy({ settings });
     const add = (sec, instrument, extra = {}) => {
-      if (!punk && sec === sections[0] && instrument === 'trumpet') return;
       // Cada instrument, una sola vegada per secció (la primera capa és la que mana).
       if (layersOf.some(layer => layer.sec === sec && layer.instrument === instrument)) return;
       if (!base.includes(instrument) && !excluded.has(instrument)) layersOf.push({ sec, instrument, ...extra });
@@ -489,7 +488,8 @@
     let solos = 0;
     const instrumentalSka = sec => {
       if (sec.type === 'intro' || sec.type === 'outro') {
-        if (sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, headA); }
+        add(sec, 'trumpet', { line: 'riff' });
+        if (sec.type === 'outro') add(sec, headA);
         add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' });
       }
       if (sec.type === 'verse') {
@@ -562,7 +562,7 @@
       if (instrumental) instrumentalSka(sec);
       else if (instrumentalPunk) instrumentalPunkSection(sec);
       else if (!punk) {
-        if (sec.type === 'intro' || sec.type === 'outro') { if (sec.type === 'outro') add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' }); }
+        if (sec.type === 'intro' || sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' }); }
         // Nutty: el piano ja omple l'estrofa i hi respon el saxo; l'orgue entra a la tornada.
         if (sec.type === 'verse') { verses++; if (key !== 'nutty') add(sec, 'organ', { revision: 2 }); if (verses > 1) add(sec, key === 'nutty' ? 'sax' : 'trumpet', { line: 'answer' }); }
         if (sec.type === 'prechorus') add(sec, 'trombone', { line: 'answer' });

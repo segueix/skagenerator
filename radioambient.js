@@ -2186,6 +2186,13 @@
                 if (rep % 4 === 3 && i >= riff.rhythm.length - 2) step = -step;
                 let p = prev === null ? nearestTone(72, chord.pcs, lo, hi) : moveByScale(prev, step, scalePcs, chord, lo, hi);
                 if (at % 1 === 0 || d >= 1) p = nearestTone(p, chord.pcs, lo, hi);
+                // L'ajust a l'acord no pot desfer el moviment escrit: si el pas puja o baixa i la nota
+                // queda igual que l'anterior, va a la nota de l'acord següent en aquella direcció
+                // (abans un terç de les notes del riff repetien l'anterior i sonaven com cops solts).
+                if (prev !== null && p === prev && step !== 0) {
+                    const dir = Math.sign(step);
+                    for (let q = prev + dir; q >= lo && q <= hi; q += dir) if (chord.pcs.includes(((q % 12) + 12) % 12)) { p = q; break; }
+                }
                 notes.push([Math.floor(at / 4), at % 4, p, Math.min(d, bars * 4 - at)]);
                 prev = p;
             });

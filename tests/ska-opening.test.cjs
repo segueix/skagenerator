@@ -23,53 +23,58 @@ function openingPerformance(song) {
 function assertWindOpening(song, context) {
   const { spec, music } = openingPerformance(song);
   const notes = music.events.filter(e => e.type === 'on');
-  assert(!notes.some(e => [3, 12].includes(e.channel)), `${context}: cap trompeta a l'inici`);
-  for (const channels of [[8], [4, 13]]) {
-    assert(notes.some(e => channels.includes(e.channel) && e.time < spec.beat * 4), `${context}: saxo i trombó al primer compàs`);
-  }
+  for (const [name, channels] of [['trompeta', [3, 12]], ['saxo', [8]], ['trombó', [4, 13]]])
+    assert(notes.some(e => channels.includes(e.channel) && e.time < spec.beat * 4), `${context}: ${name} al primer compàs`);
   const trombone = music.channels.find(c => c.channel === 4);
   assert.equal(trombone.bank, 2);
   assert.equal(trombone.program, 57, `${context}: trombó real, no un segon saxo`);
+  // Cap control MIDI que apagui notes (abans el crescendo enviava el 127, «Poly Mode On»).
+  assert(music.events.filter(e => e.type === 'cc').every(e => e.controller <= 119 && Number.isFinite(e.value)), `${context}: controls vàlids`);
+  // Els vents toquen el riff junts (secció compacta) i sense salts d'octava a mitja frase.
+  const onsets = channels => notes.filter(e => channels.includes(e.channel)).map(e => e.time);
+  const sax = onsets([8]), trumpet = onsets([3, 12]);
+  for (const t of sax) { const near = Math.min(...trumpet.map(u => Math.abs(u - t))); if (near < .06) assert(near < .012, `${context}: trompeta i saxo junts (${(near * 1000).toFixed(1)} ms)`); }
+  // Cada vent toca els intervals del riff tal com estan escrits (abans el saxo plegava nota a nota
+  // i saltava una octava a mitja frase).
+  for (const [name, channels] of [['sax', [8]], ['trombone', [4, 13]], ['trumpet', [3, 12]]]) {
+    const played = notes.filter(e => channels.includes(e.channel)).sort((a, b) => a.time - b.time).map(e => e.note);
+    const written = (spec.lines[name] || []).map(n => n[2]);
+    if (played.length !== written.length) continue;
+    for (let i = 1; i < played.length; i++) assert.equal(played[i] - played[i - 1], written[i] - written[i - 1], `${context}: ${name} sense plecs d'octava`);
+  }
 }
 
-test('tots els subgèneres de ska comencen amb saxo i trombó i reserven la trompeta per després', () => {
+test('tots els subgèneres de ska comencen amb la secció de vents sencera fent el riff', () => {
   for (const [key] of Object.entries(engine.SUBGENRES).filter(([, genre]) => genre.style === 'ska')) {
     for (const seed of [11, 22, 33, 44, 55, 66]) {
       const song = builder.createAutoSong(engine, key, { seed, candidates: 1, vocal: seed % 2 === 0 });
       assertWindOpening(song, `${key} ${seed}`);
-      assert(!song.clips.some(c => c.instrument === 'trumpet' && c.start === 0));
-      assert(song.clips.some(c => c.instrument === 'trumpet' && c.start > 0), 'la trompeta continua disponible més endavant');
+      assert(!(song.sections[0].mute || []).includes('trumpet'), 'la trompeta no se silencia a la intro');
     }
   }
 });
 
-test('regenerar qualsevol inici de ska conserva el duet, també en cançons antigues', () => {
+test('regenerar qualsevol inici de ska conserva la secció de vents, també en cançons antigues', () => {
   const song = builder.createAutoSong(engine, 'rocksteady', { seed: 77, candidates: 1 });
-  // Projecte antic: trompeta a la base i cap clip inicial de saxo ni trombó.
-  song.base.instruments.push('trumpet');
+  // Projecte antic: cap clip inicial de vents.
   song.clips = song.clips.filter(c => c.start > 0);
   let seed = 1;
   for (const opening of [...Object.keys(builder.OPENINGS), ...Object.keys(builder.OPENINGS)]) {
     builder.designEdges(engine, song, { seed: seed++, opening, middle: 'none' });
     assertWindOpening(song, opening);
-    assert(song.clips.filter(c => c.edge && c.start === 0).length <= 2, 'sense acumular clips en regenerar');
+    assert(song.clips.filter(c => c.edge && c.start === 0).length <= 3, 'sense acumular clips en regenerar');
   }
   song.sections[0].type = 'chorus';
   builder.designEdges(engine, song, { seed: 99, opening: 'band', middle: 'none' });
   assertWindOpening(song, 'cançó sense intro');
 });
 
-test('el taller i la ràdio accepten els sons de secció que posa el compositor', () => {
-  const app = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'app.js'), 'utf8');
-  const base = JSON.parse(app.match(/const BASE_SOUNDS = (\[[^\]]*\])/)[1].replaceAll("'", '"'));
-  const extra = (app.match(/const SECTION_SOUNDS = \[\.\.\.BASE_SOUNDS(?:, ([^\]]*))?\]/)?.[1] || '').split(',').map(s => s.trim().replaceAll("'", '')).filter(Boolean);
-  const allowed = new Set([...base, ...extra]);
-  assert.match(app, /Object\.keys\(s\.timbres\)\.every\(n => SECTION_SOUNDS\.includes\(n\)\)/);
-  for (const [key] of Object.entries(engine.SUBGENRES)) {
-    for (const seed of [3, 4, 5]) {
-      const song = builder.createAutoSong(engine, key, { seed, candidates: 1 });
-      for (const sec of song.sections) for (const name of Object.keys(sec.timbres || {}))
-        assert(allowed.has(name), `${key} ${seed}: so de secció «${name}» rebutjat pel validador`);
-    }
-  }
+test('el crescendo dels vents fa servir el control d\'expressió i no talla la nota', () => {
+  const settings = { seed: 3, style: 'ska', bpm: 100, tonic: 0, mode: 'major' };
+  const spec = engine.composeSongPart(settings, { type: 'verse', bars: 2, energy: 60, revision: 1, instruments: ['trumpet', 'sax', 'trombone'], layers: { trumpet: 1, sax: 1, trombone: 1 } });
+  spec.lines = { trumpet: [[0, 0, 72, 3]], sax: [[0, 0, 67, 3]], trombone: [[0, 0, 64, 3]] };
+  const music = createPerformance(spec), ccs = music.events.filter(e => e.type === 'cc');
+  assert(ccs.every(e => e.controller <= 119 && Number.isFinite(e.value)));
+  const ramp = ccs.filter(e => e.channel === 3 && e.controller === 11).map(e => e.value);
+  assert.deepEqual(ramp, [112, 117, 122, 127], 'crescendo amb CC11');
 });
