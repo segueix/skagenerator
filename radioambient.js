@@ -2113,6 +2113,17 @@
                 verse: [['I', 'V', 'vi', 'IV'], ['vi', 'IV', 'I', 'V'], ['I', 'iii', 'IV', 'V']],
                 chorus: [['I', 'V', 'vi', 'IV'], ['IV', 'I', 'V', 'vi'], ['vi', 'IV', 'I', 'V']],
                 prechorus: [['IV', 'V', 'vi', 'V']], bridge: [['ii', 'IV', 'vi', 'V'], ['IV', 'V', 'iii', 'vi']] } } },
+        eastbay: { name: 'Punk californià (East Bay)', style: 'punk', bpm: [168, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [2, 'major'], [7, 'major'], [0, 'major'], [4, 'minor']],
+            groove: { drums: [0, 3, 5], bass: [3, 0, 4], guitar: [0, 1, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'real', bass: 'pick', guitar: 'clean' }, humanize: .5, countIn: true,
+            fx: { type: 'crunch', drive: 75, tone: 60 }, fxChoices: [['crunch', 75, 60], ['distortion', 55, 62], ['overdrive', 75, 58]],
+            description: 'El punk de l’East Bay dels 90 (a l’estil de Green Day i Rancid): acords amb crunch apagats a l’estrofa i oberts a la tornada, baix inquiet que fa melodia, tornades per cantar a cor i un pont a mig temps.',
+            harmony: { major: {
+                verse: [['I', 'V', 'vi', 'iii'], ['I', 'IV', 'V', 'IV'], ['I', 'bVII', 'IV', 'I'], ['I', 'V', 'IV', 'V']],
+                chorus: [['IV', 'V', 'I', 'vi'], ['IV', 'I', 'V', 'I'], ['I', 'V', 'vi', 'IV'], ['IV', 'V', 'I', 'I']],
+                prechorus: [['IV', 'V', 'I', 'vi'], ['ii', 'IV', 'V', 'V']], bridge: [['vi', 'IV', 'V', 'V'], ['IV', 'V', 'IV', 'V'], ['vi', 'V', 'IV', 'V']] },
+              minor: {
+                verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'bIII', 'bVII', 'iv']],
+                chorus: [['bVI', 'bVII', 'i', 'i'], ['bIII', 'bVII', 'iv', 'i']], bridge: [['iv', 'bVI', 'bVII', 'V']] } } },
         horrorpunk: { name: 'Horror punk', style: 'punk', bpm: [170, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [7, 'major'], [4, 'minor'], [9, 'minor'], [11, 'minor'], [2, 'minor']],
             groove: { drums: [0, 2, 4], bass: [0, 1], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, drumTune: -3, humanize: .65, countIn: true,
             fx: { type: 'horrorpunk', drive: 70, tone: 60 },

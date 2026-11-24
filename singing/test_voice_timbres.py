@@ -10,7 +10,7 @@ from matxa import VOICES
 SUBGENRES = {
     'jamaican', 'rocksteady', 'twotone', 'nutty', 'bossreggae', 'skaswing',
     'skapunk', 'punk77', 'oi', 'skatepunk', 'garage', 'postpunk',
-    'hardcore', 'poppunk', 'horrorpunk',
+    'hardcore', 'poppunk', 'horrorpunk', 'eastbay',
 }
 
 

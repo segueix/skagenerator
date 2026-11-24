@@ -21,6 +21,7 @@
     postpunk: V('fosca', { cloud: .8, snow: .2 }, -.3, .9, 60, 'warm', { low: 2, high: -3 }),
     hardcore: V('agressiva', { snow: 1 }, -.4, 1.35, 60, 'clean', { mid: 4, high: 1 }),
     poppunk: V('lluminosa', { sun: .7, rainbow: .3 }, .1, 1.15, 64, 'clean', { high: 3 }),
+    eastbay: V('nasal i descarada', { moon: .6, sun: .4 }, -.1, 1.2, 64, 'clean', { mid: 3, high: 1 }),
     horrorpunk: V('espectral', { cloud: .6, snow: .4 }, -.3, 1, 60, 'warm', { low: 3, high: -2 })
   };
   const voiceFor = subgenre => VOICES[subgenre] || VOICES.jamaican;

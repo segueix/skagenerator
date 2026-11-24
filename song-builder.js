@@ -129,6 +129,7 @@
     postpunk: { open: { riddim: .85, drums: .7, buildup: .7, fadein: .5, riff: .5 }, close: { cold: .75, fadeout: .7, ring: .6, breakdown: .5 }, silence: .65, stop: .5, color: .65 },
     hardcore: { open: { countin: .8, drums: .7, riff: .5 }, close: { cold: .9, hit: .7, ring: .4 }, silence: .8, stop: .75, color: .25 },
     poppunk: { open: { riff: .8, voice: .7, buildup: .6, drums: .6, countin: .4 }, close: { ring: .8, hit: .7, cold: .55, riff: .5, ritard: .4 }, silence: .7, stop: .6, color: .55 },
+    eastbay: { open: { riff: .8, countin: .75, drums: .65, voice: .55, buildup: .45 }, close: { hit: .8, ring: .75, cold: .7, riff: .45 }, silence: .65, stop: .7, color: .4 },
     horrorpunk: { open: { drums: .7, riff: .7, voice: .6, buildup: .6, fadein: .5 }, close: { ring: .8, cold: .7, ritard: .6, breakdown: .5 }, silence: .6, stop: .55, color: .65 }
   };
   const THRESHOLD = .55;
@@ -453,6 +454,14 @@
     if (key === 'postpunk') { const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; of('intro').forEach(s => { s.cymbals = 'hats'; }); }
     if (key === 'hardcore') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); const b = of('bridge')[0]; if (b) b.feel = { drums: .5, bass: .5 }; }
     if (key === 'poppunk') { of('prechorus').forEach(s => tempo(s, 1.04)); const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; }); }
+    // Punk californià (East Bay): el baix fa riff a l'estrofa i al pont, pont a mig temps, de vegades
+    // tornades a doble temps i, de vegades, l'última tornada un to amunt.
+    if (key === 'eastbay') {
+      for (const sec of sections) if (['verse', 'bridge'].includes(sec.type)) sec.groove = { ...(sec.groove || {}), bass: 3 };
+      if (r() < .35) of('chorus').forEach(s => { s.groove = { ...(s.groove || {}), drums: 3 }; });
+      const b = of('bridge')[0]; if (b) b.feel = { drums: .5 };
+      if (r() < .35) sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
+    }
     if (key === 'horrorpunk') { if (of('intro')[0]) of('intro')[0].feel = { drums: .5, bass: .5 }; const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
     // Punk: de vegades una segona bateria a contratemps a partir de la segona tornada.
     if (['punk77', 'hardcore', 'horrorpunk'].includes(key) && r() < .55) of('chorus').slice(1).forEach(s => { s.offbeat = true; });
@@ -594,6 +603,7 @@
           if (key === 'hardcore') add(sec, 'guitar2', { fx: { type: 'metal', drive: 80, tone: 50 } });
           if (key === 'horrorpunk') add(sec, 'organ', { revision: 3 });
           if (key === 'poppunk') add(sec, 'guitar3', { revision: 3, fx: { type: 'none', drive: 50, tone: 50 } });
+          if (key === 'eastbay') add(sec, 'guitar3', { line: 'answer' });
         }
         if (sec.type === 'outro') { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
       }

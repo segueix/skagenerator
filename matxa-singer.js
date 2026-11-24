@@ -39,6 +39,7 @@
     postpunk: T('Post-punk fosc', 'grau', 95, 5750, { body: .40, presence: -.20, grit: .08, slapMs: 120, slapLevel: .12 }),
     hardcore: T('Hardcore agressiu', 'pere', 180, 7200, { nasal: .15, presence: .36, grit: .65 }),
     poppunk: T('Pop-punk brillant', 'gina', 140, 9600, { body: .08, presence: .38, grit: .09 }),
+    eastbay: T('Punk californià nasal', 'pere', 135, 8400, { nasal: .30, presence: .36, grit: .24 }),
     horrorpunk: T('Horror punk espectral', 'pere', 100, 6200, { body: .38, nasal: .14, presence: .12, grit: .34, slapMs: 145, slapLevel: .18 })
   });
   const DEFAULT_TIMBRE = T('Matxa natural', 'grau');

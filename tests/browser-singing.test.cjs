@@ -22,8 +22,8 @@ function syllables(count, seconds = .18, gap = .07) {
 }
 const median = list => { const s = list.filter(v => v > 0).sort((a, b) => a - b); return s[s.length >> 1]; };
 
-test('timbres de l’acció per als quinze subgèneres, amb veus Matxa vàlides', () => {
-  assert.equal(Object.keys(M.TIMBRES).length, 15);
+test('timbres de l’acció per als setze subgèneres, amb veus Matxa vàlides', () => {
+  assert.equal(Object.keys(M.TIMBRES).length, 16);
   for (const t of Object.values(M.TIMBRES)) {
     assert(singer.ACCENTS[t.speaker], t.name);
     assert(!['quim', 'olga'].includes(t.speaker), 'veus que cantades s’entenen poc');

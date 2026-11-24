@@ -24,7 +24,7 @@ class Timbre:
     slap_level: float = 0.0
 
 
-# Un preset per als quinze subgèneres del motor. Diferenciem les veus de Matxa
+# Un preset per als setze subgèneres del motor. Diferenciem les veus de Matxa
 # i el color de la mescla, però no estirem la veu fins que perdi intel·ligibilitat.
 PRESETS = {
     'jamaican': Timbre('Ska jamaicà càlid', 'grau', 95, 8200, body=.24, presence=.10),
@@ -41,6 +41,7 @@ PRESETS = {
     'postpunk': Timbre('Post-punk fosc', 'grau', 95, 5750, body=.40, presence=-.20, grit=.08, slap_ms=120, slap_level=.12),
     'hardcore': Timbre('Hardcore agressiu', 'pere', 180, 7200, nasal=.15, presence=.36, grit=.65),
     'poppunk': Timbre('Pop-punk brillant', 'gina', 140, 9600, body=.08, presence=.38, grit=.09),
+    'eastbay': Timbre('Punk californià nasal', 'pere', 135, 8400, nasal=.30, presence=.36, grit=.24),
     'horrorpunk': Timbre('Horror punk espectral', 'pere', 100, 6200, body=.38, nasal=.14, presence=.12, grit=.34, slap_ms=145, slap_level=.18),
 }
 DEFAULT = Timbre('Matxa natural', 'grau')
