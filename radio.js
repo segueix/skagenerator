@@ -35,16 +35,22 @@
   if (!studio || !engine || !builder || !audioUtils || !sampleAudio || !$('radio')) return;
 
   const RATE = studio.RATE, GAP_SECONDS = 2, TAIL_SECONDS = 1.5;
-  const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', INSTRUMENTAL_KEY = 'radiospam.instrumental', HISTORY_MAX = 300;
+  const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', INSTRUMENTAL_KEY = 'radiospam.instrumental', FAVORITE_KEY = 'radiospam.subgenre', HISTORY_MAX = 300;
   // Ràdio instrumental: cançons sense veu (ni lletra, ni melodia de guia, ni Umidaji); els vents fan el tema.
   let instrumental = false;
   try { instrumental = localStorage.getItem(INSTRUMENTAL_KEY) === '1'; } catch {}
+  // Subgènere principal: si n'hi ha un d'escollit, sona una de cada dues cançons.
+  // Buit = aleatori. Només compta a les emissores que inclouen el seu estil.
+  let favorite = '';
+  try { favorite = localStorage.getItem(FAVORITE_KEY) || ''; } catch {}
+  let favoriteTurn = true;
   const hasVoice = song => Array.isArray(song?.clips) && song.clips.some(c => c.instrument === 'vocal');
   // De tant en tant torna a sonar una cançó amb 👍 de la mateixa emissora.
   const REPLAY_CHANCE = .3, REPLAY_EVERY = 3, REPLAY_MEMORY = 5;
   // «mix»: emissora Ska-Punk, que barreja cançons de totes dues.
   const STATIONS = { ska: 'Ska', punk: 'Punk', mix: 'Ska-Punk' };
   const inStation = style => station === 'mix' ? style === 'ska' || style === 'punk' : style === station;
+  const activeFavorite = () => engine.SUBGENRES[favorite] && inStation(engine.SUBGENRES[favorite].style) ? favorite : '';
   const NOTES = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const CANCELLED = Symbol('cancel·lat');
   const audio = $('radio-audio');
@@ -177,7 +183,14 @@
   }
   // filler: cal una cançó per omplir la cua mentre Umidaji en canta una altra (o no hi ha banc de veu).
   function chooseSong(filler = false) {
-    const history = readHistory(), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
+    const choice = pickSong(filler);
+    if (activeFavorite()) favoriteTurn = choice.song.settings.subgenre !== favorite;
+    return choice;
+  }
+  function pickSong(filler) {
+    // Torn del subgènere principal: només en sonen d'aquest; altrament, de qualsevol altre.
+    const main = activeFavorite(), fits = e => !main || (favoriteTurn ? e.subgenre === main : e.subgenre !== main);
+    const all = readHistory(), history = all.filter(fits), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
     // Amb prou repertori cantat, la cua s'omple amb cançons que t'han agradat i ja tenen veu.
     const repertoire = instrumental ? [] : history.filter(e => inStation(e.style) && e.vote === 1 && savedTakes.has(e.id));
     const rested = repertoire.filter(e => !queued.includes(e.id));
@@ -198,19 +211,20 @@
     // Cançó nova: subgènere a l'atzar (diferent de l'anterior) i estructura que s'allunya de les últimes.
     // A l'emissora Ska-Punk els dos estils s'alternen (tres de cada quatre vegades canvia d'estil).
     const lastStyle = engine.SUBGENRES[lastSubgenre]?.style;
-    const style = station !== 'mix' ? station : !lastStyle ? pickOne(['ska', 'punk']) : Math.random() < .75 ? (lastStyle === 'ska' ? 'punk' : 'ska') : lastStyle;
-    const keys = Object.keys(engine.SUBGENRES).filter(key => engine.SUBGENRES[key].style === style);
-    const fresh = keys.filter(key => key !== lastSubgenre), subgenre = pickOne(fresh.length ? fresh : keys);
+    const style = main && favoriteTurn ? engine.SUBGENRES[main].style : station !== 'mix' ? station : !lastStyle ? pickOne(['ska', 'punk']) : Math.random() < .75 ? (lastStyle === 'ska' ? 'punk' : 'ska') : lastStyle;
+    const keys = Object.keys(engine.SUBGENRES).filter(key => engine.SUBGENRES[key].style === style && (!main || favoriteTurn || key !== main));
+    const fresh = keys.filter(key => key !== lastSubgenre);
+    const subgenre = main && favoriteTurn ? main : pickOne(fresh.length ? fresh : keys);
     // Les que ja esperen torn també compten com a recents.
     const waitingSongs = queue.map(t => ({ subgenre: t.song.settings.subgenre, style: t.song.settings.style, song: t.song })).reverse();
-    const recent = [...waitingSongs, ...history.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created))].slice(0, 12)
+    const recent = [...waitingSongs, ...all.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created))].slice(0, 12)
       .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
     // Cada cançó nova porta lletra en català; la melodia de veu la segueix.
     // A la ràdio instrumental no n'hi ha: els vents porten el tema.
     const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: !instrumental, ...(instrumental ? {} : { autoLyrics: 'ca' }), seed: studio.newSeed(), vary: true, recent,
       // Títols de les últimes 150 cançons (i de les que esperen a la cua): no es repeteixen.
-      avoidTitles: [...queue.map(t => t.song.title), ...history.slice(0, 150).map(e => e.title)].filter(Boolean),
-      liked: history.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
+      avoidTitles: [...queue.map(t => t.song.title), ...all.slice(0, 150).map(e => e.title)].filter(Boolean),
+      liked: all.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
     // Punk: sobretot una guitarra, sovint dues i només excepcionalment tres.
     // A la ràdio instrumental hi ha d'haver guitarra solista: dues guitarres i, de vegades, tres.
     if (style === 'punk') { const dice = Math.random(); options.guitars = instrumental ? (dice < .65 ? 2 : 3) : dice < .5 ? 1 : dice < .92 ? 2 : 3; }
@@ -481,7 +495,7 @@
     studio.stop();
     generationController?.abort();
     parked?.controller.abort(); parked = null;
-    session++; station = style; waiting = true; failures = 0; played = []; sinceReplay = REPLAY_EVERY; lastSubgenre = null;
+    session++; station = style; waiting = true; failures = 0; played = []; sinceReplay = REPLAY_EVERY; lastSubgenre = null; favoriteTurn = true;
     dropTracks();
     // Mentre la ràdio està engegada, el navegador no ha de congelar la pàgina en segon pla.
     if (navigator.locks?.request && !releaseLock) navigator.locks.request('radiospam-on-air', () => new Promise(resolve => { releaseLock = resolve; })).catch(() => {});
@@ -890,6 +904,19 @@
   instrumentalToggle.addEventListener('change', () => {
     instrumental = instrumentalToggle.checked;
     try { localStorage.setItem(INSTRUMENTAL_KEY, instrumental ? '1' : '0'); } catch {}
+  });
+  // Selector del subgènere principal, agrupat per estil.
+  const favoriteSelect = $('radio-favorite');
+  for (const [style, label] of [['ska', 'Ska'], ['punk', 'Punk']]) {
+    const group = document.createElement('optgroup'); group.label = label;
+    for (const [key, info] of Object.entries(engine.SUBGENRES)) if (info.style === style) group.append(new Option(info.name, key));
+    favoriteSelect.append(group);
+  }
+  if (!engine.SUBGENRES[favorite]) favorite = '';
+  favoriteSelect.value = favorite;
+  favoriteSelect.addEventListener('change', () => {
+    favorite = favoriteSelect.value;
+    try { localStorage.setItem(FAVORITE_KEY, favorite); } catch {}
   });
   for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { filter = button.dataset.filter; renderHistory(); });
   $('radio-back').addEventListener('click', () => { if (historyOpen) openHistory(false); else leaveStation(); });
