@@ -58,3 +58,18 @@ test('regenerar qualsevol inici de ska conserva el duet, també en cançons anti
   builder.designEdges(engine, song, { seed: 99, opening: 'band', middle: 'none' });
   assertWindOpening(song, 'cançó sense intro');
 });
+
+test('el taller i la ràdio accepten els sons de secció que posa el compositor', () => {
+  const app = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'app.js'), 'utf8');
+  const base = JSON.parse(app.match(/const BASE_SOUNDS = (\[[^\]]*\])/)[1].replaceAll("'", '"'));
+  const extra = (app.match(/const SECTION_SOUNDS = \[\.\.\.BASE_SOUNDS(?:, ([^\]]*))?\]/)?.[1] || '').split(',').map(s => s.trim().replaceAll("'", '')).filter(Boolean);
+  const allowed = new Set([...base, ...extra]);
+  assert.match(app, /Object\.keys\(s\.timbres\)\.every\(n => SECTION_SOUNDS\.includes\(n\)\)/);
+  for (const [key] of Object.entries(engine.SUBGENRES)) {
+    for (const seed of [3, 4, 5]) {
+      const song = builder.createAutoSong(engine, key, { seed, candidates: 1 });
+      for (const sec of song.sections) for (const name of Object.keys(sec.timbres || {}))
+        assert(allowed.has(name), `${key} ${seed}: so de secció «${name}» rebutjat pel validador`);
+    }
+  }
+});

@@ -2,6 +2,7 @@
 // - VSCO 2 CE (CC0): trompeta i trombó, sostinguts i staccato, a partir dels WAV (i el piano vertical del banc addicional).
 // - FreePats (CC0): baixos, guitarra neta, saxo tenor i orgue, a partir dels seus SF2.
 // - Muldjord Kit (CC-BY 4.0): un kit GM nou amb quatre capes de força per cop.
+// - Orgue de rodes fòniques: sintetitzat aquí mateix (additiu), sense mostres externes.
 // Tot es remostreja a 32 kHz en mono i es retalla perquè la web pesi poc.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -316,6 +317,57 @@ async function buildDrums(bank, config, log) {
   log(`${config.name}: ${made.size} mostres, ${Object.keys(config.map).length} cops`);
 }
 
+// ── Orgue de rodes fòniques (tipus Hammond), sintetitzat ─────────────
+// Cada tirant és una sinusoide (16', 5 1/3', 8', 4', 2 2/3', 2', 1 3/5', 1 1/3', 1');
+// cada pas del tirant val 3 dB. Els harmònics per sobre de ~6 kHz es repleguen una
+// octava avall, com a les rodes de l'orgue real. Cada mostra té una part inicial amb
+// el clic de la tecla i la percussió (que s'apaga del tot) i un bucle exacte: totes
+// les sinusoides fan un nombre enter de cicles dins del bucle, sense cap salt.
+// L'altaveu rotatori (Leslie) s'aplica en reproduir (audio/render.mjs).
+const DRAWBAR_RATIOS = [.5, 1.5, 1, 2, 3, 4, 5, 6, 8];
+export function tonewheelNote(note, spec, rate = RATE) {
+  const target = 440 * 2 ** ((note - 69) / 12), unit = target / 4; // tots els harmònics són múltiples de f/4
+  const fold = ratio => { let r = ratio; while (target * r > 6000) r /= 2; while (target * r < 30) r *= 2; return r; };
+  const partials = [];
+  spec.drawbars.forEach((step, i) => { if (step > 0) partials.push([fold(DRAWBAR_RATIOS[i]), 10 ** (-(8 - step) * 3 / 20)]); });
+  const cycles = Math.max(1, Math.round(spec.loopSeconds * unit));
+  const loopLength = Math.round(cycles * rate / unit), actualUnit = cycles * rate / loopLength;
+  const cents = 1200 * Math.log2(actualUnit / unit);
+  const attack = Math.round(spec.attackSeconds * rate), length = attack + loopLength + 8;
+  const data = new Float32Array(length), w = 2 * Math.PI * actualUnit * 4 / rate;
+  const perc = spec.percussion, percRatio = perc ? fold(perc.harmonic) : 0;
+  let seed = note * 7919 + 1, lowpass = 0;
+  const noise = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x3fffffff - 1; };
+  const clickLength = Math.round(rate * .006), clickCut = 1 - Math.exp(-2 * Math.PI * 3500 / rate);
+  for (let i = 0; i < length; i++) {
+    let y = 0;
+    for (const [ratio, amp] of partials) y += amp * Math.sin(w * ratio * i);
+    if (perc && i < attack) y += perc.level * Math.exp(-i / (perc.decay * rate)) * Math.sin(w * percRatio * i);
+    if (spec.click && i < clickLength) { lowpass += clickCut * (noise() - lowpass); y += spec.click * lowpass * Math.exp(-i / (rate * .0015)) * 4; }
+    data[i] = y;
+  }
+  return { data, loop: [attack, attack + loopLength], cents: -Math.round(cents) };
+}
+export function buildTonewheel(bank, spec, log) {
+  const [first, last, step] = spec.notes, notes = [];
+  for (let n = first; n <= last; n += step) notes.push(n);
+  const made = notes.map(note => ({ note, ...tonewheelNote(note, spec) }));
+  // Mateix guany per a totes les notes: la part del bucle continua sent periòdica.
+  for (const m of made) level(m.data, RATE, spec.levelDb);
+  const instrument = new BasicInstrument(); instrument.name = 'Tonewheel organ';
+  made.forEach(({ note, data, loop, cents }, i) => {
+    const sample = makeSample(bank, `TW${note}`, data, RATE, note, cents, loop);
+    const zone = instrument.createZone(sample);
+    zone.keyRange = { min: i === 0 ? 0 : Math.floor((notes[i - 1] + note) / 2) + 1, max: i === notes.length - 1 ? 127 : Math.floor((note + notes[i + 1]) / 2) };
+    zone.setGenerator(GeneratorTypes.sampleModes, 1);
+    zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+  });
+  bank.addInstruments(instrument);
+  const preset = new BasicPreset(bank); preset.name = 'Tonewheel organ'; preset.program = spec.program; preset.bankMSB = spec.bank;
+  preset.createZone(instrument); bank.addPresets(preset);
+  log(`${spec.name}: ${made.length} mostres amb bucle`);
+}
+
 export async function buildRealInstruments(config, log = console.log) {
   SpessaLog.setLogLevel(false, false, false);
   await mkdir(CACHE, { recursive: true });
@@ -326,6 +378,7 @@ export async function buildRealInstruments(config, log = console.log) {
   own.soundBankInfo.name = 'Ska Generator real instruments';
   await buildVsco(own, config.vsco, log);
   await buildDrums(own, config.drums, log);
+  if (config.organ) buildTonewheel(own, config.organ, log);
   const banks = [own];
   for (const entry of config.freepats) banks.push(await importFreePats(entry, log));
   const merged = BasicSoundBank.mergeSoundBanks(...banks);

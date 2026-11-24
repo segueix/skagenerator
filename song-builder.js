@@ -247,11 +247,7 @@
         revision: options.revisions?.[instrument] || 1, generated: true, edge: true, ...extra });
       return true;
     };
-    if (!punk) {
-      for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
-      // La segona veu de vent usa saxo per defecte; aquí ha de sonar un trombó real.
-      first.timbres = { ...first.timbres, trombone: 'vsco' };
-    }
+    if (!punk) for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
     const outro = last.type === 'outro';
     const openings = {
       band: () => true,
@@ -364,10 +360,12 @@
     // Hardcore: el baix Growlybass saturava el limitador i enterrava les guitarres (comentaris de la ràdio):
     // baix 4 dB avall i guitarres rítmiques 2 dB amunt.
     if (key === 'hardcore') { settings.baseVolume = { drums: 0, bass: -4 }; settings.volumes = { ...settings.volumes, guitar: 2, guitar2: 2 }; }
-    if (!punk) {
+    if (!punk && vocal) {
       // Ska: el clarinet que fa la melodia de veu és el solista i ha de quedar per davant de la banda.
       settings.volumes = { ...(settings.volumes || {}), vocal: 3 };
     }
+    // Ska instrumental: el saxo i el trombó fan el tema i han de quedar per davant de la banda.
+    if (!punk && !vocal) settings.volumes = { ...(settings.volumes || {}), sax: 2, trombone: 1 };
     for (const option of ['drumTune', 'humanize', 'cymbals', 'countIn']) if (sg[option] !== undefined) settings[option] = sg[option];
     if (settings.swing === 0) delete settings.swing;
 
@@ -379,6 +377,12 @@
       : chooseForm({ key, style: sg.style, bpm, target, r, recent: options.recent || [], vary: options.vary !== false });
     let plan = form.plan;
     const formPenalty = form.penalty;
+    // Ska instrumental: sense veu, sempre hi ha com a mínim un solo (el pont passa a ser-ho).
+    const instrumental = !vocal && !punk;
+    if (instrumental && !plan.some(([type, , role]) => type === 'solo' && !role)) {
+      const bridge = plan.findIndex(([type, , role]) => type === 'bridge' && !role);
+      if (bridge >= 0) plan = plan.map((entry, i) => i === bridge ? ['solo', ...entry.slice(1)] : entry);
+    }
 
     const id = `auto-${seed.toString(36)}`, sections = [];
     let at = 0;
@@ -464,9 +468,53 @@
     const excluded = excludedBy({ settings });
     const add = (sec, instrument, extra = {}) => {
       if (!punk && sec === sections[0] && instrument === 'trumpet') return;
+      // Cada instrument, una sola vegada per secció (la primera capa és la que mana).
+      if (layersOf.some(layer => layer.sec === sec && layer.instrument === instrument)) return;
       if (!base.includes(instrument) && !excluded.has(instrument)) layersOf.push({ sec, instrument, ...extra });
     };
     let verses = 0;
+    // Ska instrumental (com els Skatalites): un vent toca el tema A a les estrofes i un altre el
+    // tema B a les tornades, amb riffs i respostes dels altres vents; els solos s'alternen i, si
+    // són llargs, dos solistes s'hi intercanvien la meitat.
+    // (Només es fan tirades a l'atzar si és instrumental: les cançons amb veu no canvien.)
+    const headA = !instrumental ? null : mellow ? 'trumpet' : key === 'nutty' ? 'sax' : pick(['sax', 'trumpet']);
+    const headB = mellow ? 'trumpet' : headA === 'sax' ? 'trumpet' : 'sax';
+    const soloists = instrumental ? pick([['sax', 'trumpet', 'trombone'], ['trumpet', 'sax', 'trombone'], ['trombone', 'sax', 'trumpet']]) : [];
+    let solos = 0;
+    const instrumentalSka = sec => {
+      if (sec.type === 'intro' || sec.type === 'outro') {
+        if (sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, headA); }
+        add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' });
+      }
+      if (sec.type === 'verse') {
+        verses++;
+        add(sec, headA);
+        if (key !== 'nutty') add(sec, 'organ', { revision: 2 });
+        if (verses > 1) add(sec, 'trombone', { line: 'answer' });
+      }
+      if (sec.type === 'prechorus') { add(sec, headA); add(sec, 'trombone', { line: 'answer' }); }
+      if (sec.type === 'chorus') {
+        add(sec, headB);
+        if (!mellow) add(sec, headB === 'sax' ? 'trumpet' : 'sax', { line: 'riff' });
+        if (mellow || sec === lastChorus) add(sec, 'trombone', { line: 'riff' });
+        if (key === 'nutty') add(sec, 'organ', { revision: 1 });
+        if (key === 'skapunk') add(sec, 'guitar2', { fx: { type: 'distortion', drive: 65, tone: 55 }, revision: 2 });
+      }
+      if (sec.type === 'solo') {
+        const first = soloists[solos % soloists.length], second = soloists[(solos + 1) % soloists.length];
+        solos++;
+        add(sec, first);
+        // Solo llarg: a la meitat entra el segon solista i el primer calla.
+        if (sec.bars >= 16) { add(sec, second); const half = sec.bars / 2; sec.exit = { ...(sec.exit || {}), [first]: half }; sec.entrance = { ...(sec.entrance || {}), [second]: half }; }
+        add(sec, 'organ', { revision: 2 });
+      }
+      if (sec.type === 'bridge') {
+        if (key === 'rocksteady') add(sec, 'synthPad', { revision: 1 });
+        add(sec, 'trombone');
+        add(sec, headA, { line: 'answer' });
+        if (key === 'skapunk') add(sec, 'guitar3', { revision: 4, fx: { type: 'crunch', drive: 40, tone: 50 } });
+      }
+    };
     for (const sec of sections) {
       // Amb lletra, canten les seccions que en tenen; sense, les estrofes, pretornades i tornades.
       const sing = sheet.length ? !!sec.lyrics : vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
@@ -478,7 +526,8 @@
       }
       if (role === 'breakdown' && punk) { add(sec, 'guitar2', { revision: 2 }); continue; }
       if (sing) add(sec, 'vocal', register ? { register } : {});
-      if (!punk) {
+      if (instrumental) instrumentalSka(sec);
+      else if (!punk) {
         if (sec.type === 'intro' || sec.type === 'outro') { if (sec.type === 'outro') add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' }); }
         // Nutty: el piano ja omple l'estrofa i hi respon el saxo; l'orgue entra a la tornada.
         if (sec.type === 'verse') { verses++; if (key !== 'nutty') add(sec, 'organ', { revision: 2 }); if (verses > 1) add(sec, key === 'nutty' ? 'sax' : 'trumpet', { line: 'answer' }); }
@@ -583,7 +632,10 @@
     const words = TITLES[key === 'horrorpunk' ? 'horror' : punk ? 'punk' : 'ska'];
     // Amb lletra, el títol és el primer vers de la tornada (o de la cançó).
     const hook = (sections.find(s => s.type === 'chorus' && s.lyrics) || sections.find(s => s.lyrics))?.lyrics.split('\n')[0].replace(/[.,;:!?¡¿«»"]+$/g, '').trim();
-    const title = hook ? (hook[0].toUpperCase() + hook.slice(1)).slice(0, 60) : `${pick(words[0])} ${pick(words[1])}`;
+    // Sense lletra, el títol es tria evitant els de les últimes cançons.
+    const taken = new Set((options.avoidTitles || []).map(t => String(t).toLowerCase()));
+    let title = hook ? (hook[0].toUpperCase() + hook.slice(1)).slice(0, 60) : `${pick(words[0])} ${pick(words[1])}`;
+    for (let tries = 0; !hook && taken.has(title.toLowerCase()) && tries < 40; tries++) title = `${pick(words[0])} ${pick(words[1])}`;
     const song = { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
     // Si alguna secció s'alenteix, s'hi afegeix un instrument que sosté el so.
     reinforceSlowdowns(song);

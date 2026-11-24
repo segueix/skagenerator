@@ -2,7 +2,9 @@
 
 - GeneralUser GS 2.0.3, S. Christian Collins: https://schristiancollins.com/generaluser.php
   Font fixada: https://github.com/mrbumpy409/GeneralUser-GS/tree/684543d5e5efaef08d02be50dcda8d552478fa60
-  Banc modificat: selecció de guitarres, baixos, trompeta, trombó (i les seves variacions GS), trompeta amb sordina, saxo tenor, orgue, Synth Bass 1, Saw Wave, Warm Pad i kits Standard 1, Room, Power, Electronic, Jazz i Brush. S’han eliminat els altres presets i les mostres no utilitzades. Es conserven els moduladors i les mostres dels instruments seleccionats. Llicència completa a GeneralUser-GS-LICENSE.txt.
+  Banc modificat: selecció de guitarres, baixos, trompeta, trombó (i les seves variacions GS), trompeta amb sordina, saxo tenor, Synth Bass 1, Saw Wave, Warm Pad i kits Standard 1, Room, Power, Electronic, Jazz i Brush. S’han eliminat els altres presets i les mostres no utilitzades. Es conserven els moduladors i les mostres dels instruments seleccionats. Llicència completa a GeneralUser-GS-LICENSE.txt.
+
+L’orgue no prové de cap banc extern: és un orgue de rodes fòniques sintetitzat pel build del projecte (`scripts/real-instruments.mjs`).
 
 ## Instruments gravats nota a nota
 

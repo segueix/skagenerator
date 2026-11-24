@@ -189,6 +189,47 @@ export function createColorFx(type, sampleRate) {
     }
   };
 }
+// ── Altaveu rotatori (Leslie) per a l'orgue ──────────────────────────
+// Preamplificador de vàlvules (saturació suau) → cruïlla a 800 Hz → botzina (aguts)
+// i tambor (greus) que giren a velocitats diferents. Cada rotor fa variar el volum
+// (la boca s'acosta i s'allunya del micròfon) i el retard (efecte Doppler). Els dos
+// micròfons (esquerra i dreta) són a angles diferents: el so gira d'un costat a l'altre.
+// 'slow' = coral (~0,8 Hz), 'fast' = trèmolo (~6,7 Hz).
+export const LESLIE_SPEEDS = { slow: { horn: .83, drum: .7 }, fast: { horn: 6.7, drum: 5.9 } };
+export function createLeslie(speed, sampleRate) {
+  const rates = LESLIE_SPEEDS[speed];
+  if (!rates) return null;
+  const size = 2048, mask = size - 1, drive = 1.8, norm = 1 / Math.tanh(drive);
+  const horn = { rate: rates.horn, depth: .5, delay: .00045 * sampleRate, base: .0012 * sampleRate };
+  const drum = { rate: rates.drum, depth: .22, delay: .00012 * sampleRate, base: .0006 * sampleRate };
+  const side = angle => ({
+    angle, low: biquad('lowpass', 800, 0, sampleRate, .707), hornHp: biquad('highpass', 800, 0, sampleRate, .707),
+    hornBuffer: new Float32Array(size), drumBuffer: new Float32Array(size), write: 0, phaseHorn: 0, phaseDrum: 0
+  });
+  // La botzina i el tambor giren en sentits oposats; el micròfon dret és a 110°.
+  const sides = [side(0), side(Math.PI * .61)];
+  const read = (buffer, write, delay) => {
+    const at = write - delay, i = Math.floor(at), f = at - i;
+    return buffer[i & mask] * (1 - f) + buffer[(i + 1) & mask] * f;
+  };
+  return {
+    process(index, x) {
+      const s = sides[index];
+      const pre = Math.tanh(x * drive) * norm * .9 + x * .1;
+      const low = run(s.low, pre), high = run(s.hornHp, pre);
+      s.hornBuffer[s.write & mask] = high; s.drumBuffer[s.write & mask] = low;
+      const h = s.phaseHorn + s.angle, d = -s.phaseDrum + s.angle;
+      const hornOut = read(s.hornBuffer, s.write, horn.base + horn.delay * Math.sin(h)) * (1 - horn.depth * (1 - Math.cos(h)) / 2);
+      const drumOut = read(s.drumBuffer, s.write, drum.base + drum.delay * Math.sin(d)) * (1 - drum.depth * (1 - Math.cos(d)) / 2);
+      s.write++;
+      s.phaseHorn += 2 * Math.PI * horn.rate / sampleRate; s.phaseDrum += 2 * Math.PI * drum.rate / sampleRate;
+      if (s.phaseHorn > 2 * Math.PI) s.phaseHorn -= 2 * Math.PI;
+      if (s.phaseDrum > 2 * Math.PI) s.phaseDrum -= 2 * Math.PI;
+      // La modulació treu de mitjana uns 2-3 dB: es compensa.
+      return (hornOut * 1.35 + drumOut * 1.12);
+    }
+  };
+}
 const colorFor = (score, patch) => patch.clipColor ?? score.colors?.[patch.instrument];
 
 // Efecte d'un canal: el de l'instrument, amb el retoc propi de la segona presa d'una guitarra doblada.
@@ -236,8 +277,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       const totalTrim = (patch.gainDb || 0) + baseVolumeDb(score, patch.instrument);
       const user = totalTrim ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + totalTrim } : score.mix[patch.instrument];
       const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, user, sampleRate);
-      // Cadena: efecte de guitarra → efecte de color → equalitzador.
-      const chain = [createGuitarFx(fxFor(score, patch), sampleRate), createColorFx(colorFor(score, patch), sampleRate), eq].filter(Boolean);
+      // Cadena: efecte de guitarra → altaveu rotatori (orgue) → efecte de color → equalitzador.
+      const chain = [createGuitarFx(fxFor(score, patch), sampleRate), createLeslie(patch.leslie, sampleRate), createColorFx(colorFor(score, patch), sampleRate), eq].filter(Boolean);
       if (chain.length) eqs.set(patch.channel, chain.length === 1 ? chain[0] : { process: (side, x) => chain.reduce((y, stage) => stage.process(side, y), x) });
     }
     const outputs = Array.from({ length: synth.midiChannels.length }, (_, channel) => eqs.has(channel) ? [new Float32Array(BLOCK), new Float32Array(BLOCK)] : dummy);

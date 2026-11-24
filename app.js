@@ -54,7 +54,7 @@
     bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['growly', 'Jazz Bass directe · gravat (Growlybass)'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
     drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['rusty', 'Big Rusty · gravada, greu (bombo de 24")'], ['club', 'Kit de club de jazz · gravat (Virtuosity)'], ['lofi', 'Kit lo-fi, so de disc antic · gravat'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
     trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
-    trombone: [['auto', 'Saxo tenor · gravat (recomanat)'], ['vsco', 'Trombó · gravat (VSCO)'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
+    trombone: [['auto', 'Trombó · gravat (recomanat)'], ['vsco', 'Trombó · gravat (VSCO)'], ['sax', 'Saxo tenor · gravat'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
     vocal: [['auto', 'Clarinet · gravat (recomanat)'], ['oohs', 'Veu «uh» GM'], ['flute', 'Flauta GM'], ['ocarina', 'Ocarina GM'], ['clarinetGm', 'Clarinet GM']]
   };
   const defaultTimbres = () => ({ guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto' });
@@ -94,8 +94,10 @@
     organ: ['Contratemps', '«Bubble»', 'Sostingut', 'Blanques', 'Síncopa'],
     piano: ['Contratemps', '«Bounce» de music-hall', 'Boogie', 'Acords llargs', 'Corxeres martellejades'],
     synthPad: ['Sostingut', 'Blanques', 'Contratemps', 'Negres', 'Síncopa'] };
+  // El compositor també fixa el trombó real a l'obertura de ska (duet de saxo i trombó).
+  const SECTION_SOUNDS = [...BASE_SOUNDS, 'trombone'];
   const validBaseEdits = s => (s.mute === undefined || Array.isArray(s.mute) && s.mute.length <= Object.keys(INSTRUMENTS).length && new Set(s.mute).size === s.mute.length && s.mute.every(n => Object.hasOwn(INSTRUMENTS, n)))
-    && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => BASE_SOUNDS.includes(n)))
+    && (s.timbres === undefined || validTimbres(s.timbres) && Object.keys(s.timbres).every(n => SECTION_SOUNDS.includes(n)))
     && (s.patterns === undefined || !!s.patterns && typeof s.patterns === 'object' && !Array.isArray(s.patterns)
       && Object.entries(s.patterns).every(([n, i]) => Object.hasOwn(BASE_PATTERNS, n) && Number.isInteger(i) && i >= 0 && i < 5));
   const validGroove = (input, style) => input === undefined || !!input && typeof input === 'object' && !Array.isArray(input)
