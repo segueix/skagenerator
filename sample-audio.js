@@ -4,7 +4,7 @@
   const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.3-urban', base).href;
   // Bateries, baixos i piano gravats addicionals: fitxer a part que només es baixa si cal.
   const extraURL = new URL('assets/extra-instruments.sf2?v=20261111-extra', base).href;
-  const EXTRA = { drums: ['rusty', 'club', 'lofi', 'surdo3'], bass: ['growly'] };
+  const EXTRA = { drums: ['rusty', 'club', 'lofi', 'surdo3', 'batucada'], bass: ['growly'] };
   // Guitarres gravades del banc de guitarres (assets/guitar-instruments.sf2).
   const GUITAR_SOUNDS = ['jazz', 'direct', 'dist1', 'dist2'];
   const guitarURL = new URL('assets/guitar-instruments.sf2?v=20261125-guitars', base).href;

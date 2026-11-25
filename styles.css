@@ -639,3 +639,9 @@ body.recording .transport-play { background: #ef4444; }
 .lyrics-preview li span { color: var(--muted); overflow-wrap: anywhere; }
 .lyrics-preview li select { width: auto; min-width: 140px; flex: 0 0 auto; }
 .lyrics-preview li span { flex: 1 1 220px; }
+
+#batucada-editor { min-width: 0; }
+#batucada-steps { overflow-x: auto; }
+#batucada-steps > div { display: grid; grid-template-columns: 5.5rem repeat(16, minmax(1.5rem, 1fr)); align-items: center; min-height: 1.8rem; }
+#batucada-steps input { width: 1rem; height: 1rem; margin: 0 auto; cursor: pointer; }
+#batucada-steps input:nth-of-type(4n+1) { outline: 1px solid currentColor; outline-offset: 2px; }

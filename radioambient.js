@@ -1893,6 +1893,42 @@
             [[2, 38, 92], [2.25, 48, 92], [2.5, 48, 96], [2.75, 45, 96], [3, 45, 100], [3.25, 43, 100], [3.5, 43, 106], [3.75, 41, 110]],
             [[3, 38, 90], [3.125, 38, 76], [3.25, 38, 94], [3.375, 38, 80], [3.5, 38, 100], [3.625, 38, 86], [3.75, 38, 108], [3.875, 38, 92]]]
     };
+    const BATUCADA = [
+        { note: 36, name: 'Surdo 1', steps: '0000100000001000' },
+        { note: 41, name: 'Surdo 2', steps: '1000000010000000' },
+        { note: 45, name: 'Surdo 3', steps: '0001000000100010' },
+        { note: 38, name: 'Caixa', steps: '1001101010011010' },
+        { note: 50, name: 'Repique', steps: '0000001000000001' },
+        { note: 54, name: 'Tamborim', steps: '1001001000101000' },
+        { note: 67, name: 'Agogô', steps: '1000001000001000' },
+        { note: 69, name: 'Chocalho', steps: '1010101010101010' },
+        { note: 78, name: 'Cuíca', steps: '0000000100000000' }
+    ];
+
+    function validBatucadaPattern(pattern) {
+        return Array.isArray(pattern) && pattern.length === BATUCADA.length
+            && pattern.every(row => typeof row === 'string' && /^[01]{16}$/.test(row));
+    }
+    function composeBatucada(pattern, bars, energy, part, stopAt, beat) {
+        const rows = pattern ?? BATUCADA.map(piece => piece.steps);
+        if (!validBatucadaPattern(rows)) throw new Error('Patró de batucada no vàlid');
+        const line = [];
+        for (let bar = 0; bar < bars; bar++) {
+            if (bar === 0 && part.countIn) {
+                for (let t = 0; t < 4; t++) line.push([bar, t, 50, 76]);
+                continue;
+            }
+            for (let step = 0; step < 16; step++) {
+                if ((bar * 4 + step / 4) * beat >= stopAt) break;
+                rows.forEach((row, i) => {
+                    if (row[step] === '1') line.push([bar, step / 4, BATUCADA[i].note,
+                        Math.round(55 + energy * .4 + (step % 4 === 0 ? 12 : 0))]);
+                });
+            }
+        }
+        return line;
+    }
+
     function composeDrumLine(styleName, index, type, bars, energy, options = {}) {
         const g = DRUM_GROOVES[styleName][index], line = [];
         // Mida del redoble final segons el que ve després.
@@ -2935,6 +2971,9 @@
             const from = part.entrance?.[name] ?? 0, to = part.exit?.[name] ?? bars;
             audibleRanges[name] = (audibleRanges[name] || [[0, bars]]).map(([a, b]) => [Math.max(a, from), Math.min(b, to)]).filter(([a, b]) => a < b);
         }
+        if ((part.timbres?.drums ?? settings.timbres?.drums) === 'batucada') {
+            drumOptions.batucadaLine = composeBatucada(settings.batucadaPattern, bars, energy, part, drumOptions.stopAt ?? Infinity, 60 / tempo);
+        }
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             ranges: audibleRanges, guitarTakes: guitarTakes.map(take => ({ ...take })),
@@ -3044,7 +3083,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, validBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
