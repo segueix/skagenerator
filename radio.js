@@ -35,7 +35,7 @@
   if (!studio || !engine || !builder || !audioUtils || !sampleAudio || !$('radio')) return;
 
   const RATE = studio.RATE, GAP_SECONDS = 2, TAIL_SECONDS = 1.5;
-  const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', INSTRUMENTAL_KEY = 'radiospam.instrumental', FAVORITE_KEY = 'radiospam.subgenre', HISTORY_MAX = 300;
+  const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', INSTRUMENTAL_KEY = 'radiospam.instrumental', FAVORITE_KEY = 'radiospam.subgenre', LEAD_KEY = 'radiospam.leadGuitar', HISTORY_MAX = 300;
   // Ràdio instrumental: cançons sense veu (ni lletra, ni melodia de guia, ni Umidaji); els vents fan el tema.
   let instrumental = false;
   try { instrumental = localStorage.getItem(INSTRUMENTAL_KEY) === '1'; } catch {}
@@ -44,6 +44,9 @@
   let favorite = '';
   try { favorite = localStorage.getItem(FAVORITE_KEY) || ''; } catch {}
   let favoriteTurn = true;
+  // Punk: les cinc guitarres solistes van per torns, una cançó rere l'altra (es recorda entre sessions).
+  let leadTurn = 0;
+  try { leadTurn = Number(localStorage.getItem(LEAD_KEY)) || 0; } catch {}
   const hasVoice = song => Array.isArray(song?.clips) && song.clips.some(c => c.instrument === 'vocal');
   // De tant en tant torna a sonar una cançó amb 👍 de la mateixa emissora.
   const REPLAY_CHANCE = .3, REPLAY_EVERY = 3, REPLAY_MEMORY = 5;
@@ -228,6 +231,11 @@
     // Punk: sobretot una guitarra, sovint dues i només excepcionalment tres.
     // A la ràdio instrumental hi ha d'haver guitarra solista: dues guitarres i, de vegades, tres.
     if (style === 'punk') { const dice = Math.random(); options.guitars = instrumental ? (dice < .65 ? 2 : 3) : dice < .5 ? 1 : dice < .92 ? 2 : 3; }
+    // Si hi ha guitarra solista (dues guitarres o més), li toca la guitarra següent de la rotació.
+    if (style === 'punk' && options.guitars > 1) {
+      options.leadGuitar = leadTurn % (builder.PUNK_LEAD_GUITARS?.length || 5);
+      leadTurn++; try { localStorage.setItem(LEAD_KEY, String(leadTurn)); } catch {}
+    }
     const song = studio.validateSong(builder.createAutoSong(engine, subgenre, options));
     lastSubgenre = subgenre;
     return { id: studio.uid(), replay: false, song };

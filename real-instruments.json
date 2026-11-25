@@ -216,6 +216,55 @@
       "levelDb": -14
     }
   ],
+  "guitars": [
+    {
+      "name": "Electric Guitar FSBS distorted 1 (bridge)",
+      "author": "FreePats",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 29,
+      "maxSeconds": 2.2,
+      "keepSample": "^[A-G]#?\\d_s\\d_01(_L)?$",
+      "levelDb": -9.5,
+      "url": "https://github.com/freepats/electric-guitar-FSBS-dist1/releases/download/2022-09-11/EGuitarFSBS-dist1-SF2-20220911.7z",
+      "sha256": "4f0859f02c3c001059b73c98f9300bbf34c6490e6b235d60c8356291a38313d0"
+    },
+    {
+      "name": "Electric Guitar FSBS distorted 2 (bridge)",
+      "author": "FreePats",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 30,
+      "maxSeconds": 2.2,
+      "keepSample": "^[A-G]#?\\d_s\\d_01(_L)?$",
+      "levelDb": -10.5,
+      "url": "https://github.com/freepats/electric-guitar-FSBS-dist2/releases/download/2022-09-11/EGuitarFSBS-dist2-SF2-20220911.7z",
+      "sha256": "0ed99135d955940c1200e09ca9e36e261dfebbe8767ae58da6f298fe29fdd146"
+    },
+    {
+      "name": "Electric Guitar FSBS jazz bridge (small)",
+      "author": "FreePats",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 26,
+      "maxSeconds": 2.5,
+      "url": "https://github.com/freepats/electric-guitar-FSBS-jazz/releases/download/2026-08-07/EGuitarFSBS-jazz-bridge-small-SF2-20260807.7z",
+      "sha256": "d2090931a0339ba6b60c6713bc6d701393d3a420c20e56ad69a8d50de645135d",
+      "levelDb": -9.5
+    },
+    {
+      "name": "Electric Guitar FSBS direct (bridge)",
+      "author": "FreePats",
+      "license": "CC0 1.0",
+      "bank": 2,
+      "program": 28,
+      "maxSeconds": 2.2,
+      "keepSample": "^[A-G]#?\\d_s\\d_01$",
+      "levelDb": -10,
+      "url": "https://github.com/freepats/electric-guitar-FSBS-direct/releases/download/2022-09-11/EGuitarFSBS-direct-SF2-20220911.7z",
+      "sha256": "dcdadeab31c7aff67ace2556ede4021897743b7ae88c187f2d12988483403295"
+    }
+  ],
   "drums": {
     "name": "Muldjord Kit",
     "author": "Lars Muldjord",

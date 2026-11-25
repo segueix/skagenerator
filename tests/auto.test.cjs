@@ -522,3 +522,24 @@ test('ska: respostes variades a la segona estrofa i a l’última tornada, i de 
   assert(varied >= 10, `respostes variades: ${varied}`);
   assert(modulated >= 2 && modulated <= 16, `ponts al IV grau: ${modulated}`);
 });
+
+test('punk: cinc guitarres solistes gravades que es poden triar per torns', () => {
+  assert.equal(builder.PUNK_LEAD_GUITARS.length, 5);
+  assert.equal(new Set(builder.PUNK_LEAD_GUITARS.map(g => g.sound)).size, 5);
+  const leadOf = song => song.clips.find(c => c.instrument === 'guitar3' && c.sound)?.sound;
+  // Mateixa cançó (mateixa llavor) amb cada guitarra: només canvia la solista.
+  const base = builder.createAutoSong(engine, 'eastbay', { seed: 99, guitars: 3, leadGuitar: 0 });
+  for (const [i, guitar] of builder.PUNK_LEAD_GUITARS.entries()) {
+    const song = builder.createAutoSong(engine, 'eastbay', { seed: 99, guitars: 3, leadGuitar: i });
+    assert.equal(leadOf(song), guitar.sound);
+    assert.equal(song.settings.fx.guitar3.type, guitar.fx[0]);
+    assert.deepEqual(song.sections.map(s => s.type + s.bars), base.sections.map(s => s.type + s.bars));
+  }
+  // Les guitarres gravades del banc a part tenen so a la interpretació (banc 2).
+  const presets = { jazz: 26, direct: 28, dist1: 29, dist2: 30 };
+  for (const [sound, program] of Object.entries(presets)) {
+    const spec = engine.composeSongPart({ seed: 5, style: 'punk', bpm: 180, tonic: 4, mode: 'major' }, { type: 'chorus', bars: 2, energy: 80, revision: 1, instruments: ['guitar3'], timbres: { guitar3: sound } });
+    const patch = createPerformance(spec).channels.find(c => c.channel === 15);
+    assert.deepEqual([patch.bank, patch.program], [2, program], sound);
+  }
+});

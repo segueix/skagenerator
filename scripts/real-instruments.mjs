@@ -253,6 +253,30 @@ async function importFreePats(entry, log) {
     instrument.globalZone.setGenerator(GeneratorTypes.sampleModes, null);
     for (const zone of instrument.zones) zone.setGenerator(GeneratorTypes.sampleModes, null);
   }
+  // Bancs grans (diverses capes de força, repeticions i estèreo per nota): només una gravació
+  // per tram de notes, en mono, perquè la web no pesi massa. «keepSample» és una expressió
+  // regular sobre el nom de la mostra; es queda la zona de força més alta de cada tram.
+  if (entry.keepSample) {
+    const wanted = new RegExp(entry.keepSample);
+    for (const instrument of bank.instruments) {
+      const best = new Map();
+      instrument.zones.forEach((zone, index) => {
+        if (!wanted.test(zone.sample.name)) return;
+        const key = `${zone.keyRange.min}-${zone.keyRange.max}`, current = best.get(key);
+        if (!current || zone.velRange.max > instrument.zones[current].velRange.max) best.set(key, index);
+      });
+      const keep = new Set(best.values());
+      for (let index = instrument.zones.length - 1; index >= 0; index--) if (!keep.has(index)) instrument.deleteZone(index, true);
+      for (const zone of instrument.zones) {
+        zone.velRange = { min: 0, max: 127 };
+        zone.setGenerator(GeneratorTypes.pan, null);
+        zone.setGenerator(GeneratorTypes.initialAttenuation, null);
+      }
+      instrument.globalZone.setGenerator(GeneratorTypes.pan, null);
+    }
+    bank.removeUnusedElements();
+    for (const sample of bank.samples) sample.unlinkSample();
+  }
   const rate = entry.rate || RATE;
   for (const sample of bank.samples) {
     const data = trim(resample(sample.getAudioData(), sample.sampleRate, rate), rate, entry.maxSeconds, 1);
@@ -366,6 +390,22 @@ export function buildTonewheel(bank, spec, log) {
   const preset = new BasicPreset(bank); preset.name = 'Tonewheel organ'; preset.program = spec.program; preset.bankMSB = spec.bank;
   preset.createZone(instrument); bank.addPresets(preset);
   log(`${spec.name}: ${made.length} mostres amb bucle`);
+}
+
+// Guitarres solistes gravades (FreePats FSBS): banc a part que la web només baixa quan cal.
+export async function buildGuitarInstruments(entries, log = console.log) {
+  SpessaLog.setLogLevel(false, false, false);
+  await mkdir(CACHE, { recursive: true });
+  const fingerprint = sha(JSON.stringify(entries) + await readFile(new URL(import.meta.url)));
+  const cached = join(CACHE, `guitars-${fingerprint.slice(0, 16)}.sf2`);
+  try { return new Uint8Array(await readFile(cached)); } catch { /* Es construeix. */ }
+  const banks = [];
+  for (const entry of entries) banks.push(await importFreePats(entry, log));
+  const merged = BasicSoundBank.mergeSoundBanks(...banks);
+  merged.soundBankInfo.name = 'Ska Generator lead guitars';
+  const binary = new Uint8Array(merged.writeSF2());
+  await writeFile(cached, binary);
+  return binary;
 }
 
 export async function buildRealInstruments(config, log = console.log) {

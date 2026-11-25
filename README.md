@@ -395,6 +395,7 @@ Per defecte sonen instruments gravats per músics, nota a nota i amb diverses di
 | Saxo tenor | FreePats (amb mostres de VSCO) | CC0 |
 | Baix amb dits i amb pua | FreePats, Yamaha RBX d’Andrea Biasior | CC0 |
 | Guitarra neta | FreePats FSBS (pont) | CC0 |
+| Guitarres solistes del punk (distorsionada 1 i 2, directa, jazz) | FreePats FSBS (pont) | CC0 |
 | Bateria | Muldjord Kit, de Lars Muldjord (via FreePats) | CC BY 4.0 |
 | Bateria greu (bombo de 24", toms de 14–22") | Big Rusty Drums, Karoryfer | CC0 |
 | Kit de club de jazz i kit lo-fi | Virtuosity Drums | CC0 |

@@ -25,6 +25,7 @@ let client = await readFile('dist/sample-audio.js', 'utf8');
 client = client.replace(/sample-worker\.js\?v=[^']+/, `sample-worker.js?v=${await hash('sample-worker.js')}`);
 client = client.replace(/generaluser-ska-punk\.sf2\?v=[^']+/, `generaluser-ska-punk.sf2?v=${await hash('assets/generaluser-ska-punk.sf2')}`);
 client = client.replace(/extra-instruments\.sf2\?v=[^']+/, `extra-instruments.sf2?v=${await hash('assets/extra-instruments.sf2')}`);
+client = client.replace(/guitar-instruments\.sf2\?v=[^']+/, `guitar-instruments.sf2?v=${await hash('assets/guitar-instruments.sf2')}`);
 await writeFile('dist/sample-audio.js', client);
 // El worker de cant carrega WORLD i el motor amb la seva versió, i la versió del worker en depèn:
 // així un canvi del motor no es queda a mitges amb un worker antic a la memòria cau.

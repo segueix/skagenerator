@@ -247,6 +247,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     synth.soundBankManager.addSoundBank(bank, 'generaluser');
     // Banc addicional (bateries i baixos gravats que es baixen a part).
     if (options.extra) synth.soundBankManager.addSoundBank(options.extra, 'extra');
+    // Guitarres solistes gravades (banc a part).
+    if (options.guitars) synth.soundBankManager.addSoundBank(options.guitars, 'guitars');
     await synth.ready;
     // La melodia de veu fa servir un canal més enllà dels 16 del MIDI.
     while (synth.midiChannels.length <= Math.max(...score.channels.map(c => c.channel))) synth.createMIDIChannel();
@@ -342,6 +344,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // Desvincula el banc compartit perquè la secció següent conservi les mostres.
     synth.soundBankManager.deleteSoundBank('generaluser', false);
     if (options.extra) synth.soundBankManager.deleteSoundBank('extra', false);
+    if (options.guitars) synth.soundBankManager.deleteSoundBank('guitars', false);
     synth.destroy();
   }
 }

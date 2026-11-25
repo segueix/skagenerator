@@ -52,7 +52,8 @@
   const baseDefaults = style => style === 'urban' ? ['electronicDrums', 'synthBass'] : ['drums', 'bass'];
   const timbreOptions = {
     // «gravat»: mostres nota a nota de VSCO 2 CE, FreePats o el kit Muldjord.
-    guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta · gravada'], ['cleanGm', 'Guitarra neta GM'], ['muted', 'Guitarra apagada GM'], ['overdrive', 'Guitarra saturada GM'], ['distortion', 'Guitarra distorsionada GM']],
+    guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta · gravada'], ['cleanGm', 'Guitarra neta GM'], ['muted', 'Guitarra apagada GM'], ['overdrive', 'Guitarra saturada GM'], ['distortion', 'Guitarra distorsionada GM'],
+      ['jazz', 'Guitarra jazz · gravada'], ['direct', 'Guitarra directa · gravada (sense amplificador)'], ['dist1', 'Guitarra distorsionada 1 · gravada'], ['dist2', 'Guitarra distorsionada 2 · gravada']],
     bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['growly', 'Jazz Bass directe · gravat (Growlybass)'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
     drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['rusty', 'Big Rusty · gravada, greu (bombo de 24")'], ['club', 'Kit de club de jazz · gravat (Virtuosity)'], ['lofi', 'Kit lo-fi, so de disc antic · gravat'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
     trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
