@@ -180,6 +180,7 @@
     // El contrabaix Meatbass ja no existeix: les cançons que el feien servir passen al Jazz Bass gravat.
     for (const owner of [st, ...(Array.isArray(value.sections) ? value.sections : [])]) if (owner?.timbres?.bass === 'upright') owner.timbres.bass = 'growly';
     if (st.batucadaPattern !== undefined && !engine.validBatucadaPattern(st.batucadaPattern)) fail('Patró de batucada no vàlid');
+    if (st.batucadaWhistleMs !== undefined && !engine.BATUCADA_WHISTLE.durations.includes(st.batucadaWhistleMs)) fail('Durada del xiulet no vàlida');
     if (st.batucadaRhythm !== undefined && !Object.hasOwn(engine.BATUCADA_RHYTHMS, st.batucadaRhythm)) fail('Ritme de batucada no vàlid');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
@@ -1202,7 +1203,10 @@
     if (removed) notify('Els instruments que ara formen part de la base ja sonen a totes les seccions.');
   }
   // Patró de batucada actual: l'editat a mà o el del ritme triat.
-  const batucadaPattern = () => song.settings.batucadaPattern ?? (engine.BATUCADA_RHYTHMS[song.settings.batucadaRhythm] || engine.BATUCADA_RHYTHMS.samba).steps;
+  const batucadaPattern = () => {
+    const pattern = song.settings.batucadaPattern ?? (engine.BATUCADA_RHYTHMS[song.settings.batucadaRhythm] || engine.BATUCADA_RHYTHMS.samba).steps;
+    return engine.BATUCADA.map((piece, row) => pattern[row] ?? piece.steps);
+  };
   function updateSettingsUI() {
     const st = song.settings, profile = STYLES[st.style];
     $('song-title').value = song.title; $('song-style').value = st.style;
@@ -1223,6 +1227,8 @@
     // L'editor apareix si la batucada sona a tota la cançó o només en alguna secció.
     $('batucada-editor').hidden = st.timbres.drums !== 'batucada' && !song.sections.some(sec => sec.timbres?.drums === 'batucada');
     $('batucada-rhythm').value = st.batucadaRhythm || 'samba';
+    $('batucada-whistle-ms').value = String(st.batucadaWhistleMs ?? engine.BATUCADA_WHISTLE.defaultDuration);
+    $('batucada-whistle-ms').disabled = busy;
     $('batucada-rhythm').disabled = $('batucada-generate').disabled = $('batucada-reset').disabled = busy;
     const pattern = batucadaPattern();
     for (const box of $('batucada-steps').querySelectorAll('input')) {
@@ -1271,6 +1277,7 @@
       pattern[row] = pattern[row].slice(0, step) + (event.target.checked ? '1' : '0') + pattern[row].slice(step + 1);
       st.batucadaPattern = pattern;
     }
+    else if (id === 'batucada-whistle-ms') st.batucadaWhistleMs = Number(event.target.value);
     else if (id === 'batucada-rhythm') { st.batucadaRhythm = event.target.value; delete st.batucadaPattern; }
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
     else if (id === 'song-subgenre') {
@@ -1302,7 +1309,7 @@
       if (type.startsWith('horrorpunk')) notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
         : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
     }
-    const replay = id.startsWith('bat-step-') || id === 'batucada-rhythm' || id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
+    const replay = id.startsWith('bat-step-') || id === 'batucada-rhythm' || id === 'batucada-whistle-ms' || id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   }
@@ -2270,6 +2277,9 @@
   stepGrid.addEventListener('change', changeSettings);
   fillSelect($('batucada-rhythm'), Object.entries(engine.BATUCADA_RHYTHMS).map(([key, rhythm]) => [key, rhythm.name]), 'samba');
   $('batucada-rhythm').addEventListener('change', changeSettings);
+  const whistle = engine.BATUCADA_WHISTLE;
+  fillSelect($('batucada-whistle-ms'), whistle.durations.map(ms => [String(ms), `${ms} ms`]), String(whistle.defaultDuration));
+  $('batucada-whistle-ms').addEventListener('change', changeSettings);
   // Genera una variació del ritme triat (o el restableix) i, si sonava, la torna a fer sonar.
   const setBatucada = pattern => {
     const st = song.settings, replay = playing?.kind;

@@ -267,6 +267,9 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       synth.controllerChange(patch.channel, 91, Math.round((REVERB[patch.instrument] ?? 20) * level * wet));
       synth.controllerChange(patch.channel, 93, 0);
     }
+    // El xiulet sosté la nota fins al Note Off, que la percussió ignora per defecte.
+    const sustainedDrums = new Set((spec.batucadaLine || []).filter(hit => hit.length === 5).map(hit => hit[2]));
+    for (const pitch of sustainedDrums) synth.midiChannels[9].drumParams[pitch].rxNoteOff = true;
     const body = Math.round(score.seconds * sampleRate), tail = Math.round(TAIL_SECONDS * sampleRate);
     const length = body + tail, left = new Float32Array(length), right = new Float32Array(length);
     // Es capta la sortida seca de cada canal i s'hi aplica el seu equalitzador.

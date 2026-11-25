@@ -6,11 +6,11 @@ const kit = require('../extra-instruments.json').kits.find(k => k.name === 'Batu
 const settings = { seed: 7, style: 'ska', bpm: 120, tonic: 0, mode: 'major', timbres: { drums: 'batucada' } };
 const part = { type: 'verse', bars: 2, energy: 65, revision: 1, instruments: ['drums'] };
 test('cada fila de batucada sona només a la nota i al pas escollits', () => {
-  assert.equal(engine.BATUCADA.length, 9);
-  assert.equal(Object.keys(kit.pieces).length, 9);
+  assert.equal(engine.BATUCADA.length, 10);
+  assert.equal(Object.keys(kit.pieces).length, 10);
   for (const [row, piece] of engine.BATUCADA.entries()) {
     assert(kit.pieces[piece.note]);
-    const pattern = Array(9).fill('0'.repeat(16));
+    const pattern = Array(engine.BATUCADA.length).fill('0'.repeat(16));
     pattern[row] = '0010000000000000';
     const spec = engine.composeSongPart({ ...settings, batucadaPattern: pattern }, part);
     assert.deepEqual(spec.batucadaLine.map(hit => hit.slice(0, 3)), [[0, .5, piece.note], [1, .5, piece.note]]);
@@ -106,4 +106,22 @@ test('ràdio Batucada: cançons només de batucada amb el tempo i la forma de ca
   // No repeteix el ritme de la cançó anterior si no se n'hi demana un.
   for (let seed = 1; seed <= 20; seed++) assert.notEqual(builder.createBatucadaSong(engine, { seed, avoidRhythm: 'samba' }).settings.batucadaRhythm, 'samba');
   assert.equal(builder.createBatucadaSong(engine, { seed: 3, rhythm: 'ijexa' }).settings.batucadaRhythm, 'ijexa');
+});
+
+test('el xiulet és opcional als patrons antics i respecta la durada triada', () => {
+  const { note } = engine.BATUCADA_WHISTLE;
+  const legacyPattern = Array(9).fill('0000000000000000');
+  const compose = (pattern, ms) => engine.composeSongPart({
+    ...settings, humanize: 0, batucadaPattern: pattern, batucadaWhistleMs: ms
+  }, { ...part, bars: 1 });
+  assert.equal(compose(legacyPattern, 750).batucadaLine.length, 0);
+
+  const pattern = [...legacyPattern, '1000100000000000'];
+  const spec = compose(pattern, 750);
+  const hits = spec.batucadaLine.filter(hit => hit[2] === note);
+  assert.deepEqual(hits.map(hit => hit[4]), [.5, .75]);
+  const events = createPerformance(spec).events.filter(event => event.note === note);
+  assert.deepEqual(events.map(event => [event.type, event.time]), [
+    ['on', 0], ['off', .5], ['on', .5], ['off', 1.25]
+  ]);
 });

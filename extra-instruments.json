@@ -6,6 +6,11 @@
    "program": 71,
    "localDirectory": "../audio/samples/",
    "pieces": {
+    "71": {
+     "seconds": 0.24,
+     "loopSamples": [3104, 7396],
+     "layers": [[["xiulet.wav", 1]]]
+    },
     "36": {
      "seconds": 0.45,
      "layers": [

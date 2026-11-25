@@ -1893,6 +1893,7 @@
             [[2, 38, 92], [2.25, 48, 92], [2.5, 48, 96], [2.75, 45, 96], [3, 45, 100], [3.25, 43, 100], [3.5, 43, 106], [3.75, 41, 110]],
             [[3, 38, 90], [3.125, 38, 76], [3.25, 38, 94], [3.375, 38, 80], [3.5, 38, 100], [3.625, 38, 86], [3.75, 38, 108], [3.875, 38, 92]]]
     };
+    const BATUCADA_WHISTLE = { note: 71, durations: [100, 200, 350, 500, 750, 1000], defaultDuration: 350 };
     const BATUCADA = [
         { note: 36, name: 'Surdo 1', steps: '0000100000001000' },
         { note: 41, name: 'Surdo 2', steps: '1000000010000000' },
@@ -1902,16 +1903,17 @@
         { note: 54, name: 'Tamborim', steps: '1001001000101000' },
         { note: 67, name: 'Agogô', steps: '1000001000001000' },
         { note: 69, name: 'Chocalho', steps: '1010101010101010' },
-        { note: 78, name: 'Cuíca', steps: '0000000100000000' }
+        { note: 78, name: 'Cuíca', steps: '0000000100000000' },
+        { note: BATUCADA_WHISTLE.note, name: 'Xiulet', steps: '0000000000000000' }
     ];
 
     // Ritmes de batucada predefinits (setze caixetes per compàs, en l'ordre de BATUCADA).
     const BATUCADA_RHYTHMS = {
         samba: { name: 'Samba', steps: BATUCADA.map(piece => piece.steps) },
         reggae: { name: 'Samba-reggae', steps: ['0000000010001000', '1000100000000000', '0000001000000010', '1001001000101000',
-            '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000'] },
+            '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000', '0000000000000000'] },
         ijexa: { name: 'Ijexá', steps: ['1000000010000000', '0000100000001000', '0000000000100000', '0000000000000000',
-            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000'] }
+            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000'] }
     };
     // Biblioteca de figures per generar variacions: els surdos 1 i 2 i el xocalho (el pols) no canvien.
     const BATUCADA_FIGURES = {
@@ -1923,10 +1925,10 @@
         8: ['0000000100000000', '0001000100010001', '0100000001000000', '0000000000000000']
     };
     // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
-    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .56, 78: .82 };
+    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .56, 78: .82, [BATUCADA_WHISTLE.note]: .66 };
 
     function validBatucadaPattern(pattern) {
-        return Array.isArray(pattern) && pattern.length === BATUCADA.length
+        return Array.isArray(pattern) && [BATUCADA.length - 1, BATUCADA.length].includes(pattern.length)
             && pattern.every(row => typeof row === 'string' && /^[01]{16}$/.test(row));
     }
     function batucadaRows(settings = {}) {
@@ -1950,6 +1952,9 @@
         const rows = part.batucadaPattern ?? batucadaRows(settings);
         if (!validBatucadaPattern(rows)) throw new Error('Patró de batucada no vàlid');
         const line = [], type = part.type, ending = part.ending || 'fill';
+        const whistleMs = settings.batucadaWhistleMs ?? BATUCADA_WHISTLE.defaultDuration;
+        if (!BATUCADA_WHISTLE.durations.includes(whistleMs)) throw new Error('Durada del xiulet no vàlida');
+        let previousWhistle;
         const closing = type === 'outro' ? part.closing || 'hit' : null, fading = closing === 'fade';
         const quiet = energy < 45, soft = energy < 60;
         const force = (pitch, step, extra = 0) => {
@@ -1959,7 +1964,17 @@
         const add = (bar, step, row, extra = 0) => {
             if ((bar * 4 + step / 4) * beat >= stopAt) return;
             const pitch = BATUCADA[row].note;
-            line.push([bar, step / 4, pitch, force(pitch, step, extra)]);
+            const hit = [bar, step / 4, pitch, force(pitch, step, extra)];
+            if (pitch === BATUCADA_WHISTLE.note) {
+                const at = (bar * 4 + step / 4) * beat;
+                if (previousWhistle) {
+                    const previousAt = (previousWhistle[0] * 4 + previousWhistle[1]) * beat;
+                    previousWhistle[4] = Math.min(previousWhistle[4], at - previousAt);
+                }
+                hit.push(Math.min(whistleMs / 1000, stopAt - at));
+                previousWhistle = hit;
+            }
+            line.push(hit);
         };
         // Cop de tota la batucada (aturades i final).
         const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, extra));
@@ -3146,7 +3161,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, validBatucadaPattern, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, validBatucadaPattern, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
