@@ -221,7 +221,9 @@
     // Les que ja esperen torn també compten com a recents.
     const waitingSongs = queue.map(t => ({ subgenre: t.song.settings.subgenre, style: t.song.settings.style, song: t.song })).reverse();
     const recent = [...waitingSongs, ...all.filter(e => Array.isArray(e.song?.sections)).sort((a, b) => (b.lastPlayed || b.created) - (a.lastPlayed || a.created))].slice(0, 12)
-      .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
+      .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]),
+        // La cançó sencera, perquè la nova no s'assembli a les últimes (riff, tonalitat, tempo, ritmes, harmonia...).
+        song: e.song }));
     // Cada cançó nova porta lletra en català; la melodia de veu la segueix.
     // A la ràdio instrumental no n'hi ha: els vents porten el tema.
     const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: !instrumental, ...(instrumental ? {} : { autoLyrics: 'ca' }), seed: studio.newSeed(), vary: true, recent,

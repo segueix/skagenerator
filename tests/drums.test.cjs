@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const engine = require('../radioambient.js');
 const { createPerformance } = require('../audio/performance.cjs');
+const builder = require('../song-builder.js');
 
 const part = (settings = {}, extra = {}) => engine.composeSongPart({ seed: 21, style: 'ska', bpm: 140, tonic: 0, mode: 'major', ...settings },
   { type: 'chorus', bars: 8, energy: 90, revision: 1, instruments: ['drums', 'bass', 'guitar', 'trumpet'], ...extra });
@@ -114,4 +115,59 @@ test('bateria punk menys mecànica i segona bateria a contratemps', () => {
   const off = spec({ offbeat: true }).drumLine.filter(([b, t, note]) => note === 43 && b < 15);
   assert(off.length >= 40 && off.every(([, t]) => t % 1 === .5), 'timbal base a cada contratemps');
   assert.throws(() => spec({ offbeat: 'sí' }), /Segona bateria/);
+});
+
+test('punk: d-beat, skank beat i tribal per subgènere, plat a les tornades i redobles amb cop sec', () => {
+  const names = engine.SONG_GROOVES.punk;
+  const grooveOf = (key, type) => {
+    const song = builder.createAutoSong(engine, key, { seed: 11, guitars: 2, minutes: 3 });
+    const sec = song.sections.find(s => s.type === type);
+    return names.drums[(sec.groove?.drums ?? song.settings.groove.drums)];
+  };
+  assert.match(grooveOf('hardcore', 'verse'), /D-beat/);
+  assert.match(grooveOf('hardcore', 'chorus'), /Skank beat/);
+  assert.match(grooveOf('skatepunk', 'verse'), /Skank beat/);
+  assert.match(grooveOf('postpunk', 'verse'), /Tribal/);
+  const settings = { seed: 4, style: 'punk', bpm: 180, tonic: 9, mode: 'major' };
+  const sp = (type, extra = {}) => engine.composeSongPart(settings, { type, bars: 4, energy: 85, revision: 1, instruments: ['drums'], ...extra });
+  // Tornades: plat a l'u de cada compàs.
+  const chorus = sp('chorus', { next: 'verse' }).drumLine;
+  for (let b = 0; b < 4; b++) assert(chorus.some(([bb, t, note]) => bb === b && t === 0 && note === 49), `plat al compàs ${b + 1}`);
+  // Redoble cap a la tornada: acaba amb un cop sec a 3,5 (bombo i caixa junts) i res més després.
+  const fills = new Set();
+  for (let fill = 0; fill < 6; fill++) {
+    const last = sp('verse', { next: 'chorus', fill }).drumLine.filter(([b, t]) => b === 3 && t >= 2);
+    fills.add(JSON.stringify(last));
+    assert(last.some(([, t, note]) => t === 3.5 && note === 36) && !last.some(([, t]) => t > 3.5), 'cop sec al final');
+  }
+  assert(fills.size >= 4, `redobles diferents: ${fills.size}`);
+});
+
+test('punk: baix amb notes de pas, baix sol a la intro i abans de l’última tornada, i rítmiques obertes', () => {
+  const settings = { seed: 8, style: 'punk', bpm: 180, tonic: 4, mode: 'major', subgenre: 'eastbay' };
+  const sp = extra => engine.composeSongPart(settings, { type: 'verse', bars: 8, energy: 70, revision: 2, instruments: ['drums', 'bass', 'guitar'], ...extra });
+  // Notes de pas: abans d'un canvi d'acord, l'última nota del compàs és a un semitò de la fonamental següent.
+  const spec = sp();
+  let approaches = 0;
+  for (let b = 0; b < 7; b++) {
+    const next = spec.chords[b + 1].root, now = spec.chords[b].root;
+    if (next % 12 === now % 12) continue;
+    const last = spec.bassLine.filter(n => n[0] === b).sort((x, y) => y[1] - x[1])[0];
+    if (last && Math.abs(last[2] - next) === 1) approaches++;
+  }
+  assert(approaches >= 1, 'notes de pas cap a l’acord següent');
+  // Baix sol: als dos primers compassos només sona el baix (després del compte, si n'hi ha).
+  const solo = createPerformance(sp({ bassSolo: 2 })), bar = spec.beat * 4;
+  const early = solo.events.filter(e => e.type === 'on' && e.time < 2 * bar - .03);
+  assert(early.length && early.every(e => e.channel === 2), 'només el baix');
+  assert(solo.events.some(e => e.type === 'on' && e.channel === 9 && e.time > 2 * bar), 'després entra la banda');
+  // Últim compàs de baix sol.
+  const brk = createPerformance(sp({ bassBreak: true }));
+  assert(brk.events.filter(e => e.type === 'on' && e.time >= 7 * bar + .03).every(e => e.channel === 2));
+  // Rítmiques obertes a banda i banda, la segona uns mil·lisegons més tard.
+  const two = createPerformance(engine.composeSongPart(settings, { type: 'chorus', bars: 2, energy: 85, revision: 1, instruments: ['guitar', 'guitar2'], layers: { guitar2: 2 } }));
+  const pan = c => two.channels.find(p => p.channel === c).pan;
+  assert(pan(0) < 30 && pan(14) > 100);
+  const first = c => two.events.find(e => e.type === 'on' && e.channel === c).time;
+  assert(first(14) - first(0) > .008, 'la segona rítmica entra una mica més tard');
 });

@@ -94,11 +94,64 @@ test('el mode «solista» de la guitarra 3 només és vàlid per a la guitarra 3
   const { createPerformance } = require('../audio/performance.cjs');
   const spec = engine.composeSongPart(settings, { ...part, instruments: ['guitar', 'guitar3'], layers: { guitar3: 2 }, lineModes: { guitar3: 'lead' } });
   const notes = createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 15);
-  assert.equal(notes.length, spec.lines.guitar3.length, 'la guitarra solista toca la melodia nota a nota');
+  // Cada nota de la melodia té el seu atac (les octaves i les dobles cordes sonen al mateix moment).
+  const onsets = [];
+  for (const e of notes.sort((a, b) => a.time - b.time)) if (!onsets.length || e.time - onsets.at(-1) > .012) onsets.push(e.time);
+  assert.equal(onsets.length, spec.lines.guitar3.length, 'la guitarra solista toca la melodia nota a nota');
 });
 
 test('amb veu, el punk no canvia', () => {
   const song = builder.createAutoSong(engine, 'punk77', { seed: 5, guitars: 1, candidates: 1 });
   assert.equal(song.settings.guitars, 1);
   assert(!song.clips.some(c => c.line === 'lead'));
+});
+
+test('punk: tema de la guitarra solista desenvolupat, octaves o dobles cordes, bends i dues guitarres a l’última tornada', () => {
+  const { createPerformance } = require('../audio/performance.cjs');
+  const settings = { seed: 5, style: 'punk', bpm: 180, tonic: 2, mode: 'major', subgenre: 'eastbay' };
+  const sp = (extra = {}, seed = 5) => engine.composeSongPart({ ...settings, seed }, { type: 'verse', bars: 8, energy: 70, revision: 2, instruments: ['guitar', 'guitar3'], layers: { guitar3: 3 }, lineModes: { guitar3: 'lead' }, ...extra });
+  // Pregunta-resposta: els compassos 3-4 repeteixen el ritme dels compassos 1-2.
+  const line = sp().lines.guitar3, rhythm = (from, to) => line.filter(n => n[0] >= from && n[0] < to).map(n => [n[0] - from, n[1], n[3]]);
+  assert.deepEqual(rhythm(2, 4), rhythm(0, 2));
+  // Octaves o dobles cordes en alguna secció, i bends que tornen a zero.
+  let doubled = 0, bends = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const music = createPerformance(sp({}, seed)), ons = music.events.filter(e => e.type === 'on' && e.channel === 15);
+    const at = new Map(); for (const e of ons) at.set(Math.round(e.time * 100), (at.get(Math.round(e.time * 100)) || 0) + 1);
+    if ([...at.values()].some(n => n > 1)) doubled++;
+    const pitch = music.events.filter(e => e.type === 'pitch' && e.channel === 15);
+    if (pitch.some(e => e.value < 4000)) bends++;
+    assert(pitch.every(e => e.value >= 0 && e.value <= 16383));
+  }
+  assert(doubled >= 4 && bends >= 4, `octaves/dobles ${doubled}, bends ${bends}`);
+  // Última tornada: una segona guitarra solista una tercera per sota, a l'altre costat.
+  const shout = createPerformance(engine.composeSongPart(settings, { type: 'chorus', bars: 4, energy: 95, revision: 1, instruments: ['guitar', 'guitar3'], layers: { guitar3: 2 }, lineModes: { guitar3: 'lead' }, shout: true }));
+  const second = shout.channels.find(c => c.instrument === 'guitar3' && c.channel !== 15);
+  assert(second && Math.abs(second.pan - shout.channels.find(c => c.channel === 15).pan) > 40, 'segona solista oberta');
+  const first = shout.events.filter(e => e.type === 'on' && e.channel === 15), harm = shout.events.filter(e => e.type === 'on' && e.channel === second.channel);
+  assert(harm.length > 0 && harm.every(h => first.some(f => Math.abs(f.time - h.time) < .03 && [3, 4, 12, 15, 16].includes(f.note - h.note))), 'harmonia en terceres');
+});
+
+test('harmonia punk: cromatismes al hardcore, iv menor al pop-punk, pedal de tònica i pujades de to', () => {
+  const symbols = (key, mode, tonic) => {
+    const out = new Set();
+    for (let rev = 1; rev <= 6; rev++) for (const type of ['verse', 'chorus', 'prechorus', 'bridge'])
+      engine.composeSongPart({ seed: 3, style: 'punk', bpm: 190, tonic, mode, subgenre: key }, { type, bars: 4, energy: 70, revision: rev, instruments: ['bass'] }).chords.forEach(c => out.add(c.symbol));
+    return out;
+  };
+  assert(symbols('hardcore', 'minor', 11).has('bII'));
+  assert(symbols('poppunk', 'major', 2).has('iv'));
+  // Pedal: el baix es queda a la tònica encara que canviïn els acords.
+  const pedal = engine.composeSongPart({ seed: 3, style: 'punk', bpm: 180, tonic: 2, mode: 'major', subgenre: 'poppunk' }, { type: 'verse', bars: 4, energy: 60, revision: 1, instruments: ['bass'], pedal: true });
+  assert(new Set(pedal.chords.map(c => c.root % 12)).size > 1);
+  assert(pedal.bassLine.every(n => [2, 9].includes(n[2] % 12)), 'baix a la tònica (o la seva quinta)');
+  // Pujades de to a l'última tornada als subgèneres que no en tenien.
+  let lifts = 0, pedals = 0;
+  for (const key of ['skatepunk', 'garage', 'hardcore', 'postpunk', 'horrorpunk']) for (let seed = 1; seed <= 6; seed++) {
+    const song = builder.createAutoSong(engine, key, { seed: seed * 19, guitars: 2, minutes: 3 });
+    if (song.sections.some(s => s.transpose)) lifts++;
+    if (song.sections.some(s => s.pedal)) pedals++;
+  }
+  assert(lifts >= 4, `pujades de to: ${lifts} de 30`);
+  assert(pedals >= 1);
 });

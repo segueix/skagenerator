@@ -316,3 +316,45 @@ test('ska: riffs de la biblioteca, vents a tres veus, cops de secció, stop time
   const mean = music => { const v = music.events.filter(e => e.type === 'on' && [3, 12].includes(e.channel)).map(e => e.velocity); return v.reduce((a, b) => a + b, 0) / v.length; };
   assert(mean(loud) > mean(createPerformance(chorus)) + 5);
 });
+
+test('punk: riffs de la biblioteca, rítmiques apagades a l’estrofa, cops, stop and go i tornada final', () => {
+  // 1. Riffs de guitarra de la biblioteca: graella de semicorxeres i galops al skate punk.
+  const skate = engine.composeRiff(5, true, 'skatepunk').rhythm;
+  assert(skate.every(([t]) => (t * 4) % 1 === 0));
+  // 2. Estrofa apagada (guitarra apagada, corxeres curtes) i tornada oberta (el primer cop ressona).
+  const settings = { seed: 9, style: 'punk', bpm: 180, tonic: 4, mode: 'major', subgenre: 'eastbay', fx: { guitar: { type: 'crunch', drive: 75, tone: 60 } } };
+  const sp = (type, extra = {}) => engine.composeSongPart(settings, { type, bars: 4, energy: 70, revision: 1, instruments: ['drums', 'bass', 'guitar'], ...extra });
+  const verse = createPerformance(sp('verse')), chorus = createPerformance(sp('chorus'));
+  const ch0 = verse.channels.find(c => c.channel === 0);
+  assert.deepEqual([ch0.bank, ch0.program], [0, 28], 'guitarra apagada a l’estrofa');
+  assert.notDeepEqual([chorus.channels.find(c => c.channel === 0).program], [28], 'oberta a la tornada');
+  const length = (m, e) => m.events.find(o => o.type === 'off' && o.channel === e.channel && o.note === e.note && o.time >= e.time).time - e.time;
+  const first = m => m.events.find(e => e.type === 'on' && e.channel === 0);
+  assert(length(verse, first(verse)) * 3 < length(chorus, first(chorus)));
+  const beat = sp('verse').beat;
+  const strokes = new Set(verse.events.filter(e => e.type === 'on' && e.channel === 0 && e.time < 4 * beat - .03).map(e => Math.round(e.time / beat * 2)));
+  assert.equal(strokes.size, 8, 'corxeres seguides');
+  // 3. Cops de secció: a l'últim compàs, només cops (o «stop and go»: un cop i un redoble de caixa).
+  let rolls = 0, patterns = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const spec = engine.composeSongPart({ ...settings, seed }, { type: 'prechorus', bars: 4, energy: 75, revision: 1, instruments: ['drums', 'bass', 'guitar'], hits: true });
+    const music = createPerformance(spec), last = 3 * 4 * spec.beat;
+    const band = music.events.filter(e => e.type === 'on' && e.time >= last - .02 && e.channel !== 9);
+    // (La caixa fa servir gravacions alternades: altres números de nota.)
+    const snares = music.events.filter(e => e.type === 'on' && e.channel === 9 && e.time >= last + 1.9 * spec.beat && e.time < last + 3.9 * spec.beat);
+    if (snares.length >= 6) { rolls++; assert(band.every(e => e.time < last + .1), 'stop and go: només el cop de l’u'); } else patterns++;
+  }
+  assert(rolls >= 2 && patterns >= 2, `stop and go ${rolls}, cops ${patterns}`);
+  // Tornada final: plat a l'u de cada compàs.
+  const shout = createPerformance(sp('chorus', { shout: true }));
+  for (let b = 0; b < 4; b++) assert(shout.events.some(e => e.type === 'on' && e.channel === 9 && e.note === 49 && Math.abs(e.time - b * 4 * beat) < .03), `plat al compàs ${b + 1}`);
+  // 4. Cançons de punk: última tornada «shout» i, sovint, baixada abans.
+  let drops = 0, shouts = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const song = builder.createAutoSong(engine, 'poppunk', { seed: seed * 7, guitars: 2, minutes: 3 });
+    const ordered = [...song.sections].sort((a, b) => a.start - b.start), last = ordered.filter(s => s.type === 'chorus').at(-1), before = ordered[ordered.indexOf(last) - 1];
+    if (last.shout) shouts++;
+    if (before?.exit && Object.keys(before.exit).length) drops++;
+  }
+  assert(shouts >= 8 && drops >= 3, `shout ${shouts}, baixades ${drops}`);
+});

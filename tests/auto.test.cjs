@@ -632,3 +632,37 @@ test('ska: els vents entren just abans del temps a la secció marcada amb «pick
   const trumpet = horns.filter(e => [3, 12].includes(e.channel)).map(e => e.note);
   assert(trumpet.length === 2 && trumpet[1] > trumpet[0], 'dues corxeres que pugen');
 });
+
+test('ska: les cançons no es repeteixen entre elles i les seccions repetides no són calcades', () => {
+  // Una ràdio de 12 cançons de 2-tone: cap no repeteix el riff ni la combinació de ritmes de les tres anteriors.
+  const history = [];
+  let riffs = 0, grooves = 0, keys = 0;
+  for (let i = 0; i < 12; i++) {
+    const recent = history.slice(0, 12).map(song => ({ subgenre: song.settings.subgenre, style: song.settings.style, song, plan: song.sections.map(s => [s.type, s.bars]) }));
+    const song = builder.createAutoSong(engine, 'twotone', { seed: 300 + i * 7919, minutes: 3, recent });
+    const print = builder.fingerprintOf(engine, song), last = history.slice(0, 3).map(s => builder.fingerprintOf(engine, s));
+    if (last.some(p => p.riff === print.riff)) riffs++;
+    if (last.some(p => p.drums === print.drums && p.bass === print.bass && p.guitar === print.guitar)) grooves++;
+    if (last.slice(0, 2).some(p => p.key === print.key)) keys++;
+    history.unshift(song);
+  }
+  assert(riffs <= 1 && grooves <= 1 && keys <= 2, `riffs ${riffs}, ritmes ${grooves}, tonalitats ${keys}`);
+  // La semblança puja com més s'assembla a la cançó anterior.
+  const a = builder.fingerprintOf(engine, history[0]);
+  assert(builder.noveltyPenalty(a, [a]) > builder.noveltyPenalty(a, [builder.fingerprintOf(engine, history[5])]));
+  // Dins de la cançó: la segona estrofa no és calcada de la primera (patró de guitarra o baix, respostes...).
+  let varied = 0, total = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const song = builder.createAutoSong(engine, 'jamaican', { seed: seed * 23, minutes: 3 });
+    const verses = song.sections.filter(s => s.type === 'verse');
+    if (verses.length < 2) continue;
+    total++;
+    const sig = sec => JSON.stringify([sec.groove || {}, song.clips.filter(c => c.start === sec.start).map(c => c.instrument + (c.line || '') + c.revision).sort()]);
+    if (sig(verses[0]) !== sig(verses[1])) varied++;
+  }
+  assert(varied === total, `estrofes variades ${varied} de ${total}`);
+  // El riff es desenvolupa dins de la secció: la tercera vegada comença més amunt.
+  const riff = engine.composeSongPart({ seed: 9, style: 'ska', bpm: 140, tonic: 0, mode: 'major', subgenre: 'twotone' }, { type: 'chorus', bars: 8, energy: 85, revision: 1, instruments: ['trumpet'], layers: { trumpet: 1 }, lineModes: { trumpet: 'riff' } }).lines.trumpet;
+  const startOf = bar => riff.find(n => n[0] === bar)[2];
+  assert(startOf(4) > startOf(0));
+});
