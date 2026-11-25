@@ -122,6 +122,22 @@
     "83": {
      "seconds": 0.3,
      "layers": [[["cuica-glissando.wav", 1]]]
+    },
+    "35": {
+     "seconds": 0.22,
+     "layers": [[["surdo-1-apagat.wav", 1]]]
+    },
+    "43": {
+     "seconds": 0.22,
+     "layers": [[["surdo-2-apagat.wav", 1]]]
+    },
+    "47": {
+     "seconds": 0.22,
+     "layers": [[["surdo-3-apagat.wav", 1]]]
+    },
+    "68": {
+     "seconds": 0.4,
+     "layers": [[["agogo-greu.wav", 1]]]
     }
    }
   },

@@ -183,6 +183,7 @@
     if (st.batucadaWhistleMs !== undefined && !engine.BATUCADA_WHISTLE.durations.includes(st.batucadaWhistleMs)) fail('Durada del xiulet no vàlida');
     if (st.batucadaRhythm !== undefined && !Object.hasOwn(engine.BATUCADA_RHYTHMS, st.batucadaRhythm)) fail('Ritme de batucada no vàlid');
     if (st.batucadaBand !== undefined && !engine.BATUCADA_BAND.includes(st.batucadaBand)) fail('Banda de batucada no vàlida');
+    if (st.batucadaSurdo3 !== undefined && !engine.SURDO3_MODES.includes(st.batucadaSurdo3)) fail('Surdo 3 no vàlid');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
     st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
@@ -1232,6 +1233,7 @@
     $('batucada-whistle-ms').value = String(st.batucadaWhistleMs ?? engine.BATUCADA_WHISTLE.defaultDuration);
     $('batucada-whistle-ms').disabled = busy;
     $('batucada-band').value = String(st.batucadaBand ?? 1); $('batucada-band').disabled = busy;
+    $('batucada-surdo3').value = st.batucadaSurdo3 || 'grid'; $('batucada-surdo3').disabled = busy;
     $('batucada-rhythm').disabled = $('batucada-generate').disabled = $('batucada-reset').disabled = busy;
     const pattern = batucadaPattern();
     for (const box of $('batucada-steps').querySelectorAll('input')) {
@@ -1281,6 +1283,7 @@
       st.batucadaPattern = pattern;
     }
     else if (id === 'batucada-whistle-ms') st.batucadaWhistleMs = Number(event.target.value);
+    else if (id === 'batucada-surdo3') { if (event.target.value === 'grid') delete st.batucadaSurdo3; else st.batucadaSurdo3 = event.target.value; }
     else if (id === 'batucada-band') { const n = Number(event.target.value); if (n === 1) delete st.batucadaBand; else st.batucadaBand = n; }
     else if (id === 'batucada-rhythm') { st.batucadaRhythm = event.target.value; delete st.batucadaPattern; }
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
@@ -1313,7 +1316,7 @@
       if (type.startsWith('horrorpunk')) notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
         : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
     }
-    const replay = id.startsWith('bat-step-') || id === 'batucada-rhythm' || id === 'batucada-whistle-ms' || id === 'batucada-band' || id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
+    const replay = id.startsWith('bat-step-') || id === 'batucada-rhythm' || id === 'batucada-whistle-ms' || id === 'batucada-band' || id === 'batucada-surdo3' || id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   }
@@ -2287,6 +2290,9 @@
   // Músics per peça: surdos, caixa, tamborim i xocalho doblats o triplicats.
   fillSelect($('batucada-band'), engine.BATUCADA_BAND.map(n => [String(n), n === 1 ? '1 (un sol músic)' : `${n} (banda)`]), '1');
   $('batucada-band').addEventListener('change', changeSettings);
+  // Surdo 3: el de la graella o un que improvisa frases (amb cops oberts i apagats).
+  fillSelect($('batucada-surdo3'), [['grid', 'Segons la graella'], ['improv', 'Improvisa']], 'grid');
+  $('batucada-surdo3').addEventListener('change', changeSettings);
   // Genera una variació del ritme triat (o el restableix) i, si sonava, la torna a fer sonar.
   const setBatucada = pattern => {
     const st = song.settings, replay = playing?.kind;
