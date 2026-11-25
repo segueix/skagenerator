@@ -23,7 +23,7 @@ function createPerformance(spec) {
     // Guitarres gravades de FreePats (FSBS): neta, jazz, directa (sense amplificador) i dues distorsionades.
     guitar: { auto: null, clean: [2, 27], cleanGm: [0, 27], muted: [0, 28], overdrive: [0, 29], distortion: [0, 30], jazz: [2, 26], direct: [2, 28], dist1: [2, 29], dist2: [2, 30] },
     bass: { auto: null, finger: [2, 33], pick: [2, 34], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
-    drums: { auto: null, real: [0, 69], surdo3: [0, 70], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
+    drums: { auto: null, real: [0, 69], surdo3: [0, 70], batucada: [0, 71], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
     // La segona veu de vent és un trombó gravat (VSCO), com a les seccions de vent de ska
     // (trompeta, trombó i saxo tenor). El saxo tenor gravat queda com a opció ('sax').
@@ -519,7 +519,7 @@ function createPerformance(spec) {
   const snareFeel = spec.style === 'ska' ? .009 : punk ? -.003 : 0;
   const drumBars = new Map();
   for (const [b, t, drum] of spec.drumLine || []) { if (!drumBars.has(b)) drumBars.set(b, new Set()); drumBars.get(b).add(`${t}:${drum}`); }
-  if (has('drums') && spec.style !== 'urban' && spec.energy >= 40) for (const [b, hits] of drumBars) {
+  if (!spec.batucadaLine && has('drums') && spec.style !== 'urban' && spec.energy >= 40) for (const [b, hits] of drumBars) {
     if (hits.size < 6 || finale && b === spec.chords.length - 1) continue;
     for (const t of [.75, 1.75, 2.25, 3.25]) if (!hits.has(`${t}:38`) && !hits.has(`${t}:37`) && random() < .4)
       note(9, 38, (b * 4 + t) * beat + snareFeel, .05, 22 + random() * 10, .004);
@@ -538,10 +538,15 @@ function createPerformance(spec) {
       force *= drum === 46 ? .75 : .55; drum = 37;
     }
     const at = (b * 4 + t) * beat + (drum === 38 || drum === 37 ? snareFeel : 0), length = drum === 49 ? 1.4 : drum === 46 || drum === 51 ? beat * .45 : .09;
-    if (has('drums')) note(9, drum, at, length, force, .003);
+    if (has('drums') && !spec.batucadaLine) note(9, drum, at, length, force, .003);
     if (has('electronicDrums')) {
       note(10, drum, at, length, force, 0);
       if (drum === 38) note(10, 39, at + .008, .1, force * .72, 0);
+    }
+  }
+  if (has('drums') && spec.batucadaLine) {
+    for (const [barIndex, step, pitch, velocity] of spec.batucadaLine) {
+      note(9, pitch, (barIndex * 4 + step) * beat, .35, velocity, .002);
     }
   }
   if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {

@@ -2,6 +2,112 @@
  "about": "Bateries, percussió, baixos i piano gravats addicionals. Es carreguen a part, només quan una cançó els fa servir.",
  "kits": [
   {
+   "name": "Batucada",
+   "program": 71,
+   "localDirectory": "../audio/samples/",
+   "pieces": {
+    "36": {
+     "seconds": 0.45,
+     "layers": [
+      [
+       [
+        "surdo-1.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "41": {
+     "seconds": 0.39,
+     "layers": [
+      [
+       [
+        "surdo-2.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "45": {
+     "seconds": 0.67,
+     "layers": [
+      [
+       [
+        "surdo-3-greu.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "38": {
+     "seconds": 0.095,
+     "layers": [
+      [
+       [
+        "caixa.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "50": {
+     "seconds": 0.119,
+     "layers": [
+      [
+       [
+        "repique.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "54": {
+     "seconds": 0.088,
+     "layers": [
+      [
+       [
+        "tamborim.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "67": {
+     "seconds": 0.3,
+     "layers": [
+      [
+       [
+        "agogo.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "69": {
+     "seconds": 0.107,
+     "layers": [
+      [
+       [
+        "chocalho.wav",
+        1
+       ]
+      ]
+     ]
+    },
+    "78": {
+     "seconds": 0.185,
+     "layers": [
+      [
+       [
+        "cuica.wav",
+        1
+       ]
+      ]
+     ]
+    }
+   }
+  },
+  {
    "name": "Surdo 3",
    "program": 70,
    "localDirectory": "../audio/samples/",

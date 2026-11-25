@@ -62,7 +62,7 @@
     guitar: [['auto', 'Segons l’estil'], ['clean', 'Guitarra neta · gravada'], ['cleanGm', 'Guitarra neta GM'], ['muted', 'Guitarra apagada GM'], ['overdrive', 'Guitarra saturada GM'], ['distortion', 'Guitarra distorsionada GM'],
       ['jazz', 'Guitarra jazz · gravada'], ['direct', 'Guitarra directa · gravada (sense amplificador)'], ['dist1', 'Guitarra distorsionada 1 · gravada'], ['dist2', 'Guitarra distorsionada 2 · gravada']],
     bass: [['auto', 'Segons l’estil'], ['finger', 'Baix amb dits · gravat'], ['pick', 'Baix amb pua · gravat'], ['growly', 'Jazz Bass directe · gravat (Growlybass)'], ['fingerGm', 'Baix amb dits GM'], ['pickGm', 'Baix amb pua GM']],
-    drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['surdo3', 'Surdo 3'], ['rusty', 'Big Rusty · gravada, greu (bombo de 24")'], ['club', 'Kit de club de jazz · gravat (Virtuosity)'], ['lofi', 'Kit lo-fi, so de disc antic · gravat'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
+    drums: [['auto', 'Segons l’estil'], ['real', 'Bateria Muldjord · gravada'], ['surdo3', 'Surdo 3'], ['batucada', 'Batucada'], ['rusty', 'Big Rusty · gravada, greu (bombo de 24")'], ['club', 'Kit de club de jazz · gravat (Virtuosity)'], ['lofi', 'Kit lo-fi, so de disc antic · gravat'], ['jazz', 'Kit de jazz GM'], ['room', 'Kit de sala GM'], ['standard', 'Bateria acústica GM'], ['brush', 'Escombretes GM'], ['rock', 'Bateria rock GM'], ['electronic', 'Kit electrònic GM']],
     trumpet: [['auto', 'Trompeta · gravada (VSCO)'], ['gm', 'Trompeta GM'], ['bright', 'Trompeta brillant GM'], ['muted', 'Trompeta amb sordina GM']],
     trombone: [['auto', 'Trombó · gravat (recomanat)'], ['vsco', 'Trombó · gravat (VSCO)'], ['sax', 'Saxo tenor · gravat'], ['gm', 'Trombó GM'], ['warm', 'Trombó càlid GM']],
     vocal: [['auto', 'Clarinet · gravat (recomanat)'], ['oohs', 'Veu «uh» GM'], ['flute', 'Flauta GM'], ['ocarina', 'Ocarina GM'], ['clarinetGm', 'Clarinet GM']]
@@ -179,6 +179,7 @@
       || !Number.isInteger(st.bars) || st.bars < MIN_BARS || st.bars > MAX_BARS) fail('Configuració no vàlida');
     // El contrabaix Meatbass ja no existeix: les cançons que el feien servir passen al Jazz Bass gravat.
     for (const owner of [st, ...(Array.isArray(value.sections) ? value.sections : [])]) if (owner?.timbres?.bass === 'upright') owner.timbres.bass = 'growly';
+    if (st.batucadaPattern !== undefined && !engine.validBatucadaPattern(st.batucadaPattern)) fail('Patró de batucada no vàlid');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
     st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
@@ -1215,6 +1216,12 @@
       fillSelect($(`groove-${family}`), engine.SONG_GROOVES[st.style][family].map((name, index) => [String(index), name]), String(st.groove[family]));
     $('groove-guitar-field').hidden = !song.base.instruments.includes('guitar');
     for (const family of timbreFamilies) $(`timbre-${family}`).value = st.timbres[family];
+    $('batucada-editor').hidden = st.timbres.drums !== 'batucada';
+    const pattern = st.batucadaPattern ?? engine.BATUCADA.map(piece => piece.steps);
+    for (const box of $('batucada-steps').querySelectorAll('input')) {
+      box.checked = pattern[Number(box.dataset.row)][Number(box.dataset.step)] === '1';
+      box.disabled = busy;
+    }
     $('song-guitar-fx').value = st.fx?.guitar?.type || 'none';
     fillSelect($('song-subgenre'), [['', '— Cap (estil general)'], ...Object.entries(engine.SUBGENRES).filter(([, sg]) => sg.style === st.style).map(([key, sg]) => [key, sg.name])], st.subgenre || '');
     $('song-swing').value = Math.round((st.swing || 0) * 100); $('song-swing-value').textContent = `${Math.round((st.swing || 0) * 100)} %`;
@@ -1251,6 +1258,12 @@
         st.bars = bars; trimSections();
       }
     } else if (id.startsWith('groove-')) st.groove = { ...st.groove, [id.slice(7)]: Number(event.target.value) };
+    else if (id.startsWith('bat-step-')) {
+      const row = Number(event.target.dataset.row), step = Number(event.target.dataset.step);
+      const pattern = [...(st.batucadaPattern ?? engine.BATUCADA.map(piece => piece.steps))];
+      pattern[row] = pattern[row].slice(0, step) + (event.target.checked ? '1' : '0') + pattern[row].slice(step + 1);
+      st.batucadaPattern = pattern;
+    }
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
     else if (id === 'song-subgenre') {
       const key = event.target.value, sg = engine.SUBGENRES[key];
@@ -1281,7 +1294,7 @@
       if (type.startsWith('horrorpunk')) notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
         : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
     }
-    const replay = id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
+    const replay = id.startsWith('bat-step-') || id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   }
@@ -2229,6 +2242,24 @@
   // ── Esdeveniments ───────────────────────────────────────────────────
   ['song-style', 'song-bpm', 'song-key', 'song-bars', 'groove-drums', 'groove-bass', 'groove-guitar', 'timbre-guitar', 'timbre-bass', 'timbre-drums', 'timbre-trumpet', 'timbre-trombone', 'timbre-vocal', 'song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in']
     .forEach(key => $(key).addEventListener('change', changeSettings));
+  const stepGrid = $('batucada-steps');
+  engine.BATUCADA.forEach(({ note, name }, row) => {
+    const line = document.createElement('div'), label = document.createElement('span');
+    label.textContent = name;
+    label.title = 'Nota MIDI ' + note;
+    line.append(label);
+    for (let step = 0; step < 16; step++) {
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.id = 'bat-step-' + row + '-' + step;
+      box.dataset.row = row;
+      box.dataset.step = step;
+      box.setAttribute('aria-label', name + ' · temps ' + (1 + Math.floor(step / 4)) + ', subdivisió ' + (1 + step % 4));
+      line.append(box);
+    }
+    stepGrid.append(line);
+  });
+  stepGrid.addEventListener('change', changeSettings);
   $('song-humanize').addEventListener('input', event => { const v = Number(event.target.value); $('song-humanize-value').textContent = v ? `${v} %` : 'quantitzat'; });
   $('song-swing').addEventListener('input', event => { $('song-swing-value').textContent = `${event.target.value} %`; });
   for (const name of ['drums', 'bass']) {
