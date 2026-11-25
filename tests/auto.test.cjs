@@ -561,3 +561,20 @@ test('ska instrumental: els vents ocupen entre el 75 i el 90 % dels compassos', 
     assert(value >= .74 && value <= .91, `${key} ${seed}: ${(value * 100).toFixed(0)} %`);
   }
 });
+
+test('punk instrumental: la guitarra solista ocupa entre el 75 i el 90 % dels compassos', () => {
+  const occupancy = song => {
+    let total = 0, on = 0;
+    for (const sec of song.sections) for (let b = 0; b < sec.bars; b++) {
+      total++;
+      const bar = sec.start + b;
+      if (song.clips.some(c => c.instrument === 'guitar3' && c.start <= bar && bar < c.start + c.bars && !(sec.mute || []).includes('guitar3')
+        && (sec.entrance?.guitar3 ?? 0) <= b && b < (sec.exit?.guitar3 ?? sec.bars))) on++;
+    }
+    return on / total;
+  };
+  for (const key of ['punk77', 'oi', 'skatepunk', 'garage', 'postpunk', 'hardcore', 'poppunk', 'eastbay', 'horrorpunk']) for (const seed of [7, 70, 700]) {
+    const value = occupancy(builder.createAutoSong(engine, key, { seed, vocal: false, guitars: 2, minutes: 3 }));
+    assert(value >= .74 && value <= .91, `${key} ${seed}: ${(value * 100).toFixed(0)} %`);
+  }
+});
