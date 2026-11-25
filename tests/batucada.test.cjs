@@ -180,9 +180,7 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     const rhythmOf = sec => Object.keys(engine.BATUCADA_RHYTHMS).filter(key => sec.batucadaPattern
       && engine.BATUCADA_RHYTHMS[key].steps[0] === sec.batucadaPattern[0] && engine.BATUCADA_RHYTHMS[key].steps[1] === sec.batucadaPattern[1]);
     // Hi ha seccions amb un altre ritme (els surdos 1 i 2 d'un altre ritme).
-    // (El Percudium no canvia de ritme: el seu groove és el protagonista.)
-    if (song.settings.batucadaRhythm === 'percudium') assert(!secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes('percudium')));
-    else assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
+    assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
     assert(secs[0].batucada?.whistle && secs.at(-1).batucada?.peak && secs[1].batucada?.peak);
     // Els moments clau (entrada, última tornada i final) pugen també el volum general.
     assert(secs.filter(sec => sec.volumes).every(sec => sec.batucada?.peak && sec.volumes.master === 3));
@@ -336,7 +334,7 @@ test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments, sala i
   }
 });
 
-test('Percudium: timbal i xiulet sols, entrada de tots, diàlegs, aturades i retorns, final al màxim', () => {
+test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàlegs, aturades, canvis de ritme i final al màxim', () => {
   const st = { ...settings, batucadaRhythm: 'percudium', batucadaBand: 3 };
   const compose = p => engine.composeSongPart(st, { ...part, energy: 92, ...p }).batucadaLine;
   // Entrada: només el timbal (surdo 1, un sol músic) i el xiulet del mestre; l'últim compàs, un redoble.
@@ -345,16 +343,36 @@ test('Percudium: timbal i xiulet sols, entrada de tots, diàlegs, aturades i ret
   assert.deepEqual([...notes].sort((a, b) => a - b), [35, 36, engine.BATUCADA_WHISTLE.note]);
   assert(intro.every(h => !h[6]), 'un sol timbal');
   assert(intro.filter(h => h[0] === 1 && h[2] === 36).length > intro.filter(h => h[0] === 0 && h[2] === 36).length, 'redoble');
-  // Diàleg: en cada compàs parla un grup (surdos i agogô / caixa, repique, tamborim i xocalho); al final, tots.
-  const dialog = compose({ type: 'bridge', bars: 6, batucada: { dialog: 1 } });
+  // Entrada de caixa o de repique: un sol músic fa el ritme i, alhora, el xiulet fa dos curts i un de llarg.
+  for (const intro of ['caixa', 'repique']) {
+    const line = compose({ type: 'intro', bars: 2, batucada: { intro } });
+    const note = intro === 'caixa' ? 38 : 50, whistle = engine.BATUCADA_WHISTLE.note;
+    assert(line.every(h => h[2] === note || h[2] === whistle), intro);
+    assert(line.every(h => !h[6]), 'un sol músic');
+    for (const bar of [0, 1]) {
+      const blows = line.filter(h => h[0] === bar && h[2] === whistle).map(h => h[4]);
+      assert.equal(blows.length, 3); assert(blows[0] < .2 && blows[1] < .2 && blows[2] > blows[0] * 2, 'dos curts i un de llarg');
+    }
+    assert(line.filter(h => h[0] === 0 && h[2] === note).length >= 8, 'fa un ritme');
+  }
+  // Diàleg: tots continuen tocant, però el grup que parla puja el volum i els altres l'abaixen.
+  const rowOf = note => [35, 43, 47].includes(note) ? [35, 43, 47].indexOf(note) : note === engine.AGOGO_LOW ? 6 : engine.BATUCADA.findIndex(p => p.note === note);
   const group = row => engine.BATUCADA_DIALOG.findIndex(g => g.includes(row));
-  const rowOf = note => engine.BATUCADA.findIndex(p => p.note === note);
-  const groups = bar => new Set(dialog.filter(h => h[0] === bar && rowOf(h[2]) >= 0 && rowOf(h[2]) < 8).map(h => group(rowOf(h[2]))));
-  assert.deepEqual([...groups(0)], [0]); assert.deepEqual([...groups(1)], [1]); assert.deepEqual([...groups(2)], [0]);
-  assert.equal(groups(5).size, 2, 'tots al final');
-  // Diàleg per mitjos compassos.
-  const half = compose({ type: 'bridge', bars: 4, batucada: { dialog: 2 } }).filter(h => h[0] === 0 && rowOf(h[2]) >= 0 && rowOf(h[2]) < 8);
-  assert(half.every(h => group(rowOf(h[2])) === (h[1] < 2 ? 0 : 1)));
+  const plain = compose({ type: 'bridge', bars: 6 }), dialog = compose({ type: 'bridge', bars: 6, batucada: { dialog: 1 } });
+  const avg = (line, bar, g) => { const hits = line.filter(h => h[0] === bar && !h[6] && Number.isInteger(h[1] * 4) && group(rowOf(h[2])) === g); return hits.reduce((t, h) => t + h[3], 0) / hits.length; };
+  for (const bar of [0, 1, 2, 3]) {
+    const speaking = bar % 2, silent = 1 - speaking;
+    assert(avg(dialog, bar, speaking) > avg(plain, bar, speaking) + 8, `parla (${bar})`);
+    assert(avg(dialog, bar, silent) < avg(plain, bar, silent) - 6 && avg(dialog, bar, silent) > 30, `replica fluix però sona (${bar})`);
+  }
+  assert.deepEqual(dialog.filter(h => h[0] === 5).map(h => h[3]), plain.filter(h => h[0] === 5).map(h => h[3]), 'al final, tots igual');
+  // Per mitjos compassos, i amb un tercer grup que s'hi afegeix a la segona meitat.
+  const half = compose({ type: 'bridge', bars: 4, batucada: { dialog: 2 } });
+  assert.equal(group(rowOf(half.filter(h => h[0] === 0 && h[1] < 2 && !h[6]).sort((a, b) => b[3] - a[3])[0][2])), 0);
+  // (El grup que parla és el que més puja respecte de la mateixa secció sense diàleg.)
+  const three = compose({ type: 'bridge', bars: 8, batucada: { dialog: 3 } }), plain8 = compose({ type: 'bridge', bars: 8 });
+  const raised = bar => { const up = [0, 1, 2].map(g => avg(three, bar, g) - avg(plain8, bar, g)); return up.indexOf(Math.max(...up)); };
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(raised), [0, 1, 0, 0, 1, 2]);
   // Aturada: un cop de tots al màxim (127) i silenci.
   const stop = compose({ type: 'bridge', bars: 2, next: 'chorus', ending: 'break' }).filter(h => h[0] === 1);
   assert(stop.length && stop.every(h => h[1] === 0 && h[3] === 127));
@@ -368,12 +386,21 @@ test('Percudium: timbal i xiulet sols, entrada de tots, diàlegs, aturades i ret
   // Tot saturat: també el repique i l'agogô els toquen tres músics.
   const groove = compose({ type: 'chorus', bars: 1 });
   for (const note of [50, 67]) assert.equal(new Set(groove.filter(h => h[2] === note || note === 67 && h[2] === engine.AGOGO_LOW).map(h => h[6] || 0)).size, 3, `${note}`);
-  // Les cançons Percudium: timbal sol uns 5 segons, entrada de tots amb tota la potència, diàlegs,
-  // aturades i retorns, i final al màxim; sense compte de repique.
+  // Les cançons Percudium: caixa o repique i xiulet uns 5 segons, entrada de tots amb tota la potència (sense
+  // cuíca), diàlegs, aturades i represes, canvis de ritme (al mateix tempo) i final al màxim.
+  const intros = new Set();
   for (let seed = 1; seed <= 20; seed++) {
     const song = builder.createBatucadaSong(engine, { seed, rhythm: 'percudium' }), secs = song.sections;
     const bpm = secs[0].bpm ?? song.settings.bpm, seconds = secs[0].bars * 240 / bpm;
-    assert(secs[0].batucada?.intro === 'timbal' && seconds >= 4.5 && seconds <= 5.5, `entrada ${seconds}`);
+    intros.add(secs[0].batucada?.intro);
+    assert(['caixa', 'repique'].includes(secs[0].batucada?.intro) && seconds >= 4.5 && seconds <= 5.5, `entrada ${seconds}`);
+    assert(!secs.some(sec => sec.batucada?.cuica !== undefined), 'sense cuíca');
+    assert([song.settings.batucadaPattern, ...secs.map(sec => sec.batucadaPattern).filter(Boolean)].every(p => p[8] === '0'.repeat(16)));
+    const rhythmOf = sec => Object.keys(engine.BATUCADA_RHYTHMS).find(key => sec.batucadaPattern && engine.BATUCADA_RHYTHMS[key].steps[1] === sec.batucadaPattern[1]);
+    const changes = secs.filter(sec => rhythmOf(sec) && rhythmOf(sec) !== 'percudium');
+    assert(changes.length >= 1, `canvis de ritme (${seed})`);
+    assert(changes.every(sec => (sec.bpm ?? song.settings.bpm) === bpm), 'mateix tempo');
+    assert(changes.every(sec => secs[secs.indexOf(sec) - 1].batucada?.whistle), 'el mestre avisa del canvi');
     assert.equal(song.settings.countIn, false);
     assert(secs[1].batucada?.peak && secs[1].volumes?.master > 0, 'entren tots amb potència');
     assert(secs.some(sec => sec.batucada?.dialog), 'diàlegs');
@@ -382,4 +409,9 @@ test('Percudium: timbal i xiulet sols, entrada de tots, diàlegs, aturades i ret
     for (const sec of stops) { const next = secs[secs.indexOf(sec) + 1]; assert(next.batucada?.peak && next.volumes?.master > 0, 'retorn amb potència'); }
     assert(secs.at(-1).batucada?.finale);
   }
+  assert.deepEqual([...intros].sort(), ['caixa', 'repique']);
+  // Quan canvia de ritme, continua sonant com el Percudium (pes de les peces, sala i compressió).
+  const reggae = engine.composeSongPart(st, { ...part, bars: 1, energy: 92, batucadaPattern: engine.BATUCADA_RHYTHMS.reggae.steps });
+  assert(reggae.batucadaGlue && reggae.batucadaRoom === engine.BATUCADA_FEEL.percudium.room);
+  assert.deepEqual(reggae.batucadaFeel, engine.BATUCADA_FEEL.reggae.feel);
 });

@@ -1351,9 +1351,10 @@
     const solo = variation(); solo[4] = pick(REPIQUE_SOLOS);
     // Canvis de ritme: la cançó passa per un o dos ritmes més (cadascun amb el seu tempo) i torna al principal.
     const alone = !!BATUCADA_STYLES[rhythm].alone;
-    const others = alone ? [] : shuffle(rhythms.filter(key => key !== rhythm && !BATUCADA_STYLES[key].alone), r).slice(0, r() < .5 ? 2 : 1);
+    // (El Percudium també canvia de ritme, però manté el seu tempo i el seu so.)
+    const others = shuffle(rhythms.filter(key => key !== rhythm && !BATUCADA_STYLES[key].alone), r).slice(0, r() < .5 ? 2 : 1);
     const otherPattern = Object.fromEntries(others.map(key => [key, variation(key)]));
-    const tempoOf = key => { const [a, b] = BATUCADA_STYLES[key].bpm; return Math.max(a, Math.min(b, bpm)); };
+    const tempoOf = key => { if (alone) return bpm; const [a, b] = BATUCADA_STYLES[key].bpm; return Math.max(a, Math.min(b, bpm)); };
     // Algunes cançons són compactes: convenções en què tota la batucada toca la mateixa figura, molt junta.
     const compact = r() < .35;
     // Cuíca: només als solos de cuíca, amb les frases enregistrades (cadenes de cops). El primer solo fa
@@ -1381,29 +1382,36 @@
       ...(compact ? [0, 1, 2].map(() => () => ({ type: 'verse', bars: 4, energy: 94, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI), ending: 'break' })) : [])
     ];
     let bars = 4, round = 0, last = null;
-    // Percudium: forma pròpia. Uns 5 segons de timbal i xiulet sols (dos compassos) i, després, entren tots alhora;
-    // diàlegs entre grups d'instruments, aturades (breques i silencis) i retorns amb tota la potència,
-    // convenções de tots junts i un final de tots els instruments al màxim volum.
+    // Percudium: forma pròpia. Comença amb la caixa o el repique fent un ritme i, alhora, el xiulet del mestre
+    // (dos curts i un de llarg), uns 5 segons; després entren tots alhora (sense cuíca: al Percudium no n'hi ha).
+    // Diàlegs en què el grup que parla puja el volum i el que replica també (entre dos grups o afegint-n'hi un
+    // tercer), aturades i represes amb tota la potència, canvis de ritme (amb el mateix tempo) i un final de
+    // tots els instruments al màxim volum.
     if (alone) {
       plan.length = 0;
-      plan.push({ type: 'intro', bars: 2, energy: 92, pattern: base, rhythm, intro: 'timbal' });
+      plan.push({ type: 'intro', bars: 2, energy: 92, pattern: base, rhythm, intro: r() < .5 ? 'caixa' : 'repique' });
       bars = 2;
+      let dialogs = Math.floor(r() * 3), changes = 0;
+      const dialog = (pattern, ending) => ({ type: 'bridge', bars: 8, energy: 92, pattern, rhythm, dialog: 1 + dialogs++ % 3, ending });
+      const rhythmChange = () => { const key = others[changes++ % others.length]; return { type: 'verse', bars: 8, energy: 94, pattern: otherPattern[key], rhythm: key }; };
       const cycle = [
         () => ({ type: 'verse', bars: 8, energy: 92, pattern: base, rhythm }),
         () => ({ type: 'chorus', bars: 8, energy: 96, pattern: groove, rhythm }),
-        () => ({ type: 'bridge', bars: 8, energy: 92, pattern: groove, rhythm, dialog: dialogs++ % 2 ? 2 : 1, ending: 'break' }),
+        () => dialog(groove, 'break'),
         () => ({ type: 'chorus', bars: 8, energy: 98, pattern: variation(), rhythm }),
+        rhythmChange,
         () => ({ type: 'verse', bars: 4, energy: 96, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI), ending: pick(['break', 'silence']) }),
+        () => dialog(base, pick(['break', 'stop'])),
         () => ({ type: 'solo', bars: 8, energy: 94, pattern: solo, rhythm }),
-        () => ({ type: 'bridge', bars: 8, energy: 92, pattern: base, rhythm, dialog: dialogs++ % 2 ? 2 : 1, ending: pick(['break', 'stop']) }),
+        rhythmChange,
         () => ({ type: 'chorus', bars: 8, energy: 100, pattern: groove, rhythm })
       ];
-      let dialogs = Math.floor(r() * 2);
       for (let k = 0; bars + 4 < target && plan.length < 24; k++) {
-        // Després de la primera volta, de tant en tant un solo de cuíca.
-        const block = k >= cycle.length && k % 5 === 2 ? cuicaSolo() : cycle[k % cycle.length]();
+        const block = cycle[k % cycle.length]();
         plan.push(block); bars += block.bars;
       }
+      // Sempre hi ha algun canvi de ritme (també a les cançons curtes).
+      if (!plan.some(block => block.rhythm !== rhythm)) { const block = rhythmChange(); plan.splice(Math.min(plan.length, 4), 0, block); bars += block.bars; }
     }
     // Es van afegint voltes fins a arribar a la durada (amb l'outro de quatre compassos).
     while (!alone && bars + 4 < target && plan.length < 24) {
