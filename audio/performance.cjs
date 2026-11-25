@@ -102,6 +102,29 @@ function createPerformance(spec) {
   // Piano vertical gravat (VSCO 2 CE): canal propi, després de les preses de guitarra.
   const PIANO = 17 + guitarTakes.length;
   if (has('piano')) { channels.push(patch(PIANO, [2, 0], 74, 94)); instrumentOf[PIANO] = 'piano'; }
+  // Ska: secció de vents doblada. Cada vent té un segon músic (trompeta 2, trombó 2 i saxo 2) que
+  // toca la mateixa frase una tercera diatònica per sota, una mica més fluix i obert a l'altre costat:
+  // la secció sona més plena i a diverses veus. Cada segon músic té canals propis (i staccato).
+  const T2 = PIANO + 1, B2 = PIANO + 2, S2 = PIANO + 3, T2S = PIANO + 4, B2S = PIANO + 5;
+  const SECOND = {}, STACCATO = { 3: 12, 4: 13, [T2]: T2S, [B2]: B2S };
+  if (spec.style === 'ska') {
+    if (has('trumpet')) { channels.push(patch(T2, chosen('trumpet') ?? [2, 56], 72, 106), patch(T2S, [3, 56], 72, 106)); instrumentOf[T2] = instrumentOf[T2S] = 'trumpet'; SECOND[3] = T2; }
+    if (has('trombone')) { channels.push(patch(B2, tromboneSound, 58, 102), patch(B2S, [3, 57], 58, 116)); instrumentOf[B2] = instrumentOf[B2S] = 'trombone'; SECOND[4] = B2; }
+    if (has('sax')) { channels.push(patch(S2, [2, 66], 98, 86)); instrumentOf[S2] = 'sax'; SECOND[8] = S2; }
+    realBrass[T2] = realBrass[3]; realBrass[B2] = realBrass[4];
+  }
+  // Tercera diatònica per sota (dins de l'escala de la secció); fora de l'escala, la nota de l'acord
+  // de 3 a 4 semitons per sota. Si queda massa greu, l'octava avall o, si tampoc hi cap, l'uníson.
+  const SCALE = (spec.mode === 'major' ? [0, 2, 4, 5, 7, 9, 11] : spec.mode === 'dorian' ? [0, 2, 3, 5, 7, 9, 10] : [0, 2, 3, 5, 7, 8, 10])
+    .map(n => (n + (spec.tonic || 0)) % 12);
+  function thirdBelow(pitch, chord, lo) {
+    let q = pitch, steps = 0;
+    if (SCALE.includes(((pitch % 12) + 12) % 12)) {
+      while (steps < 2 && q > pitch - 5) { q--; if (SCALE.includes(((q % 12) + 12) % 12)) steps++; }
+    } else q = chord ? nearest(pitch - 3.5, chord.pcs, pitch - 4, pitch - 3) : pitch - 3;
+    if (q >= lo) return q;
+    return pitch - 12 >= lo ? pitch - 12 : pitch;
+  }
   // Un instrument amb trams només sona dins d'aquests compassos.
   function audible(channel, start) {
     const take = takeChannels.get(channel);
@@ -169,12 +192,12 @@ function createPerformance(spec) {
   // secció real. Comparteixen la deriva i la variació de cada cop (una per moment de la partitura);
   // cada músic només hi afegeix ±2 ms propis. Abans cada vent i cada canal d'staccato derivava per
   // separat i els cops del riff sortien desajustats fins a 26 ms.
-  const HORNS = new Set([3, 4, 8, 12, 13]), sectionHit = new Map();
+  const HORNS = new Set([3, 4, 8, 12, 13, T2, B2, S2, T2S, B2S]), sectionHit = new Map();
   // Ska: cada músic de la secció té el seu lloc. La trompeta mana, el saxo va un pèl darrere i el
   // trombó (més greu i lent de resposta) una mica més; i cap no està afinat exactament igual
   // (uns pocs cents amunt o avall, en unitats de pitch bend: 41 ≈ 1 cent). Això fa el so de secció.
-  const HORN_SEAT = punk ? {} : { 3: 0, 12: 0, 8: 3, 4: 5, 13: 5 };
-  const HORN_TUNE = punk || !human ? {} : { 3: 100, 12: 100, 8: 170, 4: -140, 13: -140 };
+  const HORN_SEAT = punk ? {} : { 3: 0, 12: 0, 8: 3, 4: 5, 13: 5, [T2]: 2, [T2S]: 2, [S2]: 4, [B2]: 7, [B2S]: 7 };
+  const HORN_TUNE = punk || !human ? {} : { 3: 100, 12: 100, 8: 170, 4: -140, 13: -140, [T2]: -120, [T2S]: -120, [S2]: -150, [B2]: 110, [B2S]: 110 };
   // Atzar propi per al rasgueig i les caigudes: no altera la resta de la interpretació.
   const extraRandom = rng(seedBase * 71 + 5);
   function hornJitter(start) {
@@ -229,7 +252,7 @@ function createPerformance(spec) {
   // crescendo d'expressió a les notes llargues i vibrato al final.
   function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false, connectedBefore = false, endsPhrase = false) {
     // Només els accents curts separats fan servir les mostres de staccato.
-    if (realBrass[channel] && duration < .3 && !connected) channel += 9;
+    if (realBrass[channel] && STACCATO[channel] !== undefined && duration < .3 && !connected) channel = STACCATO[channel];
     const at = Math.max(0, start), long = duration > beat * .9, center = 8192 + (HORN_TUNE[channel] || 0);
     // Nota lligada a l'anterior: atac suau (CC73, uns 30 ms) perquè no se senti el cop de llengua
     // de la mostra gravada; la resta de notes, atac natural.
@@ -493,18 +516,23 @@ function createPerformance(spec) {
       if (instrument === 'synthLead') { note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0); continue; }
       // Final de frase: després hi ha un silenci de mig temps o més (o s'acaba la línia).
       const endsPhrase = !next || (next[0] * 4 + next[1]) - (b * 4 + t + duration) >= .5;
-      if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected, slurred, joinedPrevious, endsPhrase);
+      let channel, played, force = velocity, lowest;
+      if (instrument === 'trumpet') { channel = 3; played = pitch; lowest = 55; }
       else if (instrument === 'sax') {
         // El saxo toca la seva línia en el registre agut del tenor (55–74), per sobre
         // de la segona veu i de la guitarra, perquè no quedi tapat.
         // Les notes que encara en queden fora només es pleguen si surten de l'extensió real del tenor.
-        horn(8, fold(pitch + saxShift, 46, 76), at, length, velocity, accent, connected, slurred, joinedPrevious, endsPhrase);
+        channel = 8; played = fold(pitch + saxShift, 46, 76); lowest = 46;
       }
       else {
         // Amb línia pròpia es toca tal com està composta (dins del registre del trombó);
         // sense, harmonitza la melodia amb notes de l'acord.
-        horn(4, own ? fold(pitch + tromboneShift, 40, 72) : nearest(pitch - 12, chord.pcs, 45, 67), at, length, velocity - 5, accent, connected, slurred, joinedPrevious, endsPhrase);
+        channel = 4; played = own ? fold(pitch + tromboneShift, 40, 72) : nearest(pitch - 12, chord.pcs, 45, 67); force = velocity - 5; lowest = 40;
       }
+      horn(channel, played, at, length, force, accent, connected, slurred, joinedPrevious, endsPhrase);
+      // Segon músic de la secció (només a l'ska): la mateixa frase una tercera per sota, més fluix.
+      if (SECOND[channel] !== undefined)
+        horn(SECOND[channel], thirdBelow(played, chord, lowest), at, length, force - 10, accent, connected, slurred, joinedPrevious, endsPhrase);
     }
   }
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };

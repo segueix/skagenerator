@@ -607,12 +607,16 @@
       else if (!punk) {
         if (sec.type === 'intro' || sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' }); }
         // Nutty: el piano ja omple l'estrofa i hi respon el saxo; l'orgue entra a la tornada.
-        if (sec.type === 'verse') { verses++; if (key !== 'nutty') add(sec, 'organ', { revision: 2 }); if (verses > 1) add(sec, key === 'nutty' ? 'sax' : 'trumpet', { line: 'answer' }); }
-        if (sec.type === 'prechorus') add(sec, 'trombone', { line: 'answer' });
+        // Els vents responen com a secció (no la trompeta sola): trompeta i trombó junts, i el saxo
+        // s'hi suma excepte als subgèneres lents; a l'última tornada, sempre tots tres.
+        const section = (sec, line, full) => { add(sec, 'trumpet', { line }); add(sec, 'trombone', { line }); if (full) add(sec, 'sax', { line }); };
+        if (sec.type === 'verse') {
+          verses++; if (key !== 'nutty') add(sec, 'organ', { revision: 2 });
+          if (verses > 1) { if (key === 'nutty') add(sec, 'sax', { line: 'answer' }); section(sec, 'answer', !mellow); }
+        }
+        if (sec.type === 'prechorus') { add(sec, 'trombone', { line: 'answer' }); add(sec, 'sax', { line: 'answer' }); }
         if (sec.type === 'chorus') {
-          add(sec, 'trumpet', { line: sing ? 'answer' : 'riff' });
-          if (sec === lastChorus) add(sec, 'trombone', { line: sing ? 'answer' : 'riff' });
-          if (!sing && !mellow) add(sec, 'sax', { line: 'riff' });
+          section(sec, sing ? 'answer' : 'riff', !mellow || sec === lastChorus);
           if (key === 'nutty') add(sec, 'organ', { revision: 1 });
           if (key === 'skapunk') add(sec, 'guitar2', { fx: { type: 'distortion', drive: 65, tone: 55 }, revision: 2 });
         }
