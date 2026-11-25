@@ -137,15 +137,13 @@
   // (les GM saturades porten la distorsió a la mostra: s'hi afegeix només un boost o res).
   // Probabilitat que la guitarra solista toqui el riff a la intro (punk amb veu).
   const LEAD_INTRO = { eastbay: .35, poppunk: .5, punk77: .55, oi: .45, skatepunk: .6, garage: .6, postpunk: .55, hardcore: .45, horrorpunk: .7 };
-  // Cinc guitarres solistes per al punk, totes gravades (FreePats FSBS), cadascuna amb la seva cadena
-  // d'efectes. La ràdio les va alternant d'una cançó a l'altra (opció «leadGuitar»); si no, a l'atzar.
-  // Les distorsionades ja porten el so de l'amplificador: només un boost suau amb el to fosc.
+  // Guitarres solistes del punk (triades escoltant deu solos de prova): cadascuna amb la seva
+  // cadena d'efectes. La ràdio les va alternant d'una cançó a l'altra (opció «leadGuitar»);
+  // si no, a l'atzar.
   const PUNK_LEAD_GUITARS = [
-    { name: 'Distorsionada 1', sound: 'dist1', fx: ['boost', 15, 44] },
-    { name: 'Distorsionada 2', sound: 'dist2', fx: ['boost', 15, 46] },
-    { name: 'Jazz saturada', sound: 'jazz', fx: ['tape', 75, 46] },
     { name: 'Directa amb overdrive', sound: 'direct', fx: ['overdrive', 65, 48] },
-    { name: 'Neta amb distorsió', sound: 'clean', fx: ['distortion', 58, 48] }
+    { name: 'Neta amb guany alt (metal)', sound: 'clean', fx: ['metal', 40, 50] },
+    { name: 'Saturada GM amb boost', sound: 'overdrive', fx: ['boost', 30, 46] }
   ];
   function planHighlights(song, key, r, options = {}) {
     const fit0 = FIT[key] || FIT.twotone, sections = song.sections, st = song.settings, excluded = excludedBy(song);
@@ -392,7 +390,7 @@
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
     if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
     // Punk: la segona rítmica no és un calc de la primera (una mica més o menys de guany i de to),
-    // i la solista és una de les cinc guitarres solistes (l'horror punk manté el so Misfits).
+    // i la solista és una de les guitarres solistes del punk (l'horror punk manté el so Misfits).
     let leadSound = null;
     if (punk && fx && key !== 'horrorpunk') {
       const nudge = (n, d) => Math.max(0, Math.min(100, n + Math.round((r() - .5) * 2 * d)));

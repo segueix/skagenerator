@@ -523,9 +523,8 @@ test('ska: respostes variades a la segona estrofa i a l’última tornada, i de 
   assert(modulated >= 2 && modulated <= 16, `ponts al IV grau: ${modulated}`);
 });
 
-test('punk: cinc guitarres solistes gravades que es poden triar per torns', () => {
-  assert.equal(builder.PUNK_LEAD_GUITARS.length, 5);
-  assert.equal(new Set(builder.PUNK_LEAD_GUITARS.map(g => g.sound)).size, 5);
+test('punk: les guitarres solistes triades es poden fer sonar per torns', () => {
+  assert.deepEqual(builder.PUNK_LEAD_GUITARS.map(g => `${g.sound}:${g.fx[0]}`), ['direct:overdrive', 'clean:metal', 'overdrive:boost']);
   const leadOf = song => song.clips.find(c => c.instrument === 'guitar3' && c.sound)?.sound;
   // Mateixa cançó (mateixa llavor) amb cada guitarra: només canvia la solista.
   const base = builder.createAutoSong(engine, 'eastbay', { seed: 99, guitars: 3, leadGuitar: 0 });

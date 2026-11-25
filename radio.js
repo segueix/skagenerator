@@ -44,7 +44,7 @@
   let favorite = '';
   try { favorite = localStorage.getItem(FAVORITE_KEY) || ''; } catch {}
   let favoriteTurn = true;
-  // Punk: les cinc guitarres solistes van per torns, una cançó rere l'altra (es recorda entre sessions).
+  // Punk: les guitarres solistes van per torns, una cançó rere l'altra (es recorda entre sessions).
   let leadTurn = 0;
   try { leadTurn = Number(localStorage.getItem(LEAD_KEY)) || 0; } catch {}
   const hasVoice = song => Array.isArray(song?.clips) && song.clips.some(c => c.instrument === 'vocal');
@@ -235,7 +235,7 @@
     if (style === 'punk') { const dice = Math.random(); options.guitars = instrumental ? (dice < .65 ? 2 : 3) : dice < .5 ? 1 : dice < .92 ? 2 : 3; }
     // Si hi ha guitarra solista (dues guitarres o més), li toca la guitarra següent de la rotació.
     if (style === 'punk' && options.guitars > 1) {
-      options.leadGuitar = leadTurn % (builder.PUNK_LEAD_GUITARS?.length || 5);
+      options.leadGuitar = leadTurn % (builder.PUNK_LEAD_GUITARS?.length || 3);
       leadTurn++; try { localStorage.setItem(LEAD_KEY, String(leadTurn)); } catch {}
     }
     const song = studio.validateSong(builder.createAutoSong(engine, subgenre, options));
