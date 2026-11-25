@@ -44,6 +44,18 @@ html:not(.radio-on) .radio { display: none; }
 .radio-chip { min-height: 40px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--r-line); background: var(--r-card); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .radio-chip b { color: var(--st); font-weight: 700; }
 .radio-chip:hover, .radio-icon:hover { border-color: var(--st); }
+/* Emissora compartida: avís a la pantalla d'inici amb el botó per escoltar-la (el navegador demana un toc). */
+/* Mòbil, dins d'una emissora: els botons de la capçalera només amb la icona (hi caben tots). */
+@media (max-width: 520px) {
+  .radio-top:has(#radio-share:not([hidden])) .chip-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .radio-top:has(#radio-share:not([hidden])) .radio-chip { padding: 8px 12px; min-width: 44px; }
+  .radio-top:has(#radio-share:not([hidden])) .radio-logo { font-size: 16px; gap: 7px; }
+}
+.radio-invite { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 16px; border-radius: 20px; background: var(--r-card); border: 1.5px solid var(--st, #c2f53b); }
+.radio-invite p { margin: 0; display: grid; gap: 2px; flex: 1 1 220px; }
+.radio-invite b { font-size: 18px; }
+.radio-invite span { font-size: 13px; color: var(--r-muted); }
+.radio-invite .radio-button { flex: 0 0 auto; min-height: 48px; padding: 10px 20px; font-weight: 700; }
 .radio-chip[aria-pressed="true"] { background: var(--st); border-color: var(--st); color: var(--st-text); }
 .radio-desktop { display: none; }
 @media (min-width: 900px) { .radio-desktop { display: inline-flex; align-items: center; } }
