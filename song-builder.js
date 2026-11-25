@@ -471,6 +471,12 @@
     const drumCount = engine.SONG_GROOVES[sg.style].drums.length;
     if (of('verse').length > 1 && key !== 'hardcore' && r() < .5) of('verse')[1].groove = { drums: (groove.drums + 1 + Math.floor(r() * (drumCount - 1))) % drumCount };
     if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });
+    // Ska: de vegades el pont (o el solo) se'n va a la tonalitat del IV grau i torna a la tornada,
+    // com als instrumentals jamaicans. (El ska-punk ja té el seu canvi de to a l'última tornada.)
+    if (!punk && key !== 'skapunk' && rng((seed ^ 0x2545f491) >>> 0)() < .5) {
+      const away = of('bridge')[0] || of('solo')[0];
+      if (away && away !== lastChorus && !away.transpose && away.start < (lastChorus?.start ?? Infinity)) away.transpose = 5;
+    }
     if (key === 'twotone' || key === 'punk77') sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     if (key === 'skapunk') { const b = of('bridge')[0] || of('solo')[0]; if (b) b.feel = { drums: .5 }; tempo(lastChorus, 1.04); sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 1; }); }
     // Skate punk: tornades a doble temps i pont a mig temps; street punk: de vegades l'última tornada puja un to.
@@ -672,10 +678,28 @@
     // La veu de la tornada, a més, ha de quedar per sobre de la de l'estrofa.
     const chosen = new Map(), clips = [], revisions = [], voiceMean = {};
     let quality = 0, judged = 0;
+    // Ska: les estrofes a partir de la segona i l'última tornada no repeteixen calcades les línies
+    // dels vents: en fan una variant (una altra versió, mai la mateixa que la primera).
+    // La veu no canvia: la tornada s'ha de poder cantar igual.
+    const choruses = sections.filter(s => s.type === 'chorus'), finalChorus = choruses.length > 1 ? choruses.at(-1) : null;
+    const variantOf = layer => {
+      if (punk || layer.instrument === 'vocal') return '';
+      if (layer.sec.type === 'verse' && sections.some(s => s.type === 'verse' && s.start < layer.sec.start)) return ':b';
+      if (layer.sec === finalChorus) return ':last';
+      return '';
+    };
+    // Les respostes dels vents (fragments del riff) també canvien: una variant per a les estrofes
+    // següents i una altra per a l'última tornada (mirall, seqüència amunt o avall; vegeu answerLine).
+    const answerRandom = rng((seed ^ 0x68e31da4) >>> 0), answerVariant = {};
+    for (const layer of layersOf) if (layer.line === 'answer' && layer.revision === undefined) {
+      const variant = variantOf(layer);
+      if (variant) layer.revision = answerVariant[variant] ??= 2 + Math.floor(answerRandom() * 3);
+    }
     layersOf.forEach((layer, i) => {
       let revision = layer.revision;
       if (revision === undefined && (MELODIC.includes(layer.instrument) && !layer.line || layer.line === 'lead')) {
-        const memo = `${layer.instrument}:${layer.sec.type}`;
+        const plain = `${layer.instrument}:${layer.sec.type}`, variant = variantOf(layer), memo = plain + variant;
+        const avoid = variant ? chosen.get(plain) : undefined;
         if (chosen.has(memo)) revision = chosen.get(memo);
         else {
           const company = layersOf.map((o, j) => [o, j]).filter(([o, j]) => o.sec === layer.sec && o.instrument !== layer.instrument
@@ -685,6 +709,7 @@
           if (layer.line === 'lead') lineModes[layer.instrument] = 'lead';
           let best = -Infinity, bestLine = null;
           for (let rev = 1; rev <= 30; rev++) {
+            if (rev === avoid) continue;
             const part = partFor(layer.sec, { ...layers, [layer.instrument]: rev }, layer);
             if (Object.keys(lineModes).length) part.lineModes = lineModes;
             const spec = engine.composeSongPart(settings, part), line = spec.lines[layer.instrument];

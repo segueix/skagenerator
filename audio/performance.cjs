@@ -170,6 +170,13 @@ function createPerformance(spec) {
   // cada músic només hi afegeix ±2 ms propis. Abans cada vent i cada canal d'staccato derivava per
   // separat i els cops del riff sortien desajustats fins a 26 ms.
   const HORNS = new Set([3, 4, 8, 12, 13]), sectionHit = new Map();
+  // Ska: cada músic de la secció té el seu lloc. La trompeta mana, el saxo va un pèl darrere i el
+  // trombó (més greu i lent de resposta) una mica més; i cap no està afinat exactament igual
+  // (uns pocs cents amunt o avall, en unitats de pitch bend: 41 ≈ 1 cent). Això fa el so de secció.
+  const HORN_SEAT = punk ? {} : { 3: 0, 12: 0, 8: 3, 4: 5, 13: 5 };
+  const HORN_TUNE = punk || !human ? {} : { 3: 100, 12: 100, 8: 170, 4: -140, 13: -140 };
+  // Atzar propi per al rasgueig i les caigudes: no altera la resta de la interpretació.
+  const extraRandom = rng(seedBase * 71 + 5);
   function hornJitter(start) {
     const key = Math.round(start * 200);
     if (!sectionHit.has(key)) { const r = rng(seedBase * 131 + key); sectionHit.set(key, (r() + r() + r() - 1.5) / .5); }
@@ -177,7 +184,7 @@ function createPerformance(spec) {
   }
   function humanTime(channel, pitch, start) {
     const name = instrumentOf[channel], [offset, slow, jitter] = FEEL[name] || [0, 0, 0], member = limb(channel, pitch);
-    if (HORNS.has(channel)) return human * tempoScale * (offset + slow * drift(99, start) + jitter * .8 * hornJitter(start) + 2 * gauss()) / 1000;
+    if (HORNS.has(channel)) return human * tempoScale * (offset + (HORN_SEAT[channel] || 0) + slow * drift(99, start) + jitter * .8 * hornJitter(start) + 2 * gauss()) / 1000;
     // El bombo és el més regular; la mà del charles és la que més respira.
     const limbScale = member === 1 ? .6 : member === 3 ? 1.2 : 1;
     return human * tempoScale * limbScale * (offset + slow * drift(channel * 8 + member, start) + jitter * gauss()) / 1000;
@@ -220,15 +227,18 @@ function createPerformance(spec) {
     events.push({ time: Math.max(0, Math.min(spec.seconds - .01, at)), type: 'pitch', channel, value: Math.round(Math.max(0, Math.min(16383, value))) }); };
   // Articulació de metalls: entrada amb una lleugera pujada d'afinació,
   // crescendo d'expressió a les notes llargues i vibrato al final.
-  function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false, connectedBefore = false) {
+  function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false, connectedBefore = false, endsPhrase = false) {
     // Només els accents curts separats fan servir les mostres de staccato.
     if (realBrass[channel] && duration < .3 && !connected) channel += 9;
-    const at = Math.max(0, start), long = duration > beat * .9;
+    const at = Math.max(0, start), long = duration > beat * .9, center = 8192 + (HORN_TUNE[channel] || 0);
     // Nota lligada a l'anterior: atac suau (CC73, uns 30 ms) perquè no se senti el cop de llengua
     // de la mostra gravada; la resta de notes, atac natural.
     control(channel, at - .003, 73, slurred ? 127 : 64);
-    bend(channel, at - .002, accent && random() < .55 ? 8192 - 700 - random() * 500 : 8192);
-    if (accent) for (let k = 1; k <= 4; k++) bend(channel, at + k * .016, 8192 - (4 - k) * 260 * (1 - k / 5));
+    bend(channel, at - .002, accent && random() < .55 ? center - 700 - random() * 500 : center);
+    if (accent) for (let k = 1; k <= 4; k++) bend(channel, at + k * .016, center - (4 - k) * 260 * (1 - k / 5));
+    // Ska: de vegades la nota llarga que tanca una frase cau (el «fall» dels metalls).
+    if (!punk && human && endsPhrase && long && extraRandom() < .22)
+      for (let k = 1; k <= 4; k++) bend(channel, at + duration * (.8 + k * .045), center - k * k * 260);
     // Crescendo subtil a les notes llargues (uns 2 dB): més fort sonava com si la nota s'apagués.
     // L'expressió és de tot el canal: dins d'una frase lligada no es toca, perquè cada canvi
     // també movia la cua de la nota anterior i la frase sonava a batzegades.
@@ -245,6 +255,15 @@ function createPerformance(spec) {
     let vel = Math.round(velocity * energy);
     vel = (vel < 64 ? Math.min(vel, 58) : Math.max(vel, 70)) + Math.round((random() - .5) * 4);
     note(channel, pitch, start, duration, vel, .006, true);
+  }
+  // Rasgueig: la pua recorre les cordes, no sonen totes alhora. A l'ska cada cop té la seva
+  // velocitat de pua (3-9 ms entre cordes), les últimes cordes sonen una mica més fluix i
+  // de tant en tant el cop va en sentit contrari. Al punk es manté el cop compacte de sempre.
+  function strum(channel, pitches, start, duration, velocity, gap) {
+    if (punk || !human) { pitches.forEach((pitch, k) => note(channel, pitch, start + k * gap, duration, velocity)); return; }
+    const spread = (.003 + extraRandom() * .006) * Math.min(1.4, .6 + human * .8);
+    const order = extraRandom() < .3 ? pitches.slice().reverse() : pitches;
+    order.forEach((pitch, k) => note(channel, pitch, start + k * spread, duration * (1 - .04 * k), velocity * (1 - .05 * k)));
   }
   const nearest = (target, pcs, lo, hi) => {
     let result = lo, dist = Infinity;
@@ -275,18 +294,16 @@ function createPerformance(spec) {
     } else if (has('guitar') && spec.guitarBase !== false) hits.forEach((t, hit) => {
       const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
       const duration = ending ? bar * .75 : beat * (punk ? restrained ? .23 : .46 : .18);
-      pitches.forEach((pitch, k) => {
-        note(0, pitch, t0 + t * beat + k * .007, duration, punk ? hit % 2 ? 76 : 100 : 90);
-        // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.
-        if (!punk && hit % 2 === 1) note(1, pitch, t0 + t * beat + .012 + k * .006, duration * .85, 46);
-      });
+      strum(0, pitches, t0 + t * beat, duration, punk ? hit % 2 ? 76 : 100 : 90, .007);
+      // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.
+      if (!punk && hit % 2 === 1) strum(1, pitches, t0 + t * beat + .012, duration * .85, 46, .006);
     });
     // Guitarra 2: rítmica aguda (acords una octava amunt) amb el seu propi patró.
     if (has('guitar2') && !guitarTakes.some(take => take.instrument === 'guitar2')) {
       const index = ((spec.layers?.guitar2 ?? 2) + 2) % guitarPatterns.length;
       (ending ? [0] : guitarPatterns[index]).forEach((t, hit) => {
         const pitches = punk ? [chord.root + 24, chord.root + 31] : chord.notes.map(n => n + 12).reverse();
-        pitches.forEach((pitch, k) => note(14, pitch, t0 + t * beat + .009 + k * .006, ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? hit % 2 ? 70 : 88 : 80));
+        strum(14, pitches, t0 + t * beat + .009, ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? hit % 2 ? 70 : 88 : 80, .006);
       });
     }
     // Preses independents de guitarra 1 i 2: patró i canal propis, sempre
@@ -297,14 +314,12 @@ function createPerformance(spec) {
       const pattern = ending ? [0] : guitarPatterns[index];
       if (take.instrument === 'guitar') {
         const pitches = punk ? [chord.root + 12, chord.root + 19, chord.root + 24] : chord.notes.slice().reverse();
-        for (const [hit, t] of pattern.entries()) for (const [k, pitch] of pitches.entries())
-          note(channel, pitch, t0 + t * beat + k * .007 + .004 * (takeIndex % 3),
-            ending ? bar * .7 : beat * (punk ? .35 : .22), punk ? (hit % 2 ? 76 : 95) : 82);
+        for (const [hit, t] of pattern.entries())
+          strum(channel, pitches, t0 + t * beat + .004 * (takeIndex % 3), ending ? bar * .7 : beat * (punk ? .35 : .22), punk ? (hit % 2 ? 76 : 95) : 82, .007);
       } else {
         const pitches = punk ? [chord.root + 24, chord.root + 31] : chord.notes.map(n => n + 12).reverse();
-        for (const [hit, t] of pattern.entries()) for (const [k, pitch] of pitches.entries())
-          note(channel, pitch, t0 + t * beat + .009 + k * .006 + .004 * (takeIndex % 3),
-            ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? (hit % 2 ? 68 : 84) : 78);
+        for (const [hit, t] of pattern.entries())
+          strum(channel, pitches, t0 + t * beat + .009 + .004 * (takeIndex % 3), ending ? bar * .7 : beat * (punk ? .35 : .18), punk ? (hit % 2 ? 68 : 84) : 78, .006);
       }
     }
     // Guitarra 3: punteig dins del registre real de la guitarra i harmonitzat
@@ -475,18 +490,20 @@ function createPerformance(spec) {
       const accent = !joinedPrevious && (t % 1 === 0 || duration >= 1);
       // Lligat (sense cop de llengua) només quan canvia l'altura: una nota repetida es torna a articular.
       const slurred = joinedPrevious && previous[2] !== pitch;
-      if (instrument === 'synthLead') note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0);
-      else if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected, slurred, joinedPrevious);
+      if (instrument === 'synthLead') { note(5, pitch, at, Math.max(.07, duration * beat - .03), 82, 0); continue; }
+      // Final de frase: després hi ha un silenci de mig temps o més (o s'acaba la línia).
+      const endsPhrase = !next || (next[0] * 4 + next[1]) - (b * 4 + t + duration) >= .5;
+      if (instrument === 'trumpet') horn(3, pitch, at, length, velocity, accent, connected, slurred, joinedPrevious, endsPhrase);
       else if (instrument === 'sax') {
         // El saxo toca la seva línia en el registre agut del tenor (55–74), per sobre
         // de la segona veu i de la guitarra, perquè no quedi tapat.
         // Les notes que encara en queden fora només es pleguen si surten de l'extensió real del tenor.
-        horn(8, fold(pitch + saxShift, 46, 76), at, length, velocity, accent, connected, slurred, joinedPrevious);
+        horn(8, fold(pitch + saxShift, 46, 76), at, length, velocity, accent, connected, slurred, joinedPrevious, endsPhrase);
       }
       else {
         // Amb línia pròpia es toca tal com està composta (dins del registre del trombó);
         // sense, harmonitza la melodia amb notes de l'acord.
-        horn(4, own ? fold(pitch + tromboneShift, 40, 72) : nearest(pitch - 12, chord.pcs, 45, 67), at, length, velocity - 5, accent, connected, slurred, joinedPrevious);
+        horn(4, own ? fold(pitch + tromboneShift, 40, 72) : nearest(pitch - 12, chord.pcs, 45, 67), at, length, velocity - 5, accent, connected, slurred, joinedPrevious, endsPhrase);
       }
     }
   }
