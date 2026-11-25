@@ -545,8 +545,10 @@ function createPerformance(spec) {
     }
   }
   if (has('drums') && spec.batucadaLine) {
-    for (const [barIndex, step, pitch, velocity, duration] of spec.batucadaLine) {
-      note(9, pitch, (barIndex * 4 + step) * beat, duration ?? .35, velocity, duration === undefined ? .002 : 0);
+    // La batucada ja porta la dinàmica escrita (cop a cop): no es torna a escalar amb l'energia.
+    // Els cops marcats com a junts (convenções, cops de tots) i el xiulet van a temps exacte.
+    for (const [barIndex, step, pitch, velocity, duration, tight] of spec.batucadaLine) {
+      note(9, pitch, (barIndex * 4 + step) * beat, duration ?? .35, velocity / energy, duration == null && !tight ? .002 : 0);
     }
   }
   if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {

@@ -1341,47 +1341,83 @@
       rhythm = pool.find(key => (roll -= BATUCADA_STYLES[key].weight) < 0) || pool[0];
     }
     const [low, high] = BATUCADA_STYLES[rhythm].bpm, bpm = low + Math.floor(r() * (high - low + 1));
-    const variation = () => engine.generateBatucadaPattern(rhythm, Math.floor(r() * 4294967295) + 1);
+    const variation = (key = rhythm) => engine.generateBatucadaPattern(key, Math.floor(r() * 4294967295) + 1);
     const base = variation(), groove = variation();
     const solo = variation(); solo[4] = pick(REPIQUE_SOLOS);
+    // Canvis de ritme: la cançó passa per un o dos ritmes més (cadascun amb el seu tempo) i torna al principal.
+    const others = shuffle(rhythms.filter(key => key !== rhythm), r).slice(0, r() < .5 ? 2 : 1);
+    const otherPattern = Object.fromEntries(others.map(key => [key, variation(key)]));
+    const tempoOf = key => { const [a, b] = BATUCADA_STYLES[key].bpm; return Math.max(a, Math.min(b, bpm)); };
+    // Algunes cançons són compactes: convenções en què tota la batucada toca la mateixa figura, molt junta.
+    const compact = r() < .35;
+    // Cuíca amb distorsions encadenades (en la majoria de cançons).
+    const chain = r() < .7 ? Math.floor(r() * engine.CUICA_CHAINS.length) : undefined;
     // Durada: entre 2 i 4 minuts (o la que es demani), sense passar dels límits de la cançó.
     const minutes = Math.max(1.5, Math.min(5, options.minutes ?? 2 + r() * 2));
     const barSeconds = 240 / bpm, target = Math.min(240, Math.round(minutes * 60 / barSeconds));
-    // Blocs: [tipus, compassos, energia, patró, final de secció].
-    const plan = [['intro', 4, 72, base]];
-    const middle = [['verse', 8, 70, base], ['chorus', 8, 86, groove]];
-    const extras = [() => ['bridge', 4, 36, base, r() < .5 ? 'break' : 'stop'], () => ['solo', 8, 82, solo], () => ['verse', 4, 74, groove, 'break']];
-    let bars = 4, round = 0;
+    const plan = [{ type: 'intro', bars: 4, energy: 72, pattern: base, rhythm }];
+    // Entre volta i volta: canvi de ritme, paradinha, solo de repique, solo de cuíca o convenção.
+    const change = others.map(key => () => ({ type: 'verse', bars: 8, energy: 78, pattern: otherPattern[key], rhythm: key, ...(chain !== undefined && r() < .5 ? { cuica: true } : {}) }));
+    const extras = [
+      ...change, ...change,
+      () => ({ type: 'bridge', bars: 4, energy: 40, pattern: base, rhythm, ending: r() < .5 ? 'break' : 'stop' }),
+      () => ({ type: 'solo', bars: 8, energy: 80, pattern: solo, rhythm }),
+      ...(chain !== undefined ? [() => ({ type: 'solo', bars: 4, energy: 68, pattern: base, rhythm, cuica: true })] : []),
+      ...(compact ? [0, 1, 2].map(() => () => ({ type: 'verse', bars: 4, energy: 86, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI), ending: 'break' })) : [])
+    ];
+    let bars = 4, round = 0, last = null;
     // Es van afegint voltes fins a arribar a la durada (amb l'outro de quatre compassos).
     while (bars + 4 < target && plan.length < 24) {
-      for (const block of middle) { const [type, n, energy, pattern] = block; plan.push([type, n, Math.min(100, energy + round * 4), pattern]); bars += n; }
-      // Entre volta i volta: paradinha, solo de repique o breca.
-      if (bars + 4 < target) { const extra = extras[(round + Math.floor(r() * extras.length)) % extras.length](); plan.push(extra); bars += extra[1]; }
+      plan.push({ type: 'verse', bars: 8, energy: 70 + round * 3, pattern: base, rhythm });
+      plan.push({ type: 'chorus', bars: 8, energy: 82 + round * 3, pattern: groove, rhythm, ...(chain !== undefined && r() < .6 ? { cuica: true } : {}) });
+      bars += 16;
+      // Un o dos blocs entre volta i volta (sense repetir el mateix just després).
+      for (let k = 0; k < (r() < .45 ? 2 : 1) && bars + 4 < target; k++) {
+        // Una volta de cada dues comença amb un canvi de ritme.
+        let make = k === 0 && round % 2 === 0 ? change[(round / 2) % change.length] : pick(extras);
+        for (let tries = 0; make === last && tries < 5; tries++) make = pick(extras);
+        last = make;
+        const block = make(); plan.push(block); bars += block.bars;
+      }
       round++;
     }
     // Una breca abans de l'última tornada.
-    const lastChorus = plan.map(b => b[0]).lastIndexOf('chorus');
-    if (lastChorus > 1 && !plan[lastChorus - 1][4]) plan[lastChorus - 1][4] = r() < .5 ? 'break' : 'stop';
+    const lastChorus = plan.map(b => b.type).lastIndexOf('chorus');
+    if (lastChorus > 1 && !plan[lastChorus - 1].ending) plan[lastChorus - 1].ending = r() < .5 ? 'break' : 'stop';
     const closing = pick(['hit', 'hit', 'ring', 'cold']);
-    plan.push(['outro', 4, 92, groove]);
+    plan.push({ type: 'outro', bars: 4, energy: 94, pattern: groove, rhythm });
+    // Moments clau, on la batucada puja molt: l'entrada de tots, la represa després de cada breca,
+    // l'última tornada i el final. La resta de canvis de volum són petits.
+    plan.forEach((block, i) => {
+      const previous = plan[i - 1];
+      block.peak = i === 1 || !!previous?.ending || i === lastChorus || block.type === 'outro';
+    });
     const id = `batucada-${seed.toString(36)}`, sections = [];
     let at = 0;
-    plan.forEach(([type, n, energy, pattern, ending], i) => {
-      const sec = { id: `${id}-s${i + 1}`, type, start: at, bars: n, lyrics: '', energy: Math.max(10, Math.min(100, Math.round(energy))) };
-      if (pattern !== base) sec.batucadaPattern = pattern.slice();
-      if (ending) sec.ending = ending;
-      if (type === 'outro' && closing !== 'hit') sec.closing = closing;
-      sections.push(sec); at += n;
+    plan.forEach((block, i) => {
+      const next = plan[i + 1];
+      const sec = { id: `${id}-s${i + 1}`, type: block.type, start: at, bars: block.bars, lyrics: '', energy: Math.max(10, Math.min(100, Math.round(block.energy))) };
+      if (block.pattern !== base) sec.batucadaPattern = block.pattern.slice();
+      if (block.ending) sec.ending = block.ending;
+      if (block.type === 'outro' && closing !== 'hit') sec.closing = closing;
+      if (tempoOf(block.rhythm) !== bpm) sec.bpm = tempoOf(block.rhythm);
+      // El mestre xiula a l'entrada, abans de cada breca i de cada canvi de ritme, i al final.
+      const whistle = i === 0 || !!block.ending || block.type === 'outro' || (next && next.rhythm !== block.rhythm) || !!next?.tutti || r() < .2;
+      const fx = { ...(block.peak ? { peak: true } : {}), ...(whistle ? { whistle: true } : {}), ...(block.tutti ? { tutti: block.tutti } : {}),
+        ...(block.cuica ? { cuica: chain } : {}) };
+      if (Object.keys(fx).length) sec.batucada = fx;
+      // Als moments clau també puja el volum general de la secció.
+      if (block.peak) sec.volumes = { master: 3 };
+      sections.push(sec); at += block.bars;
     });
     // De vegades l'última tornada s'accelera una mica, com quan la batucada s'escalfa.
-    const final = sections.filter(s => s.type === 'chorus').at(-1);
-    if (final && r() < .4) final.bpm = Math.min(high + 6, bpm + 4);
-    if (final?.bpm) sections.at(-1).bpm = final.bpm;
+    const final = sections[lastChorus];
+    if (final && r() < .4) { final.bpm = Math.min(high + 6, bpm + 4); sections.at(-1).bpm = final.bpm; }
     const taken = new Set((options.avoidTitles || []).map(t => String(t).toLowerCase()));
     let title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
     for (let tries = 0; taken.has(title.toLowerCase()) && tries < 40; tries++) title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
     const settings = { style: 'ska', bpm, tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
-      batucadaRhythm: rhythm, batucadaPattern: base, countIn: true, humanize: .5 };
+      batucadaRhythm: rhythm, batucadaPattern: base, countIn: true, humanize: compact ? .12 : .5 };
     return { version: 3, title, settings, base: { instruments: ['drums'], revision: 1, generated: true }, harmony: {}, sections, clips: [] };
   }
   // Una cançó és de batucada si només hi sona el kit de batucada.
