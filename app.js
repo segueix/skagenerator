@@ -48,6 +48,8 @@
     if (sec.hits) out.push('💥 cops de secció');
     if (sec.shout) out.push('📣 tornada shout');
     if (sec.pickup) out.push('↗ entrada dels vents abans del temps');
+    if (sec.bassSolo) out.push(`🎸 baix sol (${sec.bassSolo} c.)`);
+    if (sec.bassBreak) out.push('🎸 últim compàs, baix sol');
     return out;
   }
   const FADES = [['', 'Sense fos'], ['in', 'Fos d’entrada (puja des del silenci)'], ['out', 'Fos de sortida (baixa fins al silenci)']];
@@ -200,7 +202,7 @@
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
         || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.ending !== undefined && !['stop', 'none', 'break', 'silence'].includes(s.ending))
-        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || ['hits', 'shout', 'pickup'].some(f => s[f] !== undefined && typeof s[f] !== 'boolean') || (s.stopTime !== undefined && (!Number.isInteger(s.stopTime) || s.stopTime < 1 || s.stopTime > 8 || s.stopTime > s.bars)) || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
+        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || ['hits', 'shout', 'pickup', 'bassBreak'].some(f => s[f] !== undefined && typeof s[f] !== 'boolean') || (s.bassSolo !== undefined && (!Number.isInteger(s.bassSolo) || s.bassSolo < 1 || s.bassSolo > 8 || s.bassSolo > s.bars)) || (s.stopTime !== undefined && (!Number.isInteger(s.stopTime) || s.stopTime < 1 || s.stopTime > 8 || s.stopTime > s.bars)) || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
         || ['entrance', 'exit'].some(f => s[f] !== undefined && (!s[f] || typeof s[f] !== 'object' || Array.isArray(s[f]) || Object.entries(s[f]).some(([n, b]) => !Object.hasOwn(INSTRUMENTS, n) || !Number.isInteger(b) || b < 0 || b > MAX_SECTION))) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
         || !validBaseEdits(s) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
@@ -303,6 +305,8 @@
       if (sec.shout) part.shout = true;
       if (sec.stopTime) part.stopTime = sec.stopTime;
       if (sec.pickup) part.pickup = true;
+      if (sec.bassSolo) part.bassSolo = sec.bassSolo;
+      if (sec.bassBreak) part.bassBreak = true;
       if (sec.phraseBars) part.phraseBars = sec.phraseBars; // frases de la veu de 4 compassos (lletra curta)
       // Si en aquesta secció falten instruments (sobretot guitarres fortes), la resta puja una mica.
       const boost = options.baseOnly ? 0 : builder.densityBoost(s, sec);

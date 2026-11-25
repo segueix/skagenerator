@@ -8,7 +8,11 @@ const part = (type, instruments) => engine.composeSongPart({ seed: 42, style: 'p
 test('punk: una sola rítmica i estrofes amb espai respecte a la tornada', () => {
   const verse = createPerformance(part('verse', ['guitar'])), chorus = createPerformance(part('chorus', ['guitar']));
   const attacks = p => p.events.filter(e => e.type === 'on' && e.channel === 0);
-  assert(!verse.events.some(e => e.type === 'on' && e.channel === 1));
+  // Una sola part de rítmica: el canal 1 només la dobla (mateixes notes), oberta a l'altre costat.
+  const notes = (p, c) => p.events.filter(e => e.type === 'on' && e.channel === c).map(e => e.note);
+  assert.deepEqual(notes(verse, 1), notes(verse, 0));
+  const pan = c => verse.channels.find(p => p.channel === c).pan;
+  assert(pan(0) < 40 && pan(1) > 90);
   assert(attacks(verse).length < attacks(chorus).length);
 });
 test('trompeta: corxeres lligades sense staccato i silencis conservats', () => {

@@ -1823,9 +1823,13 @@
             { name: 'Punk directe', kick: [0, 2, 2.5], snare: [1, 3], hat: 'eighths' },
             { name: 'Mig temps', kick: [0, 1.5, 3.5], snare: [2], hat: 'quarters' },
             { name: 'D-beat', kick: [0, 1.5, 2, 3.5], snare: [1, 3], hat: 'eighths' },
-            { name: 'Skate punk · doble temps', kick: [0, 1, 2, 3], snare: [.5, 1.5, 2.5, 3.5], hat: 'quarters' },
+            { name: 'Skank beat (2-step) · doble temps', kick: [0, 1, 2, 3], snare: [.5, 1.5, 2.5, 3.5], hat: 'quarters' },
             { name: 'Timbals', kick: [0, 2], snare: [1, 3], hat: 'toms' },
-            { name: 'Sincopat', kick: [0, .75, 2, 2.5], snare: [1, 3], hat: 'eighths' }
+            { name: 'Sincopat', kick: [0, .75, 2, 2.5], snare: [1, 3], hat: 'eighths' },
+            // D-beat clàssic (Discharge): bombo a l'u, al «i» del dos i al tres; caixa al 2 i al 4; plat obert.
+            { name: 'D-beat clàssic', kick: [0, 1.5, 2], snare: [1, 3], hat: 'crash' },
+            // Tribal: timbal base a corxeres i timbals aguts, gairebé sense caixa (post-punk, horror).
+            { name: 'Tribal (timbals)', kick: [0, 2], snare: [3], hat: 'tribal' }
         ],
         urban: [
             { name: 'Boom bap', kick: [0, 1.75, 2.5], snare: [1, 3], hat: 'eighths', roll: true },
@@ -1859,6 +1863,16 @@
     // Redobles: cada un és una llista de [temps dins del compàs, peça, força].
     // Mida segons la secció que ve: petit (cap a una estrofa), mitjà o gran
     // (cap a una tornada o un solo). Es tria per secció perquè no es repeteixin.
+    const PUNK_FILLS = [
+        [[2, 38, 96], [2.25, 38, 90], [2.5, 38, 100], [2.75, 38, 96], [3, 48, 104], [3.25, 45, 104], [3.5, 36, 122], [3.5, 38, 118], [3.5, 49, 116]],
+        [[2, 38, 100], [2.5, 38, 104], [3, 38, 108], [3.5, 36, 122], [3.5, 38, 118], [3.5, 57, 112]],
+        [[2, 45, 98], [2.25, 45, 92], [2.5, 43, 102], [2.75, 43, 96], [3, 41, 106], [3.25, 41, 100], [3.5, 36, 122], [3.5, 38, 118], [3.5, 49, 114]],
+        [[1, 38, 90], [1.5, 38, 94], [2, 38, 98], [2.5, 38, 102], [3, 38, 108], [3.25, 38, 112], [3.5, 36, 122], [3.5, 38, 120], [3.5, 49, 116]],
+        [[2, 36, 104], [2, 38, 104], [2.5, 36, 108], [2.5, 38, 108], [3, 36, 112], [3, 38, 112], [3.5, 36, 122], [3.5, 38, 120], [3.5, 57, 114]],
+        [[2.5, 38, 98], [2.75, 38, 104], [3, 48, 108], [3.25, 43, 110], [3.5, 36, 122], [3.5, 49, 118]],
+        [[2, 38, 92], [2.125, 38, 80], [2.25, 38, 96], [2.375, 38, 84], [2.5, 38, 100], [2.625, 38, 88], [2.75, 38, 104], [2.875, 38, 92], [3, 45, 108], [3.25, 43, 110], [3.5, 36, 122], [3.5, 38, 118], [3.5, 49, 114]],
+        [[2, 48, 100], [2.5, 48, 96], [2.75, 45, 100], [3, 45, 104], [3.25, 43, 108], [3.5, 36, 122], [3.5, 38, 118], [3.5, 57, 114]]
+    ];
     const FILLS = {
         small: [
             [[3.5, 38, 70], [3.75, 38, 82]],
@@ -1887,7 +1901,10 @@
         // (la cançó s'esvaeix), 'cold' tall en sec sense plats, 'ring' redoble llarg i acord final.
         const closing = type === 'outro' ? options.closing || 'hit' : 'hit', fading = closing === 'fade';
         const size = next === 'chorus' || next === 'solo' || next === 'end' ? 'big' : next === undefined ? null : next === type ? 'small' : 'medium';
-        const pickFill = (wanted, salt = 0) => { const list = FILLS[wanted]; return list[((options.fill || 0) * 7 + salt * 3 + index) % list.length]; };
+        // Punk: abans d'una tornada, redobles propis que acaben amb un cop sec (bombo, caixa i plat
+        // apagat junts) i un instant de silenci.
+        const intoChorus = styleName === 'punk' && next === 'chorus';
+        const pickFill = (wanted, salt = 0) => { const list = intoChorus && wanted === 'big' ? PUNK_FILLS : FILLS[wanted]; return list[((options.fill || 0) * 7 + salt * 3 + index) % list.length]; };
         const hit = (b, t, note, force) => line.push([b, t, note, force]);
         const big = energy >= 70, quiet = energy < 45, half = Math.max(1, Math.floor(bars / 2));
         // Atzar fix per compàs (la mateixa secció sona sempre igual).
@@ -1927,7 +1944,9 @@
             const crescendo = last && (type === 'prechorus' || type === 'bridge');
             const fillSize = last && ending !== 'none' ? (type === 'outro' ? 'big' : size ? (quiet && size === 'big' ? 'medium' : size) : big ? 'big' : quiet ? 'small' : 'medium') : null;
             const fillFrom = crescendo ? 0 : !fillSize ? 4 : Math.min(...pickFill(fillSize).map(([t]) => t));
-            if (!build && !drop && ((b === buildBars && !quiet) || (b > 0 && b % 4 === 0 && big))) hit(b, 0, 49, b ? 92 : big ? 108 : 96);
+            // Punk: a les tornades, plat a l'u de cada compàs; a la resta, a l'inici i cada quatre compassos.
+            const punkChorus = styleName === 'punk' && type === 'chorus';
+            if (!build && !drop && (punkChorus || (b === buildBars && !quiet) || (b > 0 && b % 4 === 0 && big))) hit(b, 0, 49, punkChorus ? (b % 4 === 0 ? 108 : 96) : b ? 92 : big ? 108 : 96);
             (build ? [0] : g.kick).forEach((t, k) => { if (t < fillFrom) hit(b, t, 36, build ? 92 : k ? 106 : 112); });
             if (!build) g.snare.forEach(t => {
                 if (t < fillFrom) (drop || quiet || g.rim) ? hit(b, t, 37, drop || quiet ? 80 : 94) : hit(b, t, 38, 106);
@@ -1939,6 +1958,8 @@
                 if (hat === 'sixteenths') hit(b, t, 42, [78, 42, 60, 42][k % 4]);
                 else if (hat === 'quarters') hit(b, t, big && !drop ? 51 : 42, drop ? 58 : 84);
                 else if (hat === 'toms') hit(b, t, k % 4 === 3 ? 45 : 43, k % 2 ? 68 : 88);
+                else if (hat === 'tribal') { hit(b, t, 41, k % 2 ? 70 : 98); if (k === 3 || k === 7) hit(b, t, 45, 86); }
+                else if (hat === 'crash') hit(b, t, k % 2 ? 51 : 49, k % 2 ? 62 : 82);
                 else if (hat === 'offbeat') hit(b, t, k % 2 && big ? 46 : 42, k % 2 ? 84 : 48);
                 else hit(b, t, k === 7 && !quiet && !build ? 46 : 42, k % 2 ? 56 : 76);
             }
@@ -2095,14 +2116,14 @@
                 chorus: [['IV', 'bVII', 'I', 'I'], ['I', 'IV', 'bVII', 'IV'], ['V', 'IV', 'I', 'I']], bridge: [['bVI', 'bVII', 'I', 'I'], ['IV', 'IV', 'V', 'V']] },
               minor: { verse: [['i', 'bIII', 'iv', 'i'], ['i', 'bVII', 'i', 'bVII']], chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'iv', 'bVII', 'i']], bridge: [['iv', 'iv', 'V', 'V']] } } },
         postpunk: { name: 'Post-punk', style: 'punk', bpm: [140, 164], swing: 0, keys: [[4, 'minor'], [9, 'minor'], [11, 'minor'], [2, 'minor']],
-            groove: { drums: [0, 4, 5], bass: [3, 4], guitar: [2, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'room', bass: 'pick', guitar: 'clean' }, humanize: .3,
+            groove: { drums: [7, 4, 0], bass: [3, 4], guitar: [2, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'room', bass: 'pick', guitar: 'clean' }, humanize: .3,
             fx: { type: 'crunch', drive: 30, tone: 65 }, fxChoices: [['crunch', 30, 65], ['tape', 50, 60], ['overdrive', 30, 62]],
             description: 'Fosc i tens: el baix porta el riff, la guitarra és prima i fa arpegis, la bateria és seca i la veu canta greu.',
             harmony: { minor: {
                 verse: [['i', 'i', 'bVI', 'bVII'], ['i', 'bVI', 'bIII', 'bVII'], ['i', 'iv', 'i', 'bVII'], ['i', 'bVII', 'bVI', 'bVI']],
                 chorus: [['bVI', 'bVII', 'i', 'i'], ['bIII', 'bVII', 'i', 'bVI'], ['iv', 'bVI', 'bVII', 'i']], bridge: [['bVI', 'bVI', 'iv', 'V'], ['iv', 'i', 'bVII', 'bVII']] } } },
         hardcore: { name: 'Hardcore', style: 'punk', bpm: [200, 220], swing: 0, keys: [[11, 'minor'], [4, 'minor'], [9, 'minor'], [2, 'minor']],
-            groove: { drums: [2, 3], bass: [3, 4], guitar: [2, 0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'growly', guitar: 'clean' }, drumTune: -2, humanize: .5, countIn: true,
+            groove: { drums: [6, 2], bass: [3, 4], guitar: [2, 0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'growly', guitar: 'clean' }, drumTune: -2, humanize: .5, countIn: true,
             fx: { type: 'fuzz', drive: 75, tone: 55 },
             description: 'Molt ràpid i agressiu: D-beat, fuzz, tornades en doble temps i un tros lent i pesant («breakdown»).',
             harmony: { minor: {
@@ -2129,7 +2150,7 @@
                 verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'bIII', 'bVII', 'iv']],
                 chorus: [['bVI', 'bVII', 'i', 'i'], ['bIII', 'bVII', 'iv', 'i']], bridge: [['iv', 'bVI', 'bVII', 'V']] } } },
         horrorpunk: { name: 'Horror punk', style: 'punk', bpm: [170, 192], swing: 0, keys: [[4, 'major'], [9, 'major'], [7, 'major'], [4, 'minor'], [9, 'minor'], [11, 'minor'], [2, 'minor']],
-            groove: { drums: [0, 2, 4], bass: [0, 1], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, drumTune: -3, humanize: .65, countIn: true,
+            groove: { drums: [0, 2, 7], bass: [0, 1], guitar: [0] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'rusty', bass: 'pick', guitar: 'clean' }, drumTune: -3, humanize: .65, countIn: true,
             fx: { type: 'horrorpunk', drive: 70, tone: 60 },
             description: 'A l’estil dels Misfits: guitarres «serra mecànica» doblades, acords prestats foscos, veu greu i «whoa-oh».',
             harmony: { major: {
@@ -2598,6 +2619,9 @@
         if (part.hits !== undefined && typeof part.hits !== 'boolean') throw new Error('Cops de secció no vàlids');
         if (part.shout !== undefined && typeof part.shout !== 'boolean') throw new Error('Tornada shout no vàlida');
         if (part.pickup !== undefined && typeof part.pickup !== 'boolean') throw new Error('Entrada dels vents no vàlida');
+        // Baix sol: als primers compassos (intro) o a l'últim compàs (abans de l'última tornada).
+        if (part.bassSolo !== undefined && (!Number.isInteger(part.bassSolo) || part.bassSolo < 1 || part.bassSolo > 8)) throw new Error('Baix sol no vàlid');
+        if (part.bassBreak !== undefined && typeof part.bassBreak !== 'boolean') throw new Error('Compàs de baix sol no vàlid');
         if (part.stopTime !== undefined && (!Number.isInteger(part.stopTime) || part.stopTime < 1 || part.stopTime > 8)) throw new Error('Stop time no vàlid');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
             || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name)
@@ -2852,6 +2876,12 @@
                 ? [[0,'root',3.3,1.18]] : groove.bass>=0 ? bassPatterns[groove.bass] : classic;
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
+            // Punk: quan canvia l'acord, l'última nota del compàs (tres de cada quatre vegades) és una
+            // nota de pas cromàtica que porta a la fonamental del compàs següent.
+            if (settings.style === 'punk' && b < bars - 1 && next % 12 !== root % 12 && (seed + b * 7) % 4 !== 0) {
+                const lastNote = bassLine.filter(n => n[0] === b).sort((x, y) => y[1] - x[1])[0];
+                if (lastNote && lastNote[1] >= 3) { lastNote[2] = tones.approach; lastNote[3] = Math.min(lastNote[3], .5); }
+            }
         }
         if (part.lineModes) {
             const riff = composeRiff(settings.seed >>> 0, settings.style === 'punk', settings.subgenre);
@@ -2907,6 +2937,7 @@
             feel: { ...(part.feel || {}) },
             lineModes: { ...(part.lineModes || {}) },
             ...(part.hits ? { hits: true } : {}), ...(part.shout ? { shout: true } : {}), ...(part.pickup ? { pickup: true } : {}),
+            ...(part.bassSolo ? { bassSolo: Math.min(part.bassSolo, bars) } : {}), ...(part.bassBreak ? { bassBreak: true } : {}),
             // Punk: a l'estrofa, les rítmiques toquen apagades amb el palmell (excepte post-punk, garage i horror punk).
             ...(settings.style === 'punk' && part.type === 'verse' && SUBGENRES[settings.subgenre]?.style === 'punk' && !['postpunk', 'garage', 'horrorpunk'].includes(settings.subgenre) ? { palmMute: true } : {}),
             ...(part.stopTime ? { stopTime: Math.min(part.stopTime, bars) } : {}) };

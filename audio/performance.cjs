@@ -65,16 +65,21 @@ function createPerformance(spec) {
   const instrumentOf = { 16: 'vocal', 14: 'guitar2', 15: 'guitar3', 12: 'trumpet', 13: 'trombone', 0: 'guitar', 1: 'guitar', 2: 'bass', 3: 'trumpet', 4: 'trombone', 5: 'synthLead', 6: 'synthPad', 7: 'synthBass', 8: 'sax', 9: 'drums', 10: 'electronicDrums', 11: 'organ' };
   // Punk, estrofa: rítmiques apagades amb el palmell (so de guitarra apagada que passa per l'amplificador).
   const palm = punk && spec.palmMute === true && !misfits, MUTED = [0, 28];
+  // Punk: les rítmiques van doblades i obertes a banda i banda, com als discos. Si la part no té
+  // segona rítmica, la guitarra 1 es toca dues vegades (canal 0 a l'esquerra, canal 1 a la dreta).
+  const rhythmPreset = palm ? MUTED : chosen('guitar') ?? (punk && !amped('guitar') ? [0, 30] : [2, 27]);
+  const wideRhythm = punk && !misfits;
+  const doubleRhythm = wideRhythm && !has('guitar2') && !guitarTakes.some(take => take.instrument === 'guitar2');
   const channels = [
-    patch(0, palm ? MUTED : chosen('guitar') ?? (punk && !amped('guitar') ? [0, 30] : [2, 27]), 42, 94),
-    patch(1, chosen('guitar') ?? (amped('guitar') ? [2, 27] : punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), 84, 66),
+    patch(0, rhythmPreset, wideRhythm ? 16 : 42, 94),
+    patch(1, doubleRhythm ? rhythmPreset : chosen('guitar') ?? (amped('guitar') ? [2, 27] : punk && spec.type === 'chorus' ? [0, 29] : [0, 28]), doubleRhythm ? 112 : 84, doubleRhythm ? 94 : 66),
     patch(2, chosen('bass') ?? (punk ? [2, 34] : [2, 33]), 64, 115),
     patch(3, chosen('trumpet') ?? [2, 56], 50, 116),
     patch(4, tromboneSound, 79, 112),
     // Staccato gravat per a les notes curtes de trompeta i trombó.
     patch(12, [3, 56], 50, 116), patch(13, [3, 57], 79, 127),
     patch(16, chosen('vocal') ?? [2, 71], 64, 112),
-    patch(14, palm ? MUTED : chosen('guitar2') ?? (punk && !amped('guitar2') ? [0, 30] : [2, 27]), 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
+    patch(14, palm ? MUTED : chosen('guitar2') ?? (punk && !amped('guitar2') ? [0, 30] : [2, 27]), wideRhythm ? 112 : 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
     patch(8, [2, 66], 30, 94),
     // Orgue de rodes sintetitzat (banc 2) amb altaveu rotatori: lent a les estrofes, ràpid a tornades i solos.
     { channel: 11, bank: 2, program: 16, pan: 76, volume: 84, leslie: ['chorus', 'solo'].includes(spec.type) ? 'fast' : 'slow' },
@@ -95,7 +100,7 @@ function createPerformance(spec) {
     const fallback = family === 'guitar' ? (punk && !takeAmped ? [0, 30] : [2, 27])
       : (punk && !takeAmped ? [0, 30] : [2, 27]);
     const preset = palm && !take.sound ? MUTED : presets[family][chosenSound] ?? fallback;
-    const entry = patch(channel, preset, index % 2 ? 93 : 35, 84);
+    const entry = patch(channel, preset, wideRhythm ? (index % 2 ? 112 : 16) : index % 2 ? 93 : 35, 84);
     if (take.fx) entry.clipFx = take.fx;
     if (take.color) entry.clipColor = take.color;
     channels.push(entry);
@@ -248,7 +253,12 @@ function createPerformance(spec) {
     return ['trumpet', 'trombone', 'sax', 'guitar3'].includes(name) && Array.isArray(spec.lines?.[name]) && !['riff', 'answer'].includes(spec.lineModes?.[name]);
   };
   // La veu no para mai; al «stop time» tampoc la melodia pròpia.
-  const keepsPlaying = (channel, window) => channel === 16 || (window.melodyGoesOn && ownMelody(channel));
+  const keepsPlaying = (channel, window) => channel === 16 || window.keep?.includes(channel) || (window.melodyGoesOn && ownMelody(channel));
+  // Baix sol: als primers compassos de la secció (després del compte de baquetes, si n'hi ha) o a
+  // l'últim compàs (abans de l'última tornada). Només sonen el baix i la veu.
+  if (spec.bassSolo !== undefined && (!Number.isInteger(spec.bassSolo) || spec.bassSolo < 1 || spec.bassSolo > 8)) throw new Error('Baix sol no vàlid');
+  if (spec.bassSolo) breaks.push({ from: spec.countIn ? bar : 0, to: Math.min(spec.bassSolo, spec.chords.length) * bar, hits: [], keep: [2, 7] });
+  if (spec.bassBreak && spec.chords.length >= 2) breaks.push({ from: (spec.chords.length - 1) * bar, to: spec.chords.length * bar, hits: [], keep: [2, 7] });
   let bypassBreaks = false;
   function play(channel, pitch, start, duration, velocity, jitter, exact) {
     if (start >= spec.seconds || !audible(channel, start) || silentBand(channel, start)) return;
@@ -356,6 +366,8 @@ function createPerformance(spec) {
       const pitches = punk ? (palm ? [chord.root + 12, chord.root + 19] : [chord.root + 12, chord.root + 19, chord.root + 24]) : chord.notes.slice().reverse();
       const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * .18;
       strum(0, pitches, t0 + t * beat, duration, punk ? punkForce(t, hit, 100, 76) : 90, .007);
+      // La segona presa de la mateixa part, a la dreta, uns 14 ms més tard i una mica més fluixa.
+      if (doubleRhythm) strum(1, pitches, t0 + t * beat + .014, duration, punkForce(t, hit, 100, 76) - 3, .007);
       // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.
       if (!punk && hit % 2 === 1) strum(1, pitches, t0 + t * beat + .012, duration * .85, 46, .006);
     });
@@ -364,7 +376,7 @@ function createPerformance(spec) {
       const index = ((spec.layers?.guitar2 ?? 2) + 2) % guitarPatterns.length;
       (ending ? [0] : palm ? CHUG : guitarPatterns[index]).forEach((t, hit) => {
         const pitches = punk ? [chord.root + 24, chord.root + 31] : chord.notes.map(n => n + 12).reverse();
-        strum(14, pitches, t0 + t * beat + .009, ending ? bar * .7 : punk ? punkLength(t, beat * .35) : beat * .18, punk ? punkForce(t, hit, 88, 70) : 80, .006);
+        strum(14, pitches, t0 + t * beat + (wideRhythm ? .016 : .009), ending ? bar * .7 : punk ? punkLength(t, beat * .35) : beat * .18, punk ? punkForce(t, hit, 88, 70) : 80, .006);
       });
     }
     // Preses independents de guitarra 1 i 2: patró i canal propis, sempre
@@ -580,8 +592,6 @@ function createPerformance(spec) {
         horn(SECOND[channel], unison ? played : thirdBelow(played, chord, lowest), at, length, force - (spec.shout ? 4 : 10), accent, connected, slurred, joinedPrevious, endsPhrase);
     }
   }
-  // Tornada final del punk: plat a l'u de cada compàs.
-  if (spec.shout && punk && has('drums')) for (let b = 0; b < spec.chords.length; b++) note(9, 49, b * bar, .9, 100, .002);
   // Els cops dels talls: bateria (bombo i plat), baix, guitarra i els vents a tres veus, junts i curts.
   bypassBreaks = true;
   for (const window of breaks) for (const [k, h] of window.hits.entries()) {

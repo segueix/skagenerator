@@ -506,7 +506,12 @@
     // Garage: l'orgue de combo fa blanques a l'estrofa i s'obre a la tornada; post-punk: ponts a mig temps.
     if (key === 'garage') sections.forEach(s => { s.patterns = { ...(s.patterns || {}), organ: s.type === 'chorus' ? 4 : s.type === 'verse' ? 3 : 2 }; });
     if (key === 'postpunk') { const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; of('intro').forEach(s => { s.cymbals = 'hats'; }); }
-    if (key === 'hardcore') { of('chorus').forEach(s => { s.groove = { drums: 3 }; }); const b = of('bridge')[0]; if (b) b.feel = { drums: .5, bass: .5 }; }
+    // Hardcore: d-beat a les estrofes i «skank beat» (2-step) a les tornades.
+    if (key === 'hardcore') { of('verse').forEach(s => { s.groove = { ...(s.groove || {}), drums: 6 }; }); of('chorus').forEach(s => { s.groove = { drums: 3 }; }); const b = of('bridge')[0]; if (b) b.feel = { drums: .5, bass: .5 }; }
+    // Skate punk: «skank beat» a les estrofes. Post-punk: estrofes tribals amb timbals; horror punk: intro tribal.
+    if (key === 'skatepunk') of('verse').forEach(s => { s.groove = { ...(s.groove || {}), drums: 3 }; });
+    if (key === 'postpunk') of('verse').forEach(s => { s.groove = { ...(s.groove || {}), drums: 7 }; });
+    if (key === 'horrorpunk' && of('intro')[0]) of('intro')[0].groove = { ...(of('intro')[0].groove || {}), drums: 7 };
     if (key === 'poppunk') { of('prechorus').forEach(s => tempo(s, 1.04)); const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; }); }
     // Punk californià (East Bay): el baix fa riff a l'estrofa i al pont, pont a mig temps, de vegades
     // tornades a doble temps i, de vegades, l'última tornada un to amunt.
@@ -768,6 +773,12 @@
     // Recursos especials: només els que aporten més en aquesta cançó (vegeu planHighlights).
     const highlights = planHighlights(song, key, r, { vocal });
     if (highlights.stop) highlights.stop.ending = 'stop';
+    // Punk: de vegades la intro comença amb el baix sol (a l'estil Rancid o Ramones) i la banda entra
+    // a la meitat. Es decideix abans de l'inici de la cançó, que llavors és amb tota la banda.
+    const firstSection = [...sections].sort((a, b) => a.start - b.start)[0];
+    const bassIntro = punk && firstSection?.type === 'intro' && firstSection.bars >= 4
+      && rng((seed ^ 0x2c1b3c6d) >>> 0)() < ({ eastbay: .5, punk77: .4, poppunk: .3, oi: .3, skatepunk: .25, garage: .3, hardcore: .15 }[key] ?? 0);
+    if (bassIntro) highlights.opening = 'band';
     designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf, opening: highlights.opening, closing: highlights.closing, middle: highlights.middle });
     // Corba d'intensitat (ska i punk): abans de l'última tornada, una baixada (només baix i bateria,
     // i la veu si n'hi ha) als últims compassos de la secció anterior; l'última tornada, més plena.
@@ -781,8 +792,13 @@
         const playing = new Set([...song.base.instruments, ...song.clips.filter(inside).map(c => c.instrument)]);
         before.exit = { ...(before.exit || {}) };
         for (const name of playing) if (!['drums', 'electronicDrums', 'bass', 'synthBass', 'vocal'].includes(name)) before.exit[name] = Math.min(before.exit[name] ?? before.bars, from);
+        // Punk: l'últim compàs, el baix sol (la bateria també calla) abans que entri tota la banda.
+        if (punk) before.bassBreak = true;
         droppedBefore.add(before);
       }
+      // Intro amb el baix sol (vegeu més amunt).
+      const intro = ordered[0];
+      if (bassIntro && !intro.mute && !intro.entrance) intro.bassSolo = intro.bars >= 8 ? 4 : 2;
       lastChorus.energy = Math.min(100, (lastChorus.energy ?? 90) + 8);
       // Les tornades anteriors queden per sota: l'última ha de ser la més plena.
       for (const sec of of('chorus')) if (sec !== lastChorus) sec.energy = Math.min(sec.energy ?? 90, lastChorus.energy - 4);
