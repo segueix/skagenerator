@@ -51,8 +51,11 @@
   // De tant en tant torna a sonar una cançó amb 👍 de la mateixa emissora.
   const REPLAY_CHANCE = .3, REPLAY_EVERY = 3, REPLAY_MEMORY = 5;
   // «mix»: emissora Ska-Punk, que barreja cançons de totes dues.
-  const STATIONS = { ska: 'Ska', punk: 'Punk', mix: 'Ska-Punk' };
+  // «batucada»: només percussió (kit de batucada), amb la forma i el tempo de cada ritme.
+  const STATIONS = { ska: 'Ska', punk: 'Punk', mix: 'Ska-Punk', batucada: 'Batucada' };
   const inStation = style => station === 'mix' ? style === 'ska' || style === 'punk' : style === station;
+  // Emissora a què pertany una cançó (les de batucada són d'estil ska però només hi sona la batucada).
+  const styleOf = song => builder.isBatucadaSong(song) ? 'batucada' : song.settings.style;
   const activeFavorite = () => engine.SUBGENRES[favorite] && inStation(engine.SUBGENRES[favorite].style) ? favorite : '';
   const NOTES = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const CANCELLED = Symbol('cancel·lat');
@@ -62,7 +65,10 @@
   const clock = n => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
   const reasonOf = error => String(error?.message || error || 'Error desconegut').slice(0, 200);
   const pickOne = list => list[Math.floor(Math.random() * list.length)];
-  const subgenreName = key => engine.SUBGENRES[key]?.name || STATIONS[key] || key || '';
+  const subgenreName = key => engine.SUBGENRES[key]?.name || STATIONS[key] || engine.BATUCADA_RHYTHMS[key]?.name || key || '';
+  // Subgènere d'una cançó (a les de batucada, el ritme).
+  const kindOf = song => builder.isBatucadaSong(song) ? song.settings.batucadaRhythm || 'batucada' : song.settings.subgenre || '';
+  const songKind = song => builder.isBatucadaSong(song) ? `Batucada · ${subgenreName(kindOf(song))}` : subgenreName(song.settings.subgenre);
   const keyName = s => `${NOTES[s.settings.tonic]} ${s.settings.mode === 'major' ? 'major' : 'menor'}`;
   // Deixa pintar la pantalla abans d'una feina llarga (i no s'encalla amb la pestanya amagada).
   const breathe = () => document.visibilityState === 'visible' ? new Promise(resolve => setTimeout(resolve, 0)) : Promise.resolve();
@@ -210,6 +216,13 @@
       const entry = pickOne(liked.slice(0, Math.max(1, Math.ceil(liked.length / 2))));
       try { return historyChoice(entry); }
       catch (error) { console.warn('Cançó de l’historial no vàlida', error); }
+    }
+    // Emissora Batucada: cançó nova només de percussió, amb un ritme diferent de l'anterior.
+    if (station === 'batucada') {
+      const song = studio.validateSong(builder.createBatucadaSong(engine, { seed: studio.newSeed(), avoidRhythm: lastSubgenre,
+        avoidTitles: [...queue.map(t => t.song.title), ...all.slice(0, 150).map(e => e.title)].filter(Boolean) }));
+      lastSubgenre = song.settings.batucadaRhythm;
+      return { id: studio.uid(), replay: false, song };
     }
     // Cançó nova: subgènere a l'atzar (diferent de l'anterior) i estructura que s'allunya de les últimes.
     // A l'emissora Ska-Punk els dos estils s'alternen (tres de cada quatre vegades canvia d'estil).
@@ -412,7 +425,7 @@
     }
   }
   // Es pot posar una cançó a cantar: hi ha el banc de veu i Umidaji no en canta cap altra.
-  const canSing = () => !instrumental && !!browserSinger?.available && !parked && !historyVoice;
+  const canSing = () => !instrumental && station !== 'batucada' && !!browserSinger?.available && !parked && !historyVoice;
   // Moment en què comença cada vers: la primera nota de la melodia de veu que el canta
   // (cada síl·laba és una nota, en ordre).
   function lyricLines(song, seg, spec, at) {
@@ -490,7 +503,7 @@
       old.plays = (old.plays || 1) + 1; old.lastPlayed = now;
       if (current.sung) old.sung = true;
     }
-    else list.unshift({ id: current.id, title: current.song.title, style: current.song.settings.style, subgenre: current.song.settings.subgenre || '',
+    else list.unshift({ id: current.id, title: current.song.title, style: styleOf(current.song), subgenre: kindOf(current.song),
       seconds: Math.floor(current.seconds), created: now, lastPlayed: now, plays: 1, vote: 0, comment: '', ...(current.sung ? { sung: true } : {}), song: current.song });
     writeHistory(list);
     if (station) { played.push(current.id); sinceReplay = current.replay ? 0 : sinceReplay + 1; }
@@ -547,7 +560,7 @@
   function mediaMetadata() {
     if (!('mediaSession' in navigator) || !current) return;
     try {
-      if (window.MediaMetadata) navigator.mediaSession.metadata = new window.MediaMetadata({ title: current.song.title, artist: `Radio Spam · ${subgenreName(current.song.settings.subgenre)}`, album: station ? `Emissora ${STATIONS[station]}` : 'Historial' });
+      if (window.MediaMetadata) navigator.mediaSession.metadata = new window.MediaMetadata({ title: current.song.title, artist: `Radio Spam · ${songKind(current.song)}`, album: station ? `Emissora ${STATIONS[station]}` : 'Historial' });
     } catch {}
   }
   if ('mediaSession' in navigator) {
@@ -561,7 +574,7 @@
     $('radio-home').hidden = name !== 'home'; $('radio-player').hidden = name !== 'player';
     $('radio-back').hidden = name !== 'player';
     $('radio-back').setAttribute('aria-label', station ? 'Canvia d’emissora' : 'Torna a les emissores');
-    $('radio').dataset.station = name === 'player' ? station || current?.song.settings.style || '' : '';
+    $('radio').dataset.station = name === 'player' ? station || (current ? styleOf(current.song) : '') : '';
   }
   function setPrep(value) { prep = value; renderPrep(); }
   function prepText() {
@@ -584,7 +597,7 @@
     $('radio-retry').hidden = !failed;
     const next = $('radio-next');
     const upcoming = queue[0];
-    if (upcoming) next.textContent = `A continuació: «${upcoming.song.title}» · ${subgenreName(upcoming.song.settings.subgenre)}${upcoming.replay ? ' · 👍' : ''}${queue.length > 1 ? ` · i ${queue.length - 1} més a punt` : ''}`;
+    if (upcoming) next.textContent = `A continuació: «${upcoming.song.title}» · ${songKind(upcoming.song)}${upcoming.replay ? ' · 👍' : ''}${queue.length > 1 ? ` · i ${queue.length - 1} més a punt` : ''}`;
     else if (waiting) next.textContent = '';
     else next.textContent = text ? `A continuació: ${text[0].toLowerCase()}${text.slice(1)}` : '';
     if (parked && !waiting) next.textContent += `${next.textContent ? ' · ' : ''}Umidaji canta «${parked.title}» · ${Math.round(parked.progress * 100)} %`;
@@ -597,13 +610,13 @@
     const isPlaying = !!current && onTrack && !audio.paused;
     player.classList.toggle('is-playing', isPlaying);
     player.classList.toggle('is-waiting', waiting || !current);
-    $('radio-disc-label').textContent = (STATIONS[station || current?.song.settings.style] || '').toUpperCase();
-    $('radio-subgenre').textContent = current ? subgenreName(current.song.settings.subgenre) : `Emissora ${STATIONS[station] || ''}`;
+    $('radio-disc-label').textContent = (STATIONS[station || (current ? styleOf(current.song) : '')] || '').toUpperCase();
+    $('radio-subgenre').textContent = current ? songKind(current.song) : `Emissora ${STATIONS[station] || ''}`;
     $('radio-replay').hidden = !current?.replay || entry?.vote !== 1;
     $('radio-sung').hidden = !current?.sung;
-    $('radio-instrumental-tag').hidden = !current || hasVoice(current.song);
+    $('radio-instrumental-tag').hidden = !current || hasVoice(current.song) || builder.isBatucadaSong(current.song);
     $('radio-title').textContent = current ? current.song.title : '';
-    $('radio-meta').textContent = current ? `${keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}${current.voiceTimbre ? ' · ' + current.voiceTimbre : ''}` : '';
+    $('radio-meta').textContent = current ? `${builder.isBatucadaSong(current.song) ? 'Només percussió' : keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}${current.voiceTimbre ? ' · ' + current.voiceTimbre : ''}` : '';
     const play = $('radio-play');
     play.disabled = !current || !onTrack;
     play.firstElementChild.textContent = isPlaying ? '❚❚' : '▶';
@@ -668,7 +681,7 @@
   $('radio-down').addEventListener('click', () => current && vote(current.id, -1));
 
   // ── Historial ────────────────────────────────────────────────────────
-  const FILTERS = { all: () => true, ska: e => e.style === 'ska', punk: e => e.style === 'punk', up: e => e.vote === 1, down: e => e.vote === -1, comment: e => !!e.comment?.trim() };
+  const FILTERS = { all: () => true, ska: e => e.style === 'ska', punk: e => e.style === 'punk', batucada: e => e.style === 'batucada', up: e => e.vote === 1, down: e => e.vote === -1, comment: e => !!e.comment?.trim() };
   const dateText = ms => { try { return new Date(ms).toLocaleString('ca', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
   function make(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; }
   function historyStatus(action, label) {
@@ -816,7 +829,7 @@
       const item = make('li', `history-item ${entry.style}${current?.id === entry.id ? ' now' : ''}`);
       const head = make('div', 'history-row'), text = make('div', 'history-text');
       text.append(make('strong', '', entry.title || 'Sense títol'),
-        make('small', '', [subgenreName(entry.subgenre || entry.style), clock(entry.seconds || 0), entry.song?.settings ? keyName(entry.song) : '', dateText(entry.lastPlayed || entry.created),
+        make('small', '', [subgenreName(entry.subgenre || entry.style), clock(entry.seconds || 0), entry.song?.settings && !builder.isBatucadaSong(entry.song) ? keyName(entry.song) : '', dateText(entry.lastPlayed || entry.created),
           entry.plays > 1 ? `sonada ${entry.plays} cops` : '', current?.id === entry.id ? 'sonant ara' : ''].filter(Boolean).join(' · ')));
       const votes = make('div', 'history-votes');
       for (const [value, icon, label] of [[1, '👍', 'M’agrada'], [-1, '👎', 'No m’agrada']]) {
