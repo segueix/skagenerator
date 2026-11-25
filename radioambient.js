@@ -2201,23 +2201,47 @@
         ['.x.x.xL-.x.x.xL-', 'twotone skapunk'], ['L-------.x.x.xL-', 'rocksteady jamaican'], ['x.x.L-..x.x.L-..', 'twotone nutty skapunk'],
         ['L-.L-.L-x.x.x...', 'twotone jamaican']
     ].map(([pattern, tags]) => ({ rhythm: riffFromPattern(pattern), tags: tags.split(' ') }));
+    // Riffs de guitarra punk (dos compassos). Amb 16 caràcters cada un és una corxera; amb 32, una
+    // semicorxera (galops del skate punk i el hardcore).
+    const PUNK_RIFF_LIBRARY = [
+        // Punk del 77: tot a cops avall, corxeres seguides i acords llargs.
+        ['L-L-L-L-L---L---', 'punk77'], ['x.x.L-x.x.x.L---', 'punk77 eastbay'], ['L--.L--.L-L-L---', 'punk77 oi'], ['xxxxL---xxxxL---', 'punk77 hardcore'],
+        // Street punk / Oi!: riffs lents de càntic.
+        ['L---L---L-L-L---', 'oi horrorpunk'], ['L-.xL---L-.xL---', 'oi'], ['L---..x.L---L---', 'oi poppunk'],
+        // Skate punk: galops i semicorxeres.
+        ['x.xxx.xxx.xxL---x.xxx.xxx.xxL---', 'skatepunk hardcore'], ['x.xxx.xxL-------x.xxx.xxL-------', 'skatepunk'], ['xxxxxxxxL---L---xxxxxxxxL-------', 'skatepunk'],
+        // Hardcore: cops a l'uníson i aturades.
+        ['x.x.x...x.x.x...', 'hardcore'], ['xxxx..xxxxxx..L-', 'hardcore skatepunk'], ['L-x.L-x.x.x.L---', 'hardcore punk77'], ['x..x..x.x..x..x.', 'hardcore oi'],
+        // Pop-punk i punk californià: síncopes i notes llargues a la tornada.
+        ['L---.xL-L---.xL-', 'poppunk eastbay'], ['..x.L---..x.L---', 'poppunk'], ['L-.xL-.xL-.xL---', 'poppunk eastbay'],
+        ['L-.x.xL-L-.x.xL-', 'eastbay'], ['x.L-x.L-x.L-L---', 'eastbay punk77'], ['.xL-.xL-L-L-L---', 'eastbay poppunk'],
+        // Garage: ritme Bo Diddley i riffs de surf.
+        ['x..x..x...x.x...', 'garage'], ['L-.xL-.x..x.L---', 'garage'], ['x.x.L-.xL---....', 'garage horrorpunk'],
+        // Post-punk: arpegis repetitius.
+        ['x.x.x.x.x.x.x.x.', 'postpunk'], ['L.x.L.x.L.x.L-..', 'postpunk'], ['xxxxxxxxxxxxL---', 'postpunk skatepunk'],
+        // Horror punk: quintes a l'estil Misfits.
+        ['x.x.x.x.L---L---', 'horrorpunk punk77'], ['L-L-L-..L-L-L-..', 'horrorpunk'],
+        // Comuns.
+        ['L-.xL-.xL-L-L---', 'punk77 oi eastbay'], ['x.x.L---x.x.L---', 'punk77 poppunk garage']
+    ].map(([pattern, tags]) => ({ rhythm: riffFromPattern(pattern), tags: tags.split(' ') }));
     function riffFromPattern(pattern) {
-        const rhythm = [];
+        const rhythm = [], step = 8 / pattern.length;
         for (let i = 0; i < pattern.length; i++) {
             const c = pattern[i];
             if (c !== 'x' && c !== 'L') continue;
             let length = 1;
             if (c === 'L') while (pattern[i + length] === '-') length++;
-            // Cop curt: mitja corxera llarga (staccato); nota llarga: fins al final del lligat, amb respiració.
-            rhythm.push([i / 2, c === 'x' ? .4 : length / 2 - .08]);
+            // Cop curt: una mica menys que la seva durada (staccato); nota llarga: fins al final del lligat, amb respiració.
+            rhythm.push([i * step, c === 'x' ? step * .8 : length * step - .08]);
         }
         return rhythm;
     }
     function composeRiff(seed, punk, subgenre) {
         const r = seededRng((seed ^ 0x2f7a1c3) >>> 0);
-        // Ska: el ritme surt de la biblioteca (preferint els patrons del subgènere); punk: generat com sempre.
-        const own = !punk && subgenre ? RIFF_LIBRARY.filter(entry => entry.tags.includes(subgenre)) : [];
-        const pool = punk ? [] : own.length ? own : RIFF_LIBRARY;
+        // El ritme surt de la biblioteca de l'estil (preferint els patrons del subgènere).
+        const library = punk ? PUNK_RIFF_LIBRARY : RIFF_LIBRARY;
+        const own = subgenre ? library.filter(entry => entry.tags.includes(subgenre)) : [];
+        const pool = own.length ? own : library;
         const rhythm = pool.length ? pool[Math.floor(r() * pool.length)].rhythm.map(n => n.slice()) : riffRhythm(r, punk), steps = [0];
         const peak = Math.floor(rhythm.length * (.35 + r() * .3));
         for (let i = 1; i < rhythm.length; i++) {
@@ -2883,6 +2907,8 @@
             feel: { ...(part.feel || {}) },
             lineModes: { ...(part.lineModes || {}) },
             ...(part.hits ? { hits: true } : {}), ...(part.shout ? { shout: true } : {}), ...(part.pickup ? { pickup: true } : {}),
+            // Punk: a l'estrofa, les rítmiques toquen apagades amb el palmell (excepte post-punk, garage i horror punk).
+            ...(settings.style === 'punk' && part.type === 'verse' && SUBGENRES[settings.subgenre]?.style === 'punk' && !['postpunk', 'garage', 'horrorpunk'].includes(settings.subgenre) ? { palmMute: true } : {}),
             ...(part.stopTime ? { stopTime: Math.min(part.stopTime, bars) } : {}) };
     }
     function songPartScore(syn, spec) {

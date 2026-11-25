@@ -769,10 +769,10 @@
     const highlights = planHighlights(song, key, r, { vocal });
     if (highlights.stop) highlights.stop.ending = 'stop';
     designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf, opening: highlights.opening, closing: highlights.closing, middle: highlights.middle });
-    // Corba d'intensitat de l'ska: abans de l'última tornada, una baixada (només baix i bateria, i
-    // la veu si n'hi ha) als últims compassos de la secció anterior; l'última tornada, més plena.
+    // Corba d'intensitat (ska i punk): abans de l'última tornada, una baixada (només baix i bateria,
+    // i la veu si n'hi ha) als últims compassos de la secció anterior; l'última tornada, més plena.
     const droppedBefore = new Set();
-    if (!punk && lastChorus) {
+    if (lastChorus) {
       const drop = rng((seed ^ 0x0bf58476) >>> 0), ordered = [...sections].sort((a, b) => a.start - b.start), index = ordered.indexOf(lastChorus);
       const before = ordered[index - 1];
       if (before && index > 1 && before.bars >= 4 && !before.ending && !before.stopTime && drop() < .75) {
@@ -836,9 +836,9 @@
         occupied -= quietBars(sec) - before;
       }
     }
-    // ── Arranjament de vents de l'ska: tornada «shout», cops de secció i «stop time» ──
-    // (Atzar propi, per no canviar la resta de la cançó.)
-    if (!punk) {
+    // ── Arranjament de la banda (ska i punk): tornada «shout», cops de secció («stop and go» al
+    // punk) i «stop time». (Atzar propi, per no canviar la resta de la cançó.)
+    {
       const band = rng((seed ^ 0x1b873593) >>> 0), ordered = [...sections].sort((a, b) => a.start - b.start);
       // L'última tornada: tota la secció de vents forta.
       if (lastChorus && sections.filter(s => s.type === 'chorus').length > 1) lastChorus.shout = true;
