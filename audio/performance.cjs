@@ -557,9 +557,15 @@ function createPerformance(spec) {
   if (has('drums') && spec.batucadaLine) {
     // La batucada ja porta la dinàmica escrita (cop a cop): no es torna a escalar amb l'energia.
     // Els cops marcats com a junts (convenções, cops de tots) i el xiulet van a temps exacte.
+    // Balanç del ritme: cada semicorxera del temps es desplaça igual per a tots els músics (el xiulet, no).
+    const swingFeel = spec.batucadaFeel;
+    if (swingFeel !== undefined && (!Array.isArray(swingFeel) || swingFeel.length !== 4 || !swingFeel.every(x => Number.isFinite(x) && Math.abs(x) <= .1)))
+      throw new Error('Balanç de batucada no vàlid');
     for (const [barIndex, step, pitch, velocity, duration, tight, player] of spec.batucadaLine) {
       // Junts (convenções i cops de tots): gairebé exactes, només un mil·lisegon de diferència.
-      const offset = player ? BAND_SEATS[player - 1][tight ? 'tight' : 'offset'] : 0;
+      const sixteenth = Math.round(step * 4);
+      const offset = (player ? BAND_SEATS[player - 1][tight ? 'tight' : 'offset'] : 0)
+        + (swingFeel && duration == null && Math.abs(step * 4 - sixteenth) < 1e-6 ? swingFeel[sixteenth % 4] * beat : 0);
       note(bandChannel(player || 0), pitch, Math.max(0, (barIndex * 4 + step) * beat + offset), duration ?? .35, velocity / energy, duration == null && !tight ? .002 : 0);
     }
   }

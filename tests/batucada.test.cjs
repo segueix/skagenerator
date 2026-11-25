@@ -8,7 +8,9 @@ const part = { type: 'verse', bars: 2, energy: 65, revision: 1, instruments: ['d
 test('cada fila de batucada sona només a la nota i al pas escollits', () => {
   assert.equal(engine.BATUCADA.length, 10);
   // Les deu files de la graella i les cinc variants distorsionades de la cuíca.
-  assert.equal(Object.keys(kit.pieces).length, 10 + Object.keys(engine.CUICA_VARIANTS).length - 1);
+  // (més els tres surdos apagats i la campana greu de l'agogô).
+  assert.equal(Object.keys(kit.pieces).length, 10 + Object.keys(engine.CUICA_VARIANTS).length - 1 + 3 + 1);
+  for (const note of [...Object.values(engine.SURDO_MUTED), engine.AGOGO_LOW]) assert(kit.pieces[note], `peça ${note}`);
   for (const note of Object.keys(engine.CUICA_VARIANTS)) assert(kit.pieces[note], `cuíca ${note}`);
   for (const [row, piece] of engine.BATUCADA.entries()) {
     assert(kit.pieces[piece.note]);
@@ -28,6 +30,9 @@ test('ritmes de batucada predefinits i variacions generades vàlides i reproduï
   for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) {
     assert(engine.validBatucadaPattern(rhythm.steps), key);
     const spec = engine.composeSongPart({ ...settings, batucadaRhythm: key }, { ...part, bars: 1 });
+    // Els surdos apagats s'afegeixen al patró i la campana greu de l'agogô compta com a agogô.
+    const muted = new Set(Object.values(engine.SURDO_MUTED));
+    spec.batucadaLine = spec.batucadaLine.filter(h => !muted.has(h[2])).map(h => h[2] === engine.AGOGO_LOW ? [h[0], h[1], 67, h[3]] : h);
     const expected = rhythm.steps.flatMap((row, i) => [...row].map((on, step) => on === '1' ? [step / 4, engine.BATUCADA[i].note] : null)).filter(Boolean);
     assert.deepEqual(new Set(spec.batucadaLine.map(([, t, n]) => `${t}:${n}`)), new Set(expected.map(([t, n]) => `${t}:${n}`)));
     const variants = new Set();
@@ -233,4 +238,53 @@ test('banda: les peces es doblen o tripliquen, cada músic al seu canal, i poden
   const tutti = compose(3, { counter: 1, tutti: '1001001000101000' }).batucadaLine;
   assert(tutti.every(h => h[1] * 4 % 1 === 0 && '1001001000101000'[h[1] * 4] === '1'));
   assert.throws(() => compose(4));
+});
+
+test('balanç del samba, dues campanes d\'agogô i surdos apagats', () => {
+  const compose = (extra = {}, p = {}) => engine.composeSongPart({ ...settings, ...extra }, { ...part, bars: 1, energy: 75, ...p });
+  // Balanç: totes les peces es desplacen igual a cada semicorxera; al samba la 2a s'endarrereix i la 4a s'avança.
+  const samba = compose();
+  assert.deepEqual(samba.batucadaFeel, engine.BATUCADA_FEEL.samba.feel);
+  const perf = createPerformance({ ...samba, humanize: 0 });
+  const chocalho = perf.events.filter(e => e.type === 'on' && e.note === 69 && e.channel === 9).map(e => e.time);
+  const grid = [0, .5, 1, 1.5, 2, 2.5, 3, 3.5].map(t => t * samba.beat);
+  assert(chocalho.length >= 8);
+  assert(chocalho.slice(0, 8).every((t, i) => Math.abs(t - grid[i] - (i % 2 ? samba.batucadaFeel[2] : 0) * samba.beat) < .003));
+  const fourth = engine.composeSongPart({ ...settings, batucadaPattern: [...Array(7).fill('0'.repeat(16)), '0001000000000000', '0'.repeat(16)] }, { ...part, bars: 1 });
+  const at = createPerformance({ ...fourth, humanize: 0 }).events.find(e => e.type === 'on' && e.note === 69).time;
+  assert(at < .75 * fourth.beat - .01, 'la quarta semicorxera s\'avança');
+  // Cada ritme té el seu balanç.
+  assert.notDeepEqual(compose({ batucadaRhythm: 'reggae' }).batucadaFeel, samba.batucadaFeel);
+  // Agogô: les dues campanes segons el ritme (al samba, la greu a l'u i al tres).
+  const agogo = compose({ batucadaPattern: engine.generateBatucadaPattern('samba', 1).map((row, i) => i === 6 ? '1010001010100010' : row) }).batucadaLine
+    .filter(h => h[2] === 67 || h[2] === engine.AGOGO_LOW).map(h => [h[1], h[2]]);
+  assert.deepEqual(agogo, [[0, 68], [.5, 67], [1.5, 67], [2, 68], [2.5, 67], [3.5, 67]]);
+  // Samba: el surdo 1 apaga la pell quan toca el 2 (i al revés). Al samba-reggae, no.
+  const line = samba.batucadaLine;
+  assert.deepEqual(line.filter(h => h[2] === engine.SURDO_MUTED[0]).map(h => h[1]), [0, 2]);
+  assert.deepEqual(line.filter(h => h[2] === engine.SURDO_MUTED[1]).map(h => h[1]), [1, 3]);
+  assert(line.filter(h => h[2] === engine.SURDO_MUTED[0])[0][3] < line.filter(h => h[2] === 36)[0][3], 'l\'apagat és més fluix');
+  assert(!compose({ batucadaRhythm: 'reggae' }).batucadaLine.some(h => Object.values(engine.SURDO_MUTED).includes(h[2])));
+  // Si un surdo no toca al patró, tampoc no apaga.
+  const alone = compose({ batucadaPattern: ['0000100000001000', ...Array(9).fill('0'.repeat(16))] }).batucadaLine;
+  assert(!alone.some(h => h[2] === engine.SURDO_MUTED[1]));
+});
+test('el surdo 3 improvisa: frases que canvien, cops oberts i apagats i redobles al final de frase', () => {
+  const compose = (p = {}, extra = {}) => engine.composeSongPart({ ...settings, batucadaSurdo3: 'improv', ...extra }, { ...part, bars: 8, energy: 88, ...p }).batucadaLine;
+  const line = compose();
+  const bar = b => line.filter(h => h[0] === b && (h[2] === 45 || h[2] === engine.SURDO_MUTED[2]) && !h[6]).map(h => `${h[1]}:${h[2]}`).join();
+  const bars = [0, 1, 2, 3, 4, 5, 6, 7].map(bar);
+  assert(bars.every(Boolean), 'toca a tots els compassos');
+  assert.equal(bars[0], bars[1], 'frases de dos compassos');
+  assert(new Set(bars).size >= 3, 'les frases canvien');
+  assert(line.some(h => h[2] === engine.SURDO_MUTED[2]) && line.some(h => h[2] === 45), 'cops oberts i apagats');
+  // Redoble al final de cada frase de quatre compassos: més cops que la mitjana.
+  const count = b => line.filter(h => h[0] === b && h[2] === 45 && !h[6]).length;
+  assert(count(3) >= 8 && count(3) > count(0));
+  // És reproduïble i depèn de la secció.
+  assert.deepEqual(compose(), line);
+  assert.notDeepEqual(compose({ fill: 5 }), line);
+  assert.throws(() => compose({}, { batucadaSurdo3: 'x' }));
+  // Les cançons de la ràdio el fan improvisar.
+  assert.equal(builder.createBatucadaSong(engine, { seed: 4 }).settings.batucadaSurdo3, 'improv');
 });

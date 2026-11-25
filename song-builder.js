@@ -1430,7 +1430,7 @@
     let title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
     for (let tries = 0; taken.has(title.toLowerCase()) && tries < 40; tries++) title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
     const settings = { style: 'ska', bpm, tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
-      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, countIn: true, humanize: compact ? .1 : .3 };
+      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', countIn: true, humanize: compact ? .1 : .3 };
     return { version: 3, title, settings, base: { instruments: ['drums'], revision: 1, generated: true }, harmony: {}, sections, clips: [] };
   }
   // Una cançó és de batucada si només hi sona el kit de batucada.
