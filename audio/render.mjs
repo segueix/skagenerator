@@ -266,7 +266,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       const level = Math.min(1, 10 ** (((score.mix[patch.instrument]?.volume || 0) + baseVolumeDb(score, patch.instrument)) / 20));
       // Amb distorsió, menys sala: la reverberació surt de la guitarra neta.
       const wet = (createGuitarFx(fxFor(score, patch), sampleRate)?.reverb ?? 1) * (createColorFx(colorFor(score, patch), sampleRate)?.reverb ?? 1);
-      synth.controllerChange(patch.channel, 91, Math.round((REVERB[patch.instrument] ?? 20) * level * wet));
+      synth.controllerChange(patch.channel, 91, Math.round((patch.reverb ?? REVERB[patch.instrument] ?? 20) * level * wet));
       synth.controllerChange(patch.channel, 93, 0);
     }
     // El xiulet sosté la nota fins al Note Off, que la percussió ignora per defecte.
@@ -322,7 +322,9 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     if (masterEq) for (let i = 0; i < length; i++) { left[i] = masterEq.process(0, left[i]); right[i] = masterEq.process(1, right[i]); }
     if (options.raw) return [left, right]; // Només per a proves: sense dinàmica ni nivell.
     // Compressor de bus suau (2,5:1) per cohesionar la banda.
-    const attack = Math.exp(-1 / (.012 * sampleRate)), release = Math.exp(-1 / (.3 * sampleRate)), threshold = .16, ratio = 2.2;
+    // Amb «glue» (Percudium) la compressió és més ferma: la banda sona com un sol bloc, com en un disc masteritzat.
+    const attack = Math.exp(-1 / ((score.glue ? .001 : .012) * sampleRate)), release = Math.exp(-1 / ((score.glue ? .08 : .3) * sampleRate));
+    const threshold = score.glue ? .06 : .16, ratio = score.glue ? 5 : 2.2;
     let envelope = 0, peak = 0;
     for (let i = 0; i < length; i++) {
       if (!Number.isFinite(left[i]) || !Number.isFinite(right[i])) throw new Error('El motor ha produït àudio no vàlid');
@@ -335,7 +337,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // Nivell fix per a tota la cançó: cada secció rep el mateix guany, de manera
     // que un instrument que passa d'una secció a l'altra no canvia de volum. Les
     // seccions plenes sonen més fortes perquè hi toquen més instruments.
-    const gain = SONG_GAIN * 10 ** ((master.volume || 0) / 20);
+    // (Amb «glue», es recupera el nivell que treu la compressió.)
+    const gain = SONG_GAIN * 10 ** (((master.volume || 0) + (score.glue ? 6 : 0)) / 20);
     const fade = Math.round(.4 * sampleRate);
     const soft = x => { const a = Math.abs(x); return a < .82 ? x : Math.sign(x) * (.82 + .11 * Math.tanh((a - .82) / .11)); };
     for (let i = 0; i < length; i++) {

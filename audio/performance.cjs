@@ -127,13 +127,16 @@ function createPerformance(spec) {
   // Batucada en banda: el segon i el tercer músic de cada peça tenen canal propi, un a cada banda,
   // amb l'afinació una mica diferent (cada pell és diferent) i el seu temps (un pèl abans o després).
   const BAND_PLAYERS = Array.isArray(spec.batucadaLine) ? Math.max(0, ...spec.batucadaLine.map(hit => hit[6] || 0)) : 0;
-  const BAND = PIANO + 7, BAND_SEATS = [{ pan: 26, cents: -14, offset: .009, tight: .0015 }, { pan: 102, cents: 11, offset: -.006, tight: -.001 }];
+  const BAND = PIANO + 7, BAND_SEATS = [{ pan: 14, cents: -14, offset: .009, tight: .0015 }, { pan: 114, cents: 11, offset: -.006, tight: -.001 }];
   const bandChannel = player => player ? BAND + player - 1 : 9;
   const drumChannel = channel => channel === 9 || channel === 10 || (channel >= BAND && channel < BAND + BAND_PLAYERS);
+  const room = Number.isInteger(spec.batucadaRoom) && spec.batucadaRoom >= 0 && spec.batucadaRoom <= 100 ? spec.batucadaRoom : undefined;
+  const spread = Number.isFinite(spec.batucadaSpread) && spec.batucadaSpread >= 1 && spec.batucadaSpread <= 3 ? spec.batucadaSpread : 1;
   for (let p = 1; p <= BAND_PLAYERS; p++) {
-    channels.push({ ...patch(bandChannel(p), chosen('drums') ?? [0, 69], BAND_SEATS[p - 1].pan, 90), drums: true, tuneFine: BAND_SEATS[p - 1].cents });
+    channels.push({ ...patch(bandChannel(p), chosen('drums') ?? [0, 69], BAND_SEATS[p - 1].pan, 90), drums: true, tuneFine: BAND_SEATS[p - 1].cents, ...(room !== undefined ? { reverb: room } : {}) });
     instrumentOf[bandChannel(p)] = 'drums';
   }
+  if (room !== undefined && spec.batucadaLine) channels.find(c => c.channel === 9).reverb = room;
   // Tercera diatònica per sota (dins de l'escala de la secció); fora de l'escala, la nota de l'acord
   // de 3 a 4 semitons per sota. Si queda massa greu, l'octava avall o, si tampoc hi cap, l'uníson.
   const SCALE = (spec.mode === 'major' ? [0, 2, 4, 5, 7, 9, 11] : spec.mode === 'dorian' ? [0, 2, 3, 5, 7, 9, 10] : [0, 2, 3, 5, 7, 8, 10])
@@ -564,7 +567,7 @@ function createPerformance(spec) {
     for (const [barIndex, step, pitch, velocity, duration, tight, player] of spec.batucadaLine) {
       // Junts (convenções i cops de tots): gairebé exactes, només un mil·lisegon de diferència.
       const sixteenth = Math.round(step * 4);
-      const offset = (player ? BAND_SEATS[player - 1][tight ? 'tight' : 'offset'] : 0)
+      const offset = (player ? BAND_SEATS[player - 1][tight ? 'tight' : 'offset'] * (tight ? 1 : spread) : 0)
         + (swingFeel && duration == null && Math.abs(step * 4 - sixteenth) < 1e-6 ? swingFeel[sixteenth % 4] * beat : 0);
       note(bandChannel(player || 0), pitch, Math.max(0, (barIndex * 4 + step) * beat + offset), duration ?? .35, velocity / energy, duration == null && !tight ? .002 : 0);
     }
@@ -741,7 +744,7 @@ function createPerformance(spec) {
     }
     channels.find(c => c.channel === 1).fxTweak = { drive: -10, tone: 8 };
   }
-  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type,
+  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, ...(spec.batucadaGlue === true ? { glue: true } : {}),
     mix: spec.mix || {}, baseVolume: spec.baseVolume || {}, fx: spec.fx || {}, colors: spec.colors || {} };
 }
 module.exports = { createPerformance };

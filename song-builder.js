@@ -1323,7 +1323,9 @@
   const BATUCADA_STYLES = {
     samba: { bpm: [124, 144], weight: 3 },
     reggae: { bpm: [106, 118], weight: 2 },
-    ijexa: { bpm: [108, 122], weight: 1 }
+    ijexa: { bpm: [108, 122], weight: 1 },
+    // Percudium: més lent i molt dens, sense canvis de ritme (el groove és el protagonista).
+    percudium: { bpm: [94, 102], weight: 2, alone: true }
   };
   const BATUCADA_TITLES = [['Tambors', 'Batec', 'Cercavila', 'Rua', 'Carnaval', 'Repicada', 'Tabalada', 'Pells', 'Surdos', 'Xaranga'],
     ['de la plaça', 'del barri', 'de mitjanit', 'al carrer', 'de foc', 'del port', 'de la Rambla', 'sense fre', 'de festa major', 'del sud']];
@@ -1342,11 +1344,14 @@
     }
     const [low, high] = BATUCADA_STYLES[rhythm].bpm, bpm = low + Math.floor(r() * (high - low + 1));
     // La cuíca de la graella no sona: la cuíca només toca als seus arranjaments (solos de cuíca).
-    const variation = (key = rhythm) => engine.generateBatucadaPattern(key, Math.floor(r() * 4294967295) + 1).map((row, i) => i === 8 ? '0'.repeat(16) : row);
+    // Al Percudium, la caixa (contínua) no canvia: la densitat és el seu caràcter.
+    const variation = (key = rhythm) => engine.generateBatucadaPattern(key, Math.floor(r() * 4294967295) + 1)
+      .map((row, i) => i === 8 ? '0'.repeat(16) : i === 3 && BATUCADA_STYLES[key]?.alone ? engine.BATUCADA_RHYTHMS[key].steps[3] : row);
     const base = variation(), groove = variation();
     const solo = variation(); solo[4] = pick(REPIQUE_SOLOS);
     // Canvis de ritme: la cançó passa per un o dos ritmes més (cadascun amb el seu tempo) i torna al principal.
-    const others = shuffle(rhythms.filter(key => key !== rhythm), r).slice(0, r() < .5 ? 2 : 1);
+    const alone = !!BATUCADA_STYLES[rhythm].alone;
+    const others = alone ? [] : shuffle(rhythms.filter(key => key !== rhythm && !BATUCADA_STYLES[key].alone), r).slice(0, r() < .5 ? 2 : 1);
     const otherPattern = Object.fromEntries(others.map(key => [key, variation(key)]));
     const tempoOf = key => { const [a, b] = BATUCADA_STYLES[key].bpm; return Math.max(a, Math.min(b, bpm)); };
     // Algunes cançons són compactes: convenções en què tota la batucada toca la mateixa figura, molt junta.
@@ -1356,7 +1361,7 @@
     const chains = shuffle(engine.CUICA_CHAINS.map((_, i) => i), r), chain = chains[0];
     const otherChain = () => chains[1 + Math.floor(r() * (chains.length - 1))];
     // Banda: cada peça doblada o triplicada (dos o tres músics), perquè soni com una batucada de debò.
-    const band = r() < .35 ? 2 : 3;
+    const band = alone || r() >= .35 ? 3 : 2;
     // Durada: entre 2 i 4 minuts (o la que es demani), sense passar dels límits de la cançó.
     const minutes = Math.max(1.5, Math.min(5, options.minutes ?? 2 + r() * 2));
     const barSeconds = 240 / bpm, target = Math.min(240, Math.round(minutes * 60 / barSeconds));
@@ -1369,22 +1374,46 @@
     // La paradinha (només surdos, agogô, caixa i xocalho) és curta i surt poc: la batucada no s'apaga.
     let paradinhas = 0;
     const extras = [
-      ...change, ...change,
-      () => paradinhas++ ? change[0]() : { type: 'bridge', bars: 2, energy: 44, pattern: base, rhythm, ending: r() < .5 ? 'break' : 'stop' },
+      ...change, ...change, ...(alone ? [() => ({ type: 'verse', bars: 8, energy: 92, pattern: variation(), rhythm })] : []),
+      () => paradinhas++ ? (change[0] || (() => ({ type: 'solo', bars: 8, energy: 92, pattern: solo, rhythm })))() : { type: 'bridge', bars: 2, energy: 44, pattern: base, rhythm, ending: r() < .5 ? 'break' : 'stop' },
       () => ({ type: 'solo', bars: 8, energy: 92, pattern: solo, rhythm }),
       cuicaSolo, cuicaSolo,
       ...(compact ? [0, 1, 2].map(() => () => ({ type: 'verse', bars: 4, energy: 94, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI), ending: 'break' })) : [])
     ];
     let bars = 4, round = 0, last = null;
+    // Percudium: forma pròpia. Uns 5 segons de timbal i xiulet sols (dos compassos) i, després, entren tots alhora;
+    // diàlegs entre grups d'instruments, aturades (breques i silencis) i retorns amb tota la potència,
+    // convenções de tots junts i un final de tots els instruments al màxim volum.
+    if (alone) {
+      plan.length = 0;
+      plan.push({ type: 'intro', bars: 2, energy: 92, pattern: base, rhythm, intro: 'timbal' });
+      bars = 2;
+      const cycle = [
+        () => ({ type: 'verse', bars: 8, energy: 92, pattern: base, rhythm }),
+        () => ({ type: 'chorus', bars: 8, energy: 96, pattern: groove, rhythm }),
+        () => ({ type: 'bridge', bars: 8, energy: 92, pattern: groove, rhythm, dialog: dialogs++ % 2 ? 2 : 1, ending: 'break' }),
+        () => ({ type: 'chorus', bars: 8, energy: 98, pattern: variation(), rhythm }),
+        () => ({ type: 'verse', bars: 4, energy: 96, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI), ending: pick(['break', 'silence']) }),
+        () => ({ type: 'solo', bars: 8, energy: 94, pattern: solo, rhythm }),
+        () => ({ type: 'bridge', bars: 8, energy: 92, pattern: base, rhythm, dialog: dialogs++ % 2 ? 2 : 1, ending: pick(['break', 'stop']) }),
+        () => ({ type: 'chorus', bars: 8, energy: 100, pattern: groove, rhythm })
+      ];
+      let dialogs = Math.floor(r() * 2);
+      for (let k = 0; bars + 4 < target && plan.length < 24; k++) {
+        // Després de la primera volta, de tant en tant un solo de cuíca.
+        const block = k >= cycle.length && k % 5 === 2 ? cuicaSolo() : cycle[k % cycle.length]();
+        plan.push(block); bars += block.bars;
+      }
+    }
     // Es van afegint voltes fins a arribar a la durada (amb l'outro de quatre compassos).
-    while (bars + 4 < target && plan.length < 24) {
-      plan.push({ type: 'verse', bars: 8, energy: 84 + round * 3, pattern: base, rhythm });
+    while (!alone && bars + 4 < target && plan.length < 24) {
+      plan.push({ type: 'verse', bars: 8, energy: (alone ? 88 : 84) + round * 3, pattern: base, rhythm });
       plan.push({ type: 'chorus', bars: 8, energy: 92 + round * 2, pattern: groove, rhythm });
       bars += 16;
       // Un o dos blocs entre volta i volta (sense repetir el mateix just després).
       for (let k = 0; k < (r() < .45 ? 2 : 1) && bars + 4 < target; k++) {
         // Una volta de cada dues comença amb un canvi de ritme; la segona volta, amb un solo de cuíca.
-        let make = k === 0 && round % 2 === 0 ? change[(round / 2) % change.length] : k === 0 && round === 1 ? cuicaSolo : pick(extras);
+        let make = k === 0 && round % 2 === 0 && change.length ? change[(round / 2) % change.length] : k === 0 && round === 1 ? cuicaSolo : pick(extras);
         for (let tries = 0; make === last && tries < 5; tries++) make = pick(extras);
         last = make;
         const block = make(); plan.push(block); bars += block.bars;
@@ -1394,8 +1423,8 @@
     // Una breca abans de l'última tornada.
     const lastChorus = plan.map(b => b.type).lastIndexOf('chorus');
     if (lastChorus > 1 && !plan[lastChorus - 1].ending) plan[lastChorus - 1].ending = r() < .5 ? 'break' : 'stop';
-    const closing = pick(['hit', 'hit', 'ring', 'cold']);
-    plan.push({ type: 'outro', bars: 4, energy: 98, pattern: groove, rhythm });
+    const closing = alone ? 'hit' : pick(['hit', 'hit', 'ring', 'cold']);
+    plan.push({ type: 'outro', bars: 4, energy: alone ? 100 : 98, pattern: groove, rhythm, ...(alone ? { finale: true } : {}) });
     // Moments clau, on la batucada puja molt: l'entrada de tots, la represa després de cada breca,
     // l'última tornada i el final. La resta de canvis de volum són petits.
     plan.forEach((block, i) => {
@@ -1411,13 +1440,15 @@
       if (block.pattern !== base) sec.batucadaPattern = block.pattern.slice();
       if (block.ending) sec.ending = block.ending;
       if (block.type === 'outro' && closing !== 'hit') sec.closing = closing;
-      if (tempoOf(block.rhythm) !== bpm) sec.bpm = tempoOf(block.rhythm);
+      if (tempoOf(block.rhythm) !== Math.max(100, bpm)) sec.bpm = tempoOf(block.rhythm);
       // El mestre xiula a l'entrada, abans de cada breca i de cada canvi de ritme, i al final.
       const whistle = i === 0 || !!block.ending || block.type === 'outro' || (next && next.rhythm !== block.rhythm) || !!next?.tutti || r() < .2;
       const fx = { ...(block.peak ? { peak: true } : {}), ...(whistle ? { whistle: true } : {}), ...(block.tutti ? { tutti: block.tutti } : {}),
+        ...(block.intro ? { intro: block.intro } : {}), ...(block.dialog ? { dialog: block.dialog } : {}), ...(block.finale ? { finale: true } : {}),
         ...(block.cuica !== undefined && !block.tutti ? { cuica: block.cuica } : {}),
         // Contraritmes: a la meitat de les seccions fortes, el segon músic fa una altra figura.
-        ...(band > 1 && !block.tutti && block.energy >= 84 && block.type !== 'intro' && r() < .5 ? { counter: Math.floor(r() * 4) } : {}) };
+        // (Al Percudium, a totes: ritmes diferents alhora.)
+        ...(band > 1 && !block.tutti && !block.finale && block.energy >= 84 && block.type !== 'intro' && (alone || r() < .5) ? { counter: Math.floor(r() * 4) } : {}) };
       if (Object.keys(fx).length) sec.batucada = fx;
       // Als moments clau també puja el volum general de la secció.
       if (block.master) sec.volumes = { master: 3 };
@@ -1429,8 +1460,11 @@
     const taken = new Set((options.avoidTitles || []).map(t => String(t).toLowerCase()));
     let title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
     for (let tries = 0; taken.has(title.toLowerCase()) && tries < 40; tries++) title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
-    const settings = { style: 'ska', bpm, tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
-      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', countIn: true, humanize: compact ? .1 : .3 };
+    // L'estil ska no baixa de 100 BPM: si el ritme va més lent (Percudium), cada secció porta el seu tempo.
+    const settings = { style: 'ska', bpm: Math.max(100, bpm), tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
+      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', countIn: !alone,
+      // Percudium: el so als mitjos i brillant (menys greus de surdo, més caixa, repique i tamborim).
+      ...(alone ? { mix: { drums: { low: -12, mid: 0, high: 3, volume: 6 } } } : {}), humanize: compact ? .1 : .3 };
     return { version: 3, title, settings, base: { instruments: ['drums'], revision: 1, generated: true }, harmony: {}, sections, clips: [] };
   }
   // Una cançó és de batucada si només hi sona el kit de batucada.

@@ -1913,7 +1913,12 @@
         reggae: { name: 'Samba-reggae', steps: ['0000000010001000', '1000100000000000', '0000001000000010', '1001001000101000',
             '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000', '0000000000000000'] },
         ijexa: { name: 'Ijexá', steps: ['1000000010000000', '0000100000001000', '0000000000100000', '0000000000000000',
-            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000'] }
+            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000'] },
+        // Percudium: a partir d'un enregistrament de referència (uns 97 BPM). Textura molt densa (caixa i xocalho
+        // a totes les semicorxeres, tamborim atapeït), accents sincopats a les semicorxeres 1, 7, 10 i 14 i el pes
+        // del so als mitjos (caixa, repique i tamborim) més que als surdos.
+        percudium: { name: 'Percudium', steps: ['1000000010000000', '0000001000000100', '0010000000100010', '1111111111111111',
+            '1000001001100110', '1011011011110110', '1000001001000100', '1111111111111111', '0000000000000000', '0000000000000000'] }
     };
     // Biblioteca de figures per generar variacions: els surdos 1 i 2 i el xocalho (el pols) no canvien.
     const BATUCADA_FIGURES = {
@@ -1935,7 +1940,10 @@
     const BATUCADA_FEEL = {
         samba: { feel: [0, .028, -.008, -.042], abafado: true, agogo: 'gaaaaaaagaaaaaaa' },
         reggae: { feel: [0, .034, 0, .03], abafado: false, agogo: 'gaaaaaaaaaaaaaaa' },
-        ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' }
+        ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' },
+        // accents: semicorxeres accentuades (en lloc dels accents de cada temps); gain: pes de cada peça.
+        percudium: { feel: [0, .02, -.005, -.025], abafado: true, agogo: 'gaaaaaaaagaaaaaa', accents: '1000001001000100', graces: true, room: 44, spread: 1.6, glue: true, doubleAll: true, max: true,
+            gain: { 36: .8, 41: .8, 45: .84, 35: .8, 43: .8, 47: .84, 38: 1.42, 50: 1.1, 54: 1.08, 69: .95, 67: 1, 68: 1 } }
     };
     // Surdo apagat («abafado») de cada surdo i campana greu de l'agogô.
     const SURDO_MUTED = { 0: 35, 1: 43, 2: 47 }, AGOGO_LOW = 68;
@@ -1963,8 +1971,13 @@
             key === 'peak' || key === 'whistle' ? typeof value === 'boolean'
                 : key === 'tutti' ? typeof value === 'string' && /^[01]{16}$/.test(value)
                 : key === 'cuica' ? Number.isInteger(value) && value >= 0 && value < CUICA_CHAINS.length
-                : key === 'counter' ? Number.isInteger(value) && value >= 0 && value < 4 : false);
+                : key === 'counter' ? Number.isInteger(value) && value >= 0 && value < 4
+                : key === 'intro' ? value === 'timbal'
+                : key === 'dialog' ? value === 1 || value === 2
+                : key === 'finale' ? typeof value === 'boolean' : false);
     }
+    // Diàleg: dos grups que es responen (surdos i agogô / caixa, repique, tamborim i xocalho).
+    const BATUCADA_DIALOG = [[0, 1, 2, 6], [3, 4, 5, 7]];
     // Banda: quants músics toquen cada peça (1, 2 o 3). Surdos, caixa, tamborim i xocalho es doblen;
     // el repique, l'agogô, la cuíca i el xiulet són d'un sol músic.
     const BATUCADA_BAND = [1, 2, 3], BATUCADA_DOUBLED = new Set([0, 1, 2, 3, 5, 7]), BATUCADA_COUNTER = [2, 3, 5];
@@ -2027,8 +2040,11 @@
         // als moments clau (fx.peak) la batucada puja molt.
         const level = 88 + (energy - 70) * .15 + (fx.peak ? 14 : 0) + (fx.tutti ? 6 : 0);
         const force = (pitch, step, extra = 0) => {
-            const accent = step % 4 === 0 ? 15 : step % 2 === 0 ? 3 : -7;
-            return Math.max(20, Math.min(127, Math.round((level + accent + extra) * BATUCADA_GAIN[pitch])));
+            // Cops de tots al màxim (Percudium): totes les peces a tota força.
+            if (style.max && extra >= 90) return 127;
+            const accent = style.accents ? (style.accents[step] === '1' ? 9 : step % 2 ? -5 : -1)
+                : step % 4 === 0 ? 15 : step % 2 === 0 ? 3 : -7;
+            return Math.max(20, Math.min(127, Math.round((level + accent + extra) * BATUCADA_GAIN[pitch] * (style.gain?.[pitch] ?? 1))));
         };
         // Cadena de cuíca: cada cop de cuíca fa servir la variant següent de la cadena.
         const chain = fx.cuica !== undefined ? CUICA_CHAINS[fx.cuica] : null, phrase = chain ? CUICA_PHRASES[fx.cuica % CUICA_PHRASES.length] : null;
@@ -2049,9 +2065,12 @@
             const velocity = force(pitch, step, extra);
             const hit = [bar, step / 4, pitch, velocity];
             // Els altres músics: una mica més fluixos, cadascun amb el seu temps.
-            const others = BATUCADA_DOUBLED.has(row) ? players.filter(p => p > 0) : [];
-            const lead = !BATUCADA_DOUBLED.has(row) || players.includes(0);
-            for (const p of others) line.push([bar, step / 4, pitch, Math.round(velocity * (.9 - p * .04)), null, tight ? 1 : 0, p]);
+            // (Al Percudium també es doblen el repique i l'agogô: tot saturat d'instruments.)
+            const doubled = BATUCADA_DOUBLED.has(row) || style.doubleAll && (row === 4 || row === 6);
+            const others = doubled ? players.filter(p => p > 0) : [];
+            const lead = !doubled || players.includes(0);
+            // (Als cops de tots al màxim, tots els músics piquen igual de fort.)
+            for (const p of others) line.push([bar, step / 4, pitch, tight && style.max && velocity === 127 ? 127 : Math.round(velocity * (.9 - p * .04)), null, tight ? 1 : 0, p]);
             if (!lead) return;
             if (pitch === BATUCADA_WHISTLE.note) {
                 const at = (bar * 4 + step / 4) * beat;
@@ -2070,8 +2089,11 @@
             if (at >= stopAt) return;
             line.push([bar, step / 4, BATUCADA_WHISTLE.note, force(BATUCADA_WHISTLE.note, 0, extra), Math.min(seconds, stopAt - at)]);
         };
-        // Cop de tota la batucada (aturades i final), a temps exacte.
-        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, extra, true));
+        // Cop de tota la batucada (aturades i final), a temps exacte. Al Percudium, al màxim.
+        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, style.max ? 90 : extra, true));
+        // Diàleg: en cada moment parla un dels dos grups (per compassos o per mitjos compassos);
+        // els dos últims compassos de la secció hi tornen a ser tots.
+        const speaker = (bar, step) => !fx.dialog || bar >= bars - 2 ? null : fx.dialog === 1 ? bar % 2 : step < 8 ? 0 : 1;
         // Paradinha (poca energia): sense repique, tamborim ni cuíca; la caixa continua.
         const plays = row => !(quiet && [4, 5, 8].includes(row));
         const hits = (row, i, step) => (i === 8 && phrase ? phrase : row)[step] === '1';
@@ -2079,8 +2101,10 @@
             // Virada: cada quatre compassos el repique omple l'últim temps (si no ve una crida).
             const virada = fire && bar % 4 === 3 && to === 16 ? 12 : 16;
             for (let step = 0; step < to; step++) {
+                const voice = speaker(bar, step);
                 rows.forEach((row, i) => {
                     if (i === 4 && step >= virada) return;
+                    if (voice !== null && i < 8 && !BATUCADA_DIALOG[voice].includes(i)) return;
                     // Surdo 3 que improvisa: la frase del compàs, amb cops oberts i apagats.
                     if (improv && i === 2) {
                         const stroke = improvised[bar][step];
@@ -2098,10 +2122,14 @@
                     // Foc: la caixa omple les semicorxeres buides amb cops fluixos i el xocalho no para.
                     else if (fire && (i === 3 || i === 7)) add(bar, step, i, i === 3 ? -24 : -10);
                 });
-                if (step >= virada) add(bar, step, 4, (step - 12) * 5 + 4);
+                // (Al diàleg, només el grup que parla.)
+                const heard = row => voice === null || BATUCADA_DIALOG[voice].includes(row);
+                if (step >= virada && heard(4)) add(bar, step, 4, (step - 12) * 5 + 4);
+                // Arrossegaments: abans de cada accent, la caixa fa un cop fluix una fusa abans (Percudium).
+                if (style.graces && !fx.tutti && step > 0 && style.accents[step] === '1' && plays(3) && heard(3)) add(bar, step - .5, 3, -20);
                 // Samba: cada surdo apaga la pell (cop sord) quan l'altre toca obert.
                 // (Només si aquell surdo toca al patró.)
-                if (style.abafado && !fx.tutti) {
+                if (style.abafado && !fx.tutti && heard(0)) {
                     if (rows[0].includes('1') && rows[1][step] === '1' && rows[0][step] !== '1') add(bar, step, 0, -9, false, everyone, SURDO_MUTED[0]);
                     if (rows[1].includes('1') && rows[0][step] === '1' && rows[1][step] !== '1') add(bar, step, 1, -11, false, everyone, SURDO_MUTED[1]);
                 }
@@ -2116,7 +2144,30 @@
             add(bar, 12, 0, 8, true); add(bar, 12, 1, 8, true);
         };
         const breque = !fading && type !== 'outro' && bars > 1 && (ending === 'break' || ending === 'stop');
+        // Entrada de timbal (Percudium): un sol surdo i el xiulet del mestre; el surdo creix fins a un redoble
+        // i, a la secció següent, entren tots alhora.
+        const timbal = (bar, last) => {
+            if (bar === 0) { blow(bar, 0, beat * 1.5, 8); blow(bar, 8, .1); blow(bar, 10, .1); }
+            if (last) [0, 4, 8].forEach(step => blow(bar, step, .12, 6));
+            for (const step of last ? [0, 4, 8, 10, 12, 13, 14, 15] : [0, 4, 8, 12]) {
+                const muted = !last && (step === 4 || step === 12);
+                add(bar, step, 0, (last ? step * 2 : bar * 4) + (muted ? -8 : 0), false, [0], muted ? SURDO_MUTED[0] : undefined);
+            }
+        };
+        // Final de tots al màxim (Percudium): convenção de tots junts i, a l'últim compàs, quatre cops
+        // creixents i un cop final de tots els instruments, tots els músics, al màxim volum.
+        const finale = bar => {
+            if (bar < bars - 1) {
+                for (let step = 0; step < 16; step++) if (BATUCADA_TUTTI[1][step] === '1') [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, 20, true));
+                if (bar === bars - 2 && fx.whistle) [8, 10, 12].forEach(step => blow(bar, step, .1, 8));
+                return;
+            }
+            [0, 2, 4, 6].forEach((step, k) => [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, 20 + k * 8, true)));
+            [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, 8, row, 90, true));
+        };
         for (let bar = 0; bar < bars; bar++) {
+            if (fx.intro === 'timbal') { timbal(bar, bar === bars - 1); continue; }
+            if (fx.finale && type === 'outro') { finale(bar); continue; }
             if (bar === 0 && part.countIn) {
                 // Entrada: el mestre xiula (llarg i tres curts) i el repique compta.
                 if (fx.whistle) { blow(bar, 0, beat * 1.5, 6); [8, 10, 12].forEach(step => blow(bar, step, .1)); }
@@ -3189,7 +3240,12 @@
         if ((part.timbres?.drums ?? settings.timbres?.drums) === 'batucada') {
             drumOptions.batucadaLine = composeBatucada(settings, part, bars, energy, drumOptions.stopAt ?? Infinity, 60 / tempo);
             // Balanç del ritme de la secció (micro-temps de les semicorxeres).
-            drumOptions.batucadaFeel = BATUCADA_FEEL[batucadaRhythmOf(part.batucadaPattern ?? batucadaRows(settings), settings.batucadaRhythm)].feel.slice();
+            const batucadaStyle = BATUCADA_FEEL[batucadaRhythmOf(part.batucadaPattern ?? batucadaRows(settings), settings.batucadaRhythm)];
+            drumOptions.batucadaFeel = batucadaStyle.feel.slice();
+            // Sala i separació dels músics pròpies del ritme (el Percudium sona com un mur de so, amb més sala).
+            if (batucadaStyle.room) drumOptions.batucadaRoom = batucadaStyle.room;
+            if (batucadaStyle.spread) drumOptions.batucadaSpread = batucadaStyle.spread;
+            if (batucadaStyle.glue) drumOptions.batucadaGlue = true;
         }
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
@@ -3300,7 +3356,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
