@@ -753,6 +753,72 @@
     const highlights = planHighlights(song, key, r, { vocal });
     if (highlights.stop) highlights.stop.ending = 'stop';
     designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf, opening: highlights.opening, closing: highlights.closing, middle: highlights.middle });
+    // Cançons instrumentals: el tema no ha de sonar tota l'estona (quedava saturat). Els vents de
+    // l'ska i la guitarra solista del punk ocupen entre el 75 i el 90 % dels compassos: callen uns
+    // compassos a l'inici de les estrofes (només la base, com un «riddim»), a la primera meitat del
+    // pont, etc. Es calcula amb la cançó ja acabada (inici i final inclosos, que també poden fer
+    // callar el tema). Atzar propi: la resta de la cançó no canvia.
+    if (instrumental || instrumentalPunk) {
+      const breathe = rng((seed ^ 0x3c6ef372) >>> 0), target = .75 + breathe() * .15;
+      const THEME = punk ? ['guitar3'] : ['trumpet', 'trombone', 'sax'];
+      const inside = (c, sec) => c.start < sec.start + sec.bars && sec.start < c.start + c.bars;
+      const themeIn = sec => [...new Set(song.clips.filter(c => THEME.includes(c.instrument) && inside(c, sec) && !(sec.mute || []).includes(c.instrument)).map(c => c.instrument))];
+      const quietBars = sec => {
+        const players = themeIn(sec);
+        let quiet = 0;
+        for (let b = 0; b < sec.bars; b++) {
+          const bar = sec.start + b;
+          if (!players.some(name => song.clips.some(c => c.instrument === name && c.start <= bar && bar < c.start + c.bars)
+            && (sec.entrance?.[name] ?? 0) <= b && b < (sec.exit?.[name] ?? sec.bars))) quiet++;
+        }
+        return quiet;
+      };
+      const total = sections.reduce((t, s) => t + s.bars, 0);
+      let occupied = total - sections.reduce((t, s) => t + quietBars(s), 0);
+      // Finestres de descans, per ordre: inici de les estrofes (4 compassos si són llargues, 2 si són
+      // curtes), primera meitat del pont, inici de la pretornada, els 2 últims compassos de les estrofes
+      // llargues i dels solos (la base fa de pont cap a la secció següent) i, en últim terme, els 2
+      // últims compassos de les tornades que no són l'última.
+      const first = sections[0];
+      const windows = [
+        ...of('verse').filter(sec => sec !== first).map(sec => [sec, sec.bars >= 8 ? 4 : 2, 'start']),
+        ...of('bridge').filter(sec => sec !== first).map(sec => [sec, Math.floor(sec.bars / 2), 'start']),
+        ...of('prechorus').filter(sec => sec !== first).map(sec => [sec, Math.min(2, Math.floor(sec.bars / 2)), 'start']),
+        ...of('verse').filter(sec => sec.bars >= 8).map(sec => [sec, 2, 'end']),
+        ...of('solo').filter(sec => sec.bars >= 8).map(sec => [sec, 2, 'end']),
+        ...of('chorus').filter(sec => sec !== lastChorus && sec.bars >= 8).map(sec => [sec, 2, 'end'])
+      ].filter(([sec, n]) => n > 0 && themeIn(sec).length);
+      for (const [sec, n, where] of windows) {
+        const room = occupied - Math.ceil(target * total);
+        if (room <= 0) break;
+        const cut = Math.min(n, room), before = quietBars(sec);
+        if (where === 'start') {
+          sec.entrance = { ...(sec.entrance || {}) };
+          for (const name of themeIn(sec)) sec.entrance[name] = Math.max(sec.entrance[name] ?? 0, cut);
+        } else {
+          sec.exit = { ...(sec.exit || {}) };
+          for (const name of themeIn(sec)) sec.exit[name] = Math.min(sec.exit[name] ?? sec.bars, sec.bars - cut);
+        }
+        occupied -= quietBars(sec) - before;
+      }
+    }
+    // ── Arranjament de vents de l'ska: tornada «shout», cops de secció i «stop time» ──
+    // (Atzar propi, per no canviar la resta de la cançó.)
+    if (!punk) {
+      const band = rng((seed ^ 0x1b873593) >>> 0), ordered = [...sections].sort((a, b) => a.start - b.start);
+      // L'última tornada: tota la secció de vents forta.
+      if (lastChorus && sections.filter(s => s.type === 'chorus').length > 1) lastChorus.shout = true;
+      // Cops de secció a l'últim compàs d'una secció que porta a una tornada (sense aturada ni silenci propis).
+      const intoChorus = ordered.filter((sec, i) => i > 0 && ordered[i + 1]?.type === 'chorus' && sec.type !== 'chorus' && sec.bars >= 2 && !sec.ending);
+      if (intoChorus.length && band() < (instrumental ? .8 : .55)) {
+        intoChorus.at(-1).hits = true;
+        if (intoChorus.length > 2 && band() < .4) intoChorus[0].hits = true;
+      }
+      // «Stop time»: la banda fa un cop a l'u de cada compàs i calla mentre la melodia continua.
+      // Amb veu, al començament de la segona estrofa; sense veu, al començament d'un solo.
+      const stopTarget = vocal ? ordered.filter(sec => sec.type === 'verse')[1] : ordered.find(sec => sec.type === 'solo');
+      if (stopTarget && stopTarget.bars >= 8 && band() < .45) stopTarget.stopTime = band() < .5 ? 2 : 4;
+    }
     // La solista amb una altra guitarra: tots els seus clips sense so ni efecte propis.
     if (leadSound) for (const c of song.clips) if (c.instrument === 'guitar3' && !c.fx && !c.sound) c.sound = leadSound;
     if (highlights.color) {

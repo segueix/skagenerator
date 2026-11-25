@@ -543,3 +543,38 @@ test('punk: cinc guitarres solistes gravades que es poden triar per torns', () =
     assert.deepEqual([patch.bank, patch.program], [2, program], sound);
   }
 });
+
+test('ska instrumental: els vents ocupen entre el 75 i el 90 % dels compassos', () => {
+  const HORNS = ['trumpet', 'trombone', 'sax'];
+  const occupancy = song => {
+    let total = 0, on = 0;
+    for (const sec of song.sections) for (let b = 0; b < sec.bars; b++) {
+      total++;
+      const bar = sec.start + b;
+      if (song.clips.some(c => HORNS.includes(c.instrument) && c.start <= bar && bar < c.start + c.bars && !(sec.mute || []).includes(c.instrument)
+        && (sec.entrance?.[c.instrument] ?? 0) <= b && b < (sec.exit?.[c.instrument] ?? sec.bars))) on++;
+    }
+    return on / total;
+  };
+  for (const key of ['jamaican', 'rocksteady', 'twotone', 'nutty', 'bossreggae', 'skaswing', 'skapunk']) for (const seed of [7, 70, 700]) {
+    const value = occupancy(builder.createAutoSong(engine, key, { seed, vocal: false, minutes: 3 }));
+    assert(value >= .74 && value <= .91, `${key} ${seed}: ${(value * 100).toFixed(0)} %`);
+  }
+});
+
+test('punk instrumental: la guitarra solista ocupa entre el 75 i el 90 % dels compassos', () => {
+  const occupancy = song => {
+    let total = 0, on = 0;
+    for (const sec of song.sections) for (let b = 0; b < sec.bars; b++) {
+      total++;
+      const bar = sec.start + b;
+      if (song.clips.some(c => c.instrument === 'guitar3' && c.start <= bar && bar < c.start + c.bars && !(sec.mute || []).includes('guitar3')
+        && (sec.entrance?.guitar3 ?? 0) <= b && b < (sec.exit?.guitar3 ?? sec.bars))) on++;
+    }
+    return on / total;
+  };
+  for (const key of ['punk77', 'oi', 'skatepunk', 'garage', 'postpunk', 'hardcore', 'poppunk', 'eastbay', 'horrorpunk']) for (const seed of [7, 70, 700]) {
+    const value = occupancy(builder.createAutoSong(engine, key, { seed, vocal: false, guitars: 2, minutes: 3 }));
+    assert(value >= .74 && value <= .91, `${key} ${seed}: ${(value * 100).toFixed(0)} %`);
+  }
+});

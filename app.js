@@ -44,6 +44,9 @@
     if (sec.entrance && Object.keys(sec.entrance).length) out.push('≡ entrada per capes');
     if (sec.exit && Object.keys(sec.exit).length) out.push('≡ sortida per capes');
     if (sec.offbeat) out.push('🥁🥁 dues bateries');
+    if (sec.stopTime) out.push(`✋ stop time (${sec.stopTime} c.)`);
+    if (sec.hits) out.push('💥 cops de secció');
+    if (sec.shout) out.push('📣 tornada shout');
     return out;
   }
   const FADES = [['', 'Sense fos'], ['in', 'Fos d’entrada (puja des del silenci)'], ['out', 'Fos de sortida (baixa fins al silenci)']];
@@ -196,7 +199,7 @@
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
         || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.ending !== undefined && !['stop', 'none', 'break', 'silence'].includes(s.ending))
-        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
+        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || ['hits', 'shout'].some(f => s[f] !== undefined && typeof s[f] !== 'boolean') || (s.stopTime !== undefined && (!Number.isInteger(s.stopTime) || s.stopTime < 1 || s.stopTime > 8 || s.stopTime > s.bars)) || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
         || ['entrance', 'exit'].some(f => s[f] !== undefined && (!s[f] || typeof s[f] !== 'object' || Array.isArray(s[f]) || Object.entries(s[f]).some(([n, b]) => !Object.hasOwn(INSTRUMENTS, n) || !Number.isInteger(b) || b < 0 || b > MAX_SECTION))) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
         || !validBaseEdits(s) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
@@ -294,6 +297,10 @@
       if (sec.mix && Object.keys(sec.mix).length) part.mix = sec.mix;
       if (sec.volumes && Object.keys(sec.volumes).length) part.volumes = sec.volumes;
       if (sec.offbeat) part.offbeat = true;
+      // Arranjament de vents: cops de secció, tornada «shout» i «stop time».
+      if (sec.hits) part.hits = true;
+      if (sec.shout) part.shout = true;
+      if (sec.stopTime) part.stopTime = sec.stopTime;
       if (sec.phraseBars) part.phraseBars = sec.phraseBars; // frases de la veu de 4 compassos (lletra curta)
       // Si en aquesta secció falten instruments (sobretot guitarres fortes), la resta puja una mica.
       const boost = options.baseOnly ? 0 : builder.densityBoost(s, sec);
