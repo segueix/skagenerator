@@ -616,7 +616,7 @@
     $('radio-sung').hidden = !current?.sung;
     $('radio-instrumental-tag').hidden = !current || hasVoice(current.song) || builder.isBatucadaSong(current.song);
     $('radio-title').textContent = current ? current.song.title : '';
-    $('radio-meta').textContent = current ? `${builder.isBatucadaSong(current.song) ? 'Només percussió' : keyName(current.song)} · ${current.song.settings.bpm} BPM · ${clock(current.seconds)}${current.voiceTimbre ? ' · ' + current.voiceTimbre : ''}` : '';
+    $('radio-meta').textContent = current ? `${builder.isBatucadaSong(current.song) ? 'Només percussió' : keyName(current.song)} · ${builder.isBatucadaSong(current.song) ? current.song.sections[0]?.bpm ?? current.song.settings.bpm : current.song.settings.bpm} BPM · ${clock(current.seconds)}${current.voiceTimbre ? ' · ' + current.voiceTimbre : ''}` : '';
     const play = $('radio-play');
     play.disabled = !current || !onTrack;
     play.firstElementChild.textContent = isPlaying ? '❚❚' : '▶';

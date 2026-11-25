@@ -26,13 +26,14 @@ test('cada fila de batucada sona només a la nota i al pas escollits', () => {
 
 const hitsAt = (line, bar) => line.filter(([b]) => b === bar);
 test('ritmes de batucada predefinits i variacions generades vàlides i reproduïbles', () => {
-  assert.deepEqual(Object.keys(engine.BATUCADA_RHYTHMS), ['samba', 'reggae', 'ijexa']);
+  assert.deepEqual(Object.keys(engine.BATUCADA_RHYTHMS), ['samba', 'reggae', 'ijexa', 'percudium']);
   for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) {
     assert(engine.validBatucadaPattern(rhythm.steps), key);
     const spec = engine.composeSongPart({ ...settings, batucadaRhythm: key }, { ...part, bars: 1 });
     // Els surdos apagats s'afegeixen al patró i la campana greu de l'agogô compta com a agogô.
     const muted = new Set(Object.values(engine.SURDO_MUTED));
-    spec.batucadaLine = spec.batucadaLine.filter(h => !muted.has(h[2])).map(h => h[2] === engine.AGOGO_LOW ? [h[0], h[1], 67, h[3]] : h);
+    // (Els arrossegaments del Percudium cauen entre semicorxeres i no són del patró.)
+    spec.batucadaLine = spec.batucadaLine.filter(h => !muted.has(h[2]) && Number.isInteger(h[1] * 4)).map(h => h[2] === engine.AGOGO_LOW ? [h[0], h[1], 67, h[3]] : h);
     const expected = rhythm.steps.flatMap((row, i) => [...row].map((on, step) => on === '1' ? [step / 4, engine.BATUCADA[i].note] : null)).filter(Boolean);
     assert.deepEqual(new Set(spec.batucadaLine.map(([, t, n]) => `${t}:${n}`)), new Set(expected.map(([t, n]) => `${t}:${n}`)));
     const variants = new Set();
@@ -111,7 +112,7 @@ test('ràdio Batucada: cançons només de batucada amb el tempo i la forma de ca
     });
     assert.deepEqual(builder.createBatucadaSong(engine, { seed }), song, 'reproduïble');
   }
-  assert.deepEqual([...rhythms].sort(), ['ijexa', 'reggae', 'samba']);
+  assert.deepEqual([...rhythms].sort(), ['ijexa', 'percudium', 'reggae', 'samba']);
   // No repeteix el ritme de la cançó anterior si no se n'hi demana un.
   for (let seed = 1; seed <= 20; seed++) assert.notEqual(builder.createBatucadaSong(engine, { seed, avoidRhythm: 'samba' }).settings.batucadaRhythm, 'samba');
   assert.equal(builder.createBatucadaSong(engine, { seed: 3, rhythm: 'ijexa' }).settings.batucadaRhythm, 'ijexa');
@@ -179,7 +180,9 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     const rhythmOf = sec => Object.keys(engine.BATUCADA_RHYTHMS).filter(key => sec.batucadaPattern
       && engine.BATUCADA_RHYTHMS[key].steps[0] === sec.batucadaPattern[0] && engine.BATUCADA_RHYTHMS[key].steps[1] === sec.batucadaPattern[1]);
     // Hi ha seccions amb un altre ritme (els surdos 1 i 2 d'un altre ritme).
-    assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
+    // (El Percudium no canvia de ritme: el seu groove és el protagonista.)
+    if (song.settings.batucadaRhythm === 'percudium') assert(!secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes('percudium')));
+    else assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
     assert(secs[0].batucada?.whistle && secs.at(-1).batucada?.peak && secs[1].batucada?.peak);
     // Els moments clau (entrada, última tornada i final) pugen també el volum general.
     assert(secs.filter(sec => sec.volumes).every(sec => sec.batucada?.peak && sec.volumes.master === 3));
@@ -287,4 +290,47 @@ test('el surdo 3 improvisa: frases que canvien, cops oberts i apagats i redobles
   assert.throws(() => compose({}, { batucadaSurdo3: 'x' }));
   // Les cançons de la ràdio el fan improvisar.
   assert.equal(builder.createBatucadaSong(engine, { seed: 4 }).settings.batucadaSurdo3, 'improv');
+});
+
+test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments, sala i compressió de bloc', () => {
+  const st = engine.BATUCADA_FEEL.percudium;
+  const spec = engine.composeSongPart({ ...settings, batucadaRhythm: 'percudium', batucadaBand: 3 }, { ...part, bars: 2, energy: 90 });
+  const line = spec.batucadaLine.filter(h => !h[6]);
+  // Caixa i xocalho a totes les semicorxeres, i arrossegaments (una fusa abans dels accents).
+  for (let bar = 0; bar < 2; bar++) {
+    const caixa = line.filter(h => h[0] === bar && h[2] === 38).map(h => h[1] * 4);
+    assert(caixa.filter(Number.isInteger).length === 16);
+    assert.deepEqual(caixa.filter(x => !Number.isInteger(x)).sort((a, b) => a - b), [5.5, 8.5, 12.5]);
+    assert.equal(line.filter(h => h[0] === bar && h[2] === 69).length, 16);
+  }
+  // Accents sincopats (1, 7, 10 i 14): la caixa hi és més forta.
+  const caixa = step => line.find(h => h[0] === 0 && h[2] === 38 && h[1] * 4 === step)[3];
+  for (const step of [0, 6, 9, 13]) assert(caixa(step) > caixa(step + 1));
+  assert.equal(st.accents, '1000001001000100');
+  // Els surdos pesen menys i la caixa més que al samba.
+  const samba = engine.composeSongPart({ ...settings, batucadaBand: 3 }, { ...part, bars: 1, energy: 90 }).batucadaLine;
+  const first = (l, n) => l.find(h => h[2] === n && !h[6])[3];
+  assert(first(line, 36) < first(samba, 36) && first(line, 38) > first(samba, 38));
+  // Sala, separació dels músics i compressió de bloc.
+  assert.equal(spec.batucadaRoom, st.room);
+  assert.equal(spec.batucadaGlue, true);
+  const perf = createPerformance(spec);
+  assert(perf.glue && perf.channels.filter(c => c.drums && c.program === 71).every(c => c.reverb === st.room));
+  assert(!createPerformance(engine.composeSongPart({ ...settings, batucadaBand: 3 }, { ...part, bars: 1 })).glue);
+  // Cançons de la ràdio Percudium: 94–102 BPM (a les seccions), banda de tres, contraritmes i mescla brillant.
+  for (let seed = 1; seed <= 20; seed++) {
+    const song = builder.createBatucadaSong(engine, { seed, rhythm: 'percudium' }), secs = song.sections;
+    assert.equal(song.settings.batucadaRhythm, 'percudium');
+    assert.equal(song.settings.batucadaBand, 3);
+    assert(song.settings.bpm >= 100 && secs.every(sec => (sec.bpm ?? song.settings.bpm) >= 94 && (sec.bpm ?? song.settings.bpm) <= 108));
+    assert(song.settings.mix.drums.low < 0 && song.settings.mix.drums.high > 0);
+    assert(secs.filter(sec => sec.energy >= 84 && sec.type !== 'intro' && !sec.batucada?.tutti).every(sec => sec.batucada?.counter !== undefined));
+    // La caixa contínua es manté a totes les variacions.
+    assert([song.settings.batucadaPattern, ...secs.map(sec => sec.batucadaPattern).filter(Boolean)].every(p => p[3] === '1'.repeat(16) || p[4] !== undefined));
+  }
+  // Cap altre ritme no canvia a Percudium.
+  for (let seed = 1; seed <= 30; seed++) {
+    const song = builder.createBatucadaSong(engine, { seed, rhythm: 'samba' });
+    assert(!song.sections.some(sec => sec.batucadaPattern && sec.batucadaPattern[1] === engine.BATUCADA_RHYTHMS.percudium.steps[1]));
+  }
 });

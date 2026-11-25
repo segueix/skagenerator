@@ -1913,7 +1913,12 @@
         reggae: { name: 'Samba-reggae', steps: ['0000000010001000', '1000100000000000', '0000001000000010', '1001001000101000',
             '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000', '0000000000000000'] },
         ijexa: { name: 'Ijexá', steps: ['1000000010000000', '0000100000001000', '0000000000100000', '0000000000000000',
-            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000'] }
+            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000'] },
+        // Percudium: a partir d'un enregistrament de referència (uns 97 BPM). Textura molt densa (caixa i xocalho
+        // a totes les semicorxeres, tamborim atapeït), accents sincopats a les semicorxeres 1, 7, 10 i 14 i el pes
+        // del so als mitjos (caixa, repique i tamborim) més que als surdos.
+        percudium: { name: 'Percudium', steps: ['1000000010000000', '0000001000000100', '0010000000100010', '1111111111111111',
+            '1000001001100110', '1011011011110110', '1000001001000100', '1111111111111111', '0000000000000000', '0000000000000000'] }
     };
     // Biblioteca de figures per generar variacions: els surdos 1 i 2 i el xocalho (el pols) no canvien.
     const BATUCADA_FIGURES = {
@@ -1935,7 +1940,10 @@
     const BATUCADA_FEEL = {
         samba: { feel: [0, .028, -.008, -.042], abafado: true, agogo: 'gaaaaaaagaaaaaaa' },
         reggae: { feel: [0, .034, 0, .03], abafado: false, agogo: 'gaaaaaaaaaaaaaaa' },
-        ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' }
+        ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' },
+        // accents: semicorxeres accentuades (en lloc dels accents de cada temps); gain: pes de cada peça.
+        percudium: { feel: [0, .02, -.005, -.025], abafado: true, agogo: 'gaaaaaaaagaaaaaa', accents: '1000001001000100', graces: true, room: 44, spread: 1.6, glue: true,
+            gain: { 36: .8, 41: .8, 45: .84, 35: .8, 43: .8, 47: .84, 38: 1.42, 50: 1.1, 54: 1.08, 69: .95, 67: 1, 68: 1 } }
     };
     // Surdo apagat («abafado») de cada surdo i campana greu de l'agogô.
     const SURDO_MUTED = { 0: 35, 1: 43, 2: 47 }, AGOGO_LOW = 68;
@@ -2027,8 +2035,9 @@
         // als moments clau (fx.peak) la batucada puja molt.
         const level = 88 + (energy - 70) * .15 + (fx.peak ? 14 : 0) + (fx.tutti ? 6 : 0);
         const force = (pitch, step, extra = 0) => {
-            const accent = step % 4 === 0 ? 15 : step % 2 === 0 ? 3 : -7;
-            return Math.max(20, Math.min(127, Math.round((level + accent + extra) * BATUCADA_GAIN[pitch])));
+            const accent = style.accents ? (style.accents[step] === '1' ? 9 : step % 2 ? -5 : -1)
+                : step % 4 === 0 ? 15 : step % 2 === 0 ? 3 : -7;
+            return Math.max(20, Math.min(127, Math.round((level + accent + extra) * BATUCADA_GAIN[pitch] * (style.gain?.[pitch] ?? 1))));
         };
         // Cadena de cuíca: cada cop de cuíca fa servir la variant següent de la cadena.
         const chain = fx.cuica !== undefined ? CUICA_CHAINS[fx.cuica] : null, phrase = chain ? CUICA_PHRASES[fx.cuica % CUICA_PHRASES.length] : null;
@@ -2099,6 +2108,8 @@
                     else if (fire && (i === 3 || i === 7)) add(bar, step, i, i === 3 ? -24 : -10);
                 });
                 if (step >= virada) add(bar, step, 4, (step - 12) * 5 + 4);
+                // Arrossegaments: abans de cada accent, la caixa fa un cop fluix una fusa abans (Percudium).
+                if (style.graces && !fx.tutti && step > 0 && style.accents[step] === '1' && plays(3)) add(bar, step - .5, 3, -20);
                 // Samba: cada surdo apaga la pell (cop sord) quan l'altre toca obert.
                 // (Només si aquell surdo toca al patró.)
                 if (style.abafado && !fx.tutti) {
@@ -3189,7 +3200,12 @@
         if ((part.timbres?.drums ?? settings.timbres?.drums) === 'batucada') {
             drumOptions.batucadaLine = composeBatucada(settings, part, bars, energy, drumOptions.stopAt ?? Infinity, 60 / tempo);
             // Balanç del ritme de la secció (micro-temps de les semicorxeres).
-            drumOptions.batucadaFeel = BATUCADA_FEEL[batucadaRhythmOf(part.batucadaPattern ?? batucadaRows(settings), settings.batucadaRhythm)].feel.slice();
+            const batucadaStyle = BATUCADA_FEEL[batucadaRhythmOf(part.batucadaPattern ?? batucadaRows(settings), settings.batucadaRhythm)];
+            drumOptions.batucadaFeel = batucadaStyle.feel.slice();
+            // Sala i separació dels músics pròpies del ritme (el Percudium sona com un mur de so, amb més sala).
+            if (batucadaStyle.room) drumOptions.batucadaRoom = batucadaStyle.room;
+            if (batucadaStyle.spread) drumOptions.batucadaSpread = batucadaStyle.spread;
+            if (batucadaStyle.glue) drumOptions.batucadaGlue = true;
         }
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
