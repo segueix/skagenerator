@@ -582,6 +582,24 @@ function createPerformance(spec) {
       if (SECOND[channel] !== undefined) horn(SECOND[channel], pitch, at, stab, force - 8, true);
     }
   }
+  // Entrada dels vents just abans del temps (pickup): a l'últim compàs, dues corxeres que pugen
+  // cap a la tònica on comença la secció següent, amb tota la secció a tres veus.
+  if (spec.pickup && spec.style === 'ska' && spec.chords.length && !finale) {
+    const last = spec.chords.length - 1, tonicPc = ((spec.tonic || 0) % 12 + 12) % 12;
+    let target = 72; while (target % 12 !== tonicPc) target++;
+    const steps = [];
+    for (let q = target - 1; steps.length < 2 && q > target - 6; q--) if (SCALE.includes(((q % 12) + 12) % 12)) steps.unshift(q);
+    const savedAudible = audible;
+    audible = () => true; // els vents poden no sonar en aquesta secció (p. ex. al final d'un solo)
+    steps.forEach((top, i) => {
+      const at = last * bar + (3 + i * .5) * beat;
+      for (const [channel, pitch] of [[3, top], [8, thirdBelow(top, null, 55)], [4, thirdBelow(thirdBelow(top, null, 55), null, 48) - 12]]) {
+        horn(channel, pitch, at, beat * .42, 96, i === 0);
+        if (SECOND[channel] !== undefined) horn(SECOND[channel], pitch, at, beat * .42, 88, i === 0);
+      }
+    });
+    audible = savedAudible;
+  }
   bypassBreaks = false;
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);

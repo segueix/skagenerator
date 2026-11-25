@@ -421,6 +421,11 @@
       // Sense pont: s'afegeix un solo de 8 compassos abans de l'última tornada.
       else { const last = plan.map(([type]) => type).lastIndexOf('chorus'); if (last > 0) plan = [...plan.slice(0, last), ['solo', 8], ...plan.slice(last)]; }
     }
+    // Ska instrumental a l'estil dels Skatalites (dues de cada tres vegades): intro, tema (A a
+    // l'estrofa i B a la tornada), solos sobre una base diferent, el tema altre cop i una coda.
+    // Atzar propi: la resta de la cançó no canvia.
+    const skatalites = instrumental && !sheet.length && rng((seed ^ 0x7f4a7c15) >>> 0)() < .65;
+    if (skatalites) plan = skatalitesPlan(bpm, target, rng((seed ^ 0x5851f42d) >>> 0));
 
     const id = `auto-${seed.toString(36)}`, sections = [];
     let at = 0;
@@ -457,6 +462,16 @@
       }
     }
     const of = type => sections.filter(s => s.type === type), lastChorus = of('chorus').at(-1);
+    if (skatalites) {
+      // Solos sobre una base diferent: un altre ritme de bateria i una altra línia de baix (els acords
+      // ja són els propis del solo). Els vents entren al tema just abans del temps, amb el redoble.
+      const kinds = engine.SONG_GROOVES[sg.style];
+      for (const sec of of('solo')) sec.groove = { drums: (groove.drums + 1) % kinds.drums.length, bass: (groove.bass + 1) % kinds.bass.length };
+      sections.forEach((sec, i) => {
+        const next = sections[i + 1];
+        if (next?.type === 'verse' && (sec.type === 'intro' || sec.type === 'solo')) sec.pickup = true;
+      });
+    }
     // ── Moviments propis del subgènere (tempo, to, ritme) ─────────────
     const tempo = (sec, factor) => { if (sec) sec.bpm = Math.max(40, Math.min(240, Math.round(bpm * factor))); };
     // Canvis de tempo suaus (els salts grans sonaven bruscos): com a molt un 7 %. Per sonar
@@ -551,7 +566,7 @@
         add(sec, headB);
         if (!mellow) add(sec, headB === 'sax' ? 'trumpet' : 'sax', { line: 'riff' });
         if (mellow || sec === lastChorus) add(sec, 'trombone', { line: 'riff' });
-        if (key === 'nutty') add(sec, 'organ', { revision: 1 });
+        if (key === 'nutty' || sec === lastChorus) add(sec, 'organ', { revision: 1 });
         if (key === 'skapunk') add(sec, 'guitar2', { fx: { type: 'distortion', drive: 65, tone: 55 }, revision: 2 });
       }
       if (sec.type === 'solo') {
@@ -622,7 +637,8 @@
         if (sec.type === 'prechorus') { add(sec, 'trombone', { line: 'answer' }); add(sec, 'sax', { line: 'answer' }); }
         if (sec.type === 'chorus') {
           section(sec, sing ? 'answer' : 'riff', !mellow || sec === lastChorus);
-          if (key === 'nutty') add(sec, 'organ', { revision: 1 });
+          // L'última tornada, més plena: també l'orgue.
+          if (key === 'nutty' || sec === lastChorus) add(sec, 'organ', { revision: 1 });
           if (key === 'skapunk') add(sec, 'guitar2', { fx: { type: 'distortion', drive: 65, tone: 55 }, revision: 2 });
         }
         if (sec.type === 'solo') {
@@ -753,6 +769,24 @@
     const highlights = planHighlights(song, key, r, { vocal });
     if (highlights.stop) highlights.stop.ending = 'stop';
     designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf, opening: highlights.opening, closing: highlights.closing, middle: highlights.middle });
+    // Corba d'intensitat de l'ska: abans de l'última tornada, una baixada (només baix i bateria, i
+    // la veu si n'hi ha) als últims compassos de la secció anterior; l'última tornada, més plena.
+    const droppedBefore = new Set();
+    if (!punk && lastChorus) {
+      const drop = rng((seed ^ 0x0bf58476) >>> 0), ordered = [...sections].sort((a, b) => a.start - b.start), index = ordered.indexOf(lastChorus);
+      const before = ordered[index - 1];
+      if (before && index > 1 && before.bars >= 4 && !before.ending && !before.stopTime && drop() < .75) {
+        const bars = Math.min(4, Math.floor(before.bars / 2)), from = before.bars - bars;
+        const inside = c => c.start < before.start + before.bars && before.start < c.start + c.bars;
+        const playing = new Set([...song.base.instruments, ...song.clips.filter(inside).map(c => c.instrument)]);
+        before.exit = { ...(before.exit || {}) };
+        for (const name of playing) if (!['drums', 'electronicDrums', 'bass', 'synthBass', 'vocal'].includes(name)) before.exit[name] = Math.min(before.exit[name] ?? before.bars, from);
+        droppedBefore.add(before);
+      }
+      lastChorus.energy = Math.min(100, (lastChorus.energy ?? 90) + 8);
+      // Les tornades anteriors queden per sota: l'última ha de ser la més plena.
+      for (const sec of of('chorus')) if (sec !== lastChorus) sec.energy = Math.min(sec.energy ?? 90, lastChorus.energy - 4);
+    }
     // Cançons instrumentals: el tema no ha de sonar tota l'estona (quedava saturat). Els vents de
     // l'ska i la guitarra solista del punk ocupen entre el 75 i el 90 % dels compassos: callen uns
     // compassos a l'inici de les estrofes (només la base, com un «riddim»), a la primera meitat del
@@ -809,7 +843,7 @@
       // L'última tornada: tota la secció de vents forta.
       if (lastChorus && sections.filter(s => s.type === 'chorus').length > 1) lastChorus.shout = true;
       // Cops de secció a l'últim compàs d'una secció que porta a una tornada (sense aturada ni silenci propis).
-      const intoChorus = ordered.filter((sec, i) => i > 0 && ordered[i + 1]?.type === 'chorus' && sec.type !== 'chorus' && sec.bars >= 2 && !sec.ending);
+      const intoChorus = ordered.filter((sec, i) => i > 0 && ordered[i + 1]?.type === 'chorus' && sec.type !== 'chorus' && sec.bars >= 2 && !sec.ending && !droppedBefore.has(sec));
       if (intoChorus.length && band() < (instrumental ? .8 : .55)) {
         intoChorus.at(-1).hits = true;
         if (intoChorus.length > 2 && band() < .4) intoChorus[0].hits = true;
@@ -882,6 +916,20 @@
       const weight = .85 ** i * (song.subgenre === key ? 1 : song.style === style ? .7 : .3);
       return t + weight * formSimilarity(plan, song.plan) ** 3;
     }, 0);
+  }
+  // Forma Skatalites: intro, tema A (estrofa) i B (tornada), d'un a tres solos, tema i coda.
+  // Es tria la combinació de llargades que s'acosta més a la durada demanada.
+  function skatalitesPlan(bpm, target, r) {
+    const seconds = bars => bars * 240 / bpm;
+    let best = null;
+    for (const intro of [4, 8]) for (const a of [8, 16]) for (const b of [8, 16]) for (const solo of [8, 16]) for (const solos of [1, 2, 3]) for (const coda of [4, 8]) {
+      const plan = [['intro', intro], ['verse', a], ['chorus', b], ...Array.from({ length: solos }, () => ['solo', solo]), ['verse', a], ['chorus', b], ['outro', coda]];
+      const total = plan.reduce((t, [, bars]) => t + bars, 0);
+      if (total > 256) continue;
+      const score = Math.abs(seconds(total) - target) + r() * 12;
+      if (!best || score < best.score) best = { plan, score };
+    }
+    return best.plan;
   }
   function chooseForm({ key, style, bpm, target, r, recent = [], vary = true }) {
     const fast = bpm >= 160, punk = style === 'punk', pick = list => list[Math.floor(r() * list.length)];
