@@ -428,3 +428,12 @@ test('cada surdo talla el seu so anterior (obert i apagat): els redobles no s\'a
   assert.equal(new Set([36, 41, 45].map(n => pieces[n].choke)).size, 3, 'cada surdo, el seu grup');
   assert(!pieces[38].choke && !pieces[69].choke, 'la caixa i el xocalho no es tallen');
 });
+
+test('els surdos de la batucada no van a la reverberació (sonaven com un to metàl·lic després dels cops)', () => {
+  const perf = createPerformance(engine.composeSongPart({ ...settings, batucadaBand: 3 }, { ...part, bars: 1 }));
+  const drums = perf.channels.filter(c => c.drums && c.program === 71);
+  assert.equal(drums.length, 3);
+  for (const channel of drums) assert.deepEqual(channel.dryKeys, [35, 36, 41, 43, 45, 47]);
+  const ska = createPerformance(engine.composeSongPart({ ...settings, timbres: {}, instruments: ['drums'] }, { ...part, bars: 1 }));
+  assert(ska.channels.every(c => !c.dryKeys), 'les bateries de l\'ska no canvien');
+});

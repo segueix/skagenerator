@@ -137,6 +137,9 @@ function createPerformance(spec) {
     instrumentOf[bandChannel(p)] = 'drums';
   }
   if (room !== undefined && spec.batucadaLine) channels.find(c => c.channel === 9).reverb = room;
+  // Els surdos de la batucada, secs (com el bombo d'una bateria): la reverberació del sintetitzador convertia
+  // la seva energia greu en un to metàl·lic que es quedava sonant després dels cops (sobretot el surdo 3).
+  if (spec.batucadaLine) for (const entry of channels) if (entry.channel === 9 || (entry.channel >= BAND && entry.channel < BAND + BAND_PLAYERS)) entry.dryKeys = [35, 36, 41, 43, 45, 47];
   // Tercera diatònica per sota (dins de l'escala de la secció); fora de l'escala, la nota de l'acord
   // de 3 a 4 semitons per sota. Si queda massa greu, l'octava avall o, si tampoc hi cap, l'uníson.
   const SCALE = (spec.mode === 'major' ? [0, 2, 4, 5, 7, 9, 11] : spec.mode === 'dorian' ? [0, 2, 3, 5, 7, 9, 10] : [0, 2, 3, 5, 7, 8, 10])

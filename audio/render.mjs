@@ -293,6 +293,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       if (patch.drums && patch.tune) for (const param of synth.midiChannels[patch.channel].drumParams) param.pitchCoarse = patch.tune;
       // Músics de la batucada: cada un amb l'afinació una mica diferent (cents).
       if (patch.drums && patch.tuneFine) for (const param of synth.midiChannels[patch.channel].drumParams) param.pitchFine = patch.tuneFine;
+      // Peces sense reverberació (els surdos de la batucada): el so de la sala els feia ressonar com un to metàl·lic.
+      if (patch.drums && patch.dryKeys) for (const key of patch.dryKeys) synth.midiChannels[patch.channel].drumParams[key].reverbSend = 0;
       synth.controllerChange(patch.channel, 7, patch.volume);
       synth.controllerChange(patch.channel, 10, patch.pan);
       // L'enviament a la reverberació segueix el volum de l'instrument.
