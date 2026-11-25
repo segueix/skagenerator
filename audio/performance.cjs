@@ -227,8 +227,30 @@ function createPerformance(spec) {
   // (després del cop, només sona la bateria fins a la secció següent).
   if (spec.stopAt !== undefined && (!Number.isFinite(spec.stopAt) || spec.stopAt <= 0 || spec.stopAt > spec.seconds)) throw new Error('Aturada no vàlida');
   const silentBand = (channel, start) => channel !== 9 && channel !== 10 && ((spec.countIn && start < bar - .01) || (spec.stopAt !== undefined && start >= spec.stopAt - .01));
+  // Talls de la banda. «Stop time» (primers compassos de la secció): la banda només fa un cop a l'u
+  // de cada compàs i calla; la veu i les melodies pròpies (tema, solo) continuen. Cops de secció
+  // (últim compàs): tota la banda, vents inclosos, toca uns cops curts junts i calla entremig.
+  const HIT_PATTERNS = [[0, 1.5], [0, 2.5], [2, 3.5], [.5, 1.5, 2.5], [0, 1, 2], [1.5, 3]];
+  const breaks = [];
+  if (spec.stopTime !== undefined && (!Number.isInteger(spec.stopTime) || spec.stopTime < 1 || spec.stopTime > 8)) throw new Error('Stop time no vàlid');
+  for (let b = 0; b < Math.min(spec.stopTime || 0, spec.chords.length); b++) breaks.push({ from: b * bar, to: (b + 1) * bar, hits: [0], melodyGoesOn: true });
+  if (spec.hits && spec.chords.length >= 2 && !finale)
+    breaks.push({ from: (spec.chords.length - 1) * bar, to: spec.chords.length * bar, hits: HIT_PATTERNS[rng(((spec.seed >>> 0) || 1) * 17 + spec.chords.length)() * HIT_PATTERNS.length | 0], melodyGoesOn: false });
+  const ownMelody = channel => {
+    if (channel === 16 || channel === 5) return true;
+    const name = instrumentOf[channel];
+    return ['trumpet', 'trombone', 'sax', 'guitar3'].includes(name) && Array.isArray(spec.lines?.[name]) && !['riff', 'answer'].includes(spec.lineModes?.[name]);
+  };
+  // La veu no para mai; al «stop time» tampoc la melodia pròpia.
+  const keepsPlaying = (channel, window) => channel === 16 || (window.melodyGoesOn && ownMelody(channel));
+  let bypassBreaks = false;
   function play(channel, pitch, start, duration, velocity, jitter, exact) {
     if (start >= spec.seconds || !audible(channel, start) || silentBand(channel, start)) return;
+    if (!bypassBreaks) for (const window of breaks) {
+      if (keepsPlaying(channel, window)) continue;
+      if (start >= window.from - .005 && start < window.to - .005) return;
+      if (start < window.from && start + duration > window.from) duration = Math.max(.02, window.from - start - .01);
+    }
     if (spec.stopAt !== undefined && channel !== 9 && channel !== 10 && start < spec.stopAt) duration = Math.min(duration, spec.stopAt - start);
     const guitarTake = takeChannels.get(channel);
     if (guitarTake) duration = Math.min(duration, guitarTake.to * bar - start);
@@ -483,14 +505,17 @@ function createPerformance(spec) {
     // Registre: tota la línia es mou la mateixa quantitat d'octaves (la que n'hi deixa més notes
     // dins del registre preferit) i només es pleguen les notes que surten de l'extensió de l'instrument. Abans cada nota es
     // plegava per separat i el riff saltava una octava enmig de la frase (p. ex. 74 → 65 en lloc de 77).
-    const fitOctave = (pitches, lo, hi) => {
+    // Si alguna octava fa cabre tota la frase dins de l'extensió de l'instrument (min–max), es tria
+    // entre aquestes: així no cal plegar cap nota (les veus de secció poden anar més amunt que el riff).
+    const fitOctave = (pitches, lo, hi, min = -Infinity, max = Infinity) => {
+      const shifts = [0, -1, 1, -2, 2, -3], fits = shifts.filter(k => pitches.every(p => p + 12 * k >= min && p + 12 * k <= max));
       let best = 0, inside = -1;
-      for (const k of [0, -1, 1, -2, 2, -3]) { const n = pitches.filter(p => p + 12 * k >= lo && p + 12 * k <= hi).length; if (n > inside) { best = k; inside = n; } }
+      for (const k of fits.length ? fits : shifts) { const n = pitches.filter(p => p + 12 * k >= lo && p + 12 * k <= hi).length; if (n > inside) { best = k; inside = n; } }
       return best * 12;
     };
     const fold = (p, lo, hi) => { while (p > hi) p -= 12; while (p < lo) p += 12; return p; };
-    const saxShift = instrument === 'sax' ? fitOctave(line.map(n => n[2]), 55, 74) : 0;
-    const tromboneShift = instrument === 'trombone' && own ? fitOctave(line.map(n => n[2]), 45, 67) : 0;
+    const saxShift = instrument === 'sax' ? fitOctave(line.map(n => n[2]), 55, 74, 46, 76) : 0;
+    const tromboneShift = instrument === 'trombone' && own ? fitOctave(line.map(n => n[2]), 45, 67, 40, 72) : 0;
     for (const [index, [b, t, pitch, duration]] of line.entries()) {
       const at = b * bar + t * beat, last = finale && b === spec.chords.length - 1;
       if (last) continue;
@@ -530,12 +555,34 @@ function createPerformance(spec) {
         // sense, harmonitza la melodia amb notes de l'acord.
         channel = 4; played = own ? fold(pitch + tromboneShift, 40, 72) : nearest(pitch - 12, chord.pcs, 45, 67); force = velocity - 5; lowest = 40;
       }
+      // Tornada «shout»: tota la secció forta.
+      if (spec.shout) force += 14;
       horn(channel, played, at, length, force, accent, connected, slurred, joinedPrevious, endsPhrase);
-      // Segon músic de la secció (només a l'ska): la mateixa frase una tercera per sota, més fluix.
+      // Amb la secció repartint-se l'acord (riff o resposta), el segon músic dobla la seva veu a
+      // l'uníson (més cos sense embrutar l'acord); amb una melodia pròpia, fa la tercera per sota.
+      const unison = ['riff', 'answer'].includes(spec.lineModes?.[instrument]);
       if (SECOND[channel] !== undefined)
-        horn(SECOND[channel], thirdBelow(played, chord, lowest), at, length, force - 10, accent, connected, slurred, joinedPrevious, endsPhrase);
+        horn(SECOND[channel], unison ? played : thirdBelow(played, chord, lowest), at, length, force - (spec.shout ? 4 : 10), accent, connected, slurred, joinedPrevious, endsPhrase);
     }
   }
+  // Els cops dels talls: bateria (bombo i plat), baix, guitarra i els vents a tres veus, junts i curts.
+  bypassBreaks = true;
+  for (const window of breaks) for (const [k, h] of window.hits.entries()) {
+    const at = window.from + h * beat, chord = spec.chords[Math.min(spec.chords.length - 1, Math.floor(at / bar + 1e-6))];
+    if (!chord) continue;
+    const stab = beat * .3, force = window.melodyGoesOn ? 96 : 108;
+    if (has('drums')) { note(9, 36, at, .2, force + 6, .002); if (!window.melodyGoesOn || window.from === 0 || k === 0) note(9, 49, at, .6, window.melodyGoesOn ? 84 : 104, .002); }
+    if (has('bass')) note(2, 40 + ((chord.pcs[0] - 4 + 12) % 12), at, stab * 1.3, force, .002);
+    if (has('guitar') && spec.guitarBase !== false) strum(0, chord.notes.slice().reverse(), at, stab, force - 8, .006);
+    const top = nearest(76, chord.pcs, 70, 81), below = p => { for (let q = p - 1; q >= p - 9; q--) if (chord.pcs.includes(q % 12)) return q; return p - 3; };
+    const voices = { trumpet: [3, top], sax: [8, below(top)], trombone: [4, below(below(top)) - 12] };
+    for (const [name, [channel, pitch]] of Object.entries(voices)) {
+      if (!has(name)) continue;
+      horn(channel, pitch, at, stab, force, true);
+      if (SECOND[channel] !== undefined) horn(SECOND[channel], pitch, at, stab, force - 8, true);
+    }
+  }
+  bypassBreaks = false;
   const order = { off: 0, cc: 1, pitch: 1, on: 2 };
   events.sort((a, b) => a.time - b.time || order[a.type] - order[b.type]);
   // Una nota repetida (mateix canal i mateixa tecla) no pot encavalcar-se amb l'anterior:

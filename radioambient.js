@@ -2170,9 +2170,51 @@
             return [t, i === onsets.length - 1 ? Math.max(.25, Math.min(2, 8 - t) - .25) : gap];
         });
     }
-    function composeRiff(seed, punk) {
+    // ── Biblioteca de riffs de vents d'ska ─────────────────────────────
+    // Patrons rítmics de dos compassos (pregunta i resposta) amb les cèl·lules típiques de l'ska:
+    // cops a contratemps, notes que avancen el temps (lligades per sobre de la barra) i frases 2+2.
+    // Cada caràcter és una corxera: «x» cop curt, «L» nota llarga que dura mentre segueixen «-», «.» silenci.
+    // Cada grup indica els subgèneres on encaixa millor.
+    const RIFF_LIBRARY = [
+        // 2-tone i ska-punk: cops secs i empenta.
+        ['x.x.L--.x.x.L---', 'twotone skapunk nutty'], ['.x.xL---.x.xL---', 'twotone skapunk'], ['L--.x.L-L--.x...', 'twotone nutty'],
+        ['x..x..x.L-------', 'twotone skapunk'], ['x..x..x.x..x..L-', 'twotone skapunk'], ['.L-.L-.L-L---...', 'twotone jamaican'],
+        ['L-.xL-.xL-.x.L--', 'twotone nutty'], ['..x.x.L-..x.x.L-', 'twotone skaswing'], ['x.x...x.x.x...x.', 'skapunk'],
+        ['x..x..x...x.x.L-', 'skapunk twotone'], ['L-x.x.L-x.x.x.L-', 'skapunk'], ['x.x.x.L---.x.x..', 'skapunk twotone'],
+        // Ska jamaicà (Skatalites): frases llargues, anticipacions i aire de jazz.
+        ['L--xL--.L-x.L---', 'jamaican skaswing'], ['.x.L---.x.L---..', 'jamaican bossreggae'], ['L-L-L--.x.x.L---', 'jamaican'],
+        ['x.L--.x.L-------', 'jamaican rocksteady'], ['..L--.L-.L--.L--', 'jamaican skaswing'], ['L---.x.xL---.x.x', 'jamaican twotone'],
+        // Rocksteady i early reggae: espai, notes llargues i entrades després del temps.
+        ['....L--.....L---', 'rocksteady bossreggae'], ['..L---....L-x...', 'rocksteady bossreggae'], ['.L--...x.L--....', 'rocksteady bossreggae jamaican'],
+        ['L-----..x.L-----', 'rocksteady'], ['..x.L-----..x.L-', 'bossreggae rocksteady'],
+        // Nutty (Madness): aire de marxa, negres rectes.
+        ['L-L-L-L-L-L-L---', 'nutty'], ['x.x.L-x.x.x.L---', 'nutty twotone'], ['L-.xL-.xL-L-L-..', 'nutty'],
+        // Ska-swing (jump blues): riffs curts que es repeteixen i pregunta-resposta.
+        ['L-.xL-..L-.xL-..', 'skaswing jamaican'], ['x.L-..x.L---....', 'skaswing'], ['L--.x.L-.....x.x', 'skaswing nutty'],
+        // Comuns a tots.
+        ['.x..x..xL-------', 'twotone jamaican skaswing'], ['L--.L--.L-.xL---', 'jamaican twotone nutty'], ['x...x.L-x...x.L-', 'twotone skapunk bossreggae'],
+        ['.xL-.xL-.xL-L---', 'twotone skaswing jamaican'], ['L-.x.xL-L-.x.x..', 'nutty skaswing'], ['..x.L-..L-x.L---', 'jamaican rocksteady'],
+        ['.x.x.xL-.x.x.xL-', 'twotone skapunk'], ['L-------.x.x.xL-', 'rocksteady jamaican'], ['x.x.L-..x.x.L-..', 'twotone nutty skapunk'],
+        ['L-.L-.L-x.x.x...', 'twotone jamaican']
+    ].map(([pattern, tags]) => ({ rhythm: riffFromPattern(pattern), tags: tags.split(' ') }));
+    function riffFromPattern(pattern) {
+        const rhythm = [];
+        for (let i = 0; i < pattern.length; i++) {
+            const c = pattern[i];
+            if (c !== 'x' && c !== 'L') continue;
+            let length = 1;
+            if (c === 'L') while (pattern[i + length] === '-') length++;
+            // Cop curt: mitja corxera llarga (staccato); nota llarga: fins al final del lligat, amb respiració.
+            rhythm.push([i / 2, c === 'x' ? .4 : length / 2 - .08]);
+        }
+        return rhythm;
+    }
+    function composeRiff(seed, punk, subgenre) {
         const r = seededRng((seed ^ 0x2f7a1c3) >>> 0);
-        const rhythm = riffRhythm(r, punk), steps = [0];
+        // Ska: el ritme surt de la biblioteca (preferint els patrons del subgènere); punk: generat com sempre.
+        const own = !punk && subgenre ? RIFF_LIBRARY.filter(entry => entry.tags.includes(subgenre)) : [];
+        const pool = punk ? [] : own.length ? own : RIFF_LIBRARY;
+        const rhythm = pool.length ? pool[Math.floor(r() * pool.length)].rhythm.map(n => n.slice()) : riffRhythm(r, punk), steps = [0];
         const peak = Math.floor(rhythm.length * (.35 + r() * .3));
         for (let i = 1; i < rhythm.length; i++) {
             const up = i <= peak ? 1 : -1, size = r() < .65 ? 1 : r() < .7 ? 2 : 0;
@@ -2213,6 +2255,20 @@
     }
     // Segona veu: la mateixa línia una tercera diatònica per sota.
     const harmonize = (notes, chords, scalePcs) => notes.map(([b, t, p, d]) => [b, t, moveByScale(p, -2, scalePcs, chords[b], 52, 84), d]);
+    // Veus de sota d'una línia de secció: la nota de l'acord immediatament per sota (i la següent);
+    // si la nota de dalt no és de l'acord (nota de pas), terceres diatòniques per sota.
+    function voiceSection(top, chords, scalePcs) {
+        const below = (p, pcs) => { for (let q = p - 1; q >= p - 9; q--) if (pcs.includes(((q % 12) + 12) % 12)) return q; return p - 3; };
+        const second = [], third = [];
+        for (const [b, t, p, d] of top) {
+            const chord = chords[Math.min(chords.length - 1, b)];
+            const inChord = chord.pcs.includes(((p % 12) + 12) % 12);
+            const v2 = inChord ? below(p, chord.pcs) : moveByScale(p, -2, scalePcs, chord, 40, 84);
+            const v3 = inChord ? below(v2, chord.pcs) : moveByScale(v2, -2, scalePcs, chord, 40, 84);
+            second.push([b, t, v2, d]); third.push([b, t, v3, d]);
+        }
+        return [second, third];
+    }
     // Respostes: fragments del riff als silencis de la veu (pregunta i resposta).
     // Variant (versió de la capa menys 1): 0 com sempre; 1 el fragment al revés (mirall);
     // 2 el mateix fragment començant més amunt (seqüència); 3 més avall i al revés.
@@ -2510,6 +2566,10 @@
         if (part.entrance && part.exit && Object.entries(part.exit).some(([name, bar]) => bar <= (part.entrance[name] ?? 0))) throw new Error('Entrades o sortides d’instruments no vàlides');
         if (part.countIn !== undefined && typeof part.countIn !== 'boolean') throw new Error('Compte d’entrada no vàlid');
         if (part.offbeat !== undefined && typeof part.offbeat !== 'boolean') throw new Error('Segona bateria no vàlida');
+        // Arranjament de vents: cops de secció al final, tornada «shout» i compassos de «stop time».
+        if (part.hits !== undefined && typeof part.hits !== 'boolean') throw new Error('Cops de secció no vàlids');
+        if (part.shout !== undefined && typeof part.shout !== 'boolean') throw new Error('Tornada shout no vàlida');
+        if (part.stopTime !== undefined && (!Number.isInteger(part.stopTime) || part.stopTime < 1 || part.stopTime > 8)) throw new Error('Stop time no vàlid');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
             || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name)
                 || !(['riff', 'answer'].includes(mode) || mode === 'lead' && name === 'guitar3'))))
@@ -2718,7 +2778,7 @@
                 bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
         }
         if (part.lineModes) {
-            const riff = composeRiff(settings.seed >>> 0, settings.style === 'punk');
+            const riff = composeRiff(settings.seed >>> 0, settings.style === 'punk', settings.subgenre);
             const voiceLine = lines.vocal || null;
             for (const [name, how] of Object.entries(part.lineModes)) {
                 if (!(name in layers)) continue;
@@ -2728,6 +2788,15 @@
                 // Trombó/segona veu: el riff harmonitzat una tercera per sota.
                 // També a les respostes: amb la trompeta, el trombó fa la segona veu i no l'uníson.
                 lines[name] = name === 'trombone' && (how === 'riff' || how === 'answer') ? harmonize(line, chords, ctx.scalePcs) : line;
+            }
+            // Secció de vents a tres veus: quan la trompeta fa el riff o la resposta i el saxo o el trombó
+            // la toquen amb ella, no van en terceres paral·leles sinó repartint-se l'acord (veus tancades):
+            // trompeta a dalt, saxo la nota de l'acord de sota i trombó la següent.
+            const sectionMode = name => ['riff', 'answer'].includes(part.lineModes[name]) && Array.isArray(lines[name]);
+            if (sectionMode('trumpet') && (sectionMode('sax') || sectionMode('trombone'))) {
+                const [second, third] = voiceSection(lines.trumpet, chords, ctx.scalePcs);
+                if (sectionMode('sax')) lines.sax = second;
+                if (sectionMode('trombone')) lines.trombone = sectionMode('sax') ? third : second;
             }
         }
         const drumOptions = {};
@@ -2759,7 +2828,10 @@
             baseVolume: { ...baseVolume },
             fx: { ...(settings.fx || {}), ...(part.fx || {}) },
             colors: { ...(part.colors || {}) },
-            feel: { ...(part.feel || {}) } };
+            feel: { ...(part.feel || {}) },
+            lineModes: { ...(part.lineModes || {}) },
+            ...(part.hits ? { hits: true } : {}), ...(part.shout ? { shout: true } : {}),
+            ...(part.stopTime ? { stopTime: Math.min(part.stopTime, bars) } : {}) };
     }
     function songPartScore(syn, spec) {
         const beat = spec.beat, bar = beat * 4, intensity = 0.35 + spec.energy / 155;

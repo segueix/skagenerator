@@ -282,3 +282,37 @@ test('ska: secció de vents doblada (segona veu una tercera per sota) i vents qu
     }
   }
 });
+
+test('ska: riffs de la biblioteca, vents a tres veus, cops de secció, stop time i tornada shout', () => {
+  const base = { seed: 4242, style: 'ska', bpm: 140, tonic: 0, mode: 'major', subgenre: 'twotone' };
+  const horns = { instruments: ['trumpet', 'sax', 'trombone'], layers: { trumpet: 1, sax: 1, trombone: 1 }, lineModes: { trumpet: 'riff', sax: 'riff', trombone: 'riff' } };
+  const chorus = engine.composeSongPart(base, { type: 'chorus', bars: 4, energy: 85, revision: 1, ...horns });
+  // El ritme del riff és un patró de la biblioteca: totes les notes cauen a la graella de corxeres.
+  assert(chorus.lines.trumpet.every(([, t]) => (t * 2) % 1 === 0));
+  // Tres veus: a cada moment, saxo i trombó toquen per sota de la trompeta, en notes diferents.
+  chorus.lines.trumpet.forEach(([b, t, p], i) => {
+    const s = chorus.lines.sax[i], tb = chorus.lines.trombone[i];
+    assert.deepEqual([s[0], s[1], tb[0], tb[1]], [b, t, b, t]);
+    assert(s[2] < p && tb[2] < s[2], `veus per sota: ${p} ${s[2]} ${tb[2]}`);
+  });
+  // Cops de secció: a l'últim compàs, la banda només toca els cops (bombo i plat amb els vents).
+  const all = ['drums', 'bass', 'guitar', 'trumpet', 'sax', 'trombone'];
+  const hitsSpec = engine.composeSongPart(base, { type: 'prechorus', bars: 4, energy: 75, revision: 1, ...horns, instruments: all, hits: true });
+  const hits = createPerformance(hitsSpec), lastBar = 3 * hitsSpec.beat * 4;
+  const ons = hits.events.filter(e => e.type === 'on' && e.time >= lastBar - .03);
+  const moments = [...new Set(ons.map(e => Math.round((e.time - lastBar) / hitsSpec.beat * 2) / 2))];
+  assert(moments.length >= 2 && moments.length <= 3, `cops: ${moments}`);
+  // (Cops curts: la trompeta i el trombó gravats van als canals d'staccato, 12 i 13.)
+  assert(ons.some(e => e.channel === 9) && ons.some(e => [3, 12].includes(e.channel)) && ons.some(e => [4, 13].includes(e.channel)) && ons.some(e => e.channel === 8));
+  // Stop time: als dos primers compassos, la banda només fa el cop de l'u; la veu continua.
+  const stopSpec = engine.composeSongPart(base, { type: 'verse', bars: 4, energy: 60, revision: 1, instruments: ['drums', 'bass', 'guitar', 'vocal'], layers: { vocal: 2 }, stopTime: 2 });
+  const stop = createPerformance(stopSpec), barLength = stopSpec.beat * 4;
+  const band = stop.events.filter(e => e.type === 'on' && e.channel !== 16 && e.time < 2 * barLength - .03);
+  // (La humanització pot avançar el cop uns mil·lisegons: es mesura la distància a la barra més propera.)
+  assert(band.every(e => Math.abs(e.time / barLength - Math.round(e.time / barLength)) * barLength < .05), 'només el cop de l’u');
+  assert(stop.events.some(e => e.type === 'on' && e.channel !== 16 && e.time > 2 * barLength), 'la banda torna a entrar');
+  // Shout: els vents més forts que a la tornada normal.
+  const loud = createPerformance(engine.composeSongPart(base, { type: 'chorus', bars: 4, energy: 85, revision: 1, ...horns, shout: true }));
+  const mean = music => { const v = music.events.filter(e => e.type === 'on' && [3, 12].includes(e.channel)).map(e => e.velocity); return v.reduce((a, b) => a + b, 0) / v.length; };
+  assert(mean(loud) > mean(createPerformance(chorus)) + 5);
+});

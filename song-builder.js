@@ -792,6 +792,23 @@
     const highlights = planHighlights(song, key, r, { vocal });
     if (highlights.stop) highlights.stop.ending = 'stop';
     designEdges(engine, song, { seed: Math.floor(r() * 4294967295) + 1, vocal, revisions: revisionsOf, opening: highlights.opening, closing: highlights.closing, middle: highlights.middle });
+    // ── Arranjament de vents de l'ska: tornada «shout», cops de secció i «stop time» ──
+    // (Atzar propi, per no canviar la resta de la cançó.)
+    if (!punk) {
+      const band = rng((seed ^ 0x1b873593) >>> 0), ordered = [...sections].sort((a, b) => a.start - b.start);
+      // L'última tornada: tota la secció de vents forta.
+      if (lastChorus && sections.filter(s => s.type === 'chorus').length > 1) lastChorus.shout = true;
+      // Cops de secció a l'últim compàs d'una secció que porta a una tornada (sense aturada ni silenci propis).
+      const intoChorus = ordered.filter((sec, i) => i > 0 && ordered[i + 1]?.type === 'chorus' && sec.type !== 'chorus' && sec.bars >= 2 && !sec.ending);
+      if (intoChorus.length && band() < (instrumental ? .8 : .55)) {
+        intoChorus.at(-1).hits = true;
+        if (intoChorus.length > 2 && band() < .4) intoChorus[0].hits = true;
+      }
+      // «Stop time»: la banda fa un cop a l'u de cada compàs i calla mentre la melodia continua.
+      // Amb veu, al començament de la segona estrofa; sense veu, al començament d'un solo.
+      const stopTarget = vocal ? ordered.filter(sec => sec.type === 'verse')[1] : ordered.find(sec => sec.type === 'solo');
+      if (stopTarget && stopTarget.bars >= 8 && band() < .45) stopTarget.stopTime = band() < .5 ? 2 : 4;
+    }
     // La solista amb una altra guitarra: tots els seus clips sense so ni efecte propis.
     if (leadSound) for (const c of song.clips) if (c.instrument === 'guitar3' && !c.fx && !c.sound) c.sound = leadSound;
     if (highlights.color) {
