@@ -1472,7 +1472,7 @@
     const settings = { style: 'ska', bpm: Math.max(100, bpm), tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
       batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', countIn: !alone,
       // Percudium: el so als mitjos i brillant (menys greus de surdo, més caixa, repique i tamborim).
-      ...(alone ? { mix: { drums: { low: -12, mid: 0, high: 3, volume: 6 } } } : {}), humanize: compact ? .1 : .3 };
+      ...(alone ? { mix: { drums: { low: -8, mid: 0, high: 2, volume: 1 } } } : {}), humanize: compact ? .1 : .3 };
     return { version: 3, title, settings, base: { instruments: ['drums'], revision: 1, generated: true }, harmony: {}, sections, clips: [] };
   }
   // Una cançó és de batucada si només hi sona el kit de batucada.

@@ -1,8 +1,7 @@
 // Mostres derivades del kit de batucada, fetes a partir de les gravacions (audio/samples):
-// - Surdo apagat («abafado»): el músic atura la pell amb la mà. Es conserva l'atac de la maceta i,
-//   després, la pell s'atura de pressa (decaïment exponencial), els harmònics alts s'apaguen
-//   (passabaixos que entra després de l'atac) i el to puja una mica (la mà tensa la pell).
-//   Tot són operacions lineals: no hi ha saturació ni distorsió.
+// - Surdo apagat («abafado»): el músic atura la pell amb la mà. Es conserva la gravació sencera (atac,
+//   soroll de la pell i to) i només s'esmorteeix: sona uns mil·lisegons i s'apaga de manera progressiva,
+//   amb els aguts una mica més suaus. Tot són operacions lineals: no hi ha saturació ni distorsió.
 // - Agogô greu: la segona campana, una quarta justa per sota de la gravada.
 // Es tornen a generar amb: node scripts/batucada-derived.mjs
 import { readFile, writeFile } from 'node:fs/promises';
@@ -54,16 +53,19 @@ function lowpass(data, rate, hz) {
   }
   return out;
 }
-// Surdo apagat: atac intacte (attackMs), després la pell s'atura (tau) i el so s'enfosqueix (passabaixos).
-function muted(data, rate, { attackMs = 4, tauMs = 48, cutoff = 480, semitones = .6, lengthMs = 220, click = .55 }) {
-  const source = repitch(data, semitones), attack = Math.round(rate * attackMs / 1000), length = Math.min(source.length, Math.round(rate * lengthMs / 1000));
-  const dark = lowpass(source, rate, cutoff), out = new Float32Array(length), blend = Math.round(rate * .006);
+// Surdo apagat: la mateixa gravació (amb tot el soroll natural de la pell, sense canviar-ne el to), que sona
+// sencera uns mil·lisegons i després s'esmorteeix de manera progressiva, com quan la mà para la pell.
+// Només s'enfosqueix una mica (barreja amb un passabaixos suau): un filtre fort la deixaria com una
+// sinusoide pura, amb so de caixa de ritmes.
+function muted(data, rate, { holdMs = 14, tauMs = 75, tone = .4, cutoff = 1800, lengthMs = 320 }) {
+  const length = Math.min(data.length, Math.round(rate * lengthMs / 1000)), hold = rate * holdMs / 1000, tau = rate * tauMs / 1000, ease = rate * .012;
+  const dark = lowpass(data, rate, cutoff), out = new Float32Array(length);
   for (let i = 0; i < length; i++) {
-    // De la pell oberta a l'apagada; fins i tot l'atac és una mica fosc (la mà ja és a la pell).
-    const mix = Math.max(1 - click, Math.min(1, (i - attack) / blend));
-    const decay = i < attack ? 1 : Math.exp(-(i - attack) / (rate * tauMs / 1000));
-    const fade = Math.min(1, (length - 1 - i) / (rate * .02));
-    out[i] = (source[i] * (1 - mix) + dark[i] * mix) * decay * fade;
+    // Corba suau: plana durant l'atac i, amb una transició de 12 ms, decaïment exponencial.
+    const t = Math.max(0, i - hold), blend = Math.min(1, t / ease), smooth = blend * blend * (3 - 2 * blend);
+    const damp = 1 - smooth + smooth * Math.exp(-t / tau);
+    const fade = Math.min(1, (length - 1 - i) / (rate * .03));
+    out[i] = (data[i] * (1 - tone) + dark[i] * tone) * damp * fade;
   }
   // Mateix pic que la gravació (només es baixa o es manté el nivell: no hi ha saturació).
   const gain = Math.min(1, peakOf(data) / (peakOf(out) || 1)) * .92;
@@ -71,9 +73,9 @@ function muted(data, rate, { attackMs = 4, tauMs = 48, cutoff = 480, semitones =
 }
 const load = async file => readWav(await readFile(new URL(file, DIR)));
 const OUTPUTS = {
-  'surdo-1-apagat.wav': async () => { const { data, rate } = await load('surdo-1.wav'); return [muted(data, rate, { cutoff: 460 }), rate]; },
-  'surdo-2-apagat.wav': async () => { const { data, rate } = await load('surdo-2.wav'); return [muted(data, rate, { cutoff: 430, click: .4 }), rate]; },
-  'surdo-3-apagat.wav': async () => { const { data, rate } = await load('surdo-3-greu.wav'); return [muted(data, rate, { cutoff: 420, tauMs: 42 }), rate]; },
+  'surdo-1-apagat.wav': async () => { const { data, rate } = await load('surdo-1.wav'); return [muted(data, rate, {}), rate]; },
+  'surdo-2-apagat.wav': async () => { const { data, rate } = await load('surdo-2.wav'); return [muted(data, rate, { tauMs: 70 }), rate]; },
+  'surdo-3-apagat.wav': async () => { const { data, rate } = await load('surdo-3-greu.wav'); return [muted(data, rate, { tauMs: 65 }), rate]; },
   'agogo-greu.wav': async () => {
     const { data, rate } = await load('agogo.wav'), low = repitch(data, -5), gain = peakOf(data) / (peakOf(low) || 1);
     return [low.map(v => v * gain), rate];

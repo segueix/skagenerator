@@ -222,6 +222,10 @@ test('banda: les peces es doblen o tripliquen, cada músic al seu canal, i poden
   const count = (line, note, player) => line.filter(h => h[2] === note && (h[6] || 0) === player).length;
   for (const note of [36, 41, 45, 38, 54, 69]) for (const player of [0, 1, 2]) assert.equal(count(trio, note, player), count(solo, note, 0), `${note}/${player}`);
   for (const note of [50, 67]) assert.equal(count(trio, note, 1) + count(trio, note, 2), 0, `${note} d'un sol músic`);
+  // Als surdos, els altres músics toquen bastant més fluix (si no, les còpies fan un efecte de filtre metàl·lic).
+  const velocity = (note, player) => trio.find(h => h[2] === note && (h[6] || 0) === player)[3];
+  for (const note of [36, 41, 45]) assert(velocity(note, 1) <= velocity(note, 0) * .7, `${note}`);
+  assert(velocity(38, 1) >= velocity(38, 0) * .8, 'la caixa, gairebé igual');
   // Cada músic té canal propi, obert a una banda i desafinat uns cents; un pèl a destemps.
   const perf = createPerformance({ ...compose(3), humanize: 0 });
   const seats = perf.channels.filter(c => c.drums && c.program === 71 && c.channel !== 9);

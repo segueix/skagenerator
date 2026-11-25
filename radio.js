@@ -37,8 +37,9 @@
   const RATE = studio.RATE, GAP_SECONDS = 2, TAIL_SECONDS = 1.5;
   const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', INSTRUMENTAL_KEY = 'radiospam.instrumental', FAVORITE_KEY = 'radiospam.subgenre', LEAD_KEY = 'radiospam.leadGuitar', HISTORY_MAX = 300;
   // Ràdio instrumental: cançons sense veu (ni lletra, ni melodia de guia, ni Umidaji); els vents fan el tema.
-  let instrumental = false;
-  try { instrumental = localStorage.getItem(INSTRUMENTAL_KEY) === '1'; } catch {}
+  // Per defecte, instrumental (fins que algú la desactivi).
+  let instrumental = true;
+  try { instrumental = localStorage.getItem(INSTRUMENTAL_KEY) !== '0'; } catch {}
   // Subgènere principal: si n'hi ha un d'escollit, sona una de cada dues cançons.
   // Buit = aleatori. Només compta a les emissores que inclouen el seu estil.
   let favorite = '';
@@ -54,6 +55,11 @@
   // «batucada»: només percussió (kit de batucada), amb la forma i el tempo de cada ritme.
   const STATIONS = { ska: 'Ska', punk: 'Punk', mix: 'Ska-Punk', batucada: 'Batucada' };
   const inStation = style => station === 'mix' ? style === 'ska' || style === 'punk' : style === station;
+  // Adreça de cada emissora (?emissora=batucada) i, a la Batucada, de l'estil triat (&estil=percudium):
+  // es pot compartir l'emissora; cadascú hi sentirà les seves cançons, compostes al seu dispositiu.
+  const STATION_SLUGS = { ska: 'ska', punk: 'punk', mix: 'ska-punk', batucada: 'batucada' };
+  const STYLE_SLUGS = { samba: 'samba', reggae: 'samba-reggae', ijexa: 'ijexa', percudium: 'percudium' };
+  const fromSlug = (map, slug) => Object.keys(map).find(key => map[key] === String(slug || '').toLowerCase()) || null;
   // Emissora a què pertany una cançó (les de batucada són d'estil ska però només hi sona la batucada).
   const styleOf = song => builder.isBatucadaSong(song) ? 'batucada' : song.settings.style;
   const activeFavorite = () => engine.SUBGENRES[favorite] && inStation(engine.SUBGENRES[favorite].style) ? favorite : '';
@@ -527,7 +533,51 @@
     if (navigator.locks?.request && !releaseLock) navigator.locks.request('radiospam-on-air', () => new Promise(resolve => { releaseLock = resolve; })).catch(() => {});
     playSilence(); // dins del toc: desbloqueja el so per a tota la sessió
     setPrep({ stage: 'compose', value: 0 });
+    $('radio-invite').hidden = true;
+    showAddress(true);
     showScreen('player'); renderPlayer(); fill(session);
+  }
+  // Adreça i títol de la pestanya amb el nom de l'emissora (i de l'estil de batucada, si n'hi ha un de triat).
+  function stationUrl(style = station) {
+    const url = new URL(location.href);
+    url.hash = '';
+    url.searchParams.delete('emissora'); url.searchParams.delete('estil');
+    if (style) {
+      url.searchParams.set('emissora', STATION_SLUGS[style]);
+      const chosen = style === 'batucada' && favorite.startsWith('batucada:') ? STYLE_SLUGS[favorite.slice(9)] : null;
+      if (chosen) url.searchParams.set('estil', chosen);
+    }
+    return url.href;
+  }
+  function stationName(style = station) {
+    const chosen = style === 'batucada' && favorite.startsWith('batucada:') ? engine.BATUCADA_RHYTHMS[favorite.slice(9)]?.name : null;
+    return chosen ? `${STATIONS[style]} · ${chosen}` : STATIONS[style] || '';
+  }
+  function showAddress(push) {
+    const href = stationUrl();
+    document.title = station ? `${stationName()} · Radio Spam` : 'Radio Spam';
+    $('radio-share').hidden = !station;
+    if (href === location.href) return;
+    try { history[push ? 'pushState' : 'replaceState']({ station }, '', href); } catch {}
+  }
+  // Enllaç per compartir: la pàgina de l'emissora (punk/, batucada/percudium/…), que porta el títol
+  // «Escolta Punk a Ràdio SPAM» i la seva imatge per a WhatsApp i les altres apps, i obre la ràdio.
+  function shareLink(style = station) {
+    const chosen = style === 'batucada' && favorite.startsWith('batucada:') ? favorite.slice(9) : null;
+    const path = `${STATION_SLUGS[style]}/${chosen && STYLE_SLUGS[chosen] ? `${STYLE_SLUGS[chosen]}/` : ''}`;
+    const label = chosen && engine.BATUCADA_RHYTHMS[chosen] ? `Batucada ${engine.BATUCADA_RHYTHMS[chosen].name}` : STATIONS[style];
+    return { url: new URL(path, new URL('.', location.href)).href, title: `Escolta ${label} a Ràdio SPAM` };
+  }
+  // Comparteix l'emissora: el full de compartir del dispositiu o, si no n'hi ha, l'enllaç copiat.
+  async function shareStation() {
+    if (!station) return;
+    const { url, title } = shareLink();
+    if (navigator.share) {
+      try { await navigator.share({ title, text: title, url }); return; }
+      catch (error) { if (error?.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(`${title} ${url}`); toast(`Enllaç copiat: ${title}`); }
+    catch { window.prompt('Copia l’enllaç de l’emissora:', url); }
   }
   function dropTracks() {
     for (const track of [current, ...queue]) if (track) URL.revokeObjectURL(track.url);
@@ -542,6 +592,7 @@
     clearTimeout(retryTimer); releaseLock?.(); releaseLock = null;
     audio.pause(); audio.removeAttribute('src'); audio.load();
     dropTracks(); showScreen('home');
+    showAddress(false);
     if ('mediaSession' in navigator) { try { navigator.mediaSession.metadata = null; } catch {} }
   }
   function togglePlay() {
@@ -921,7 +972,6 @@
     if (radio) $('theme-color').content = '#0c0b12'; else { studio.refresh(); window.dispatchEvent(new Event('resize')); }
     window.scrollTo(0, 0);
   }
-  $('radio-studio').addEventListener('click', () => setView('studio'));
   $('to-radio').addEventListener('click', () => setView('radio'));
 
   for (const button of document.querySelectorAll('[data-station]')) button.addEventListener('click', () => chooseStation(button.dataset.station));
@@ -947,7 +997,32 @@
   favoriteSelect.addEventListener('change', () => {
     favorite = favoriteSelect.value;
     try { localStorage.setItem(FAVORITE_KEY, favorite); } catch {}
+    if (station) showAddress(false);
   });
+  $('radio-share').addEventListener('click', shareStation);
+  // Enllaç compartit (?emissora=...): la ràdio obre la pantalla d'inici amb un avís i un botó per escoltar-la
+  // (el navegador no deixa sonar res sense un toc). L'estil de batucada de l'enllaç passa a ser el triat.
+  function openSharedStation() {
+    const params = new URLSearchParams(location.search), style = fromSlug(STATION_SLUGS, params.get('emissora'));
+    if (!style) { $('radio-invite').hidden = true; return null; }
+    const rhythm = style === 'batucada' ? fromSlug(STYLE_SLUGS, params.get('estil')) : null;
+    if (rhythm) { favorite = `batucada:${rhythm}`; favoriteSelect.value = favorite; try { localStorage.setItem(FAVORITE_KEY, favorite); } catch {} }
+    $('radio-invite-name').textContent = `Emissora ${stationName(style)}`;
+    $('radio-invite').hidden = false;
+    $('radio-invite').dataset.station = style;
+    document.title = `${stationName(style)} · Radio Spam`;
+    return style;
+  }
+  $('radio-invite-go').addEventListener('click', () => chooseStation($('radio-invite').dataset.station));
+  // Enrere / endavant del navegador: entra o surt de l'emissora.
+  window.addEventListener('popstate', () => {
+    const style = fromSlug(STATION_SLUGS, new URLSearchParams(location.search).get('emissora'));
+    if (style === station) return;
+    if (station) leaveStation();
+    if (style) openSharedStation();
+  });
+  if (new URLSearchParams(location.search).has('emissora')) setView('radio');
+  openSharedStation();
   for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { filter = button.dataset.filter; renderHistory(); });
   $('radio-back').addEventListener('click', () => { if (historyOpen) openHistory(false); else leaveStation(); });
   $('radio-play').addEventListener('click', togglePlay);
