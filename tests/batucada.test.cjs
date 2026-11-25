@@ -419,3 +419,12 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
   assert(reggae.batucadaGlue && reggae.batucadaRoom === engine.BATUCADA_FEEL.percudium.room);
   assert.deepEqual(reggae.batucadaFeel, engine.BATUCADA_FEEL.reggae.feel);
 });
+
+test('cada surdo talla el seu so anterior (obert i apagat): els redobles no s\'acumulen', () => {
+  const pieces = kit.pieces;
+  for (const [open, muted] of [[36, 35], [41, 43], [45, 47]]) {
+    assert(pieces[open].choke && pieces[open].choke === pieces[muted].choke, `surdo ${open}`);
+  }
+  assert.equal(new Set([36, 41, 45].map(n => pieces[n].choke)).size, 3, 'cada surdo, el seu grup');
+  assert(!pieces[38].choke && !pieces[69].choke, 'la caixa i el xocalho no es tallen');
+});

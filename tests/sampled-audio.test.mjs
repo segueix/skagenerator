@@ -293,3 +293,18 @@ test('orgue de rodes: bucles exactes, percussió que s’apaga i el Leslie gira 
   for (let i = 0; i < L.length; i++) { lr += L[i] * R[i]; ll += L[i] * L[i]; rr += R[i] * R[i]; }
   assert(ll > 0 && lr / Math.sqrt(ll * rr) < .85, 'l’orgue sona obert en estèreo');
 });
+
+test('el limitador abaixa els pics abans que arribin (sense deformar l\'ona) i després recupera el volum', async () => {
+  const { limitPeaks } = await import('../audio/render.mjs');
+  const n = 8000, l = new Float32Array(n), r = new Float32Array(n);
+  for (let i = 0; i < n; i++) l[i] = r[i] = .5 * Math.sin(i / 5) * (i >= 4000 && i < 4060 ? 3 : 1);
+  const before = Float32Array.from(l);
+  limitPeaks(l, r, 22050, .8);
+  let peak = 0; for (const v of l) peak = Math.max(peak, Math.abs(v));
+  assert(peak <= .8001, `pic ${peak}`);
+  assert.deepEqual([...l.slice(0, 3800)], [...before.slice(0, 3800)], 'lluny del pic, igual');
+  assert(Math.abs(l[7900] / before[7900] - 1) < .08, 'recupera el volum (en uns 80 ms)');
+  const quiet = Float32Array.from({ length: 100 }, (_, i) => .3 * Math.sin(i)), copy = Float32Array.from(quiet);
+  limitPeaks(quiet, Float32Array.from(quiet), 22050, .8);
+  assert.deepEqual([...quiet], [...copy], 'sense pics, no toca res');
+});
