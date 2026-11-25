@@ -1905,26 +1905,88 @@
         { note: 78, name: 'Cuíca', steps: '0000000100000000' }
     ];
 
+    // Ritmes de batucada predefinits (setze caixetes per compàs, en l'ordre de BATUCADA).
+    const BATUCADA_RHYTHMS = {
+        samba: { name: 'Samba', steps: BATUCADA.map(piece => piece.steps) },
+        reggae: { name: 'Samba-reggae', steps: ['0000000010001000', '1000100000000000', '0000001000000010', '1001001000101000',
+            '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000'] },
+        ijexa: { name: 'Ijexá', steps: ['1000000010000000', '0000100000001000', '0000000000100000', '0000000000000000',
+            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000'] }
+    };
+    // Biblioteca de figures per generar variacions: els surdos 1 i 2 i el xocalho (el pols) no canvien.
+    const BATUCADA_FIGURES = {
+        2: ['0001000000100010', '0010001000101010', '0000001000000010', '0001000100100010'],
+        3: ['1001101010011010', '1011101110111011', '1001001010010010', '1011101010111010'],
+        4: ['0000001000000001', '1000001010000010', '0010001000100010', '0000000100000101'],
+        5: ['1001001000101000', '1011011010110110', '1010101010101010', '1101011011010110'],
+        6: ['1000001000001000', '1010001010100010', '1000100010101000', '1010110101011010'],
+        8: ['0000000100000000', '0001000100010001', '0100000001000000', '0000000000000000']
+    };
+    // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
+    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .56, 78: .82 };
+
     function validBatucadaPattern(pattern) {
         return Array.isArray(pattern) && pattern.length === BATUCADA.length
             && pattern.every(row => typeof row === 'string' && /^[01]{16}$/.test(row));
     }
-    function composeBatucada(pattern, bars, energy, part, stopAt, beat) {
-        const rows = pattern ?? BATUCADA.map(piece => piece.steps);
+    function batucadaRows(settings = {}) {
+        if (settings.batucadaPattern !== undefined) return settings.batucadaPattern;
+        return (BATUCADA_RHYTHMS[settings.batucadaRhythm] || BATUCADA_RHYTHMS.samba).steps;
+    }
+    // Variació del ritme triat: cada llavor dona una combinació de figures diferent (reproduïble).
+    function generateBatucadaPattern(rhythm = 'samba', seed = 1) {
+        const base = (BATUCADA_RHYTHMS[rhythm] || BATUCADA_RHYTHMS.samba).steps;
+        let h = (seed >>> 0) || 1;
+        const next = () => { h = Math.imul(h ^ (h >>> 15), 2246822519) + 0x9e3779b9 >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+        return base.map((row, i) => {
+            const figures = BATUCADA_FIGURES[i];
+            if (!figures) return row;
+            const candidates = [row, ...figures.filter(f => f !== row)];
+            return candidates[Math.floor(next() * candidates.length)];
+        });
+    }
+    function composeBatucada(settings, part, bars, energy, stopAt, beat) {
+        const rows = batucadaRows(settings);
         if (!validBatucadaPattern(rows)) throw new Error('Patró de batucada no vàlid');
-        const line = [];
+        const line = [], type = part.type, ending = part.ending || 'fill';
+        const closing = type === 'outro' ? part.closing || 'hit' : null, fading = closing === 'fade';
+        const quiet = energy < 45, soft = energy < 60;
+        const force = (pitch, step, extra = 0) => {
+            const accent = step % 4 === 0 ? 12 : step % 2 === 0 ? 3 : -6;
+            return Math.max(20, Math.min(127, Math.round((58 + energy * .45 + accent + extra) * BATUCADA_GAIN[pitch])));
+        };
+        const add = (bar, step, row, extra = 0) => {
+            if ((bar * 4 + step / 4) * beat >= stopAt) return;
+            const pitch = BATUCADA[row].note;
+            line.push([bar, step / 4, pitch, force(pitch, step, extra)]);
+        };
+        // Cop de tota la batucada (aturades i final).
+        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, extra));
+        // A poca energia només hi ha els surdos, l'agogô i el xocalho; sense gaire energia, sense cuíca ni repique.
+        const plays = row => !(quiet && [3, 4, 5, 8].includes(row)) && !(soft && [4, 8].includes(row));
+        // Crida (chamada) del repique abans de la secció següent: el repique i la caixa omplen l'últim temps.
+        const call = bar => {
+            for (let step = 0; step < 12; step++) rows.forEach((row, i) => { if (row[step] === '1' && plays(i)) add(bar, step, i); });
+            for (let step = 12; step < 16; step++) { add(bar, step, 4, (step - 12) * 6); add(bar, step, 3, (step - 12) * 5); }
+            add(bar, 12, 0, 8); add(bar, 12, 1, 8);
+        };
         for (let bar = 0; bar < bars; bar++) {
-            if (bar === 0 && part.countIn) {
-                for (let t = 0; t < 4; t++) line.push([bar, t, 50, 76]);
+            if (bar === 0 && part.countIn) { for (let t = 0; t < 4; t++) add(bar, t * 4, 4, t === 3 ? 14 : 4); continue; }
+            const last = bar === bars - 1;
+            if (type === 'outro' && last && !fading) {
+                if (closing === 'cold') { unison(bar, 0, 16, [0, 1, 2, 3]); continue; }
+                unison(bar, 0, 18, [0, 1, 2, 3, 4, 5, 6, 7]);
+                if (closing === 'ring') {
+                    for (let step = 2; step < 12; step++) { add(bar, step, 3, step * 2 - 10); add(bar, step, 7, step * 2 - 10); }
+                    unison(bar, 12, 22);
+                }
                 continue;
             }
-            for (let step = 0; step < 16; step++) {
-                if ((bar * 4 + step / 4) * beat >= stopAt) break;
-                rows.forEach((row, i) => {
-                    if (row[step] === '1') line.push([bar, step / 4, BATUCADA[i].note,
-                        Math.round(55 + energy * .4 + (step % 4 === 0 ? 12 : 0))]);
-                });
-            }
+            if (last && ending === 'silence') continue;
+            if (last && (ending === 'break' || (ending === 'stop' && bars > 1))) { unison(bar, 0); continue; }
+            const intoNext = last && ending !== 'none' && part.next !== undefined && part.next !== 'end';
+            if (intoNext || (type === 'outro' && !fading && bar === bars - 2)) { call(bar); continue; }
+            for (let step = 0; step < 16; step++) rows.forEach((row, i) => { if (row[step] === '1' && plays(i)) add(bar, step, i); });
         }
         return line;
     }
@@ -2972,7 +3034,7 @@
             audibleRanges[name] = (audibleRanges[name] || [[0, bars]]).map(([a, b]) => [Math.max(a, from), Math.min(b, to)]).filter(([a, b]) => a < b);
         }
         if ((part.timbres?.drums ?? settings.timbres?.drums) === 'batucada') {
-            drumOptions.batucadaLine = composeBatucada(settings.batucadaPattern, bars, energy, part, drumOptions.stopAt ?? Infinity, 60 / tempo);
+            drumOptions.batucadaLine = composeBatucada(settings, part, bars, energy, drumOptions.stopAt ?? Infinity, 60 / tempo);
         }
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
@@ -3083,7 +3145,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, validBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, validBatucadaPattern, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

@@ -189,7 +189,12 @@
         </div>
         <fieldset id="batucada-editor" hidden>
           <legend>Patró de batucada</legend>
-          <p>Marca els cops del compàs. Cada grup de quatre caselles és un temps.</p>
+          <p>Tria un ritme, genera’n variacions o marca els cops del compàs a mà. Cada grup de quatre caselles és un temps. A la cançó, la batucada segueix l’energia de cada secció, fa la crida del repique abans de la secció següent i acaba amb un cop de tots.</p>
+          <div class="batucada-tools">
+            <label><span class="field-label">RITME</span><select id="batucada-rhythm" aria-label="Ritme de batucada"></select></label>
+            <button type="button" id="batucada-generate">Genera una variació</button>
+            <button type="button" id="batucada-reset">Restableix el ritme</button>
+          </div>
           <div id="batucada-steps"></div>
         </fieldset>
         <details class="fold section-volumes" id="fold-song-volumes" open>
