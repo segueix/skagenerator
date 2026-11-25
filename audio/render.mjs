@@ -239,6 +239,39 @@ function fxFor(score, patch) {
   const clampPct = v => Math.max(0, Math.min(100, v));
   return { ...fx, drive: clampPct(fx.drive + patch.fxTweak.drive), tone: clampPct(fx.tone + patch.fxTweak.tone) };
 }
+// Limitador de pics (estèreo enllaçat): el guany necessari en cada punt és el mínim dels 6 ms següents
+// (anticipació) i es recupera en uns 80 ms; una mitjana mòbil de 3 ms el fa baixar sense salts i, quan
+// arriba el pic, ja és tan baix com cal.
+export function limitPeaks(left, right, sampleRate, ceiling = .8) {
+  const length = left.length, ahead = Math.max(1, Math.round(.003 * sampleRate)), release = 1 - Math.exp(-1 / (.08 * sampleRate));
+  const need = new Float32Array(length);
+  let over = false;
+  for (let i = 0; i < length; i++) {
+    const peak = Math.max(Math.abs(left[i]), Math.abs(right[i]));
+    need[i] = peak > ceiling ? ceiling / peak : 1;
+    if (need[i] < 1) over = true;
+  }
+  if (!over) return;
+  // Mínim en una finestra que mira endavant (cua monòtona).
+  const target = new Float32Array(length), queue = new Int32Array(length);
+  let head = 0, tail = 0;
+  for (let i = length - 1; i >= 0; i--) {
+    while (tail > head && need[queue[tail - 1]] >= need[i]) tail--;
+    queue[tail++] = i;
+    while (queue[head] > i + 2 * ahead) head++;
+    target[i] = need[queue[head]];
+  }
+  // Recuperació lenta (cap endavant) i mitjana mòbil de la mateixa longitud que l'anticipació.
+  let g = 1;
+  for (let i = 0; i < length; i++) { g = target[i] < g ? target[i] : g + (target[i] - g) * release; target[i] = g; }
+  let sum = 0; const smooth = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    sum += target[i]; if (i >= ahead) sum -= target[i - ahead];
+    smooth[i] = sum / Math.min(i + 1, ahead);
+  }
+  for (let i = 0; i < length; i++) { left[i] *= smooth[i]; right[i] *= smooth[i]; }
+}
+
 export async function renderSampledPart(bank, spec, sampleRate = 44100, options = {}) {
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
   const score = performance.createPerformance(spec);
@@ -344,8 +377,13 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     const soft = x => { const a = Math.abs(x); return a < .82 ? x : Math.sign(x) * (.82 + .11 * Math.tanh((a - .82) / .11)); };
     for (let i = 0; i < length; i++) {
       const envelopeGain = gain * Math.min(1, i / 64, (length - 1 - i) / fade);
-      left[i] = soft(left[i] * envelopeGain); right[i] = soft(right[i] * envelopeGain);
+      left[i] *= envelopeGain; right[i] *= envelopeGain;
     }
+    // Limitador amb anticipació: abans d'un pic que passaria del sostre, abaixa el volum de mica en mica
+    // (sense deformar l'ona) i el recupera després. Sense ell, els atacs forts (cops de tots, percussió
+    // amb molts músics) arribaven al saturador final i sonaven distorsionats. El saturador queda de seguretat.
+    limitPeaks(left, right, sampleRate, .8);
+    for (let i = 0; i < length; i++) { left[i] = soft(left[i]); right[i] = soft(right[i]); }
     options.onProgress?.(1);
     return [left, right];
   } finally {

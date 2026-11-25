@@ -13,6 +13,7 @@
     },
     "36": {
      "seconds": 0.45,
+     "choke": 1,
      "layers": [
       [
        [
@@ -24,6 +25,7 @@
     },
     "41": {
      "seconds": 0.39,
+     "choke": 2,
      "layers": [
       [
        [
@@ -35,6 +37,7 @@
     },
     "45": {
      "seconds": 0.67,
+     "choke": 3,
      "layers": [
       [
        [
@@ -125,14 +128,17 @@
     },
     "35": {
      "seconds": 0.22,
+     "choke": 1,
      "layers": [[["surdo-1-apagat.wav", 1]]]
     },
     "43": {
      "seconds": 0.22,
+     "choke": 2,
      "layers": [[["surdo-2-apagat.wav", 1]]]
     },
     "47": {
      "seconds": 0.22,
+     "choke": 3,
      "layers": [[["surdo-3-apagat.wav", 1]]]
     },
     "68": {
