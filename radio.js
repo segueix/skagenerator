@@ -37,8 +37,9 @@
   const RATE = studio.RATE, GAP_SECONDS = 2, TAIL_SECONDS = 1.5;
   const HISTORY_KEY = 'radiospam.history', VIEW_KEY = 'radiospam.view', INSTRUMENTAL_KEY = 'radiospam.instrumental', FAVORITE_KEY = 'radiospam.subgenre', LEAD_KEY = 'radiospam.leadGuitar', HISTORY_MAX = 300;
   // Ràdio instrumental: cançons sense veu (ni lletra, ni melodia de guia, ni Umidaji); els vents fan el tema.
-  let instrumental = false;
-  try { instrumental = localStorage.getItem(INSTRUMENTAL_KEY) === '1'; } catch {}
+  // Per defecte, instrumental (fins que algú la desactivi).
+  let instrumental = true;
+  try { instrumental = localStorage.getItem(INSTRUMENTAL_KEY) !== '0'; } catch {}
   // Subgènere principal: si n'hi ha un d'escollit, sona una de cada dues cançons.
   // Buit = aleatori. Només compta a les emissores que inclouen el seu estil.
   let favorite = '';
@@ -559,16 +560,23 @@
     if (href === location.href) return;
     try { history[push ? 'pushState' : 'replaceState']({ station }, '', href); } catch {}
   }
+  // Enllaç per compartir: la pàgina de l'emissora (punk/, batucada/percudium/…), que porta el títol
+  // «Escolta Punk a Ràdio SPAM» i la seva imatge per a WhatsApp i les altres apps, i obre la ràdio.
+  function shareLink(style = station) {
+    const chosen = style === 'batucada' && favorite.startsWith('batucada:') ? favorite.slice(9) : null;
+    const path = `${STATION_SLUGS[style]}/${chosen && STYLE_SLUGS[chosen] ? `${STYLE_SLUGS[chosen]}/` : ''}`;
+    const label = chosen && engine.BATUCADA_RHYTHMS[chosen] ? `Batucada ${engine.BATUCADA_RHYTHMS[chosen].name}` : STATIONS[style];
+    return { url: new URL(path, new URL('.', location.href)).href, title: `Escolta ${label} a Ràdio SPAM` };
+  }
   // Comparteix l'emissora: el full de compartir del dispositiu o, si no n'hi ha, l'enllaç copiat.
   async function shareStation() {
     if (!station) return;
-    const url = stationUrl(), name = stationName();
-    const text = `Escolta l’emissora ${name} de Radio Spam. Cada cançó es compon al teu dispositiu: sentiràs les teves pròpies cançons.`;
+    const { url, title } = shareLink();
     if (navigator.share) {
-      try { await navigator.share({ title: `${name} · Radio Spam`, text, url }); return; }
+      try { await navigator.share({ title, text: title, url }); return; }
       catch (error) { if (error?.name === 'AbortError') return; }
     }
-    try { await navigator.clipboard.writeText(url); toast(`Enllaç copiat: ${url}`); }
+    try { await navigator.clipboard.writeText(`${title} ${url}`); toast(`Enllaç copiat: ${title}`); }
     catch { window.prompt('Copia l’enllaç de l’emissora:', url); }
   }
   function dropTracks() {
@@ -964,7 +972,6 @@
     if (radio) $('theme-color').content = '#0c0b12'; else { studio.refresh(); window.dispatchEvent(new Event('resize')); }
     window.scrollTo(0, 0);
   }
-  $('radio-studio').addEventListener('click', () => setView('studio'));
   $('to-radio').addEventListener('click', () => setView('radio'));
 
   for (const button of document.querySelectorAll('[data-station]')) button.addEventListener('click', () => chooseStation(button.dataset.station));
