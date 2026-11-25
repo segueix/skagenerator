@@ -2278,7 +2278,9 @@
         for (let k = 0; k < Math.abs(steps); k++) p = stepScale(p, Math.sign(steps), scalePcs, chord, lo, hi);
         return p;
     }
-    function realizeRiff(riff, chords, bars, scalePcs, from = 0, to = bars * 4, only = null) {
+    // develop: a la tercera repetició el riff comença més amunt (seqüència), perquè dins d'una
+    // secció llarga no soni quatre vegades calcat.
+    function realizeRiff(riff, chords, bars, scalePcs, from = 0, to = bars * 4, only = null, develop = false) {
         const notes = [], lo = 64, hi = 81;
         for (let start = 0, rep = 0; start < bars * 4; start += 8, rep++) {
             let prev = null;
@@ -2289,7 +2291,7 @@
                 let step = riff.steps[i];
                 // Desenvolupament: la quarta repetició acaba al revés (pregunta-resposta).
                 if (rep % 4 === 3 && i >= riff.rhythm.length - 2) step = -step;
-                let p = prev === null ? nearestTone(72, chord.pcs, lo, hi) : moveByScale(prev, step, scalePcs, chord, lo, hi);
+                let p = prev === null ? nearestTone(develop && rep % 4 === 2 ? 76 : 72, chord.pcs, lo, hi) : moveByScale(prev, step, scalePcs, chord, lo, hi);
                 if (at % 1 === 0 || d >= 1) p = nearestTone(p, chord.pcs, lo, hi);
                 // L'ajust a l'acord no pot desfer el moviment escrit: si el pas puja o baixa i la nota
                 // queda igual que l'anterior, va a la nota de l'acord següent en aquella direcció
@@ -2899,7 +2901,7 @@
                 if (how === 'lead') { lines[name] = ownLine(name, layers[name], saltOf(name), 72); continue; }
                 // Hardcore: el riff es mou per semitons (riff cromàtic).
                 const riffScale = settings.subgenre === 'hardcore' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : ctx.scalePcs;
-                const line = how === 'riff' ? realizeRiff(riff, chords, bars, riffScale) : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine, (layers[name] || 1) - 1);
+                const line = how === 'riff' ? realizeRiff(riff, chords, bars, riffScale, 0, bars * 4, null, settings.style === 'ska') : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine, (layers[name] || 1) - 1);
                 // Trombó/segona veu: el riff harmonitzat una tercera per sota.
                 // També a les respostes: amb la trompeta, el trombó fa la segona veu i no l'uníson.
                 lines[name] = name === 'trombone' && (how === 'riff' || how === 'answer') ? harmonize(line, chords, ctx.scalePcs) : line;

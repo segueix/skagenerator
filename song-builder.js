@@ -367,9 +367,25 @@
     // Tonalitat: la triada (si és una de les del subgènere); si no, la d'una cançó que t'ha agradat o una a l'atzar.
     const chosenKey = Array.isArray(options.key) && sg.keys.find(([t, m]) => t === options.key[0] && m === options.key[1]);
     const fromModel = model && sg.keys.some(([t, m]) => t === model.tonic && m === model.mode) ? [model.tonic, model.mode] : null;
-    const [tonic, mode] = chosenKey || fromModel || pick(sg.keys);
+    // Memòria: les últimes cançons d'aquest subgènere (tonalitat, ritme i harmonia que cal evitar repetir).
+    const recentSame = (options.recentPrints || []).filter(p => p && p.subgenre === key).slice(0, 3);
+    const fresh = (list, used) => { const rest = list.filter(x => !used.includes(x)); return rest.length ? rest : list; };
+    const freshKeys = fresh(sg.keys.map(([t, m]) => `${t}:${m}`), recentSame.slice(0, 2).map(p => p.key)).map(k => sg.keys.find(([t, m]) => `${t}:${m}` === k));
+    const [tonic, mode] = chosenKey || fromModel || pick(freshKeys);
     const groove = model?.groove && sg.groove.drums.includes(model.groove.drums) ? { ...model.groove }
-      : { drums: pick(sg.groove.drums), bass: pick(sg.groove.bass), guitar: pick(sg.groove.guitar) };
+      : (() => {
+        // La combinació de bateria, baix i guitarra que menys s'assembla a les tres últimes cançons del subgènere.
+        const combos = [];
+        for (const drums of sg.groove.drums) for (const bass of sg.groove.bass) for (const guitar of sg.groove.guitar) {
+          // (Una combinació idèntica a una de recent pesa el doble: si no, alternava entre dues d'oposades.)
+          const likeness = recentSame.reduce((t, p, i) => { const m = (p.drums === drums) + (p.bass === bass) + (p.guitar === guitar); return t + [1, .7, .5][i] * (m === 3 ? 6 : m); }, 0);
+          combos.push({ drums, bass, guitar, likeness });
+        }
+        const least = Math.min(...combos.map(c => c.likeness)), best = combos.filter(c => c.likeness <= least + .01);
+        const { drums, bass, guitar } = pick(best);
+        r(); r(); // abans es feien tres tirades (una per família): la resta de la cançó no canvia
+        return { drums, bass, guitar };
+      })();
     const settings = { style: sg.style, subgenre: key, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
     // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
@@ -491,6 +507,20 @@
     // Un altre ritme de bateria a la segona estrofa (de vegades), com fa «Dona-li varietat».
     const drumCount = engine.SONG_GROOVES[sg.style].drums.length;
     if (of('verse').length > 1 && key !== 'hardcore' && r() < .5) of('verse')[1].groove = { drums: (groove.drums + 1 + Math.floor(r() * (drumCount - 1))) % drumCount };
+    // Ska: les estrofes i tornades que es repeteixen no sonen calcades: la guitarra i, de vegades,
+    // el baix hi fan un altre patró (dels del subgènere). Atzar propi: la resta no canvia.
+    if (!punk) {
+      const variety = rng((seed ^ 0x045d9f3b) >>> 0);
+      const other = (list, now) => { const rest = list.filter(x => x !== now); return rest.length ? rest[Math.floor(variety() * rest.length)] : now; };
+      for (const type of ['verse', 'chorus']) of(type).forEach((sec, n) => {
+        if (n === 0) return;
+        const next = { ...(sec.groove || {}) };
+        if (variety() < .7) next.guitar = other(sg.groove.guitar, groove.guitar);
+        if (variety() < .5) next.bass = other(sg.groove.bass, groove.bass);
+        for (const family of ['guitar', 'bass']) if (next[family] === groove[family]) delete next[family];
+        if (Object.keys(next).length) sec.groove = next;
+      });
+    }
     if (key === 'jamaican') of('bridge').forEach(s => { s.cymbals = 'hats'; });
     // Ska: de vegades el pont (o el solo) se'n va a la tonalitat del IV grau i torna a la tornada,
     // com als instrumentals jamaicans. (El ska-punk ja té el seu canvi de to a l'última tornada.)
@@ -708,7 +738,9 @@
         const sec = of(type)[0];
         return sec ? engine.composeSongPart(settings, { ...partFor(sec, {}, null, trial[type]), instruments: [] }).chords.map(ch => ch.symbol || ch.pcs.join('-')) : null;
       };
-      const form = harmonyScore(chordsOf);
+      // Les progressions de les últimes cançons del subgènere resten punts (si la tonalitat de mode coincideix).
+      const reused = recentSame.filter(p => p.key?.endsWith(`:${mode}`));
+      const form = harmonyScore(chordsOf) - (reused.some(p => p.chorus === trial.chorus) ? 1.2 : 0) - (reused.some(p => p.verse === trial.verse) ? .7 : 0);
       if (form > bestForm) { bestForm = form; bestHarmony = trial; }
     }
     Object.assign(harmony, bestHarmony);
@@ -887,7 +919,10 @@
     }
     // Puntuació de la cançó: forma harmònica, qualitat mitjana de les línies i varietat d'inici, final i silencis.
     // La forma que s'assembla a les últimes cançons resta punts.
-    const rating = bestForm + quality / Math.max(1, judged) - 1.5 * formPenalty + 
+    // Memòria de les últimes cançons: com més s'assembla a les que han sonat (riff, tonalitat,
+    // tempo, ritmes, harmonia, inici i final), menys punts.
+    const novelty = noveltyPenalty(fingerprintOf(engine, song), options.recentPrints || []);
+    const rating = bestForm + quality / Math.max(1, judged) - 1.5 * formPenalty - 2 * novelty + 
       // Premia que els recursos aplicats encaixin bé (no que n'hi hagi molts).
       + (highlights.chosen.length ? .3 * highlights.chosen.reduce((t, c) => t + c.value, 0) / highlights.chosen.length : .2);
     return { song, score: rating };
@@ -1259,14 +1294,39 @@
 
   // Cançó automàtica: es componen tres candidates (amb tot el que sap fer el
   // taller) i es queda la que puntua millor.
+  // ── Memòria de les últimes cançons ─────────────────────────────────
+  // L'«empremta» d'una cançó: el que fa que dues cançons sonin semblants.
+  function fingerprintOf(engine, song) {
+    const st = song?.settings || {};
+    let riff = null;
+    try { riff = JSON.stringify(engine.composeRiff(st.seed >>> 0, st.style === 'punk', st.subgenre).rhythm); } catch { /* sense riff */ }
+    return { subgenre: st.subgenre, style: st.style, key: `${st.tonic}:${st.mode}`, bpm: st.bpm, drums: st.groove?.drums, bass: st.groove?.bass, guitar: st.groove?.guitar,
+      riff, verse: song?.harmony?.verse, chorus: song?.harmony?.chorus, opening: song?.edges?.opening, closing: song?.edges?.closing };
+  }
+  // Semblança amb les últimes cançons (0 = cap, 1 = calcada a l'última), pesant més les més recents.
+  function noveltyPenalty(print, recent) {
+    const same = (a, b) => a !== undefined && a !== null && a === b ? 1 : 0;
+    return recent.slice(0, 12).reduce((total, other, i) => {
+      if (!other) return total;
+      const sameSub = print.subgenre && print.subgenre === other.subgenre;
+      const score = 1.5 * same(print.riff, other.riff) + same(print.key, other.key) + (Math.abs((print.bpm || 0) - (other.bpm || 0)) <= 4 ? .5 : 0)
+        + .4 * same(print.drums, other.drums) + .4 * same(print.bass, other.bass) + .3 * same(print.guitar, other.guitar)
+        + (sameSub ? .7 * same(print.verse, other.verse) + .9 * same(print.chorus, other.chorus) : 0)
+        + .3 * same(print.opening, other.opening) + .3 * same(print.closing, other.closing);
+      const weight = .85 ** i * (sameSub ? 1 : print.style === other.style ? .5 : .2);
+      return total + weight * score / 6.3;
+    }, 0);
+  }
   function createAutoSong(engine, key, options = {}) {
     const seed = (options.seed >>> 0) || 1, candidates = Math.max(1, Math.min(6, options.candidates ?? 3));
+    // Empremtes de les últimes cançons (es calculen un sol cop per a tots els candidats).
+    const recentPrints = options.recentPrints || (options.recent || []).map(entry => entry?.song ? fingerprintOf(engine, entry.song) : null);
     let best = null;
     for (let k = 0; k < candidates; k++) {
-      const attempt = composeAuto(engine, key, { ...options, seed: k ? (Math.imul(seed, 2246822519) + Math.imul(k, 3266489917)) >>> 0 || 1 : seed });
+      const attempt = composeAuto(engine, key, { ...options, recentPrints, seed: k ? (Math.imul(seed, 2246822519) + Math.imul(k, 3266489917)) >>> 0 || 1 : seed });
       if (!best || attempt.score > best.score) best = attempt;
     }
     return best.song;
   }
-  return { PUNK_LEAD_GUITARS, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });
