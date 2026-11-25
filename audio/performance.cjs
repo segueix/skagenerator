@@ -127,7 +127,7 @@ function createPerformance(spec) {
   // Batucada en banda: el segon i el tercer músic de cada peça tenen canal propi, un a cada banda,
   // amb l'afinació una mica diferent (cada pell és diferent) i el seu temps (un pèl abans o després).
   const BAND_PLAYERS = Array.isArray(spec.batucadaLine) ? Math.max(0, ...spec.batucadaLine.map(hit => hit[6] || 0)) : 0;
-  const BAND = PIANO + 7, BAND_SEATS = [{ pan: 14, cents: -24, offset: .009, tight: .0015 }, { pan: 114, cents: 19, offset: -.006, tight: -.001 }];
+  const BAND = PIANO + 7, BAND_SEATS = [{ pan: 14, cents: -24, offset: .009, tight: .006 }, { pan: 114, cents: 19, offset: -.006, tight: -.005 }];
   const bandChannel = player => player ? BAND + player - 1 : 9;
   const drumChannel = channel => channel === 9 || channel === 10 || (channel >= BAND && channel < BAND + BAND_PLAYERS);
   const room = Number.isInteger(spec.batucadaRoom) && spec.batucadaRoom >= 0 && spec.batucadaRoom <= 100 ? spec.batucadaRoom : undefined;
@@ -747,7 +747,7 @@ function createPerformance(spec) {
     }
     channels.find(c => c.channel === 1).fxTweak = { drive: -10, tone: 8 };
   }
-  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, ...(spec.batucadaGlue === true ? { glue: true } : {}),
+  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type,
     mix: spec.mix || {}, baseVolume: spec.baseVolume || {}, fx: spec.fx || {}, colors: spec.colors || {} };
 }
 module.exports = { createPerformance };

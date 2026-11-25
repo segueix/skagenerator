@@ -183,7 +183,9 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
     assert(secs[0].batucada?.whistle && secs.at(-1).batucada?.peak && secs[1].batucada?.peak);
     // Els moments clau (entrada, última tornada i final) pugen també el volum general.
-    assert(secs.filter(sec => sec.volumes).every(sec => sec.batucada?.peak && sec.volumes.master === 3));
+    // (+1 dB: més, el limitador hauria d'aixafar el final i els cops de tots.)
+    assert(secs.filter(sec => sec.volumes).every(sec => sec.batucada?.peak && sec.volumes.master === 1));
+    assert(song.settings.mix?.drums?.volume <= 1, 'mescla de la batucada sense excés de volum');
     assert(secs[1].volumes && secs.at(-1).volumes);
     // La cuíca només sona als seus arranjaments (solos de cuíca): la de la graella no toca enlloc.
     assert([song.settings.batucadaPattern, ...secs.map(sec => sec.batucadaPattern).filter(Boolean)].every(p => p[8] === '0'.repeat(16)), `cuíca (${seed})`);
@@ -295,7 +297,7 @@ test('el surdo 3 improvisa: frases que canvien, cops oberts i apagats i redobles
   assert.equal(builder.createBatucadaSong(engine, { seed: 4 }).settings.batucadaSurdo3, 'improv');
 });
 
-test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments, sala i compressió de bloc', () => {
+test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments i sala, sense compressió de bloc', () => {
   const st = engine.BATUCADA_FEEL.percudium;
   const spec = engine.composeSongPart({ ...settings, batucadaRhythm: 'percudium', batucadaBand: 3 }, { ...part, bars: 2, energy: 90 });
   const line = spec.batucadaLine.filter(h => !h[6]);
@@ -314,12 +316,12 @@ test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments, sala i
   const samba = engine.composeSongPart({ ...settings, batucadaBand: 3 }, { ...part, bars: 1, energy: 90 }).batucadaLine;
   const first = (l, n) => l.find(h => h[2] === n && !h[6])[3];
   assert(first(line, 36) < first(samba, 36) && first(line, 38) > first(samba, 38));
-  // Sala, separació dels músics i compressió de bloc.
+  // Sala i separació dels músics. Sense compressió de bloc: amb tants cops al màxim, movia el guany al ritme
+  // de l'ona i distorsionava el final i els cops de tots.
   assert.equal(spec.batucadaRoom, st.room);
-  assert.equal(spec.batucadaGlue, true);
+  assert.equal(spec.batucadaGlue, undefined);
   const perf = createPerformance(spec);
-  assert(perf.glue && perf.channels.filter(c => c.drums && c.program === 71).every(c => c.reverb === st.room));
-  assert(!createPerformance(engine.composeSongPart({ ...settings, batucadaBand: 3 }, { ...part, bars: 1 })).glue);
+  assert(!perf.glue && perf.channels.filter(c => c.drums && c.program === 71).every(c => c.reverb === st.room));
   // Cançons de la ràdio Percudium: 94–102 BPM (a les seccions), banda de tres, contraritmes i mescla brillant.
   for (let seed = 1; seed <= 20; seed++) {
     const song = builder.createBatucadaSong(engine, { seed, rhythm: 'percudium' }), secs = song.sections;
@@ -379,13 +381,19 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
   assert.deepEqual([0, 1, 2, 3, 4, 5].map(raised), [0, 1, 0, 0, 1, 2]);
   // Aturada: un cop de tots al màxim (127) i silenci.
   const stop = compose({ type: 'bridge', bars: 2, next: 'chorus', ending: 'break' }).filter(h => h[0] === 1);
-  assert(stop.length && stop.every(h => h[1] === 0 && h[3] === 127));
+  // Aturada: un cop de tots junts, fort però sense forçar-lo a 127 (24 notes a 127 alhora es distorsionaven).
+  assert(stop.length && stop.every(h => h[1] === 0));
   assert.equal(new Set(stop.map(h => h[6] || 0)).size, 3, 'tots els músics');
+  const lead = stop.filter(h => !h[6]);
+  assert(lead.some(h => h[3] >= 100) && lead.filter(h => h[3] === 127).length <= 1);
   // Final: cops de tots els instruments junts i un cop final de tots, tots els músics, al màxim.
   const end = compose({ type: 'outro', bars: 4, batucada: { finale: true } });
   const lastHit = end.filter(h => h[0] === 3 && h[1] === 2);
   assert.deepEqual([...new Set(lastHit.map(h => rowOf(h[2]) >= 0 ? rowOf(h[2]) : 0))].length >= 8 || lastHit.length >= 8, true);
-  assert(lastHit.every(h => h[3] >= 120) && new Set(lastHit.map(h => h[6] || 0)).size === 3);
+  // El cop final, el més fort (de cada instrument, el músic principal), sense passar del límit.
+  const strongest = row => Math.max(...end.filter(h => h[0] === 3 && h[1] < 2 && !h[6] && rowOf(h[2]) === row).map(h => h[3]));
+  for (const h of lastHit.filter(h => !h[6])) assert(h[3] >= strongest(rowOf(h[2])), `final ${h[2]}`);
+  assert(new Set(lastHit.map(h => h[6] || 0)).size === 3);
   assert(!end.some(h => h[0] === 3 && h[1] > 2), 'després, silenci');
   // Tot saturat: també el repique i l'agogô els toquen tres músics.
   const groove = compose({ type: 'chorus', bars: 1 });
@@ -416,7 +424,7 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
   assert.deepEqual([...intros].sort(), ['caixa', 'repique']);
   // Quan canvia de ritme, continua sonant com el Percudium (pes de les peces, sala i compressió).
   const reggae = engine.composeSongPart(st, { ...part, bars: 1, energy: 92, batucadaPattern: engine.BATUCADA_RHYTHMS.reggae.steps });
-  assert(reggae.batucadaGlue && reggae.batucadaRoom === engine.BATUCADA_FEEL.percudium.room);
+  assert(reggae.batucadaRoom === engine.BATUCADA_FEEL.percudium.room);
   assert.deepEqual(reggae.batucadaFeel, engine.BATUCADA_FEEL.reggae.feel);
 });
 

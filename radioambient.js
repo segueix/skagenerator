@@ -1942,7 +1942,7 @@
         reggae: { feel: [0, .034, 0, .03], abafado: false, agogo: 'gaaaaaaaaaaaaaaa' },
         ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' },
         // accents: semicorxeres accentuades (en lloc dels accents de cada temps); gain: pes de cada peça.
-        percudium: { feel: [0, .02, -.005, -.025], abafado: true, agogo: 'gaaaaaaaagaaaaaa', accents: '1000001001000100', graces: true, room: 44, spread: 1.6, glue: true, doubleAll: true, max: true,
+        percudium: { feel: [0, .02, -.005, -.025], abafado: true, agogo: 'gaaaaaaaagaaaaaa', accents: '1000001001000100', graces: true, room: 44, spread: 1.6, doubleAll: true, max: true,
             gain: { 36: .8, 41: .8, 45: .84, 35: .8, 43: .8, 47: .84, 38: 1.42, 50: 1.1, 54: 1.08, 69: .88, 67: 1, 68: 1 } }
     };
     // Surdo apagat («abafado») de cada surdo i campana greu de l'agogô.
@@ -2076,11 +2076,10 @@
             const doubled = BATUCADA_DOUBLED.has(row) || sound.doubleAll && (row === 4 || row === 6);
             const others = doubled ? players.filter(p => p > 0) : [];
             const lead = !doubled || players.includes(0);
-            // (Als cops de tots al màxim, tots els músics piquen igual de fort.)
             // Als surdos, els altres músics bastant més fluixos: tres còpies gairebé iguals d'un cop greu
             // farien un efecte de filtre (so metàl·lic, «industrial»); així el surdo principal mana.
             const share = row <= 2 ? .64 : .9;
-            for (const p of others) line.push([bar, step / 4, pitch, tight && sound.max && velocity === 127 ? 127 : Math.round(velocity * (share - p * .04)), null, tight ? 1 : 0, p]);
+            for (const p of others) line.push([bar, step / 4, pitch, Math.round(velocity * (share - p * .04)), null, tight ? 1 : 0, p]);
             if (!lead) return;
             if (pitch === BATUCADA_WHISTLE.note) {
                 const at = (bar * 4 + step / 4) * beat;
@@ -2099,8 +2098,9 @@
             if (at >= stopAt) return;
             line.push([bar, step / 4, BATUCADA_WHISTLE.note, force(BATUCADA_WHISTLE.note, 0, extra), Math.min(seconds, stopAt - at)]);
         };
-        // Cop de tota la batucada (aturades i final), a temps exacte. Al Percudium, al màxim.
-        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, sound.max ? 90 : extra, true));
+        // Cop de tota la batucada (aturades i final), a temps exacte. Al Percudium, ben fort però sense forçar-lo
+        // a 127 (24 notes a 127 alhora obligaven el limitador a aixafar el so: es distorsionava).
+        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, sound.max ? 16 : extra, true));
         // Diàleg: en cada moment parla un grup. 1: surdos i caixes es responen compàs a compàs;
         // 2: cada mig compàs; 3: primer dialoguen dos grups i, a la segona meitat, s'hi afegeix el tercer.
         // Els dos últims compassos de la secció, tots igual.
@@ -2168,12 +2168,14 @@
         // creixents i un cop final de tots els instruments, tots els músics, al màxim volum.
         const finale = bar => {
             if (bar < bars - 1) {
-                for (let step = 0; step < 16; step++) if (BATUCADA_TUTTI[1][step] === '1') [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, 20, true));
+                // (Força moderada: 24 notes alhora ja sonen molt fort; més fort, el limitador hauria d'aixafar-les.)
+                for (let step = 0; step < 16; step++) if (BATUCADA_TUTTI[1][step] === '1') [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, 0, true));
                 if (bar === bars - 2 && fx.whistle) [8, 10, 12].forEach(step => blow(bar, step, .1, 8));
                 return;
             }
-            [0, 2, 4, 6].forEach((step, k) => [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, 20 + k * 8, true)));
-            [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, 8, row, 90, true));
+            // (El cop final, el més fort de tots, també per sobre dels accents dels cops que creixen.)
+            [0, 2, 4, 6].forEach((step, k) => [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, k * 3, true)));
+            [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, 8, row, 24, true));
         };
         // Entrada de caixa o repique (Percudium): un sol músic fa un ritme i, alhora, el mestre xiula dos
         // xiulets curts i un de llarg; l'últim compàs creix i, a la secció següent, entren tots.
@@ -2196,11 +2198,12 @@
             }
             const last = bar === bars - 1;
             if (type === 'outro' && last && !fading) {
-                if (closing === 'cold') { unison(bar, 0, 16, [0, 1, 2, 3]); continue; }
-                unison(bar, 0, 18, [0, 1, 2, 3, 4, 5, 6, 7]);
+                // (Cops finals ben forts però sense passar del límit: amb tres músics, 24 notes alhora.)
+                if (closing === 'cold') { unison(bar, 0, 8, [0, 1, 2, 3]); continue; }
+                unison(bar, 0, 8, [0, 1, 2, 3, 4, 5, 6, 7]);
                 if (closing === 'ring') {
                     for (let step = 2; step < 12; step++) { add(bar, step, 3, step * 2 - 10); add(bar, step, 7, step * 2 - 10); }
-                    unison(bar, 12, 22);
+                    unison(bar, 12, 12);
                 }
                 continue;
             }
@@ -3267,7 +3270,6 @@
             // Sala i separació dels músics pròpies del ritme (el Percudium sona com un mur de so, amb més sala).
             if (batucadaStyle.room) drumOptions.batucadaRoom = batucadaStyle.room;
             if (batucadaStyle.spread) drumOptions.batucadaSpread = batucadaStyle.spread;
-            if (batucadaStyle.glue) drumOptions.batucadaGlue = true;
         }
         return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
