@@ -1925,7 +1925,22 @@
         8: ['0000000100000000', '0001000100010001', '0100000001000000', '0000000000000000']
     };
     // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
-    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .56, 78: .82, [BATUCADA_WHISTLE.note]: .66 };
+    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .56, 78: .82, [BATUCADA_WHISTLE.note]: .66,
+        79: .8, 80: .84, 81: .78, 82: .78, 83: .8 };
+    // Cuíca amb distorsions: la gravació original (78) i cinc variants (aguda, greu, trencada,
+    // robòtica i glissando) que s'encadenen cop a cop. Cada cadena porta una frase pròpia de cuíca.
+    const CUICA_VARIANTS = { 78: 'Original', 79: 'Aguda', 80: 'Greu', 81: 'Trencada', 82: 'Robòtica', 83: 'Glissando' };
+    const CUICA_CHAINS = [[78, 79, 80, 83], [80, 81, 79, 82], [79, 83, 80, 81, 82], [83, 82, 81, 80], [78, 81, 78, 82, 79, 83]];
+    const CUICA_PHRASES = ['0011000100110001', '0101000001010001', '0010011000100110', '0001000100010011', '0011001100010001'];
+    // «Convenções»: figures que toca tota la batucada alhora, molt junta.
+    const BATUCADA_TUTTI = ['1001001000101000', '1000100010101010', '1011010010110100', '1001001001001010', '1010001010100010', '1110111011100000'];
+    // Opcions de batucada d'una secció: moment clau (puja molt), xiulet del mestre, convenção de tots i cadena de cuíca.
+    function validBatucadaFx(fx) {
+        return fx === undefined || !!fx && typeof fx === 'object' && !Array.isArray(fx) && Object.entries(fx).every(([key, value]) =>
+            key === 'peak' || key === 'whistle' ? typeof value === 'boolean'
+                : key === 'tutti' ? typeof value === 'string' && /^[01]{16}$/.test(value)
+                : key === 'cuica' ? Number.isInteger(value) && value >= 0 && value < CUICA_CHAINS.length : false);
+    }
 
     function validBatucadaPattern(pattern) {
         return Array.isArray(pattern) && [BATUCADA.length - 1, BATUCADA.length].includes(pattern.length)
@@ -1948,22 +1963,32 @@
         });
     }
     function composeBatucada(settings, part, bars, energy, stopAt, beat) {
-        // Cada secció pot portar el seu patró (variació, solo...); si no, el de la cançó.
-        const rows = part.batucadaPattern ?? batucadaRows(settings);
-        if (!validBatucadaPattern(rows)) throw new Error('Patró de batucada no vàlid');
+        // Cada secció pot portar el seu patró (variació, solo, un altre ritme...); si no, el de la cançó.
+        const pattern = part.batucadaPattern ?? batucadaRows(settings);
+        if (!validBatucadaPattern(pattern)) throw new Error('Patró de batucada no vàlid');
+        const fx = part.batucada || {};
+        if (!validBatucadaFx(fx)) throw new Error('Opcions de batucada no vàlides');
+        // Convenção: tots els instruments (menys el xiulet) toquen la mateixa figura, junts.
+        const rows = fx.tutti ? pattern.map((row, i) => i === 9 ? row : fx.tutti) : pattern;
         const line = [], type = part.type, ending = part.ending || 'fill';
         const whistleMs = settings.batucadaWhistleMs ?? BATUCADA_WHISTLE.defaultDuration;
         if (!BATUCADA_WHISTLE.durations.includes(whistleMs)) throw new Error('Durada del xiulet no vàlida');
         let previousWhistle;
         const closing = type === 'outro' ? part.closing || 'hit' : null, fading = closing === 'fade';
-        const quiet = energy < 45, soft = energy < 60;
+        const quiet = energy < 45;
+        // Dinàmica: quan l'energia baixa, el volum baixa poc (no sona artificial);
+        // als moments clau (fx.peak) la batucada puja molt.
+        const level = 84 + (energy - 70) * .12 + (fx.peak ? 14 : 0) + (fx.tutti ? 6 : 0);
         const force = (pitch, step, extra = 0) => {
             const accent = step % 4 === 0 ? 12 : step % 2 === 0 ? 3 : -6;
-            return Math.max(20, Math.min(127, Math.round((58 + energy * .45 + accent + extra) * BATUCADA_GAIN[pitch])));
+            return Math.max(20, Math.min(127, Math.round((level + accent + extra) * BATUCADA_GAIN[pitch])));
         };
-        const add = (bar, step, row, extra = 0) => {
+        // Cadena de cuíca: cada cop de cuíca fa servir la variant següent de la cadena.
+        const chain = fx.cuica !== undefined ? CUICA_CHAINS[fx.cuica] : null, phrase = chain ? CUICA_PHRASES[fx.cuica % CUICA_PHRASES.length] : null;
+        let cuicaIndex = 0;
+        const add = (bar, step, row, extra = 0, tight = false) => {
             if ((bar * 4 + step / 4) * beat >= stopAt) return;
-            const pitch = BATUCADA[row].note;
+            const pitch = row === 8 && chain ? chain[cuicaIndex++ % chain.length] : BATUCADA[row].note;
             const hit = [bar, step / 4, pitch, force(pitch, step, extra)];
             if (pitch === BATUCADA_WHISTLE.note) {
                 const at = (bar * 4 + step / 4) * beat;
@@ -1973,21 +1998,39 @@
                 }
                 hit.push(Math.min(whistleMs / 1000, stopAt - at));
                 previousWhistle = hit;
-            }
+            } else if (tight) hit.push(null, 1); // a temps exacte: tots junts
             line.push(hit);
         };
-        // Cop de tota la batucada (aturades i final).
-        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, extra));
-        // A poca energia només hi ha els surdos, l'agogô i el xocalho; sense gaire energia, sense cuíca ni repique.
-        const plays = row => !(quiet && [3, 4, 5, 8].includes(row)) && !(soft && [4, 8].includes(row));
-        // Crida (chamada) del repique abans de la secció següent: el repique i la caixa omplen l'últim temps.
-        const call = bar => {
-            for (let step = 0; step < 12; step++) rows.forEach((row, i) => { if (row[step] === '1' && plays(i)) add(bar, step, i); });
-            for (let step = 12; step < 16; step++) { add(bar, step, 4, (step - 12) * 6); add(bar, step, 3, (step - 12) * 5); }
-            add(bar, 12, 0, 8); add(bar, 12, 1, 8);
+        // Xiulet del mestre (avisos): durada en segons.
+        const blow = (bar, step, seconds, extra = 0) => {
+            const at = (bar * 4 + step / 4) * beat;
+            if (at >= stopAt) return;
+            line.push([bar, step / 4, BATUCADA_WHISTLE.note, force(BATUCADA_WHISTLE.note, 0, extra), Math.min(seconds, stopAt - at)]);
         };
+        // Cop de tota la batucada (aturades i final), a temps exacte.
+        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, extra, true));
+        // Paradinha (poca energia): sense repique, tamborim ni cuíca; la caixa continua.
+        const plays = row => !(quiet && [4, 5, 8].includes(row));
+        const hits = (row, i, step) => row[step] === '1' || i === 8 && phrase && phrase[step] === '1';
+        const groove = (bar, to = 16) => {
+            for (let step = 0; step < to; step++) rows.forEach((row, i) => { if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, !!fx.tutti); });
+        };
+        // Crida (chamada) del repique abans de la secció següent: el repique i la caixa omplen l'últim temps.
+        // Amb xiulet: un xiulet llarg i dos de curts avisen del canvi.
+        const call = bar => {
+            if (fx.whistle) { blow(bar, 0, beat * .9, 6); blow(bar, 8, .1); blow(bar, 10, .1); }
+            groove(bar, 12);
+            for (let step = 12; step < 16; step++) { add(bar, step, 4, (step - 12) * 6, true); add(bar, step, 3, (step - 12) * 5, true); }
+            add(bar, 12, 0, 8, true); add(bar, 12, 1, 8, true);
+        };
+        const breque = !fading && type !== 'outro' && bars > 1 && (ending === 'break' || ending === 'stop');
         for (let bar = 0; bar < bars; bar++) {
-            if (bar === 0 && part.countIn) { for (let t = 0; t < 4; t++) add(bar, t * 4, 4, t === 3 ? 14 : 4); continue; }
+            if (bar === 0 && part.countIn) {
+                // Entrada: el mestre xiula (llarg i tres curts) i el repique compta.
+                if (fx.whistle) { blow(bar, 0, beat * 1.5, 6); [8, 10, 12].forEach(step => blow(bar, step, .1)); }
+                for (let t = 0; t < 4; t++) add(bar, t * 4, 4, t === 3 ? 14 : 4);
+                continue;
+            }
             const last = bar === bars - 1;
             if (type === 'outro' && last && !fading) {
                 if (closing === 'cold') { unison(bar, 0, 16, [0, 1, 2, 3]); continue; }
@@ -2002,7 +2045,9 @@
             if (last && (ending === 'break' || (ending === 'stop' && bars > 1))) { unison(bar, 0); continue; }
             const intoNext = last && ending !== 'none' && part.next !== undefined && part.next !== 'end';
             if (intoNext || (type === 'outro' && !fading && bar === bars - 2)) { call(bar); continue; }
-            for (let step = 0; step < 16; step++) rows.forEach((row, i) => { if (row[step] === '1' && plays(i)) add(bar, step, i); });
+            // Abans d'una breca, el xiulet avisa (tres cops curts).
+            if (fx.whistle && breque && bar === bars - 2) [8, 10, 12].forEach(step => blow(bar, step, .09, 4));
+            groove(bar);
         }
         return line;
     }
@@ -3161,7 +3206,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, validBatucadaPattern, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, BATUCADA_TUTTI, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

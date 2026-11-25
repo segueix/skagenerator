@@ -7,7 +7,9 @@ const settings = { seed: 7, style: 'ska', bpm: 120, tonic: 0, mode: 'major', tim
 const part = { type: 'verse', bars: 2, energy: 65, revision: 1, instruments: ['drums'] };
 test('cada fila de batucada sona només a la nota i al pas escollits', () => {
   assert.equal(engine.BATUCADA.length, 10);
-  assert.equal(Object.keys(kit.pieces).length, 10);
+  // Les deu files de la graella i les cinc variants distorsionades de la cuíca.
+  assert.equal(Object.keys(kit.pieces).length, 10 + Object.keys(engine.CUICA_VARIANTS).length - 1);
+  for (const note of Object.keys(engine.CUICA_VARIANTS)) assert(kit.pieces[note], `cuíca ${note}`);
   for (const [row, piece] of engine.BATUCADA.entries()) {
     assert(kit.pieces[piece.note]);
     const pattern = Array(engine.BATUCADA.length).fill('0'.repeat(16));
@@ -46,9 +48,9 @@ test('la batucada segueix la cançó: energia, crida del repique, aturades i fin
   const line = play({ bars: 1 });
   const loud = n => Math.max(...line.filter(h => h[2] === n).map(h => h[3]));
   assert(loud(36) > loud(69) + 15);
-  // Poca energia: sense caixa, repique, tamborim ni cuíca.
+  // Poca energia (paradinha): sense repique, tamborim ni cuíca, però la caixa continua.
   const calm = play({ bars: 2, energy: 30 });
-  assert(calm.length && calm.every(([, , n]) => ![38, 50, 54, 78].includes(n)));
+  assert(calm.length && calm.every(([, , n]) => ![50, 54, 78].includes(n)) && calm.some(([, , n]) => n === 38));
   // Abans de la secció següent, el repique omple l'últim temps en semicorxeres.
   const call = hitsAt(play({ bars: 2, next: 'chorus' }), 1).filter(([, t, n]) => n === 50 && t >= 3).map(([, t]) => t);
   assert.deepEqual(call, [3, 3.25, 3.5, 3.75]);
@@ -124,4 +126,60 @@ test('el xiulet és opcional als patrons antics i respecta la durada triada', ()
   assert.deepEqual(events.map(event => [event.type, event.time]), [
     ['on', 0], ['off', .5], ['on', .5], ['off', 1.25]
   ]);
+});
+
+test('dinàmica: a poca energia el volum baixa poc i als moments clau puja molt', () => {
+  const surdo = (energy, batucada) => {
+    const spec = engine.composeSongPart(settings, { ...part, bars: 1, energy, ...(batucada ? { batucada } : {}) });
+    return createPerformance({ ...spec, humanize: 0 }).events.find(e => e.type === 'on' && e.note === 36).velocity;
+  };
+  const low = surdo(40), mid = surdo(75), peak = surdo(75, { peak: true });
+  assert(mid - low <= 8, `baixa poc: ${low} → ${mid}`);
+  assert(peak - mid >= 12, `puja molt: ${mid} → ${peak}`);
+});
+test('xiulet del mestre, convenção de tots junts i cadena de cuíca amb distorsions', () => {
+  const play = (p, extra = {}) => engine.composeSongPart({ ...settings, ...extra }, { ...part, ...p }).batucadaLine;
+  const whistle = engine.BATUCADA_WHISTLE.note;
+  // Xiulet a l'entrada (llarg i tres curts) i abans de la crida del repique.
+  const entry = play({ bars: 2, countIn: true, batucada: { whistle: true } }).filter(h => h[0] === 0 && h[2] === whistle);
+  assert.deepEqual(entry.map(h => h[1]), [0, 2, 2.5, 3]);
+  assert(entry[0][4] > entry[1][4]);
+  assert(play({ bars: 2, next: 'chorus', batucada: { whistle: true } }).some(h => h[0] === 1 && h[2] === whistle));
+  assert(!play({ bars: 2, next: 'chorus' }).some(h => h[2] === whistle));
+  // Abans d'una breca, tres xiulets curts.
+  assert.equal(play({ bars: 3, next: 'verse', ending: 'break', batucada: { whistle: true } }).filter(h => h[0] === 1 && h[2] === whistle).length, 3);
+  // Convenção: totes les peces toquen la mateixa figura, a temps exacte.
+  const tutti = '1001001000101000', line = play({ bars: 1, batucada: { tutti } });
+  const steps = new Set(line.map(h => h[1] * 4));
+  assert.deepEqual([...steps].sort((a, b) => a - b), [0, 3, 6, 10, 12]);
+  assert(line.every(h => h[5] === 1));
+  const perf = createPerformance(engine.composeSongPart(settings, { ...part, bars: 1, batucada: { tutti } }));
+  const ons = perf.events.filter(e => e.type === 'on');
+  for (const step of steps) assert.equal(new Set(ons.filter(e => Math.abs(e.time - step / 4 * .5) < .03).map(e => e.time)).size, 1, 'tots alhora');
+  // Cadena de cuíca: els cops de cuíca passen per les variants en ordre.
+  for (const [index, chain] of engine.CUICA_CHAINS.entries()) {
+    const cuica = play({ bars: 2, energy: 80, batucada: { cuica: index } }).filter(h => engine.CUICA_VARIANTS[h[2]]);
+    assert(cuica.length >= chain.length);
+    assert.deepEqual(cuica.map(h => h[2]), cuica.map((_, k) => chain[k % chain.length]));
+  }
+  assert.throws(() => play({ batucada: { cuica: 99 } }));
+  assert.throws(() => play({ batucada: { tutti: 'x' } }));
+});
+test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cuíca', () => {
+  let compact = 0, chains = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const song = builder.createBatucadaSong(engine, { seed }), secs = song.sections;
+    const rhythmOf = sec => Object.keys(engine.BATUCADA_RHYTHMS).filter(key => sec.batucadaPattern
+      && engine.BATUCADA_RHYTHMS[key].steps[0] === sec.batucadaPattern[0] && engine.BATUCADA_RHYTHMS[key].steps[1] === sec.batucadaPattern[1]);
+    // Hi ha seccions amb un altre ritme (els surdos 1 i 2 d'un altre ritme).
+    assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
+    assert(secs[0].batucada?.whistle && secs.at(-1).batucada?.peak && secs[1].batucada?.peak);
+    assert(secs.filter(sec => sec.batucada?.peak).every(sec => sec.volumes?.master === 3));
+    assert(secs.filter(sec => sec.ending).every(sec => sec.batucada?.whistle));
+    if (secs.some(sec => sec.batucada?.tutti)) { compact++; assert(song.settings.humanize < .2); }
+    if (secs.some(sec => sec.batucada?.cuica !== undefined)) chains++;
+    for (const sec of secs) assert(engine.validBatucadaFx(sec.batucada));
+  }
+  assert(compact >= 8 && compact <= 35, `cançons compactes: ${compact}`);
+  assert(chains >= 25, `cançons amb cadena de cuíca: ${chains}`);
 });

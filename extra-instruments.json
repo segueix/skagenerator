@@ -109,6 +109,26 @@
        ]
       ]
      ]
+    },
+    "79": {
+     "seconds": 0.13,
+     "layers": [[["cuica-aguda.wav", 1]]]
+    },
+    "80": {
+     "seconds": 0.25,
+     "layers": [[["cuica-greu.wav", 1]]]
+    },
+    "81": {
+     "seconds": 0.17,
+     "layers": [[["cuica-trencada.wav", 1]]]
+    },
+    "82": {
+     "seconds": 0.21,
+     "layers": [[["cuica-robotica.wav", 1]]]
+    },
+    "83": {
+     "seconds": 0.18,
+     "layers": [[["cuica-glissando.wav", 1]]]
     }
    }
   },

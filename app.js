@@ -208,7 +208,7 @@
         || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.ending !== undefined && !['stop', 'none', 'break', 'silence'].includes(s.ending))
         || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || ['hits', 'shout', 'pickup', 'bassBreak', 'pedal'].some(f => s[f] !== undefined && typeof s[f] !== 'boolean') || (s.bassSolo !== undefined && (!Number.isInteger(s.bassSolo) || s.bassSolo < 1 || s.bassSolo > 8 || s.bassSolo > s.bars)) || (s.stopTime !== undefined && (!Number.isInteger(s.stopTime) || s.stopTime < 1 || s.stopTime > 8 || s.stopTime > s.bars)) || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
         || ['entrance', 'exit'].some(f => s[f] !== undefined && (!s[f] || typeof s[f] !== 'object' || Array.isArray(s[f]) || Object.entries(s[f]).some(([n, b]) => !Object.hasOwn(INSTRUMENTS, n) || !Number.isInteger(b) || b < 0 || b > MAX_SECTION))) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
-        || !validBaseEdits(s) || (s.batucadaPattern !== undefined && !engine.validBatucadaPattern(s.batucadaPattern)) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
+        || !validBaseEdits(s) || (s.batucadaPattern !== undefined && !engine.validBatucadaPattern(s.batucadaPattern)) || !engine.validBatucadaFx(s.batucada) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
@@ -337,6 +337,7 @@
       }
       if (sec.timbres && Object.keys(sec.timbres).length) part.timbres = { ...sec.timbres };
       if (sec.batucadaPattern) part.batucadaPattern = sec.batucadaPattern;
+      if (sec.batucada) part.batucada = { ...sec.batucada };
       if (sec.patterns) { const layers = {}; for (const [name, index] of Object.entries(sec.patterns)) if (base.includes(name)) layers[name] = index + 1; if (Object.keys(layers).length) part.layers = layers; }
       if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
