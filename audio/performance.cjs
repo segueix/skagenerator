@@ -545,8 +545,8 @@ function createPerformance(spec) {
     }
   }
   if (has('drums') && spec.batucadaLine) {
-    for (const [barIndex, step, pitch, velocity] of spec.batucadaLine) {
-      note(9, pitch, (barIndex * 4 + step) * beat, .35, velocity, .002);
+    for (const [barIndex, step, pitch, velocity, duration] of spec.batucadaLine) {
+      note(9, pitch, (barIndex * 4 + step) * beat, duration ?? .35, velocity, duration === undefined ? .002 : 0);
     }
   }
   if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {

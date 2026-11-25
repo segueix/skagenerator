@@ -75,7 +75,7 @@ async function buildKit(bank, kit, log) {
       for (const [file, gain] of layer) parts.push([await load(kit.base, file, RATE, kit.localDirectory), gain]);
       const length = Math.max(...parts.map(([a]) => a.length)), data = new Float32Array(length);
       for (const [a, gain] of parts) for (let i = 0; i < a.length; i++) data[i] += a[i] * gain;
-      const out = trim(data, RATE, piece.seconds);
+      const out = piece.loopSamples ? data : trim(data, RATE, piece.seconds);
       cache.set(id, out); audio.push(out);
     }
     // La capa més forta a la sonoritat de referència i cada capa inferior 3,5 dB per
@@ -88,12 +88,13 @@ async function buildKit(bank, kit, log) {
     const n = piece.layers.length;
     piece.layers.forEach((layer, li) => {
       const id = JSON.stringify(layer) + piece.seconds;
-      if (!made.has(id)) made.set(id, makeSample(bank, `K${kit.program}${gm}v${li}`, cache.get(id), RATE, Number(gm)));
+      if (!made.has(id)) made.set(id, makeSample(bank, `K${kit.program}${gm}v${li}`, cache.get(id), RATE, Number(gm), 0, piece.loopSamples));
       const zone = instrument.createZone(made.get(id));
       zone.keyRange = { min: Number(gm), max: Number(gm) };
       zone.velRange = { min: Math.round(li * 128 / n), max: Math.round((li + 1) * 128 / n) - 1 };
       zone.setGenerator(GeneratorTypes.overridingRootKey, Number(gm));
-      zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(Math.max(1, piece.seconds)));
+      zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(piece.loopSamples ? .035 : Math.max(1, piece.seconds)));
+      if (piece.loopSamples) zone.setGenerator(GeneratorTypes.sampleModes, 1);
       if (piece.choke) zone.setGenerator(GeneratorTypes.exclusiveClass, piece.choke);
     });
   }
