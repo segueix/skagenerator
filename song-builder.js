@@ -656,6 +656,45 @@
     if (!punk) for (const instrument of SKA_OPENING_WINDS) {
       if (!layersOf.some(layer => layer.sec === sections[0] && layer.instrument === instrument)) add(sections[0], instrument, { line: 'riff' });
     }
+    // Ska instrumental: els vents no han de sonar tota l'estona (quedava saturat). Ocupen entre el
+    // 75 i el 90 % dels compassos: callen uns compassos a l'inici de les estrofes (només la base i
+    // l'orgue, com un «riddim») i a la primera meitat del pont. Atzar propi: la resta no canvia.
+    if (instrumental && !punk) {
+      const breathe = rng((seed ^ 0x3c6ef372) >>> 0), target = .75 + breathe() * .15;
+      const HORN_NAMES = ['trumpet', 'trombone', 'sax'];
+      const hornsIn = sec => [...new Set(layersOf.filter(l => l.sec === sec && HORN_NAMES.includes(l.instrument)).map(l => l.instrument))];
+      const quietBars = sec => {
+        const horns = hornsIn(sec);
+        let quiet = 0;
+        for (let b = 0; b < sec.bars; b++) if (!horns.some(h => (sec.entrance?.[h] ?? 0) <= b && b < (sec.exit?.[h] ?? sec.bars))) quiet++;
+        return quiet;
+      };
+      const total = sections.reduce((t, s) => t + s.bars, 0);
+      let occupied = total - sections.reduce((t, s) => t + quietBars(s), 0);
+      // Finestres de descans, per ordre: inici de les estrofes (4 compassos si són llargues, 2 si són
+      // curtes), primera meitat del pont, inici de la pretornada, i els 2 últims compassos de les
+      // estrofes llargues i dels solos (la base i l'orgue fan de pont cap a la secció següent).
+      const windows = [
+        ...of('verse').map(sec => [sec, sec.bars >= 8 ? 4 : 2, 'start']),
+        ...of('bridge').map(sec => [sec, Math.floor(sec.bars / 2), 'start']),
+        ...of('prechorus').map(sec => [sec, Math.min(2, Math.floor(sec.bars / 2)), 'start']),
+        ...of('verse').filter(sec => sec.bars >= 8).map(sec => [sec, 2, 'end']),
+        ...of('solo').filter(sec => sec.bars >= 8).map(sec => [sec, 2, 'end'])
+      ].filter(([sec, n]) => sec !== sections[0] && n > 0 && hornsIn(sec).length);
+      for (const [sec, n, where] of windows) {
+        const room = occupied - Math.ceil(target * total);
+        if (room <= 0) break;
+        const cut = Math.min(n, room), before = quietBars(sec);
+        if (where === 'start') {
+          sec.entrance = { ...(sec.entrance || {}) };
+          for (const horn of hornsIn(sec)) sec.entrance[horn] = Math.max(sec.entrance[horn] ?? 0, cut);
+        } else {
+          sec.exit = { ...(sec.exit || {}) };
+          for (const horn of hornsIn(sec)) sec.exit[horn] = Math.min(sec.exit[horn] ?? sec.bars, sec.bars - cut);
+        }
+        occupied -= quietBars(sec) - before;
+      }
+    }
     // ── Millor versió de cada línia pròpia (la mateixa per a seccions iguals) ──
     const partFor = (sec, layers, extra, h = harmony[sec.type] || 1) => {
       const part = { type: sec.type, bars: sec.bars, energy: sec.energy ?? TYPES[sec.type].energy, revision: h,
