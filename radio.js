@@ -57,6 +57,8 @@
   // Emissora a què pertany una cançó (les de batucada són d'estil ska però només hi sona la batucada).
   const styleOf = song => builder.isBatucadaSong(song) ? 'batucada' : song.settings.style;
   const activeFavorite = () => engine.SUBGENRES[favorite] && inStation(engine.SUBGENRES[favorite].style) ? favorite : '';
+  // Estil de batucada triat al selector («batucada:percudium»...): a l'emissora Batucada, totes les cançons en són.
+  const batucadaStyle = () => { const key = favorite.startsWith('batucada:') ? favorite.slice(9) : ''; return station === 'batucada' && engine.BATUCADA_RHYTHMS[key] ? key : ''; };
   const NOTES = ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
   const CANCELLED = Symbol('cancel·lat');
   const audio = $('radio-audio');
@@ -198,7 +200,8 @@
   }
   function pickSong(filler) {
     // Torn del subgènere principal: només en sonen d'aquest; altrament, de qualsevol altre.
-    const main = activeFavorite(), fits = e => !main || (favoriteTurn ? e.subgenre === main : e.subgenre !== main);
+    const main = activeFavorite(), chosenStyle = batucadaStyle();
+    const fits = e => chosenStyle ? e.subgenre === chosenStyle : !main || (favoriteTurn ? e.subgenre === main : e.subgenre !== main);
     const all = readHistory(), history = all.filter(fits), queued = [current?.id, ...queue.map(t => t.id), ...played.slice(-REPLAY_MEMORY)];
     // Amb prou repertori cantat, la cua s'omple amb cançons que t'han agradat i ja tenen veu.
     const repertoire = instrumental ? [] : history.filter(e => inStation(e.style) && e.vote === 1 && savedTakes.has(e.id));
@@ -219,7 +222,7 @@
     }
     // Emissora Batucada: cançó nova només de percussió, amb un ritme diferent de l'anterior.
     if (station === 'batucada') {
-      const song = studio.validateSong(builder.createBatucadaSong(engine, { seed: studio.newSeed(), avoidRhythm: lastSubgenre,
+      const song = studio.validateSong(builder.createBatucadaSong(engine, { seed: studio.newSeed(), avoidRhythm: lastSubgenre, ...(chosenStyle ? { rhythm: chosenStyle } : {}),
         avoidTitles: [...queue.map(t => t.song.title), ...all.slice(0, 150).map(e => e.title)].filter(Boolean) }));
       lastSubgenre = song.settings.batucadaRhythm;
       return { id: studio.uid(), replay: false, song };
@@ -935,7 +938,11 @@
     for (const [key, info] of Object.entries(engine.SUBGENRES)) if (info.style === style) group.append(new Option(info.name, key));
     favoriteSelect.append(group);
   }
-  if (!engine.SUBGENRES[favorite]) favorite = '';
+  // Estils de batucada (samba, samba-reggae, ijexá, Percudium...).
+  const batucadaGroup = document.createElement('optgroup'); batucadaGroup.label = 'Batucada';
+  for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) batucadaGroup.append(new Option(rhythm.name, `batucada:${key}`));
+  favoriteSelect.append(batucadaGroup);
+  if (!engine.SUBGENRES[favorite] && !engine.BATUCADA_RHYTHMS[favorite.startsWith('batucada:') ? favorite.slice(9) : '']) favorite = '';
   favoriteSelect.value = favorite;
   favoriteSelect.addEventListener('change', () => {
     favorite = favoriteSelect.value;

@@ -196,11 +196,12 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     assert(average >= 84, `energia mitjana ${average}`);
     assert(secs.filter(sec => sec.energy < 60).length <= 1);
     assert(secs.filter(sec => sec.ending).every(sec => sec.batucada?.whistle));
-    if (secs.some(sec => sec.batucada?.tutti)) { compact++; assert(song.settings.humanize < .2); }
+    // (El Percudium té convenções però conserva una mica de soltesa entre músics.)
+    if (song.settings.batucadaRhythm !== 'percudium' && secs.some(sec => sec.batucada?.tutti)) { compact++; assert(song.settings.humanize < .2); }
     if (secs.some(sec => sec.batucada?.cuica !== undefined)) chains++;
     for (const sec of secs) assert(engine.validBatucadaFx(sec.batucada));
   }
-  assert(compact >= 8 && compact <= 35, `cançons compactes: ${compact}`);
+  assert(compact >= 4 && compact <= 35, `cançons compactes: ${compact}`);
   assert(chains >= 50, `cançons amb solo de cuíca: ${chains}`);
 });
 
@@ -324,7 +325,7 @@ test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments, sala i
     assert.equal(song.settings.batucadaBand, 3);
     assert(song.settings.bpm >= 100 && secs.every(sec => (sec.bpm ?? song.settings.bpm) >= 94 && (sec.bpm ?? song.settings.bpm) <= 108));
     assert(song.settings.mix.drums.low < 0 && song.settings.mix.drums.high > 0);
-    assert(secs.filter(sec => sec.energy >= 84 && sec.type !== 'intro' && !sec.batucada?.tutti).every(sec => sec.batucada?.counter !== undefined));
+    assert(secs.filter(sec => sec.energy >= 84 && sec.type !== 'intro' && !sec.batucada?.tutti && !sec.batucada?.finale).every(sec => sec.batucada?.counter !== undefined));
     // La caixa contínua es manté a totes les variacions.
     assert([song.settings.batucadaPattern, ...secs.map(sec => sec.batucadaPattern).filter(Boolean)].every(p => p[3] === '1'.repeat(16) || p[4] !== undefined));
   }
@@ -332,5 +333,53 @@ test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments, sala i
   for (let seed = 1; seed <= 30; seed++) {
     const song = builder.createBatucadaSong(engine, { seed, rhythm: 'samba' });
     assert(!song.sections.some(sec => sec.batucadaPattern && sec.batucadaPattern[1] === engine.BATUCADA_RHYTHMS.percudium.steps[1]));
+  }
+});
+
+test('Percudium: timbal i xiulet sols, entrada de tots, diàlegs, aturades i retorns, final al màxim', () => {
+  const st = { ...settings, batucadaRhythm: 'percudium', batucadaBand: 3 };
+  const compose = p => engine.composeSongPart(st, { ...part, energy: 92, ...p }).batucadaLine;
+  // Entrada: només el timbal (surdo 1, un sol músic) i el xiulet del mestre; l'últim compàs, un redoble.
+  const intro = compose({ type: 'intro', bars: 2, batucada: { intro: 'timbal', whistle: true } });
+  const notes = new Set(intro.map(h => h[2]));
+  assert.deepEqual([...notes].sort((a, b) => a - b), [35, 36, engine.BATUCADA_WHISTLE.note]);
+  assert(intro.every(h => !h[6]), 'un sol timbal');
+  assert(intro.filter(h => h[0] === 1 && h[2] === 36).length > intro.filter(h => h[0] === 0 && h[2] === 36).length, 'redoble');
+  // Diàleg: en cada compàs parla un grup (surdos i agogô / caixa, repique, tamborim i xocalho); al final, tots.
+  const dialog = compose({ type: 'bridge', bars: 6, batucada: { dialog: 1 } });
+  const group = row => engine.BATUCADA_DIALOG.findIndex(g => g.includes(row));
+  const rowOf = note => engine.BATUCADA.findIndex(p => p.note === note);
+  const groups = bar => new Set(dialog.filter(h => h[0] === bar && rowOf(h[2]) >= 0 && rowOf(h[2]) < 8).map(h => group(rowOf(h[2]))));
+  assert.deepEqual([...groups(0)], [0]); assert.deepEqual([...groups(1)], [1]); assert.deepEqual([...groups(2)], [0]);
+  assert.equal(groups(5).size, 2, 'tots al final');
+  // Diàleg per mitjos compassos.
+  const half = compose({ type: 'bridge', bars: 4, batucada: { dialog: 2 } }).filter(h => h[0] === 0 && rowOf(h[2]) >= 0 && rowOf(h[2]) < 8);
+  assert(half.every(h => group(rowOf(h[2])) === (h[1] < 2 ? 0 : 1)));
+  // Aturada: un cop de tots al màxim (127) i silenci.
+  const stop = compose({ type: 'bridge', bars: 2, next: 'chorus', ending: 'break' }).filter(h => h[0] === 1);
+  assert(stop.length && stop.every(h => h[1] === 0 && h[3] === 127));
+  assert.equal(new Set(stop.map(h => h[6] || 0)).size, 3, 'tots els músics');
+  // Final: cops de tots els instruments junts i un cop final de tots, tots els músics, al màxim.
+  const end = compose({ type: 'outro', bars: 4, batucada: { finale: true } });
+  const lastHit = end.filter(h => h[0] === 3 && h[1] === 2);
+  assert.deepEqual([...new Set(lastHit.map(h => rowOf(h[2]) >= 0 ? rowOf(h[2]) : 0))].length >= 8 || lastHit.length >= 8, true);
+  assert(lastHit.every(h => h[3] >= 120) && new Set(lastHit.map(h => h[6] || 0)).size === 3);
+  assert(!end.some(h => h[0] === 3 && h[1] > 2), 'després, silenci');
+  // Tot saturat: també el repique i l'agogô els toquen tres músics.
+  const groove = compose({ type: 'chorus', bars: 1 });
+  for (const note of [50, 67]) assert.equal(new Set(groove.filter(h => h[2] === note || note === 67 && h[2] === engine.AGOGO_LOW).map(h => h[6] || 0)).size, 3, `${note}`);
+  // Les cançons Percudium: timbal sol uns 5 segons, entrada de tots amb tota la potència, diàlegs,
+  // aturades i retorns, i final al màxim; sense compte de repique.
+  for (let seed = 1; seed <= 20; seed++) {
+    const song = builder.createBatucadaSong(engine, { seed, rhythm: 'percudium' }), secs = song.sections;
+    const bpm = secs[0].bpm ?? song.settings.bpm, seconds = secs[0].bars * 240 / bpm;
+    assert(secs[0].batucada?.intro === 'timbal' && seconds >= 4.5 && seconds <= 5.5, `entrada ${seconds}`);
+    assert.equal(song.settings.countIn, false);
+    assert(secs[1].batucada?.peak && secs[1].volumes?.master > 0, 'entren tots amb potència');
+    assert(secs.some(sec => sec.batucada?.dialog), 'diàlegs');
+    const stops = secs.filter(sec => sec.ending);
+    assert(stops.length >= 2, 'aturades');
+    for (const sec of stops) { const next = secs[secs.indexOf(sec) + 1]; assert(next.batucada?.peak && next.volumes?.master > 0, 'retorn amb potència'); }
+    assert(secs.at(-1).batucada?.finale);
   }
 });
