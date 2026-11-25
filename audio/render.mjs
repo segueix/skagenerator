@@ -323,8 +323,9 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     if (options.raw) return [left, right]; // Només per a proves: sense dinàmica ni nivell.
     // Compressor de bus suau (2,5:1) per cohesionar la banda.
     // Amb «glue» (Percudium) la compressió és més ferma: la banda sona com un sol bloc, com en un disc masteritzat.
-    const attack = Math.exp(-1 / ((score.glue ? .001 : .012) * sampleRate)), release = Math.exp(-1 / ((score.glue ? .08 : .3) * sampleRate));
-    const threshold = score.glue ? .06 : .16, ratio = score.glue ? 5 : 2.2;
+    // (Atac de 5 ms: més ràpid, el compressor seguiria l'ona dels surdos i la distorsionaria.)
+    const attack = Math.exp(-1 / ((score.glue ? .005 : .012) * sampleRate)), release = Math.exp(-1 / ((score.glue ? .15 : .3) * sampleRate));
+    const threshold = score.glue ? .07 : .16, ratio = score.glue ? 3.5 : 2.2;
     let envelope = 0, peak = 0;
     for (let i = 0; i < length; i++) {
       if (!Number.isFinite(left[i]) || !Number.isFinite(right[i])) throw new Error('El motor ha produït àudio no vàlid');

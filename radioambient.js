@@ -1930,7 +1930,7 @@
         8: ['0000000100000000', '0001000100010001', '0100000001000000', '0000000000000000']
     };
     // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
-    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .56, 78: .82, [BATUCADA_WHISTLE.note]: .66,
+    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .74, 78: .82, [BATUCADA_WHISTLE.note]: .66,
         79: .8, 80: .84, 81: .78, 82: .78, 83: .8, 35: .8, 43: .78, 47: .76, 68: .78 };
     // Balanç de cada ritme (micro-temps): desplaçament de cada semicorxera del temps, en fraccions de temps.
     // Al samba la segona semicorxera s'endarrereix i la quarta s'avança (aproximació als estudis de
@@ -1943,7 +1943,7 @@
         ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' },
         // accents: semicorxeres accentuades (en lloc dels accents de cada temps); gain: pes de cada peça.
         percudium: { feel: [0, .02, -.005, -.025], abafado: true, agogo: 'gaaaaaaaagaaaaaa', accents: '1000001001000100', graces: true, room: 44, spread: 1.6, glue: true, doubleAll: true, max: true,
-            gain: { 36: .8, 41: .8, 45: .84, 35: .8, 43: .8, 47: .84, 38: 1.42, 50: 1.1, 54: 1.08, 69: .95, 67: 1, 68: 1 } }
+            gain: { 36: .8, 41: .8, 45: .84, 35: .8, 43: .8, 47: .84, 38: 1.42, 50: 1.1, 54: 1.08, 69: .88, 67: 1, 68: 1 } }
     };
     // Surdo apagat («abafado») de cada surdo i campana greu de l'agogô.
     const SURDO_MUTED = { 0: 35, 1: 43, 2: 47 }, AGOGO_LOW = 68;
@@ -2077,7 +2077,10 @@
             const others = doubled ? players.filter(p => p > 0) : [];
             const lead = !doubled || players.includes(0);
             // (Als cops de tots al màxim, tots els músics piquen igual de fort.)
-            for (const p of others) line.push([bar, step / 4, pitch, tight && sound.max && velocity === 127 ? 127 : Math.round(velocity * (.9 - p * .04)), null, tight ? 1 : 0, p]);
+            // Als surdos, els altres músics bastant més fluixos: tres còpies gairebé iguals d'un cop greu
+            // farien un efecte de filtre (so metàl·lic, «industrial»); així el surdo principal mana.
+            const share = row <= 2 ? .64 : .9;
+            for (const p of others) line.push([bar, step / 4, pitch, tight && sound.max && velocity === 127 ? 127 : Math.round(velocity * (share - p * .04)), null, tight ? 1 : 0, p]);
             if (!lead) return;
             if (pitch === BATUCADA_WHISTLE.note) {
                 const at = (bar * 4 + step / 4) * beat;
