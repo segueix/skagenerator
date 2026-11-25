@@ -2,15 +2,17 @@ name: Publicar Ska Generator amb els instruments reals
 
 on:
   push:
-    # També la branca de treball: Pages la publica i sense el build no hi hauria instruments (error 404).
+    # Les branques de treball també es compilen i passen els tests, però només main es publica:
+    # l'entorn github-pages no accepta desplegaments d'altres branques (el pas fallava sempre).
     branches: [main, 'claude/**']
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Un grup per branca: un push a una branca de treball ja no cancel·la la publicació de main.
 concurrency:
-  group: ska-generator-pages
+  group: ska-generator-pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,6 +59,7 @@ jobs:
   deploy:
     name: Publicar la versió compilada
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       actions: read
