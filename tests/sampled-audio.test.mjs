@@ -42,7 +42,10 @@ test('la interpretació és reproduïble, només activa els instruments seleccio
   const guitar = ska.events.filter(e => e.type === 'on' && e.channel === 0);
   assert(Math.abs(guitar[0].time - spec.beat / 2) < .01);
   const muted = createPerformance({ ...spec, instruments: ['trumpet'] });
-  assert(muted.events.every(e => e.channel === 3 || e.channel === 12));
+  // Només trompetes (a l'ska, també la segona trompeta de la secció, als seus canals).
+  const trumpets = new Set(muted.channels.filter(c => c.instrument === 'trumpet').map(c => c.channel));
+  assert(muted.events.every(e => trumpets.has(e.channel)));
+  assert(muted.events.some(e => e.channel === 3));
   const punkSpec = engine.composeSongPart({ ...settings, style: 'punk', bpm: 180 }, part);
   const punk = createPerformance(punkSpec);
   assert.equal(punk.channels.find(c => c.channel === 0).program, 30);

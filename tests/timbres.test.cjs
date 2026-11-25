@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const engine = require('../radioambient.js');
 const { createPerformance } = require('../audio/performance.cjs');
+const builder = require('../song-builder.js');
 const config = { seed: 771, style: 'ska', bpm: 128, tonic: 0, mode: 'major',
   instruments: ['guitar', 'bass', 'drums'] };
 const part = { type: 'verse', bars: 4, energy: 60, revision: 1 };
@@ -91,10 +92,15 @@ test('per defecte sonen els instruments gravats i les notes curtes dels metalls 
   assert(notes(12).every(e => off(e).time - e.time < .31));
   assert(notes(3).every(e => off(e).time - e.time >= .29));
   // Les inflexions van al mateix canal que la nota.
-  assert(music.events.filter(e => e.type === 'pitch').every(e => [3, 4, 8, 12, 13].includes(e.channel)));
+  // (També els segons músics de la secció de l'ska, als seus canals de vent.)
+  const horns = new Set(music.channels.filter(p => ['trumpet', 'trombone', 'sax'].includes(p.instrument)).map(p => p.channel));
+  assert(music.events.filter(e => e.type === 'pitch').every(e => horns.has(e.channel)));
   // Amb el so GM no hi ha staccato separat.
   const gm = createPerformance(engine.composeSongPart({ ...config, instruments: ['trumpet'], timbres: { trumpet: 'gm' } }, { ...part, layers: { trumpet: 2 } }));
-  assert(gm.events.every(e => e.channel === 3));
+  // Cap nota a l'staccato gravat (12); la segona trompeta GM tampoc en fa servir.
+  const gmStaccato = new Set(gm.channels.filter(p => p.bank === 3).map(p => p.channel));
+  assert(gm.events.every(e => e.type !== 'on' || !gmStaccato.has(e.channel)));
+  assert(gm.events.some(e => e.channel === 3));
   assert.equal(gm.channels.find(p => p.channel === 3).bank, 0);
 });
 
@@ -214,7 +220,9 @@ test('la segona veu de vent és un trombó gravat amb staccato i el saxo tenor �
   sax.lines.trombone = [[0, 0, 67, .25], [0, 1, 69, 1]];
   const music = createPerformance(sax);
   assert.deepEqual([music.channels.find(p => p.channel === 4).bank, music.channels.find(p => p.channel === 4).program], [2, 66]);
-  assert(music.events.filter(e => e.type === 'on').every(e => e.channel === 4), 'el saxo no fa servir l’staccato del trombó');
+  // Primer i segon trombó amb so de saxo: cap nota a cap canal d'staccato.
+  const saxChannels = new Set(music.channels.filter(p => p.instrument === 'trombone' && p.bank === 2 && p.program === 66).map(p => p.channel));
+  assert(music.events.filter(e => e.type === 'on').every(e => saxChannels.has(e.channel)), 'el saxo no fa servir l’staccato del trombó');
   assert.equal(createPerformance(sp({ trombone: 'gm' })).channels.find(p => p.channel === 4).bank, 0);
 });
 
@@ -248,4 +256,29 @@ test('guitarra horror punk (estil Misfits): quintes a cops avall, apagades a l�
   assert(ch(0).pan < 30 && ch(1).pan > 100 && ch(0).volume === ch(1).volume);
   assert.deepEqual([ch(0).bank, ch(0).program], [2, 27], 'entra el so net a l’amplificador');
   assert.equal(verse.fx.guitar.type, 'horrorpunk');
+});
+
+test('ska: secció de vents doblada (segona veu una tercera per sota) i vents que responen junts', () => {
+  const spec = engine.composeSongPart({ ...config, instruments: ['trumpet', 'trombone', 'sax'] }, { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3, sax: 4 } });
+  const music = createPerformance(spec);
+  const byInstrument = name => music.channels.filter(p => p.instrument === name).map(p => p.channel);
+  for (const name of ['trumpet', 'trombone', 'sax']) assert(byInstrument(name).length >= 2, `${name}: segon músic`);
+  const second = music.channels.find(p => p.instrument === 'trumpet' && p.channel > 16).channel;
+  const lead = music.events.filter(e => e.type === 'on' && (e.channel === 3 || e.channel === 12));
+  const harmony = music.events.filter(e => e.type === 'on' && (e.channel === second || e.channel === second + 3));
+  assert.equal(harmony.length, lead.length, 'la segona trompeta toca cada nota de la primera');
+  const intervals = harmony.map((e, i) => lead[i].note - e.note);
+  assert(intervals.every(d => [0, 3, 4, 12].includes(d)), `intervals: ${[...new Set(intervals)]}`);
+  assert(intervals.filter(d => d === 3 || d === 4).length >= intervals.length * .8, 'sobretot terceres');
+  // Al punk no hi ha segons músics.
+  const punk = createPerformance(engine.composeSongPart({ ...config, style: 'punk', bpm: 180, instruments: ['trumpet'] }, { ...part, layers: { trumpet: 2 } }));
+  assert.equal(punk.channels.filter(p => p.instrument === 'trumpet' && p.channel > 16).length, 0);
+  // Les tornades amb veu: trompeta i trombó responen junts.
+  for (const seed of [3, 9, 27]) {
+    const song = builder.createAutoSong(engine, 'twotone', { seed, minutes: 3 });
+    for (const sec of song.sections.filter(s => s.type === 'chorus')) {
+      const horns = song.clips.filter(c => c.start === sec.start && ['trumpet', 'trombone', 'sax'].includes(c.instrument)).map(c => c.instrument);
+      assert(horns.includes('trumpet') && horns.includes('trombone'), `tornada amb secció: ${horns}`);
+    }
+  }
 });

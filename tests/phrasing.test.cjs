@@ -16,7 +16,9 @@ test('trompeta: corxeres lligades sense staccato i silencis conservats', () => {
   spec.humanize = 0;
   spec.lines.trumpet = [[0, 0, 67, .5], [0, .5, 69, .5], [0, 2, 71, .5]];
   const events = createPerformance(spec).events;
-  const on = events.filter(e => e.type === 'on'), off = events.filter(e => e.type === 'off');
+  // Només la primera trompeta (a l'ska, la segona toca la mateixa frase en altres canals).
+  const first = e => e.channel === 3 || e.channel === 12;
+  const on = events.filter(e => e.type === 'on' && first(e)), off = events.filter(e => e.type === 'off' && first(e));
   assert.equal(on[0].channel, 3); assert.equal(on[1].channel, 3);
   assert(on[1].time - off[0].time < .015);
   assert(on[2].time - off[1].time > .45);

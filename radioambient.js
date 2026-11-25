@@ -2726,7 +2726,8 @@
                 if (how === 'lead') { lines[name] = ownLine(name, layers[name], saltOf(name), 72); continue; }
                 const line = how === 'riff' ? realizeRiff(riff, chords, bars, ctx.scalePcs) : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine, (layers[name] || 1) - 1);
                 // Trombó/segona veu: el riff harmonitzat una tercera per sota.
-                lines[name] = name === 'trombone' && how === 'riff' ? harmonize(line, chords, ctx.scalePcs) : line;
+                // També a les respostes: amb la trompeta, el trombó fa la segona veu i no l'uníson.
+                lines[name] = name === 'trombone' && (how === 'riff' || how === 'answer') ? harmonize(line, chords, ctx.scalePcs) : line;
             }
         }
         const drumOptions = {};
