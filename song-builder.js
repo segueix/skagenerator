@@ -137,10 +137,11 @@
   // (les GM saturades porten la distorsió a la mostra: s'hi afegeix només un boost o res).
   // Probabilitat que la guitarra solista toqui el riff a la intro (punk amb veu).
   const LEAD_INTRO = { eastbay: .35, poppunk: .5, punk77: .55, oi: .45, skatepunk: .6, garage: .6, postpunk: .55, hardcore: .45, horrorpunk: .7 };
+  // To (0-100) més aviat fosc: amb valors alts la solista sonava estrident; el guany, moderat.
   const PUNK_LEAD_TONES = [
-    { fx: ['overdrive', 82, 68] }, { fx: ['distortion', 72, 72] }, { fx: ['fuzz', 55, 56] }, { fx: ['crunch', 92, 74] },
-    { fx: ['tape', 80, 62] }, { fx: ['boost', 85, 70] }, { fx: ['metal', 45, 64] },
-    { sound: 'overdrive', fx: ['boost', 40, 62] }, { sound: 'distortion', fx: ['none', 50, 58] }, { sound: 'cleanGm', fx: ['overdrive', 70, 64] }
+    { fx: ['overdrive', 72, 50] }, { fx: ['distortion', 60, 50] }, { fx: ['fuzz', 45, 42] }, { fx: ['crunch', 82, 54] },
+    { fx: ['tape', 72, 48] }, { fx: ['boost', 75, 52] }, { fx: ['metal', 35, 46] },
+    { sound: 'overdrive', fx: ['boost', 30, 46] }, { sound: 'distortion', fx: ['boost', 10, 40] }, { sound: 'cleanGm', fx: ['overdrive', 60, 48] }
   ];
   function planHighlights(song, key, r, options = {}) {
     const fit0 = FIT[key] || FIT.twotone, sections = song.sections, st = song.settings, excluded = excludedBy(song);
