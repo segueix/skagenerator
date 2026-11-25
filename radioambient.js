@@ -1935,12 +1935,17 @@
     // «Convenções»: figures que toca tota la batucada alhora, molt junta.
     const BATUCADA_TUTTI = ['1001001000101000', '1000100010101010', '1011010010110100', '1001001001001010', '1010001010100010', '1110111011100000'];
     // Opcions de batucada d'una secció: moment clau (puja molt), xiulet del mestre, convenção de tots i cadena de cuíca.
+    // counter: a la banda, el segon músic de surdo 3, caixa i tamborim toca una altra figura alhora (0–3).
     function validBatucadaFx(fx) {
         return fx === undefined || !!fx && typeof fx === 'object' && !Array.isArray(fx) && Object.entries(fx).every(([key, value]) =>
             key === 'peak' || key === 'whistle' ? typeof value === 'boolean'
                 : key === 'tutti' ? typeof value === 'string' && /^[01]{16}$/.test(value)
-                : key === 'cuica' ? Number.isInteger(value) && value >= 0 && value < CUICA_CHAINS.length : false);
+                : key === 'cuica' ? Number.isInteger(value) && value >= 0 && value < CUICA_CHAINS.length
+                : key === 'counter' ? Number.isInteger(value) && value >= 0 && value < 4 : false);
     }
+    // Banda: quants músics toquen cada peça (1, 2 o 3). Surdos, caixa, tamborim i xocalho es doblen;
+    // el repique, l'agogô, la cuíca i el xiulet són d'un sol músic.
+    const BATUCADA_BAND = [1, 2, 3], BATUCADA_DOUBLED = new Set([0, 1, 2, 3, 5, 7]), BATUCADA_COUNTER = [2, 3, 5];
 
     function validBatucadaPattern(pattern) {
         return Array.isArray(pattern) && [BATUCADA.length - 1, BATUCADA.length].includes(pattern.length)
@@ -1988,10 +1993,24 @@
         // Cadena de cuíca: cada cop de cuíca fa servir la variant següent de la cadena.
         const chain = fx.cuica !== undefined ? CUICA_CHAINS[fx.cuica] : null, phrase = chain ? CUICA_PHRASES[fx.cuica % CUICA_PHRASES.length] : null;
         let cuicaIndex = 0;
-        const add = (bar, step, row, extra = 0, tight = false) => {
+        // Banda: cada peça doblada la toquen fins a tres músics (cada un al seu canal, en la mescla).
+        const band = settings.batucadaBand ?? 1;
+        if (!BATUCADA_BAND.includes(band)) throw new Error('Banda de batucada no vàlida');
+        const everyone = Array.from({ length: band }, (_, p) => p);
+        // Contraritme: el segon músic de surdo 3, caixa i tamborim toca una altra figura de la mateixa peça.
+        const counter = band > 1 && fx.counter !== undefined && !fx.tutti
+            ? Object.fromEntries(BATUCADA_COUNTER.map(row => { const list = BATUCADA_FIGURES[row].filter(f => f !== rows[row]); return [row, list[fx.counter % list.length]]; }))
+            : null;
+        const add = (bar, step, row, extra = 0, tight = false, players = everyone) => {
             if ((bar * 4 + step / 4) * beat >= stopAt) return;
             const pitch = row === 8 && chain ? chain[cuicaIndex++ % chain.length] : BATUCADA[row].note;
-            const hit = [bar, step / 4, pitch, force(pitch, step, extra)];
+            const velocity = force(pitch, step, extra);
+            const hit = [bar, step / 4, pitch, velocity];
+            // Els altres músics: una mica més fluixos, cadascun amb el seu temps.
+            const others = BATUCADA_DOUBLED.has(row) ? players.filter(p => p > 0) : [];
+            const lead = !BATUCADA_DOUBLED.has(row) || players.includes(0);
+            for (const p of others) line.push([bar, step / 4, pitch, Math.round(velocity * (.9 - p * .04)), null, tight ? 1 : 0, p]);
+            if (!lead) return;
             if (pitch === BATUCADA_WHISTLE.note) {
                 const at = (bar * 4 + step / 4) * beat;
                 if (previousWhistle) {
@@ -2020,6 +2039,13 @@
             for (let step = 0; step < to; step++) {
                 rows.forEach((row, i) => {
                     if (i === 4 && step >= virada) return;
+                    // Amb contraritme, el segon músic fa la seva figura i la resta, la del patró.
+                    if (counter?.[i]) {
+                        if (counter[i][step] === '1' && plays(i)) add(bar, step, i, -4, false, [1]);
+                        if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, false, everyone.filter(p => p !== 1));
+                        else if (fire && i === 3) add(bar, step, i, -24, false, everyone.filter(p => p !== 1));
+                        return;
+                    }
                     if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, !!fx.tutti);
                     // Foc: la caixa omple les semicorxeres buides amb cops fluixos i el xocalho no para.
                     else if (fire && (i === 3 || i === 7)) add(bar, step, i, i === 3 ? -24 : -10);
@@ -3218,7 +3244,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, BATUCADA_TUTTI, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, BATUCADA_TUTTI, BATUCADA_BAND, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

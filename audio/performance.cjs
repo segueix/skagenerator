@@ -124,6 +124,16 @@ function createPerformance(spec) {
   // Punk, última tornada: segona guitarra solista (una tercera per sota), oberta a l'altre costat.
   const LEAD2 = punk && spec.shout && has('guitar3') && Array.isArray(spec.lines?.guitar3) ? PIANO + 6 : null;
   if (LEAD2 !== null) { channels.push(patch(LEAD2, chosen('guitar3') ?? [2, 27], 100, 80)); instrumentOf[LEAD2] = 'guitar3'; }
+  // Batucada en banda: el segon i el tercer músic de cada peça tenen canal propi, un a cada banda,
+  // amb l'afinació una mica diferent (cada pell és diferent) i el seu temps (un pèl abans o després).
+  const BAND_PLAYERS = Array.isArray(spec.batucadaLine) ? Math.max(0, ...spec.batucadaLine.map(hit => hit[6] || 0)) : 0;
+  const BAND = PIANO + 7, BAND_SEATS = [{ pan: 26, cents: -14, offset: .009, tight: .0015 }, { pan: 102, cents: 11, offset: -.006, tight: -.001 }];
+  const bandChannel = player => player ? BAND + player - 1 : 9;
+  const drumChannel = channel => channel === 9 || channel === 10 || (channel >= BAND && channel < BAND + BAND_PLAYERS);
+  for (let p = 1; p <= BAND_PLAYERS; p++) {
+    channels.push({ ...patch(bandChannel(p), chosen('drums') ?? [0, 69], BAND_SEATS[p - 1].pan, 90), drums: true, tuneFine: BAND_SEATS[p - 1].cents });
+    instrumentOf[bandChannel(p)] = 'drums';
+  }
   // Tercera diatònica per sota (dins de l'escala de la secció); fora de l'escala, la nota de l'acord
   // de 3 a 4 semitons per sota. Si queda massa greu, l'octava avall o, si tampoc hi cap, l'uníson.
   const SCALE = (spec.mode === 'major' ? [0, 2, 4, 5, 7, 9, 11] : spec.mode === 'dorian' ? [0, 2, 3, 5, 7, 9, 10] : [0, 2, 3, 5, 7, 8, 10])
@@ -236,7 +246,7 @@ function createPerformance(spec) {
   // Compte d'entrada (primer compàs només amb baquetes) i aturada de la banda
   // (després del cop, només sona la bateria fins a la secció següent).
   if (spec.stopAt !== undefined && (!Number.isFinite(spec.stopAt) || spec.stopAt <= 0 || spec.stopAt > spec.seconds)) throw new Error('Aturada no vàlida');
-  const silentBand = (channel, start) => channel !== 9 && channel !== 10 && ((spec.countIn && start < bar - .01) || (spec.stopAt !== undefined && start >= spec.stopAt - .01));
+  const silentBand = (channel, start) => !drumChannel(channel) && ((spec.countIn && start < bar - .01) || (spec.stopAt !== undefined && start >= spec.stopAt - .01));
   // Talls de la banda. «Stop time» (primers compassos de la secció): la banda només fa un cop a l'u
   // de cada compàs i calla; la veu i les melodies pròpies (tema, solo) continuen. Cops de secció
   // (últim compàs): tota la banda, vents inclosos, toca uns cops curts junts i calla entremig.
@@ -547,8 +557,10 @@ function createPerformance(spec) {
   if (has('drums') && spec.batucadaLine) {
     // La batucada ja porta la dinàmica escrita (cop a cop): no es torna a escalar amb l'energia.
     // Els cops marcats com a junts (convenções, cops de tots) i el xiulet van a temps exacte.
-    for (const [barIndex, step, pitch, velocity, duration, tight] of spec.batucadaLine) {
-      note(9, pitch, (barIndex * 4 + step) * beat, duration ?? .35, velocity / energy, duration == null && !tight ? .002 : 0);
+    for (const [barIndex, step, pitch, velocity, duration, tight, player] of spec.batucadaLine) {
+      // Junts (convenções i cops de tots): gairebé exactes, només un mil·lisegon de diferència.
+      const offset = player ? BAND_SEATS[player - 1][tight ? 'tight' : 'offset'] : 0;
+      note(bandChannel(player || 0), pitch, Math.max(0, (barIndex * 4 + step) * beat + offset), duration ?? .35, velocity / energy, duration == null && !tight ? .002 : 0);
     }
   }
   if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {
