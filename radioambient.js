@@ -2214,7 +2214,12 @@
     // Segona veu: la mateixa línia una tercera diatònica per sota.
     const harmonize = (notes, chords, scalePcs) => notes.map(([b, t, p, d]) => [b, t, moveByScale(p, -2, scalePcs, chords[b], 52, 84), d]);
     // Respostes: fragments del riff als silencis de la veu (pregunta i resposta).
-    function answerLine(riff, chords, bars, scalePcs, vocal) {
+    // Variant (versió de la capa menys 1): 0 com sempre; 1 el fragment al revés (mirall);
+    // 2 el mateix fragment començant més amunt (seqüència); 3 més avall i al revés.
+    // Així una segona estrofa o l'última tornada no repeteixen calcada la resposta.
+    const ANSWER_VARIANTS = [[74, 1], [74, -1], [79, 1], [69, -1]];
+    function answerLine(riff, chords, bars, scalePcs, vocal, variant = 0) {
+        const [startPitch, direction] = ANSWER_VARIANTS[((variant % 4) + 4) % 4];
         const head = riff.rhythm.filter(([t]) => t < 3), span = Math.max(...head.map(([t, d]) => t + d)) - head[0][0];
         // Forats de la veu [inici, final]: la resposta només hi posa les notes que hi caben.
         const gaps = [];
@@ -2234,7 +2239,7 @@
                 const at = gap + t - head[0][0];
                 if (at >= end - .25 || at >= bars * 4) return;
                 const chord = chords[Math.floor(at / 4)];
-                let p = prev === null ? nearestTone(74, chord.pcs, 64, 81) : moveByScale(prev, riff.steps[i], scalePcs, chord, 64, 81);
+                let p = prev === null ? nearestTone(startPitch, chord.pcs, 64, 81) : moveByScale(prev, riff.steps[i] * direction, scalePcs, chord, 64, 81);
                 if (at % 1 === 0) p = nearestTone(p, chord.pcs, 64, 81);
                 notes.push([Math.floor(at / 4), at % 4, p, Math.min(d, end - at, bars * 4 - at)]); prev = p;
             });
@@ -2719,7 +2724,7 @@
                 if (!(name in layers)) continue;
                 // Guitarra solista amb melodia pròpia (tema o solo), com un vent.
                 if (how === 'lead') { lines[name] = ownLine(name, layers[name], saltOf(name), 72); continue; }
-                const line = how === 'riff' ? realizeRiff(riff, chords, bars, ctx.scalePcs) : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine);
+                const line = how === 'riff' ? realizeRiff(riff, chords, bars, ctx.scalePcs) : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine, (layers[name] || 1) - 1);
                 // Trombó/segona veu: el riff harmonitzat una tercera per sota.
                 lines[name] = name === 'trombone' && how === 'riff' ? harmonize(line, chords, ctx.scalePcs) : line;
             }

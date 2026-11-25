@@ -505,3 +505,20 @@ test('subgèneres nous de punk: street punk, skate punk, garage, post-punk i pun
     }
   }
 });
+
+test('ska: respostes variades a la segona estrofa i a l’última tornada, i de vegades pont al IV grau', () => {
+  const settings = { seed: 4242, style: 'ska', bpm: 140, tonic: 0, mode: 'major', subgenre: 'twotone' };
+  const answer = revision => engine.composeSongPart(settings, { type: 'verse', bars: 8, energy: 60, revision: 2, instruments: ['trumpet'],
+    layers: { trumpet: revision }, lineModes: { trumpet: 'answer' } }).lines.trumpet.map(n => n[2]);
+  const pitches = [1, 2, 3, 4].map(answer);
+  assert.equal(new Set(pitches.map(p => p.join())).size, 4, 'cada variant de resposta és diferent');
+  let varied = 0, modulated = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const song = builder.createAutoSong(engine, 'twotone', { seed: seed * 37, minutes: 3 });
+    const answers = song.clips.filter(c => c.line === 'answer').map(c => c.revision);
+    if (new Set(answers).size > 1) varied++;
+    if (song.sections.some(s => ['bridge', 'solo'].includes(s.type) && s.transpose === 5)) modulated++;
+  }
+  assert(varied >= 10, `respostes variades: ${varied}`);
+  assert(modulated >= 2 && modulated <= 16, `ponts al IV grau: ${modulated}`);
+});
