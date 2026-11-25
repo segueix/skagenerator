@@ -522,6 +522,16 @@
       if (r() < .35) sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = 2; });
     }
     if (key === 'horrorpunk') { if (of('intro')[0]) of('intro')[0].feel = { drums: .5, bass: .5 }; const b = of('bridge')[0]; if (b) b.feel = { drums: .5 }; }
+    // Harmonia punk (atzar propi, per no canviar la resta de la cançó):
+    //  · pujada de to a l'última tornada també als subgèneres que no en tenien;
+    //  · pedal de tònica a les estrofes (el baix fix i els acords per sobre) al punk més melòdic.
+    if (punk) {
+      const harmonyDice = rng((seed ^ 0x6c8e9cf5) >>> 0);
+      const lift = { skatepunk: [.4, 2], garage: [.3, 1], hardcore: [.25, 1], postpunk: [.25, 2], horrorpunk: [.3, 2] }[key];
+      if (lift && lastChorus && harmonyDice() < lift[0] && !sections.some(s => s.transpose)) sections.filter(s => s.start >= lastChorus.start).forEach(s => { s.transpose = lift[1]; });
+      const pedalChance = { punk77: .4, oi: .35, poppunk: .5, eastbay: .45, skatepunk: .3, garage: .3 }[key] ?? 0;
+      if (harmonyDice() < pedalChance) of('verse').forEach(s => { s.pedal = true; });
+    }
     // Punk: de vegades una segona bateria a contratemps a partir de la segona tornada.
     if (['punk77', 'hardcore', 'horrorpunk'].includes(key) && r() < .55) of('chorus').slice(1).forEach(s => { s.offbeat = true; });
     if (key === 'punk77' || key === 'skapunk') for (const sec of sections) {

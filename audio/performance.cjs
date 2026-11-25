@@ -121,6 +121,9 @@ function createPerformance(spec) {
     if (has('sax')) { channels.push(patch(S2, [2, 66], 98, 86)); instrumentOf[S2] = 'sax'; SECOND[8] = S2; }
     realBrass[T2] = realBrass[3]; realBrass[B2] = realBrass[4];
   }
+  // Punk, última tornada: segona guitarra solista (una tercera per sota), oberta a l'altre costat.
+  const LEAD2 = punk && spec.shout && has('guitar3') && Array.isArray(spec.lines?.guitar3) ? PIANO + 6 : null;
+  if (LEAD2 !== null) { channels.push(patch(LEAD2, chosen('guitar3') ?? [2, 27], 100, 80)); instrumentOf[LEAD2] = 'guitar3'; }
   // Tercera diatònica per sota (dins de l'escala de la secció); fora de l'escala, la nota de l'acord
   // de 3 a 4 semitons per sota. Si queda massa greu, l'octava avall o, si tampoc hi cap, l'uníson.
   const SCALE = (spec.mode === 'major' ? [0, 2, 4, 5, 7, 9, 11] : spec.mode === 'dorian' ? [0, 2, 3, 5, 7, 9, 10] : [0, 2, 3, 5, 7, 8, 10])
@@ -318,6 +321,42 @@ function createPerformance(spec) {
     vel = (vel < 64 ? Math.min(vel, 58) : Math.max(vel, 70)) + Math.round((random() - .5) * 4);
     note(channel, pitch, start, duration, vel, .006, true);
   }
+  // ── Guitarra solista amb línia (riff, resposta o tema) ─────────────
+  // Les notes a temps s'ajusten a l'acord; al tema («lead»), les de contratemps poden ser notes de
+  // pas. Al punk, cada secció tria una manera de tocar: en octaves (estil Green Day), amb dobles
+  // cordes a les notes llargues o nota a nota; les notes llargues del tema i de les respostes
+  // poden entrar amb un «bend» (des d'un to per sota) o un lliscament, i acabar amb vibrato.
+  // A l'última tornada («shout») una segona guitarra la dobla una tercera per sota, a l'altre costat.
+  function playLeadGuitar() {
+    const mode = spec.lineModes?.guitar3, lead = mode === 'lead', dice = rng(((spec.seed >>> 0) || 1) * 29 + spec.chords.length * 3);
+    const style = !punk ? 'single' : (() => { const v = dice(); return v < .35 && mode !== 'answer' ? 'octaves' : v < .7 ? 'doublestops' : 'single'; })();
+    const expressive = punk && (lead || mode === 'answer');
+    const line = spec.lines.guitar3;
+    for (const [index, [nb, t, pitch, duration]] of line.entries()) {
+      const harmony = spec.chords[nb];
+      if (!harmony) continue;
+      let tuned = lead && t % 1 !== 0 ? pitch : nearest(pitch, harmony.pcs, 62, 79);
+      while (tuned > 79) tuned -= 12; while (tuned < 62) tuned += 12;
+      const at = nb * bar + t * beat, length = Math.max(.06, duration * beat * .9), force = t % 1 === 0 ? 96 : 84;
+      const channels = LEAD2 !== null ? [[15, tuned, force], [LEAD2, thirdBelow(tuned, harmony, 52), force - 6]] : [[15, tuned, force]];
+      // Inflexions: es tornen a zero abans de cada nota; un «bend» o un lliscament a les notes llargues.
+      const long = duration >= .75, previous = line[index - 1];
+      const afterRest = !previous || (previous[0] * 4 + previous[1] + previous[3]) < nb * 4 + t - .3;
+      const shape = expressive && long ? (dice() < .4 ? 'bend' : afterRest && dice() < .35 ? 'slide' : null) : null;
+      for (const [channel] of channels) {
+        if (expressive) bend(channel, at - .003, 8192);
+        if (shape === 'bend') for (let k = 0; k <= 5; k++) bend(channel, at + k * Math.min(.14, length * .35) / 5, Math.round(8192 - 8191 * (1 - k / 5)));
+        if (shape === 'slide') for (let k = 0; k <= 3; k++) bend(channel, at + k * .02, Math.round(8192 - 8191 * (1 - k / 3)));
+        // Vibrato a la segona meitat de les notes llargues.
+        if (expressive && duration >= 1.5) for (let k = 0; k < 8; k++) bend(channel, at + length * (.5 + k * .06), Math.round(8192 + Math.sin(k * Math.PI / 2) * 300));
+      }
+      for (const [channel, p, f] of channels) {
+        note(channel, p, at, length, f, .004);
+        if (style === 'octaves') note(channel, p - 12, at, length, f - 8, .004);
+        else if (style === 'doublestops' && long && channel === 15) note(channel, thirdBelow(p, harmony, 50), at, length, f - 10, .004);
+      }
+    }
+  }
   // Rasgueig: la pua recorre les cordes, no sonen totes alhora. A l'ska cada cop té la seva
   // velocitat de pua (3-9 ms entre cordes), les últimes cordes sonen una mica més fluix i
   // de tant en tant el cop va en sentit contrari. Al punk es manté el cop compacte de sempre.
@@ -400,12 +439,7 @@ function createPerformance(spec) {
     // notes de pas que xoquin amb acords prestats o amb les altres guitarres.
     // Manté el contorn rítmic, però resol les altures a notes de l'acord.
     if (has('guitar3') && Array.isArray(spec.lines?.guitar3)) {
-      if (b === 0) for (const [nb, t, pitch, duration] of spec.lines.guitar3) {
-        const harmony = spec.chords[nb];
-        if (!harmony) continue;
-        const tuned = nearest(pitch, harmony.pcs, 62, 79);
-        note(15, tuned, nb * bar + t * beat, Math.max(.06, duration * beat * .9), t % 1 === 0 ? 96 : 84, .004);
-      }
+      if (b === 0) playLeadGuitar();
     } else if (has('guitar3')) {
       // Abans el quart to era una altra octava sobre l'acord i pujava fins
       // a notes extremes. La quarta nota repeteix una veu interior de l'acord.
