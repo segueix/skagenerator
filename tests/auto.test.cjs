@@ -578,3 +578,57 @@ test('punk instrumental: la guitarra solista ocupa entre el 75 i el 90 % dels co
     assert(value >= .74 && value <= .91, `${key} ${seed}: ${(value * 100).toFixed(0)} %`);
   }
 });
+
+test('ska: forma Skatalites, girs de jazz, tema que es desenvolupa i corba d’intensitat', () => {
+  // 1. Forma Skatalites a la majoria de cançons instrumentals: intro, tema, solos, tema i coda.
+  let skatalites = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const song = builder.createAutoSong(engine, 'jamaican', { seed: seed * 41, vocal: false, minutes: 3 });
+    const form = song.sections.map(s => s.type[0]).join('');
+    if (/^ivcs+vco$/.test(form)) {
+      skatalites++;
+      const solos = song.sections.filter(s => s.type === 'solo');
+      assert(solos.every(s => s.groove && (s.groove.drums !== song.settings.groove.drums || s.groove.bass !== song.settings.groove.bass)), 'solos sobre una altra base');
+      assert(song.sections[0].pickup && solos.at(-1).pickup, 'els vents entren abans del temps');
+    }
+  }
+  assert(skatalites >= 5, `forma Skatalites: ${skatalites} de 12`);
+  // 2. Ska jamaicà: les seccions llargues acaben amb ii–V; el solo té acords propis; rocksteady amb i, iv i bVII.
+  const verse = engine.composeSongPart({ seed: 7, style: 'ska', bpm: 120, tonic: 5, mode: 'major', subgenre: 'jamaican' }, { type: 'verse', bars: 8, energy: 60, revision: 1, instruments: ['bass'] });
+  assert.deepEqual(verse.chords.slice(-2).map(c => c.symbol), ['ii7', 'V7']);
+  const solo = engine.composeSongPart({ seed: 7, style: 'ska', bpm: 120, tonic: 5, mode: 'major', subgenre: 'twotone' }, { type: 'solo', bars: 4, energy: 60, revision: 1, instruments: ['bass'] });
+  const twotoneVerse = engine.composeSongPart({ seed: 7, style: 'ska', bpm: 120, tonic: 5, mode: 'major', subgenre: 'twotone' }, { type: 'verse', bars: 4, energy: 60, revision: 1, instruments: ['bass'] });
+  assert.notDeepEqual(solo.chords.map(c => c.symbol), twotoneVerse.chords.map(c => c.symbol), 'el solo no repeteix els acords de l’estrofa');
+  const minor = new Set();
+  for (let rev = 1; rev <= 5; rev++) for (const type of ['verse', 'chorus'])
+    engine.composeSongPart({ seed: 3, style: 'ska', bpm: 104, tonic: 9, mode: 'minor', subgenre: 'rocksteady' }, { type, bars: 4, energy: 60, revision: rev, instruments: ['bass'] }).chords.forEach(c => minor.add(c.symbol));
+  for (const symbol of ['i', 'iv', 'bVII']) assert(minor.has(symbol), `rocksteady: ${symbol}`);
+  // 3. Tema de vent: als compassos 3-4 hi ha la resposta (mateix ritme que els compassos 1-2).
+  const theme = engine.composeSongPart({ seed: 3, style: 'ska', bpm: 160, tonic: 5, mode: 'major', subgenre: 'skaswing' }, { type: 'verse', bars: 8, energy: 60, revision: 2, instruments: ['trumpet'], layers: { trumpet: 3 } }).lines.trumpet;
+  const rhythm = (from, to) => theme.filter(n => n[0] >= from && n[0] < to).map(n => [n[0] - from, n[1], n[3]]);
+  assert.deepEqual(rhythm(2, 4), rhythm(0, 2), 'la segona meitat respon amb el mateix ritme');
+  assert.notDeepEqual(theme.filter(n => n[0] >= 2 && n[0] < 4).map(n => n[2]), theme.filter(n => n[0] < 2).map(n => n[2]), 'però amb altres notes');
+  // 4. Abans de l'última tornada, una baixada (només baix i bateria); l'última tornada, més plena i forta.
+  let drops = 0;
+  for (let seed = 1; seed <= 8; seed++) {
+    const song = builder.createAutoSong(engine, 'twotone', { seed: seed * 13, minutes: 3 });
+    const ordered = [...song.sections].sort((a, b) => a.start - b.start), last = ordered.filter(s => s.type === 'chorus').at(-1), before = ordered[ordered.indexOf(last) - 1];
+    if (before?.exit && Object.keys(before.exit).length) {
+      drops++;
+      assert(!['drums', 'bass', 'vocal'].some(name => name in before.exit), 'el baix, la bateria i la veu continuen');
+    }
+    const others = ordered.filter(s => s.type === 'chorus' && s !== last);
+    assert(others.every(s => (last.energy ?? 0) > (s.energy ?? 0)), 'l’última tornada és la més forta');
+    assert(song.clips.some(c => c.instrument === 'organ' && c.start === last.start) || song.base.instruments.includes('organ'), 'l’última tornada porta orgue');
+  }
+  assert(drops >= 3, `baixades: ${drops} de 8`);
+});
+
+test('ska: els vents entren just abans del temps a la secció marcada amb «pickup»', () => {
+  const spec = engine.composeSongPart({ seed: 5, style: 'ska', bpm: 120, tonic: 7, mode: 'major', subgenre: 'jamaican' }, { type: 'intro', bars: 4, energy: 55, revision: 1, instruments: ['drums', 'bass', 'guitar'], pickup: true });
+  const music = createPerformance(spec), lastBar = 3 * 4 * spec.beat;
+  const horns = music.events.filter(e => e.type === 'on' && [3, 12, 4, 13, 8].includes(e.channel) && e.time >= lastBar + 2.8 * spec.beat);
+  assert(horns.length >= 4, `notes d'entrada: ${horns.length}`);
+  const trumpet = horns.filter(e => [3, 12].includes(e.channel)).map(e => e.note);
+  assert(trumpet.length === 2 && trumpet[1] > trumpet[0], 'dues corxeres que pugen');
+});

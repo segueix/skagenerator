@@ -2003,16 +2003,18 @@
             groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'growly', trombone: 'vsco' }, humanize: .65,
             description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de club de jazz, baix de dits greu, acords de setena i secció de vents fent el tema.',
             harmony: { major: {
-                verse: [['I', 'vi', 'ii7', 'V7'], ['I', 'IV', 'I', 'V7'], ['Imaj7', 'vi7', 'ii7', 'V7'], ['I', 'I7', 'IV', 'iv']],
-                chorus: [['IV', 'V7', 'I', 'vi'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'IV', 'V7', 'IV']],
-                prechorus: [['ii7', 'V7', 'ii7', 'V7']], bridge: [['IV', 'iv', 'I', 'VI7'], ['ii7', 'V7', 'iii7', 'VI7']] } } },
+                verse: [['I', 'vi', 'ii7', 'V7'], ['I', 'IV', 'I', 'V7'], ['Imaj7', 'vi7', 'ii7', 'V7'], ['I', 'I7', 'IV', 'iv'], ['I', 'V7/ii', 'ii7', 'V7'], ['I', 'V7/vi', 'vi7', 'V7/V']],
+                chorus: [['IV', 'V7', 'I', 'vi'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'IV', 'V7', 'IV'], ['I', 'vi7', 'ii7', 'V7'], ['IV', 'V7/ii', 'ii7', 'V7']],
+                prechorus: [['ii7', 'V7', 'ii7', 'V7']], bridge: [['IV', 'iv', 'I', 'VI7'], ['ii7', 'V7', 'iii7', 'VI7']],
+                // Solos sobre una base diferent del tema (com els Skatalites): vamp de ii–V i girs de jazz.
+                solo: [['ii7', 'V7', 'I', 'vi7'], ['iii7', 'VI7', 'ii7', 'V7'], ['I', 'V7/IV', 'IV', 'iv']] } } },
         rocksteady: { name: 'Rocksteady', style: 'ska', bpm: [100, 108], swing: .15, keys: [[9, 'minor'], [2, 'minor'], [7, 'minor'], [0, 'minor'], [0, 'major'], [5, 'major']],
             groove: { drums: [1, 3], bass: [1, 3], guitar: [2] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { trumpet: 'muted', bass: 'finger', drums: 'lofi' }, humanize: .7,
             description: 'Més lent i greu que l’ska: one drop, baix dub en primer pla, orgue de fons i vents amb sordina.',
             harmony: { minor: {
-                verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'iv', 'bVII', 'bIII'], ['i7', 'iv7', 'i7', 'v7']],
-                chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'bVII', 'bIII', 'bVI'], ['i', 'bVI', 'bIII', 'bVII']],
-                bridge: [['iv', 'i', 'bVI', 'V7']] },
+                verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'iv', 'bVII', 'bIII'], ['i7', 'iv7', 'i7', 'v7'], ['i', 'iv', 'bVII', 'i'], ['i', 'bVII', 'iv', 'i']],
+                chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'bVII', 'bIII', 'bVI'], ['i', 'bVI', 'bIII', 'bVII'], ['iv', 'bVII', 'i', 'i'], ['i', 'iv', 'i', 'bVII']],
+                bridge: [['iv', 'i', 'bVI', 'V7']], solo: [['i', 'iv', 'bVII', 'bIII'], ['iv7', 'bVII', 'i7', 'i7']] },
               major: { verse: [['I', 'vi', 'IV', 'V'], ['I', 'iii', 'IV', 'V']], chorus: [['IV', 'I', 'V', 'vi']], bridge: [['vi', 'IV', 'ii', 'V7']] } } },
         twotone: { name: 'Ska 2-tone', style: 'ska', bpm: [132, 156], swing: 0, keys: [[0, 'major'], [7, 'major'], [5, 'major'], [10, 'major'], [9, 'minor'], [2, 'minor'], [7, 'minor']],
             groove: { drums: [0, 4], bass: [0, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar'], timbres: {}, humanize: .5,
@@ -2043,9 +2045,10 @@
             groove: { drums: [0], bass: [0], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'piano'], timbres: { drums: 'jazz', bass: 'finger', trombone: 'vsco' }, humanize: .6, countIn: true,
             description: 'Ska a ritme de swing: balanceig marcat, baix caminant, piano de boogie i tota la secció de vents fent riffs de big band.',
             harmony: { major: {
-                verse: [['I', 'VI7', 'II7', 'V7'], ['I', 'I7', 'IV', 'iv'], ['I', 'IV', 'I', 'V7']],
-                chorus: [['IV', 'IV7', 'I', 'VI7'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'I7', 'IV', 'V7']],
-                prechorus: [['ii7', 'V7', 'ii7', 'V7']], bridge: [['III7', 'VI7', 'II7', 'V7']] },
+                verse: [['I', 'VI7', 'II7', 'V7'], ['I', 'I7', 'IV', 'iv'], ['I', 'IV', 'I', 'V7'], ['I', 'vi7', 'ii7', 'V7'], ['I', 'V7/IV', 'IV', 'V7/V']],
+                chorus: [['IV', 'IV7', 'I', 'VI7'], ['ii7', 'V7', 'I', 'VI7'], ['I', 'I7', 'IV', 'V7'], ['I', 'V7/ii', 'ii7', 'V7']],
+                prechorus: [['ii7', 'V7', 'ii7', 'V7']], bridge: [['III7', 'VI7', 'II7', 'V7']],
+                solo: [['I', 'I7', 'IV', 'IV7'], ['ii7', 'V7', 'iii7', 'VI7'], ['I', 'VI7', 'ii7', 'V7']] },
               minor: { verse: [['i', 'iv', 'i', 'V7'], ['i', 'bVI', 'V7', 'i']], chorus: [['iv', 'i', 'V7', 'i'], ['bVI', 'V7', 'i', 'i']], bridge: [['iv', 'bVII', 'bIII', 'V7']] } } },
         skapunk: { name: 'Ska-punk', style: 'ska', bpm: [160, 180], swing: 0, keys: [[7, 'major'], [0, 'major'], [10, 'major'], [5, 'major'], [3, 'major'], [9, 'minor'], [2, 'minor']],
             groove: { drums: [4, 5], bass: [2, 4], guitar: [3, 4] }, base: ['drums', 'bass', 'guitar'], timbres: { drums: 'real', bass: 'pick' }, humanize: .45, countIn: true,
@@ -2136,7 +2139,8 @@
     function paletteFor(subgenre, mode, type) {
         const pal = SUBGENRES[subgenre]?.harmony[mode] || Object.values(SUBGENRES[subgenre]?.harmony || {})[0];
         if (!pal) return null;
-        const fallback = { intro: 'verse', solo: 'verse', outro: 'chorus', prechorus: 'chorus', bridge: 'verse' };
+        // Els solos van sobre una base diferent de la del tema: sense progressió pròpia, la del pont.
+        const fallback = { intro: 'verse', solo: 'bridge', outro: 'chorus', prechorus: 'chorus', bridge: 'verse' };
         return pal[type] || pal[fallback[type]] || pal.verse;
     }
     // ── Riff de la cançó ────────────────────────────────────────────────
@@ -2569,6 +2573,7 @@
         // Arranjament de vents: cops de secció al final, tornada «shout» i compassos de «stop time».
         if (part.hits !== undefined && typeof part.hits !== 'boolean') throw new Error('Cops de secció no vàlids');
         if (part.shout !== undefined && typeof part.shout !== 'boolean') throw new Error('Tornada shout no vàlida');
+        if (part.pickup !== undefined && typeof part.pickup !== 'boolean') throw new Error('Entrada dels vents no vàlida');
         if (part.stopTime !== undefined && (!Number.isInteger(part.stopTime) || part.stopTime < 1 || part.stopTime > 8)) throw new Error('Stop time no vàlid');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
             || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name)
@@ -2635,6 +2640,12 @@
             const progression = palette[(variation >= 0 ? variation : (part.revision || 1) - 1) % palette.length];
             chords = Array.from({ length: bars }, (_, i) => chordFromSymbol(tonic, progression[i % progression.length]));
             if (part.type === 'outro') chords[bars - 1] = chordFromSymbol(tonic, mode === 'major' ? 'I' : 'i');
+            // Ska jamaicà i ska-swing: les seccions llargues acaben amb un gir ii–V (iv–V en menor)
+            // que porta de nou a la tònica de la secció següent.
+            if (['jamaican', 'skaswing'].includes(settings.subgenre) && bars >= 8 && bars % 4 === 0 && ['verse', 'chorus', 'solo', 'bridge'].includes(part.type)) {
+                chords[bars - 2] = chordFromSymbol(tonic, mode === 'major' ? 'ii7' : 'iv');
+                chords[bars - 1] = chordFromSymbol(tonic, 'V7');
+            }
         } else chords = degrees.map(d => buildChord(tonic, mode, d, { chordBase: 55 }, false));
         const ctx = { chords, scalePcs: SCALES[mode].map(n => (tonic + n) % 12), lo: 64, hi: part.type === 'chorus' ? 84 : 79, center: 72, maxJump: 3 };
         ctx.prev = nearestTone(72, chords[0].pcs, 64, 79);
@@ -2660,22 +2671,63 @@
         // repetir la mateixa frase: A, A' (final obert a la terça o la quinta),
         // B (frase nova de contrast, una mica més aguda) i A'' (final tancat a la
         // fonamental de l'acord). Les notes a temps s'ajusten a l'acord de cada compàs.
-        const develop = (phrase, dr, lctx, rhythmSet) => {
+        // Tema de vent de l'ska («theme»): a cada frase de quatre compassos, els dos últims responen
+        // als dos primers (mateix ritme, contorn al revés i final a la fonamental); la segona frase
+        // repeteix el motiu un grau amunt (seqüència) i el tema B respon al tema A.
+        const answerHalf = (phrase, lo, hi) => {
+            const call = phrase.filter(n => n[0] < 2);
+            if (!call.length || phrase.some(n => n[0] >= 4)) return phrase;
+            // Resposta: el mateix ritme i contorn, dos graus més avall (o més amunt si no hi cap), amb
+            // les notes a temps sobre l'acord i l'última a la fonamental.
+            // Cap on hi ha més espai (avall o amunt): dos graus, o un si l'espai és just.
+            const roomDown = Math.min(...call.map(n => n[2])) - lo, roomUp = hi - Math.max(...call.map(n => n[2]));
+            const down = (roomDown >= roomUp ? -1 : 1) * (Math.max(roomDown, roomUp) >= 4 ? 2 : 1);
+            const reply = call.map(([b, t, p, d], i) => {
+                const chord = chords[Math.min(chords.length - 1, b + 2)];
+                let q = moveByScale(p, down, ctx.scalePcs, chord, lo, hi);
+                if (i === call.length - 1) q = nearestTone(q, [chord.pcs[0]], lo, hi);
+                else if (t % 1 === 0 && !chord.pcs.includes(((q % 12) + 12) % 12)) {
+                    // La nota de l'acord en el sentit de la resposta (si no, tornava a la de la pregunta).
+                    let r = q;
+                    for (let k = 1; k <= 4; k++) { const c = q + Math.sign(down) * k; if (c >= lo && c <= hi && chord.pcs.includes(((c % 12) + 12) % 12)) { r = c; break; } }
+                    q = r === q ? nearestTone(q, chord.pcs, lo, hi) : r;
+                }
+                return [b + 2, t, q, d];
+            });
+            return [...call, ...reply];
+        };
+        const sequenceUp = (block, lo, hi) => block.map(([b, t, p, d]) => {
+            const chord = chords[Math.min(chords.length - 1, b)];
+            let q = moveByScale(p, 1, ctx.scalePcs, chord, lo, hi);
+            // A temps, la nota de l'acord igual o més aguda (si s'ajustava a la més propera, tornava enrere).
+            if (t % 1 === 0 && !chord.pcs.includes(((q % 12) + 12) % 12)) { let up = q; while (up < hi && !chord.pcs.includes(((up % 12) + 12) % 12)) up++; q = chord.pcs.includes(((up % 12) + 12) % 12) ? up : nearestTone(q, chord.pcs, lo, hi); }
+            return [b, t, q, d];
+        });
+        const develop = (phrase, dr, lctx, rhythmSet, theme = false) => {
             const blocks = Math.ceil(bars / 4);
+            if (theme && phrase.length) phrase = answerHalf(phrase, lctx.lo, lctx.hi);
             if (blocks < 2 || !phrase.length) return repeat(phrase);
             const out = [], lo = lctx.lo, hi = lctx.hi, firstEnd = phrase[phrase.length - 1][2] % 12;
             for (let k = 0; k < blocks; k++) {
-                const b0 = k * 4, role = k === 0 ? 'A' : k === blocks - 1 ? 'end' : k % 4 === 2 || blocks === 3 ? 'B' : 'open';
+                const b0 = k * 4;
+                let role = k === 0 ? 'A' : k === blocks - 1 ? 'end' : k % 4 === 2 || blocks === 3 ? 'B' : 'open';
+                // Tema: en una secció de vuit compassos, el tema B respon al tema A (i tanca).
+                if (theme && blocks === 2 && k === 1) role = 'Bend';
                 let block;
-                if (role === 'B') {
+                if (role === 'B' || role === 'Bend') {
                     const own = [0, 1, 2, 3].map(i => b0 + i).filter(b => b < bars);
                     const prev = out.length ? out[out.length - 1][2] : lctx.prev;
                     block = composePhrase(dr, { ...lctx, center: lctx.center + 3, prev }, own, own.map((_, i) => rhythmSet[(i + 1) % rhythmSet.length])).notes;
+                    if (theme) block = answerHalf(block.map(([b, t, p, d]) => [b - b0, t, p, d]), lo, hi).map(([b, t, p, d]) => [b + b0, t, p, d]).filter(n => n[0] < bars);
+                    const last = block[block.length - 1];
+                    if (last && role === 'Bend') last[2] = nearestTone(last[2], [chords[last[0]].pcs[0]], lo, hi);
                 } else {
                     block = phrase.filter(n => n[0] + b0 < bars).map(([b, t, p, d]) => {
                         const chord = chords[b + b0];
                         return [b + b0, t, t % 1 === 0 && !chord.pcs.includes(p % 12) ? nearestTone(p, chord.pcs, lo, hi) : p, d];
                     });
+                    // Tema: la segona frase repeteix el motiu un grau amunt.
+                    if (theme && role === 'open') block = sequenceUp(block, lo, hi);
                     const last = block[block.length - 1];
                     if (last && role !== 'A') {
                         const pcs = chords[last[0]].pcs, open = pcs.slice(1, 3).filter(pc => pc !== firstEnd);
@@ -2723,7 +2775,7 @@
             const lctx = { ...ctx, prev: nearestTone(start, chords[0].pcs, 64, 79) };
             const lrhythms = phraseBars.map(() => rhythmPool[Math.floor(lr() * rhythmPool.length)]);
             if (name === 'synthLead' && lr() < .5) lrhythms[lrhythms.length - 1] = RHYTHMS.r7;
-            return develop(composePhrase(lr, lctx, phraseBars, lrhythms).notes, lr, lctx, lrhythms);
+            return develop(composePhrase(lr, lctx, phraseBars, lrhythms).notes, lr, lctx, lrhythms, settings.style === 'ska' && name !== 'synthLead');
         };
         const saltOf = name => name.split('').reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
         Object.keys(layers).forEach(name => {
@@ -2830,7 +2882,7 @@
             colors: { ...(part.colors || {}) },
             feel: { ...(part.feel || {}) },
             lineModes: { ...(part.lineModes || {}) },
-            ...(part.hits ? { hits: true } : {}), ...(part.shout ? { shout: true } : {}),
+            ...(part.hits ? { hits: true } : {}), ...(part.shout ? { shout: true } : {}), ...(part.pickup ? { pickup: true } : {}),
             ...(part.stopTime ? { stopTime: Math.min(part.stopTime, bars) } : {}) };
     }
     function songPartScore(syn, spec) {
