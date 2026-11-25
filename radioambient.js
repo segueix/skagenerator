@@ -2648,7 +2648,7 @@
             || !Number.isInteger(take.revision) || take.revision < 1 || take.revision > 1000000
             || !Number.isInteger(take.from) || !Number.isInteger(take.to) || take.from < 0 || take.from >= take.to || take.to > bars
             || (take.feel !== undefined && ![.5, 2].includes(take.feel))
-            || (take.sound !== undefined && !['auto', 'clean', 'cleanGm', 'muted', 'overdrive', 'distortion'].includes(take.sound))
+            || (take.sound !== undefined && !['auto', 'clean', 'cleanGm', 'muted', 'overdrive', 'distortion', 'jazz', 'direct', 'dist1', 'dist2'].includes(take.sound))
             || (take.color !== undefined && !Object.hasOwn(COLOR_FX, take.color))))
             throw new Error('Preses de guitarra no vàlides');
         if (part.guitarBase !== undefined && typeof part.guitarBase !== 'boolean') throw new Error('Guitarra base no vàlida');

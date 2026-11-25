@@ -137,11 +137,15 @@
   // (les GM saturades porten la distorsió a la mostra: s'hi afegeix només un boost o res).
   // Probabilitat que la guitarra solista toqui el riff a la intro (punk amb veu).
   const LEAD_INTRO = { eastbay: .35, poppunk: .5, punk77: .55, oi: .45, skatepunk: .6, garage: .6, postpunk: .55, hardcore: .45, horrorpunk: .7 };
-  // To (0-100) més aviat fosc: amb valors alts la solista sonava estrident; el guany, moderat.
-  const PUNK_LEAD_TONES = [
-    { fx: ['overdrive', 72, 50] }, { fx: ['distortion', 60, 50] }, { fx: ['fuzz', 45, 42] }, { fx: ['crunch', 82, 54] },
-    { fx: ['tape', 72, 48] }, { fx: ['boost', 75, 52] }, { fx: ['metal', 35, 46] },
-    { sound: 'overdrive', fx: ['boost', 30, 46] }, { sound: 'distortion', fx: ['boost', 10, 40] }, { sound: 'cleanGm', fx: ['overdrive', 60, 48] }
+  // Cinc guitarres solistes per al punk, totes gravades (FreePats FSBS), cadascuna amb la seva cadena
+  // d'efectes. La ràdio les va alternant d'una cançó a l'altra (opció «leadGuitar»); si no, a l'atzar.
+  // Les distorsionades ja porten el so de l'amplificador: només un boost suau amb el to fosc.
+  const PUNK_LEAD_GUITARS = [
+    { name: 'Distorsionada 1', sound: 'dist1', fx: ['boost', 15, 44] },
+    { name: 'Distorsionada 2', sound: 'dist2', fx: ['boost', 15, 46] },
+    { name: 'Jazz saturada', sound: 'jazz', fx: ['tape', 75, 46] },
+    { name: 'Directa amb overdrive', sound: 'direct', fx: ['overdrive', 65, 48] },
+    { name: 'Neta amb distorsió', sound: 'clean', fx: ['distortion', 58, 48] }
   ];
   function planHighlights(song, key, r, options = {}) {
     const fit0 = FIT[key] || FIT.twotone, sections = song.sections, st = song.settings, excluded = excludedBy(song);
@@ -372,15 +376,16 @@
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
     if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
     // Punk: la segona rítmica no és un calc de la primera (una mica més o menys de guany i de to),
-    // i la solista té un so propi, diferent del de les rítmiques (l'horror punk manté el so Misfits).
+    // i la solista és una de les cinc guitarres solistes (l'horror punk manté el so Misfits).
     let leadSound = null;
     if (punk && fx && key !== 'horrorpunk') {
       const nudge = (n, d) => Math.max(0, Math.min(100, n + Math.round((r() - .5) * 2 * d)));
       settings.fx.guitar2 = { ...fx, drive: nudge(fx.drive, 12), tone: nudge(fx.tone, 10) };
-      const tones = PUNK_LEAD_TONES.filter(t => t.fx[0] !== fx.type);
-      const lead = pick(tones);
-      settings.fx.guitar3 = { type: lead.fx[0], drive: nudge(lead.fx[1], 6), tone: nudge(lead.fx[2], 6) };
-      leadSound = lead.sound || null;
+      const chosenLead = Number.isInteger(options.leadGuitar) ? ((options.leadGuitar % PUNK_LEAD_GUITARS.length) + PUNK_LEAD_GUITARS.length) % PUNK_LEAD_GUITARS.length : null;
+      const lead = pick(PUNK_LEAD_GUITARS); // (es tira igualment: la resta de la cançó no canvia)
+      const guitar = chosenLead === null ? lead : PUNK_LEAD_GUITARS[chosenLead];
+      settings.fx.guitar3 = { type: guitar.fx[0], drive: nudge(guitar.fx[1], 6), tone: nudge(guitar.fx[2], 6) };
+      leadSound = guitar.sound;
     }
     // El baix manté el paper melòdic amb marge perquè destaquin la veu i els vents.
     balanceProminentBass(settings);
@@ -1123,5 +1128,5 @@
     }
     return best.song;
   }
-  return { createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { PUNK_LEAD_GUITARS, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

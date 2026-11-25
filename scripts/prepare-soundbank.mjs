@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BasicSoundBank, SoundBankLoader, SpessaLog } from 'spessasynth_core';
-import { buildRealInstruments } from './real-instruments.mjs';
+import { buildGuitarInstruments, buildRealInstruments } from './real-instruments.mjs';
 import { buildExtraInstruments, loadBank } from './extra-instruments.mjs';
 import extra from '../extra-instruments.json' with { type: 'json' };
 import real from '../real-instruments.json' with { type: 'json' };
@@ -48,8 +48,14 @@ export async function prepareSoundBank() {
   await writeFile('dist/assets/extra-instruments.sf2', extraBinary);
   info.extra = { bytes: extraBinary.byteLength, sha256: createHash('sha256').update(extraBinary).digest('hex'),
     presets: loadBank(Buffer.from(extraBinary)).presets.map(({ name, program, bankMSB, isGMGSDrum }) => ({ name, program, bank: bankMSB, drums: isGMGSDrum })) };
+  // Guitarres solistes gravades: un altre fitxer a part, només per a les cançons que les fan servir.
+  const guitarBinary = await buildGuitarInstruments(structuredClone(real.guitars || []));
+  if (guitarBinary.byteLength >= 20 * 1024 * 1024) throw new Error('El banc de guitarres supera el límit');
+  await writeFile('dist/assets/guitar-instruments.sf2', guitarBinary);
+  info.guitars = { bytes: guitarBinary.byteLength, sha256: createHash('sha256').update(guitarBinary).digest('hex'),
+    presets: loadBank(Buffer.from(guitarBinary)).presets.map(({ name, program, bankMSB }) => ({ name, program, bank: bankMSB })) };
   await writeFile('dist/assets/soundbank.json', JSON.stringify(info, null, 2));
-  console.log(`Mostres preparades: ${(subset.byteLength / 1024 / 1024).toFixed(1)} MB, ${merged.presets.length} instruments i kits; banc addicional ${(extraBinary.byteLength / 1024 / 1024).toFixed(1)} MB.`);
+  console.log(`Mostres preparades: ${(subset.byteLength / 1024 / 1024).toFixed(1)} MB, ${merged.presets.length} instruments i kits; banc addicional ${(extraBinary.byteLength / 1024 / 1024).toFixed(1)} MB; guitarres ${(guitarBinary.byteLength / 1024 / 1024).toFixed(1)} MB.`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) await prepareSoundBank();
