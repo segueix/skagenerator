@@ -180,6 +180,7 @@
     // El contrabaix Meatbass ja no existeix: les cançons que el feien servir passen al Jazz Bass gravat.
     for (const owner of [st, ...(Array.isArray(value.sections) ? value.sections : [])]) if (owner?.timbres?.bass === 'upright') owner.timbres.bass = 'growly';
     if (st.batucadaPattern !== undefined && !engine.validBatucadaPattern(st.batucadaPattern)) fail('Patró de batucada no vàlid');
+    if (st.batucadaRhythm !== undefined && !Object.hasOwn(engine.BATUCADA_RHYTHMS, st.batucadaRhythm)) fail('Ritme de batucada no vàlid');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
     st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
@@ -1199,6 +1200,8 @@
     song.clips = kept;
     if (removed) notify('Els instruments que ara formen part de la base ja sonen a totes les seccions.');
   }
+  // Patró de batucada actual: l'editat a mà o el del ritme triat.
+  const batucadaPattern = () => song.settings.batucadaPattern ?? (engine.BATUCADA_RHYTHMS[song.settings.batucadaRhythm] || engine.BATUCADA_RHYTHMS.samba).steps;
   function updateSettingsUI() {
     const st = song.settings, profile = STYLES[st.style];
     $('song-title').value = song.title; $('song-style').value = st.style;
@@ -1216,8 +1219,11 @@
       fillSelect($(`groove-${family}`), engine.SONG_GROOVES[st.style][family].map((name, index) => [String(index), name]), String(st.groove[family]));
     $('groove-guitar-field').hidden = !song.base.instruments.includes('guitar');
     for (const family of timbreFamilies) $(`timbre-${family}`).value = st.timbres[family];
-    $('batucada-editor').hidden = st.timbres.drums !== 'batucada';
-    const pattern = st.batucadaPattern ?? engine.BATUCADA.map(piece => piece.steps);
+    // L'editor apareix si la batucada sona a tota la cançó o només en alguna secció.
+    $('batucada-editor').hidden = st.timbres.drums !== 'batucada' && !song.sections.some(sec => sec.timbres?.drums === 'batucada');
+    $('batucada-rhythm').value = st.batucadaRhythm || 'samba';
+    $('batucada-rhythm').disabled = $('batucada-generate').disabled = $('batucada-reset').disabled = busy;
+    const pattern = batucadaPattern();
     for (const box of $('batucada-steps').querySelectorAll('input')) {
       box.checked = pattern[Number(box.dataset.row)][Number(box.dataset.step)] === '1';
       box.disabled = busy;
@@ -1260,10 +1266,11 @@
     } else if (id.startsWith('groove-')) st.groove = { ...st.groove, [id.slice(7)]: Number(event.target.value) };
     else if (id.startsWith('bat-step-')) {
       const row = Number(event.target.dataset.row), step = Number(event.target.dataset.step);
-      const pattern = [...(st.batucadaPattern ?? engine.BATUCADA.map(piece => piece.steps))];
+      const pattern = [...batucadaPattern()];
       pattern[row] = pattern[row].slice(0, step) + (event.target.checked ? '1' : '0') + pattern[row].slice(step + 1);
       st.batucadaPattern = pattern;
     }
+    else if (id === 'batucada-rhythm') { st.batucadaRhythm = event.target.value; delete st.batucadaPattern; }
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
     else if (id === 'song-subgenre') {
       const key = event.target.value, sg = engine.SUBGENRES[key];
@@ -1294,7 +1301,7 @@
       if (type.startsWith('horrorpunk')) notify(st.style === 'punk' ? 'Horror punk: acords de quinta a cops avall, apagats a l’estrofa i oberts a la tornada, amb dues guitarres a banda i banda.'
         : 'Horror punk activat. Per sonar com els Misfits, prova l’estil Punk a 160–200 BPM.');
     }
-    const replay = id.startsWith('bat-step-') || id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
+    const replay = id.startsWith('bat-step-') || id === 'batucada-rhythm' || id.startsWith('groove-') || id.startsWith('timbre-') || ['song-guitar-fx', 'song-subgenre', 'song-swing', 'song-cymbals', 'song-drum-tune', 'song-humanize', 'song-count-in'].includes(id) ? playing?.kind : null;
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   }
@@ -2260,6 +2267,18 @@
     stepGrid.append(line);
   });
   stepGrid.addEventListener('change', changeSettings);
+  fillSelect($('batucada-rhythm'), Object.entries(engine.BATUCADA_RHYTHMS).map(([key, rhythm]) => [key, rhythm.name]), 'samba');
+  $('batucada-rhythm').addEventListener('change', changeSettings);
+  // Genera una variació del ritme triat (o el restableix) i, si sonava, la torna a fer sonar.
+  const setBatucada = pattern => {
+    const st = song.settings, replay = playing?.kind;
+    if (pattern) st.batucadaPattern = pattern; else delete st.batucadaPattern;
+    stop(); save(); updateSettingsUI(); render();
+    if (replay) play(replay);
+  };
+  $('batucada-generate').addEventListener('click', () =>
+    setBatucada(engine.generateBatucadaPattern(song.settings.batucadaRhythm || 'samba', Math.floor(Math.random() * 2 ** 31) + 1)));
+  $('batucada-reset').addEventListener('click', () => setBatucada(null));
   $('song-humanize').addEventListener('input', event => { const v = Number(event.target.value); $('song-humanize-value').textContent = v ? `${v} %` : 'quantitzat'; });
   $('song-swing').addEventListener('input', event => { $('song-swing-value').textContent = `${event.target.value} %`; });
   for (const name of ['drums', 'bass']) {
@@ -2325,7 +2344,7 @@
   $('section-type').addEventListener('change', event => changeSection('type', event.target.value));
   function changeSectionValue(apply) {
     const sec = current(); if (!sec || busy) return;
-    apply(sec); const replay = playing?.kind; stop(); save(); render();
+    apply(sec); const replay = playing?.kind; stop(); save(); updateSettingsUI(); render();
     if (replay === 'song' || replay === 'section') play(replay);
   }
   $('section-ending').addEventListener('change', event => changeSectionValue(sec => {
