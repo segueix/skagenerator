@@ -100,34 +100,27 @@
      ]
     },
     "78": {
-     "seconds": 0.185,
-     "layers": [
-      [
-       [
-        "cuica.wav",
-        1
-       ]
-      ]
-     ]
+     "seconds": 0.39,
+     "layers": [[["cuica.wav", 1]]]
     },
     "79": {
-     "seconds": 0.13,
+     "seconds": 0.23,
      "layers": [[["cuica-aguda.wav", 1]]]
     },
     "80": {
-     "seconds": 0.25,
+     "seconds": 0.21,
      "layers": [[["cuica-greu.wav", 1]]]
     },
     "81": {
-     "seconds": 0.17,
-     "layers": [[["cuica-trencada.wav", 1]]]
+     "seconds": 0.07,
+     "layers": [[["cuica-curta.wav", 1]]]
     },
     "82": {
-     "seconds": 0.21,
-     "layers": [[["cuica-robotica.wav", 1]]]
+     "seconds": 0.19,
+     "layers": [[["cuica-mitjana.wav", 1]]]
     },
     "83": {
-     "seconds": 0.18,
+     "seconds": 0.3,
      "layers": [[["cuica-glissando.wav", 1]]]
     }
    }

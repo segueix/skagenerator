@@ -1927,11 +1927,11 @@
     // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
     const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .56, 78: .82, [BATUCADA_WHISTLE.note]: .66,
         79: .8, 80: .84, 81: .78, 82: .78, 83: .8 };
-    // Cuíca amb distorsions: la gravació original (78) i cinc variants (aguda, greu, trencada,
-    // robòtica i glissando) que s'encadenen cop a cop. Cada cadena porta una frase pròpia de cuíca.
-    const CUICA_VARIANTS = { 78: 'Original', 79: 'Aguda', 80: 'Greu', 81: 'Trencada', 82: 'Robòtica', 83: 'Glissando' };
-    const CUICA_CHAINS = [[78, 79, 80, 83], [80, 81, 79, 82], [79, 83, 80, 81, 82], [83, 82, 81, 80], [78, 81, 78, 82, 79, 83]];
-    const CUICA_PHRASES = ['0011000100110001', '0101000001010001', '0010011000100110', '0001000100010011', '0011001100010001'];
+    // Sis cops enregistrats. Les cinc frases segueixen entrades de la demostració, quantitzades a 16 passos.
+    const CUICA_VARIANTS = { 78: 'Oberta', 79: 'Aguda', 80: 'Greu', 81: 'Curta', 82: 'Mitjana', 83: 'Glissando' };
+    const CUICA_CHAINS = [[82, 82, 80, 82, 80, 82, 82, 79, 80], [79, 82, 80, 79, 82, 80, 79, 82, 80, 79],
+        [78, 82, 80, 83, 82, 80, 79, 82, 80, 82, 79], [82, 82, 80, 82, 80, 79, 80], [78, 81, 81, 81, 81, 81, 81, 81, 83]];
+    const CUICA_PHRASES = ['1001100110011101', '0101110101011101', '0101110111011101', '1001100010011100', '1011101110111011'];
     // «Convenções»: figures que toca tota la batucada alhora, molt junta.
     const BATUCADA_TUTTI = ['1001001000101000', '1000100010101010', '1011010010110100', '1001001001001010', '1010001010100010', '1110111011100000'];
     // Opcions de batucada d'una secció: moment clau (puja molt), xiulet del mestre, convenção de tots i cadena de cuíca.
@@ -2011,7 +2011,7 @@
         const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, extra, true));
         // Paradinha (poca energia): sense repique, tamborim ni cuíca; la caixa continua.
         const plays = row => !(quiet && [4, 5, 8].includes(row));
-        const hits = (row, i, step) => row[step] === '1' || i === 8 && phrase && phrase[step] === '1';
+        const hits = (row, i, step) => (i === 8 && phrase ? phrase : row)[step] === '1';
         const groove = (bar, to = 16) => {
             for (let step = 0; step < to; step++) rows.forEach((row, i) => { if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, !!fx.tutti); });
         };
