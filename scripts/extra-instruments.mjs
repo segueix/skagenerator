@@ -1,4 +1,4 @@
-// Banc addicional de bateries i baixos gravats (tot CC0). Es publica en un fitxer
+// Banc addicional de bateries i baixos gravats i percussió pròpia. Es publica en un fitxer
 // a part (assets/extra-instruments.sf2) i la web només el baixa quan una cançó
 // fa servir algun d'aquests sons: el banc principal no creix.
 // - Big Rusty Drums (Karoryfer): bombo de 24" i toms grans, so greu i rodó.
@@ -16,7 +16,7 @@ const sha = data => createHash('sha256').update(data).digest('hex');
 let flac;
 async function decode(path) {
   const data = await readFile(path);
-  if (!path.toLowerCase().endsWith('.flac')) return readWav(data);
+  if (!(path instanceof URL ? path.pathname : path).toLowerCase().endsWith('.flac')) return readWav(data);
   if (!flac) { const { FLACDecoder } = await import('@wasm-audio-decoders/flac'); flac = new FLACDecoder(); await flac.ready; }
   await flac.reset();
   const { channelData, sampleRate } = await flac.decodeFile(new Uint8Array(data));
@@ -25,8 +25,9 @@ async function decode(path) {
   return { data: mono, rate: sampleRate };
 }
 const url = (base, file) => base + file.split('/').map(encodeURIComponent).join('/');
-async function load(base, file, rate) {
-  const wav = await decode(await download(url(base, file)));
+async function load(base, file, rate, localDirectory) {
+  const path = localDirectory ? new URL(localDirectory + file, import.meta.url) : await download(url(base, file));
+  const wav = await decode(path);
   return resample(wav.data, wav.rate, rate);
 }
 
@@ -71,7 +72,7 @@ async function buildKit(bank, kit, log) {
     for (const layer of piece.layers) {
       const id = JSON.stringify(layer) + piece.seconds;
       const parts = [];
-      for (const [file, gain] of layer) parts.push([await load(kit.base, file, RATE), gain]);
+      for (const [file, gain] of layer) parts.push([await load(kit.base, file, RATE, kit.localDirectory), gain]);
       const length = Math.max(...parts.map(([a]) => a.length)), data = new Float32Array(length);
       for (const [a, gain] of parts) for (let i = 0; i < a.length; i++) data[i] += a[i] * gain;
       const out = trim(data, RATE, piece.seconds);
@@ -129,7 +130,12 @@ export async function buildExtraInstruments(config, log = console.log) {
   SpessaLog.setLogLevel(false, false, false);
   await mkdir(CACHE, { recursive: true });
   const fingerprint = sha(JSON.stringify(config) + JSON.stringify(ROUND_ROBIN) + await readFile(new URL(import.meta.url)));
-  const cached = join(CACHE, `extra-${fingerprint.slice(0, 16)}.sf2`);
+  const localFiles = new Set(config.kits.filter(kit => kit.localDirectory).flatMap(kit =>
+    Object.values(withAlternates(kit.pieces)).flatMap(piece =>
+      piece.layers.flatMap(layer => layer.map(([file]) => kit.localDirectory + file)))));
+  const localHashes = await Promise.all([...localFiles].map(async file =>
+    sha(await readFile(new URL(file, import.meta.url)))));
+  const cached = join(CACHE, `extra-${sha(fingerprint + localHashes.join('')).slice(0, 16)}.sf2`);
   try { return new Uint8Array(await readFile(cached)); } catch { /* Es construeix. */ }
   const bank = new BasicSoundBank();
   bank.soundBankInfo.name = 'Ska Generator extra drums, basses and piano';

@@ -23,7 +23,7 @@ function createPerformance(spec) {
     // Guitarres gravades de FreePats (FSBS): neta, jazz, directa (sense amplificador) i dues distorsionades.
     guitar: { auto: null, clean: [2, 27], cleanGm: [0, 27], muted: [0, 28], overdrive: [0, 29], distortion: [0, 30], jazz: [2, 26], direct: [2, 28], dist1: [2, 29], dist2: [2, 30] },
     bass: { auto: null, finger: [2, 33], pick: [2, 34], growly: [4, 33], fingerGm: [0, 33], pickGm: [0, 34] },
-    drums: { auto: null, real: [0, 69], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
+    drums: { auto: null, real: [0, 69], surdo3: [0, 70], rusty: [0, 68], club: [0, 66], lofi: [0, 67], standard: [0, 0], rock: [0, 16], electronic: [0, 24], jazz: [0, 32], room: [0, 8], brush: [0, 40] },
     trumpet: { auto: null, gm: [0, 56], bright: [1, 56], muted: [0, 59] },
     // La segona veu de vent és un trombó gravat (VSCO), com a les seccions de vent de ska
     // (trompeta, trombó i saxo tenor). El saxo tenor gravat queda com a opció ('sax').
