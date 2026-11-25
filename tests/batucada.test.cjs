@@ -174,12 +174,33 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     // Hi ha seccions amb un altre ritme (els surdos 1 i 2 d'un altre ritme).
     assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
     assert(secs[0].batucada?.whistle && secs.at(-1).batucada?.peak && secs[1].batucada?.peak);
-    assert(secs.filter(sec => sec.batucada?.peak).every(sec => sec.volumes?.master === 3));
+    // Els moments clau (entrada, última tornada i final) pugen també el volum general.
+    assert(secs.filter(sec => sec.volumes).every(sec => sec.batucada?.peak && sec.volumes.master === 3));
+    assert(secs[1].volumes && secs.at(-1).volumes);
+    // La cuíca sempre toca les frases enregistrades (menys a les convenções i a la paradinha).
+    assert(secs.filter(sec => !sec.batucada?.tutti && sec.energy >= 45).every(sec => sec.batucada?.cuica !== undefined), `cuíca (${seed})`);
+    // Cançons enèrgiques: poques seccions fluixes i energia mitjana alta.
+    const average = secs.reduce((t, sec) => t + sec.energy * sec.bars, 0) / song.settings.bars;
+    assert(average >= 84, `energia mitjana ${average}`);
+    assert(secs.filter(sec => sec.energy < 60).length <= 1);
     assert(secs.filter(sec => sec.ending).every(sec => sec.batucada?.whistle));
     if (secs.some(sec => sec.batucada?.tutti)) { compact++; assert(song.settings.humanize < .2); }
     if (secs.some(sec => sec.batucada?.cuica !== undefined)) chains++;
     for (const sec of secs) assert(engine.validBatucadaFx(sec.batucada));
   }
   assert(compact >= 8 && compact <= 35, `cançons compactes: ${compact}`);
-  assert(chains >= 25, `cançons amb cadena de cuíca: ${chains}`);
+  assert.equal(chains, 60, 'totes les cançons amb la cuíca nova');
+});
+
+test('a molta energia la batucada s\'encén: caixa en semicorxeres, xocalho continu i virada del repique', () => {
+  const line = engine.composeSongPart(settings, { ...part, bars: 4, energy: 92 }).batucadaLine;
+  for (let bar = 0; bar < 4; bar++) {
+    const steps = note => new Set(line.filter(h => h[0] === bar && h[2] === note).map(h => h[1] * 4));
+    assert.equal(steps(38).size, 16, 'caixa');
+    assert.equal(steps(69).size, 16, 'xocalho');
+  }
+  assert.deepEqual(line.filter(h => h[0] === 3 && h[2] === 50 && h[1] >= 3).map(h => h[1]), [3, 3.25, 3.5, 3.75], 'virada');
+  // A energia mitjana, el patró tal qual.
+  const calm = engine.composeSongPart(settings, { ...part, bars: 1, energy: 75 }).batucadaLine;
+  assert(calm.filter(h => h[2] === 38).length < 16);
 });

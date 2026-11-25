@@ -1976,11 +1976,13 @@
         let previousWhistle;
         const closing = type === 'outro' ? part.closing || 'hit' : null, fading = closing === 'fade';
         const quiet = energy < 45;
+        // A molta energia la batucada s'encén: caixa en semicorxeres, xocalho continu i viradas del repique.
+        const fire = energy >= 85 && !fx.tutti;
         // Dinàmica: quan l'energia baixa, el volum baixa poc (no sona artificial);
         // als moments clau (fx.peak) la batucada puja molt.
-        const level = 84 + (energy - 70) * .12 + (fx.peak ? 14 : 0) + (fx.tutti ? 6 : 0);
+        const level = 88 + (energy - 70) * .15 + (fx.peak ? 14 : 0) + (fx.tutti ? 6 : 0);
         const force = (pitch, step, extra = 0) => {
-            const accent = step % 4 === 0 ? 12 : step % 2 === 0 ? 3 : -6;
+            const accent = step % 4 === 0 ? 15 : step % 2 === 0 ? 3 : -7;
             return Math.max(20, Math.min(127, Math.round((level + accent + extra) * BATUCADA_GAIN[pitch])));
         };
         // Cadena de cuíca: cada cop de cuíca fa servir la variant següent de la cadena.
@@ -2013,7 +2015,17 @@
         const plays = row => !(quiet && [4, 5, 8].includes(row));
         const hits = (row, i, step) => (i === 8 && phrase ? phrase : row)[step] === '1';
         const groove = (bar, to = 16) => {
-            for (let step = 0; step < to; step++) rows.forEach((row, i) => { if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, !!fx.tutti); });
+            // Virada: cada quatre compassos el repique omple l'últim temps (si no ve una crida).
+            const virada = fire && bar % 4 === 3 && to === 16 ? 12 : 16;
+            for (let step = 0; step < to; step++) {
+                rows.forEach((row, i) => {
+                    if (i === 4 && step >= virada) return;
+                    if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, !!fx.tutti);
+                    // Foc: la caixa omple les semicorxeres buides amb cops fluixos i el xocalho no para.
+                    else if (fire && (i === 3 || i === 7)) add(bar, step, i, i === 3 ? -24 : -10);
+                });
+                if (step >= virada) add(bar, step, 4, (step - 12) * 5 + 4);
+            }
         };
         // Crida (chamada) del repique abans de la secció següent: el repique i la caixa omplen l'últim temps.
         // Amb xiulet: un xiulet llarg i dos de curts avisen del canvi.
