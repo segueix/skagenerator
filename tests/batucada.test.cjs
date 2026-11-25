@@ -100,7 +100,9 @@ test('ràdio Batucada: cançons només de batucada amb el tempo i la forma de ca
       const spec = engine.composeSongPart(st, part);
       assert(spec.batucadaLine.length > 0);
       const perf = createPerformance(spec);
-      assert(perf.events.filter(e => e.type === 'on').every(e => e.channel === 9));
+      // Només sona la batucada: el canal 9 i els canals dels altres músics, tots amb el kit de batucada.
+      const drums = new Set(perf.channels.filter(c => c.drums && c.program === 71).map(c => c.channel));
+      assert(perf.events.filter(e => e.type === 'on').every(e => drums.has(e.channel)));
     });
     assert.deepEqual(builder.createBatucadaSong(engine, { seed }), song, 'reproduïble');
   }
@@ -174,12 +176,61 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     // Hi ha seccions amb un altre ritme (els surdos 1 i 2 d'un altre ritme).
     assert(secs.some(sec => rhythmOf(sec).length && !rhythmOf(sec).includes(song.settings.batucadaRhythm)) || secs.length < 8, `canvi de ritme (${seed})`);
     assert(secs[0].batucada?.whistle && secs.at(-1).batucada?.peak && secs[1].batucada?.peak);
-    assert(secs.filter(sec => sec.batucada?.peak).every(sec => sec.volumes?.master === 3));
+    // Els moments clau (entrada, última tornada i final) pugen també el volum general.
+    assert(secs.filter(sec => sec.volumes).every(sec => sec.batucada?.peak && sec.volumes.master === 3));
+    assert(secs[1].volumes && secs.at(-1).volumes);
+    // La cuíca només sona als seus arranjaments (solos de cuíca): la de la graella no toca enlloc.
+    assert([song.settings.batucadaPattern, ...secs.map(sec => sec.batucadaPattern).filter(Boolean)].every(p => p[8] === '0'.repeat(16)), `cuíca (${seed})`);
+    assert(secs.filter(sec => sec.batucada?.cuica !== undefined).every(sec => sec.type === 'solo'));
+    assert([2, 3].includes(song.settings.batucadaBand));
+    // Cançons enèrgiques: poques seccions fluixes i energia mitjana alta.
+    const average = secs.reduce((t, sec) => t + sec.energy * sec.bars, 0) / song.settings.bars;
+    assert(average >= 84, `energia mitjana ${average}`);
+    assert(secs.filter(sec => sec.energy < 60).length <= 1);
     assert(secs.filter(sec => sec.ending).every(sec => sec.batucada?.whistle));
     if (secs.some(sec => sec.batucada?.tutti)) { compact++; assert(song.settings.humanize < .2); }
     if (secs.some(sec => sec.batucada?.cuica !== undefined)) chains++;
     for (const sec of secs) assert(engine.validBatucadaFx(sec.batucada));
   }
   assert(compact >= 8 && compact <= 35, `cançons compactes: ${compact}`);
-  assert(chains >= 25, `cançons amb cadena de cuíca: ${chains}`);
+  assert(chains >= 50, `cançons amb solo de cuíca: ${chains}`);
+});
+
+test('a molta energia la batucada s\'encén: caixa en semicorxeres, xocalho continu i virada del repique', () => {
+  const line = engine.composeSongPart(settings, { ...part, bars: 4, energy: 92 }).batucadaLine;
+  for (let bar = 0; bar < 4; bar++) {
+    const steps = note => new Set(line.filter(h => h[0] === bar && h[2] === note).map(h => h[1] * 4));
+    assert.equal(steps(38).size, 16, 'caixa');
+    assert.equal(steps(69).size, 16, 'xocalho');
+  }
+  assert.deepEqual(line.filter(h => h[0] === 3 && h[2] === 50 && h[1] >= 3).map(h => h[1]), [3, 3.25, 3.5, 3.75], 'virada');
+  // A energia mitjana, el patró tal qual.
+  const calm = engine.composeSongPart(settings, { ...part, bars: 1, energy: 75 }).batucadaLine;
+  assert(calm.filter(h => h[2] === 38).length < 16);
+});
+
+test('banda: les peces es doblen o tripliquen, cada músic al seu canal, i poden fer contraritmes', () => {
+  const compose = (band, fx) => engine.composeSongPart({ ...settings, batucadaBand: band }, { ...part, bars: 1, energy: 75, ...(fx ? { batucada: fx } : {}) });
+  const solo = compose(1).batucadaLine, trio = compose(3).batucadaLine;
+  const count = (line, note, player) => line.filter(h => h[2] === note && (h[6] || 0) === player).length;
+  for (const note of [36, 41, 45, 38, 54, 69]) for (const player of [0, 1, 2]) assert.equal(count(trio, note, player), count(solo, note, 0), `${note}/${player}`);
+  for (const note of [50, 67]) assert.equal(count(trio, note, 1) + count(trio, note, 2), 0, `${note} d'un sol músic`);
+  // Cada músic té canal propi, obert a una banda i desafinat uns cents; un pèl a destemps.
+  const perf = createPerformance({ ...compose(3), humanize: 0 });
+  const seats = perf.channels.filter(c => c.drums && c.program === 71 && c.channel !== 9);
+  assert.equal(seats.length, 2);
+  assert(seats[0].pan < 64 && seats[1].pan > 64 && seats.every(c => c.tuneFine));
+  const first = channel => perf.events.find(e => e.type === 'on' && e.channel === channel && e.note === 36).time;
+  assert(first(seats[0].channel) > first(9) && first(seats[1].channel) < first(9));
+  // Contraritme: el segon músic de caixa, tamborim i surdo 3 fa una altra figura.
+  const counter = compose(3, { counter: 1 }).batucadaLine;
+  const steps = (line, note, player) => line.filter(h => h[2] === note && (h[6] || 0) === player).map(h => h[1]).join();
+  for (const note of [45, 38, 54]) {
+    assert.notEqual(steps(counter, note, 1), steps(counter, note, 0), `${note}`);
+    assert.equal(steps(counter, note, 2), steps(counter, note, 0));
+  }
+  // A les convenções no hi ha contraritme: tots junts.
+  const tutti = compose(3, { counter: 1, tutti: '1001001000101000' }).batucadaLine;
+  assert(tutti.every(h => h[1] * 4 % 1 === 0 && '1001001000101000'[h[1] * 4] === '1'));
+  assert.throws(() => compose(4));
 });

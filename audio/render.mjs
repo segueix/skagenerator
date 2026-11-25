@@ -258,6 +258,8 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       synth.programChange(patch.channel, patch.program);
       // Bateria més greu: s'afina cada peça del kit (paràmetres de bateria GS/XG).
       if (patch.drums && patch.tune) for (const param of synth.midiChannels[patch.channel].drumParams) param.pitchCoarse = patch.tune;
+      // Músics de la batucada: cada un amb l'afinació una mica diferent (cents).
+      if (patch.drums && patch.tuneFine) for (const param of synth.midiChannels[patch.channel].drumParams) param.pitchFine = patch.tuneFine;
       synth.controllerChange(patch.channel, 7, patch.volume);
       synth.controllerChange(patch.channel, 10, patch.pan);
       // L'enviament a la reverberació segueix el volum de l'instrument.
@@ -268,7 +270,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       synth.controllerChange(patch.channel, 93, 0);
     }
     // El xiulet sosté la nota fins al Note Off, que la percussió ignora per defecte.
-    const sustainedDrums = new Set((spec.batucadaLine || []).filter(hit => hit.length === 5).map(hit => hit[2]));
+    const sustainedDrums = new Set((spec.batucadaLine || []).filter(hit => hit[4] != null).map(hit => hit[2]));
     for (const pitch of sustainedDrums) synth.midiChannels[9].drumParams[pitch].rxNoteOff = true;
     const body = Math.round(score.seconds * sampleRate), tail = Math.round(TAIL_SECONDS * sampleRate);
     const length = body + tail, left = new Float32Array(length), right = new Float32Array(length);
