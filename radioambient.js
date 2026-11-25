@@ -1946,7 +1946,8 @@
         });
     }
     function composeBatucada(settings, part, bars, energy, stopAt, beat) {
-        const rows = batucadaRows(settings);
+        // Cada secció pot portar el seu patró (variació, solo...); si no, el de la cançó.
+        const rows = part.batucadaPattern ?? batucadaRows(settings);
         if (!validBatucadaPattern(rows)) throw new Error('Patró de batucada no vàlid');
         const line = [], type = part.type, ending = part.ending || 'fill';
         const closing = type === 'outro' ? part.closing || 'hit' : null, fading = closing === 'fade';

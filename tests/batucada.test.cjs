@@ -67,3 +67,43 @@ test('la batucada segueix la cançó: energia, crida del repique, aturades i fin
   assert.equal(engine.composeSongPart({ ...settings, timbres: {} }, part).batucadaLine, undefined);
   assert(engine.composeSongPart({ ...settings, timbres: {} }, { ...part, timbres: { drums: 'batucada' } }).batucadaLine.length);
 });
+
+const builder = require('../song-builder.js');
+test('ràdio Batucada: cançons només de batucada amb el tempo i la forma de cada ritme', () => {
+  const rhythms = new Set();
+  for (let seed = 1; seed <= 40; seed++) {
+    const song = builder.createBatucadaSong(engine, { seed });
+    const st = song.settings, range = builder.BATUCADA_STYLES[st.batucadaRhythm].bpm;
+    rhythms.add(st.batucadaRhythm);
+    assert(builder.isBatucadaSong(song));
+    assert.deepEqual(song.base.instruments, ['drums']);
+    assert.equal(song.clips.length, 0);
+    assert.equal(st.timbres.drums, 'batucada');
+    assert(st.bpm >= range[0] && st.bpm <= range[1], `${st.batucadaRhythm} a ${st.bpm} BPM`);
+    assert(engine.validBatucadaPattern(st.batucadaPattern));
+    // Seccions seguides, sense buits, de la crida inicial al cop final.
+    let at = 0;
+    for (const sec of song.sections) { assert.equal(sec.start, at); at += sec.bars; }
+    assert.equal(at, st.bars);
+    assert(st.bars <= 256 && st.bars * 240 / st.bpm <= 300 && st.bars * 240 / st.bpm >= 90, `${st.bars} compassos`);
+    assert.equal(song.sections[0].type, 'intro');
+    assert.equal(song.sections.at(-1).type, 'outro');
+    assert(song.sections.some(s => s.ending === 'break' || s.ending === 'stop'), 'hi ha alguna breca');
+    assert(song.sections.some(s => s.batucadaPattern), 'hi ha variacions');
+    // Cada secció es pot compondre i només sona la batucada.
+    song.sections.forEach((sec, i) => {
+      const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: 1, instruments: ['drums'], timbres: {},
+        next: song.sections[i + 1]?.type ?? 'end', ...(sec.ending ? { ending: sec.ending } : {}), ...(sec.closing ? { closing: sec.closing } : {}),
+        ...(sec.batucadaPattern ? { batucadaPattern: sec.batucadaPattern } : {}), ...(sec.bpm ? { bpm: sec.bpm } : {}), ...(i === 0 ? { countIn: true } : {}) };
+      const spec = engine.composeSongPart(st, part);
+      assert(spec.batucadaLine.length > 0);
+      const perf = createPerformance(spec);
+      assert(perf.events.filter(e => e.type === 'on').every(e => e.channel === 9));
+    });
+    assert.deepEqual(builder.createBatucadaSong(engine, { seed }), song, 'reproduïble');
+  }
+  assert.deepEqual([...rhythms].sort(), ['ijexa', 'reggae', 'samba']);
+  // No repeteix el ritme de la cançó anterior si no se n'hi demana un.
+  for (let seed = 1; seed <= 20; seed++) assert.notEqual(builder.createBatucadaSong(engine, { seed, avoidRhythm: 'samba' }).settings.batucadaRhythm, 'samba');
+  assert.equal(builder.createBatucadaSong(engine, { seed: 3, rhythm: 'ijexa' }).settings.batucadaRhythm, 'ijexa');
+});
