@@ -29,8 +29,8 @@ test('cada fila de batucada sona només a la nota i al pas escollits', () => {
 test('tabal: mostra llarga per a negres, curta per a cops seguits i patrons antics sense canvis', () => {
   const row = engine.BATUCADA.findIndex(p => p.name === 'Tabal');
   assert.equal(row, 10);
-  assert.equal(kit.pieces[84].layers[0][0][0], 'tabal-negra.opus');
-  assert.equal(kit.pieces[85].layers[0][0][0], 'tabal-corxera.opus');
+  assert.equal(kit.pieces[84].layers[0][0][0], 'tabal-negra.wav');
+  assert.equal(kit.pieces[85].layers[0][0][0], 'tabal-corxera.wav');
   assert.equal(kit.pieces[84].choke, kit.pieces[85].choke);
   const legacy = Array(10).fill('0'.repeat(16));
   const play = pattern => engine.composeSongPart({ ...settings, batucadaPattern: pattern }, { ...part, bars: 1 });
@@ -43,8 +43,8 @@ test('tabal: mostra llarga per a negres, curta per a cops seguits i patrons anti
 test('bombo: cop al centre a l\'inici de cada temps i al marge a la resta', () => {
   const row = engine.BATUCADA.findIndex(p => p.name === 'Bombo');
   assert.equal(row, 11);
-  assert.equal(kit.pieces[86].layers[0][0][0], 'bombo-cop-central.opus');
-  assert.equal(kit.pieces[87].layers[0][0][0], 'bombo-cop-marge.opus');
+  assert.equal(kit.pieces[86].layers[0][0][0], 'bombo-cop-central.wav');
+  assert.equal(kit.pieces[87].layers[0][0][0], 'bombo-cop-marge.wav');
   assert.equal(kit.pieces[86].choke, kit.pieces[87].choke);
   assert.notEqual(kit.pieces[86].choke, kit.pieces[84].choke);
   const empty = Array(11).fill('0'.repeat(16));

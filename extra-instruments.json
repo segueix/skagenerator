@@ -6,10 +6,10 @@
    "program": 71,
    "localDirectory": "../audio/samples/",
    "pieces": {
-    "84": {"seconds": 0.5, "choke": 4, "layers": [[["tabal-negra.opus", 1]]]},
-    "85": {"seconds": 0.245, "choke": 4, "layers": [[["tabal-corxera.opus", 1]]]},
-    "86": {"seconds": 0.64, "choke": 5, "layers": [[["bombo-cop-central.opus", 1]]]},
-    "87": {"seconds": 0.28, "choke": 5, "layers": [[["bombo-cop-marge.opus", 1]]]},
+    "84": {"seconds": 0.5, "choke": 4, "layers": [[["tabal-negra.wav", 1]]]},
+    "85": {"seconds": 0.245, "choke": 4, "layers": [[["tabal-corxera.wav", 1]]]},
+    "86": {"seconds": 0.64, "choke": 5, "layers": [[["bombo-cop-central.wav", 1]]]},
+    "87": {"seconds": 0.28, "choke": 5, "layers": [[["bombo-cop-marge.wav", 1]]]},
     "71": {
      "seconds": 0.24,
      "loopSamples": [3104, 7396],
