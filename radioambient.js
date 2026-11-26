@@ -1997,6 +1997,15 @@
     // el repique, l'agogô, la cuíca i el xiulet són d'un sol músic.
     const BATUCADA_BAND = [1, 2, 3], BATUCADA_DOUBLED = new Set([0, 1, 2, 3, 5, 7]), BATUCADA_COUNTER = [2, 3, 5];
 
+    // Frase de la cançó («que es pugui picar de mans»): el tabal toca una figura curta tres compassos seguits i, al
+    // quart, la mateixa primera meitat amb un final diferent (A A A B). Abans de la tornada, el repique recupera
+    // aquell final per anunciar-la. Cada cançó de la ràdio en tria una: li dona identitat.
+    const BATUCADA_MOTIFS = ['1000101000101000', '1001001000100000', '1000100100100000', '1010001000100010', '1001001001000100', '1000101001001000'];
+    const BATUCADA_ENDINGS = ['10101010', '10110100', '11011000', '10101101', '10010110'];
+    function validBatucadaMotif(motif) {
+        return motif === undefined || !!motif && typeof motif === 'object' && !Array.isArray(motif) && Object.keys(motif).length === 2
+            && /^[01]{16}$/.test(motif.figure) && /^[01]{8}$/.test(motif.ending) && motif.figure.includes('1') && motif.ending.includes('1');
+    }
     // Quin instrument de la graella (fila de BATUCADA) toca cada nota del kit: cops apagats, campana greu,
     // variants de la cuíca i articulacions del tabal i del bombo compten com el seu instrument.
     const BATUCADA_NOTE_ROWS = Object.fromEntries([
@@ -2088,15 +2097,29 @@
         // La graella té una sola fila de tabal. Si el proper cop cau abans d'una negra,
         // es fa servir la mostra curta original (també en semicorxeres); si no, la llarga.
         // (Als cops de tots, la figura que toquen tots junts: figure.)
-        const tabalNote = (bar, step, figure = rows[TABAL_ROW]) => {
+        // Frase de la cançó al tabal (si el tabal toca al patró i no és una convenção): A A A B, per frases de quatre compassos.
+        if (!validBatucadaMotif(settings.batucadaMotif)) throw new Error('Frase de batucada no vàlida');
+        const motif = settings.batucadaMotif && !fx.tutti && pattern[TABAL_ROW]?.includes('1') ? settings.batucadaMotif : null;
+        const motifBar = bar => bar % 4 === 3 ? motif.figure.slice(0, 8) + motif.ending : motif.figure;
+        const tabalFigure = bar => motif ? motifBar(bar) : rows[TABAL_ROW];
+        const tabalNote = (bar, step, figure = null) => {
             for (let gap = 1; gap < 4; gap++) {
                 const next = step + gap;
                 if (next >= 16 && bar + 1 >= bars) break;
                 if ((bar * 4 + next / 4) * beat >= stopAt) break;
-                if (figure?.[next % 16] === '1') return TABAL_CORXERA;
+                const shape = figure ?? tabalFigure(next >= 16 ? bar + 1 : bar);
+                if (shape?.[next % 16] === '1') return TABAL_CORXERA;
             }
             return TABAL_NEGRA;
         };
+        // Bombo: el centre (greu i llarg) resol i el marge (sec) pregunta. Centre als dos temps forts de cada compàs
+        // de 2/4 (passos 0 i 8) i marge a la resta; a l'últim compàs de cada frase de quatre, tot al marge (pregunta),
+        // i el primer temps de la frase següent, al centre i més fort (resolució). Abans de cada represa (crida i breca),
+        // dos cops curts de marge que la colla resol al primer temps amb el centre.
+        const bomboNote = (bar, step) => step % 8 === 0 && !(bar % 4 === 3 && step > 0) ? BOMBO_CENTRAL : BOMBO_MARGE;
+        const bomboPlays = pattern[BOMBO_ROW]?.includes('1');
+        let pickupBar = -1;
+        const pickup = bar => { if (bomboPlays) { add(bar, 13, BOMBO_ROW, -2, true, everyone, BOMBO_MARGE); add(bar, 14, BOMBO_ROW, 4, true, everyone, BOMBO_MARGE); } };
         // Tabal i bombo als cops de tots (aturades, final i convenções), si toquen al patró.
         const extraRows = [TABAL_ROW, BOMBO_ROW].filter(row => pattern[row]?.includes('1'));
         const add = (bar, step, row, extra = 0, tight = false, players = everyone, note = undefined) => {
@@ -2106,7 +2129,7 @@
             // L'agogô alterna les dues campanes segons el ritme.
             const pitch = note ?? (row === 8 && chain ? chain[cuicaIndex++ % chain.length]
                 : row === 6 && style.agogo[step] === 'g' ? AGOGO_LOW : row === TABAL_ROW ? tabalNote(bar, step)
-                : row === BOMBO_ROW ? (step % 4 === 0 ? BOMBO_CENTRAL : BOMBO_MARGE) : BATUCADA[row].note);
+                : row === BOMBO_ROW ? bomboNote(bar, step) : BATUCADA[row].note);
             const velocity = force(pitch, step, extra);
             const hit = [bar, step / 4, pitch, velocity];
             // Els altres músics: una mica més fluixos, cadascun amb el seu temps.
@@ -2146,7 +2169,7 @@
             : bar < Math.floor((bars - 2) / 2) ? bar % 2 : bar % 3;
         // Paradinha (poca energia): sense repique, tamborim ni cuíca; la caixa continua.
         const plays = row => !(quiet && [4, 5, 8].includes(row));
-        const hits = (row, i, step) => (i === 8 && phrase ? phrase : row)[step] === '1';
+        const hits = (row, i, step, bar) => (i === 8 && phrase ? phrase : i === TABAL_ROW && motif ? motifBar(bar) : row)[step] === '1';
         const groove = (bar, to = 16) => {
             // Virada: cada quatre compassos el repique omple l'últim temps (si no ve una crida).
             const virada = fire && bar % 4 === 3 && to === 16 ? 12 : 16;
@@ -2163,11 +2186,15 @@
                     // Amb contraritme, el segon músic fa la seva figura i la resta, la del patró.
                     if (counter?.[i]) {
                         if (counter[i][step] === '1' && plays(i)) add(bar, step, i, -4, false, [1]);
-                        if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, false, everyone.filter(p => p !== 1));
+                        if (hits(row, i, step, bar) && plays(i)) add(bar, step, i, 0, false, everyone.filter(p => p !== 1));
                         else if (fire && i === 3) add(bar, step, i, -24, false, everyone.filter(p => p !== 1));
                         return;
                     }
-                    if (hits(row, i, step) && plays(i)) add(bar, step, i, 0, !!fx.tutti);
+                    // (Abans d'una represa, el bombo deixa l'últim temps per als dos cops de marge.)
+                    if (i === BOMBO_ROW && bar === pickupBar && step >= 12) return;
+                    // Resolució: el primer temps de cada frase, el centre del bombo més fort; la frase del tabal, ben present.
+                    const lift = i === BOMBO_ROW && step === 0 && bar % 4 === 0 ? 10 : i === TABAL_ROW && motif ? 6 : 0;
+                    if (hits(row, i, step, bar) && plays(i)) add(bar, step, i, lift, !!fx.tutti);
                     // Foc: la caixa omple les semicorxeres buides amb cops fluixos i el xocalho no para.
                     else if (fire && (i === 3 || i === 7)) add(bar, step, i, i === 3 ? -24 : -10);
                 });
@@ -2185,11 +2212,24 @@
         };
         // Crida (chamada) del repique abans de la secció següent: el repique i la caixa omplen l'últim temps.
         // Amb xiulet: un xiulet llarg i dos de curts avisen del canvi.
+        // Amb frase de cançó, abans de la tornada el repique toca sol el final de la frase (la segona meitat del
+        // compàs B) i la resta li deixa espai: la caixa manté el moviment amb cops fluixos i els surdos, el pols.
         const call = bar => {
             if (fx.whistle) { blow(bar, 0, beat * .9, 6); blow(bar, 8, .1); blow(bar, 10, .1); }
+            if (motif && part.next === 'chorus') {
+                groove(bar, 8);
+                for (let step = 8; step < 16; step++) {
+                    if (motif.ending[step - 8] === '1') add(bar, step, 4, 8 + (step - 8) * 2, true);
+                    if (plays(3)) add(bar, step, 3, -22);
+                    if (rows[0][step] === '1') add(bar, step, 0, 0); if (rows[1][step] === '1') add(bar, step, 1, 0);
+                }
+                pickup(bar);
+                return;
+            }
             groove(bar, 12);
             for (let step = 12; step < 16; step++) { add(bar, step, 4, (step - 12) * 6, true); add(bar, step, 3, (step - 12) * 5, true); }
             add(bar, 12, 0, 8, true); add(bar, 12, 1, 8, true);
+            pickup(bar);
         };
         const breque = !fading && type !== 'outro' && bars > 1 && (ending === 'break' || ending === 'stop');
         // Entrada de timbal (Percudium): un sol surdo i el xiulet del mestre; el surdo creix fins a un redoble
@@ -2213,9 +2253,10 @@
                 return;
             }
             // (El cop final, el més fort de tots, també per sobre dels accents dels cops que creixen.)
+            // (El bombo pregunta amb el marge als quatre cops que creixen i resol amb el centre al cop final.)
             [0, 2, 4, 6].forEach((step, k) => [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row =>
-                add(bar, step, row, k * 3, true, everyone, row === TABAL_ROW ? TABAL_CORXERA : undefined)));
-            [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row => add(bar, 8, row, 24, true, everyone, row === TABAL_ROW ? TABAL_NEGRA : undefined));
+                add(bar, step, row, k * 3, true, everyone, row === TABAL_ROW ? TABAL_CORXERA : row === BOMBO_ROW ? BOMBO_MARGE : undefined)));
+            [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row => add(bar, 8, row, 24, true, everyone, row === TABAL_ROW ? TABAL_NEGRA : row === BOMBO_ROW ? BOMBO_CENTRAL : undefined));
         };
         // Entrada de caixa o repique (Percudium): un sol músic fa un ritme i, alhora, el mestre xiula dos
         // xiulets curts i un de llarg; l'últim compàs creix i, a la secció següent, entren tots.
@@ -2253,6 +2294,7 @@
             if (intoNext || (type === 'outro' && !fading && bar === bars - 2)) { call(bar); continue; }
             // Abans d'una breca, el xiulet avisa (tres cops curts).
             if (fx.whistle && breque && bar === bars - 2) [8, 10, 12].forEach(step => blow(bar, step, .09, 4));
+            if (breque && bar === bars - 2) { pickupBar = bar; groove(bar); pickup(bar); continue; }
             groove(bar);
         }
         return line;
@@ -3420,7 +3462,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
