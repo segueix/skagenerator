@@ -241,7 +241,10 @@
       .sort((a, b) => LAYER_ORDER.indexOf(a) - LAYER_ORDER.indexOf(b));
     const drums = base.find(name => name === 'drums' || name === 'electronicDrums');
     const riffer = punk ? 'guitar3' : 'trumpet', voice = options.vocal ?? song.clips.some(c => c.instrument === 'vocal');
-    const openingRiff = punk ? [riffer] : SKA_OPENING_WINDS;
+    // Ska instrumental amb protagonisme repartit (seccions amb «leads»): la intro és la del pla i, si comença
+    // amb el riff, el fan el saxo i el trombó (cap cançó no comença amb la trompeta de protagonista).
+    const planned = !punk && sections.some(sec => Array.isArray(sec.leads));
+    const openingRiff = punk ? [riffer] : planned ? ['sax', 'trombone'] : SKA_OPENING_WINDS;
     // Només sonen els instruments triats. La bateria no calla del tot: entra a l'últim compàs amb
     // un redoble, perquè el pas a la secció següent no sigui brusc.
     const only = (sec, keep) => {
@@ -263,7 +266,7 @@
         revision: options.revisions?.[instrument] || 1, generated: true, edge: true, ...extra });
       return true;
     };
-    if (!punk) for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
+    if (!punk && !planned) for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
     const outro = last.type === 'outro';
     const openings = {
       band: () => true,
@@ -314,6 +317,8 @@
       return Object.keys(table)[0];
     };
     if (!punk) for (const name of SOLO_OPENINGS) delete openings[name];
+    // (Amb el protagonisme repartit, la intro ja la decideix el pla: el riff obligat silenciaria qui porta la melodia.)
+    if (planned) delete openings.riff;
     const opening = choose(openings, options.opening, previous.opening);
     const closing = choose(closings, options.closing, previous.closing);
     // Silenci al mig: la secció que porta a una tornada (preferiblement l'última) acaba
@@ -579,52 +584,77 @@
     if (punk && !vocal && settings.guitars === 1) settings.guitars = 2;
     const excluded = excludedBy({ settings });
     const add = (sec, instrument, extra = {}) => {
-      // Cada instrument, una sola vegada per secció (la primera capa és la que mana).
-      if (layersOf.some(layer => layer.sec === sec && layer.instrument === instrument)) return;
+      // Cada instrument, una sola vegada per secció (la primera capa és la que mana). Un tram (offset i length)
+      // que continua el mateix paper just on acaba l'anterior l'allarga.
+      const same = layersOf.find(layer => layer.sec === sec && layer.instrument === instrument);
+      if (same) {
+        if (extra.offset !== undefined && same.line === extra.line && (same.offset ?? 0) + (same.length ?? sec.bars) === extra.offset) same.length = (same.length ?? sec.bars) + (extra.length ?? sec.bars - extra.offset);
+        return;
+      }
       if (!base.includes(instrument) && !excluded.has(instrument)) layersOf.push({ sec, instrument, ...extra });
     };
     let verses = 0;
-    // Ska instrumental (com els Skatalites): un vent toca el tema A a les estrofes i un altre el
-    // tema B a les tornades, amb riffs i respostes dels altres vents; els solos s'alternen i, si
-    // són llargs, dos solistes s'hi intercanvien la meitat.
-    // (Només es fan tirades a l'atzar si és instrumental: les cançons amb veu no canvien.)
-    const headA = !instrumental ? null : mellow ? 'trumpet' : key === 'nutty' ? 'sax' : pick(['sax', 'trumpet']);
-    const headB = mellow ? 'trumpet' : headA === 'sax' ? 'trumpet' : 'sax';
-    const soloists = instrumental ? pick([['sax', 'trumpet', 'trombone'], ['trumpet', 'sax', 'trombone'], ['trombone', 'sax', 'trumpet']]) : [];
-    let solos = 0;
-    const instrumentalSka = sec => {
-      if (sec.type === 'intro' || sec.type === 'outro') {
-        add(sec, 'trumpet', { line: 'riff' });
-        if (sec.type === 'outro') add(sec, headA);
-        add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' });
-      }
-      if (sec.type === 'verse') {
-        verses++;
-        add(sec, headA);
-        if (key !== 'nutty') add(sec, 'organ', { revision: 2 });
-        if (verses > 1) add(sec, 'trombone', { line: 'answer' });
-      }
-      if (sec.type === 'prechorus') { add(sec, headA); add(sec, 'trombone', { line: 'answer' }); }
-      if (sec.type === 'chorus') {
-        add(sec, headB);
-        if (!mellow) add(sec, headB === 'sax' ? 'trumpet' : 'sax', { line: 'riff' });
-        if (mellow || sec === lastChorus) add(sec, 'trombone', { line: 'riff' });
-        if (key === 'nutty' || sec === lastChorus) add(sec, 'organ', { revision: 1 });
-        if (key === 'skapunk') add(sec, 'guitar2', { fx: { type: 'distortion', drive: 65, tone: 55 }, revision: 2 });
-      }
-      if (sec.type === 'solo') {
-        const first = soloists[solos % soloists.length], second = soloists[(solos + 1) % soloists.length];
-        solos++;
-        add(sec, first);
-        // Solo llarg: a la meitat entra el segon solista i el primer calla.
-        if (sec.bars >= 16) { add(sec, second); const half = sec.bars / 2; sec.exit = { ...(sec.exit || {}), [first]: half }; sec.entrance = { ...(sec.entrance || {}), [second]: half }; }
-        add(sec, 'organ', { revision: 2 });
-      }
-      if (sec.type === 'bridge') {
-        if (key === 'rocksteady') add(sec, 'synthPad', { revision: 1 });
-        add(sec, 'trombone');
-        add(sec, headA, { line: 'answer' });
-        if (key === 'skapunk') add(sec, 'guitar3', { revision: 4, fx: { type: 'crunch', drive: 40, tone: 50 } });
+    // Ska instrumental: el protagonisme es reparteix per blocs (vegeu planInstrumentalSka) i cada bloc es
+    // realitza amb els instruments, les línies i l'acompanyament que li toquen. (Atzar propi: amb veu, res no canvia.)
+    const leadPlan = instrumental ? planInstrumentalSka({ sections, key, base, r: rng((seed ^ 0x51ed270b) >>> 0), roles, lastChorus }) : [];
+    const instrumentalSka = () => {
+      const play = rng((seed ^ 0x2f8a1c3d) >>> 0), pickOf = list => list[Math.floor(play() * list.length)];
+      const textures = ['harmony', 'unison', 'counter'].sort(() => play() - .5);
+      let sections3 = 0, firstLead = true;
+      const themeCount = {}, themeShift = Math.floor(play() * 3);
+      const volume = (sec, name, db) => { sec.volumes = { ...(sec.volumes || {}), [name]: Math.max(sec.volumes?.[name] ?? 0, db) }; };
+      // Línia d'un instrument de la base (orgue, piano o baix) per a tota la secció.
+      const baseLine = (sec, name, mode) => { sec.lines = { ...(sec.lines || {}), [name]: mode }; };
+      for (const unit of leadPlan) {
+        const { sec, kind, offset, bars, role } = unit, span = { offset, length: bars };
+        sec.leads = [...(sec.leads || []), [offset, bars, role]];
+        if (role === 'rhythm') continue;
+        const mode = kind === 'solo' ? 'lead' : kind === 'theme' ? 'theme' : 'riff';
+        if (mode === 'theme') {
+          const n = themeCount[sec.type] = (themeCount[sec.type] ?? -1) + 1;
+          if (n > 0 && sec.themeVariant === undefined) sec.themeVariant = 1 + (n - 1 + themeShift) % 3;
+        }
+        const winds = ['trumpet', 'sax', 'trombone'];
+        // Diàleg: un vent que no porta la melodia respon amb frases breus als seus silencis.
+        const answer = (leader, chance) => {
+          if (mode === 'riff' || play() >= chance) return;
+          const who = pickOf(winds.filter(name => name !== leader && !(firstLead && name === 'trumpet')));
+          if (who) add(sec, who, { line: 'answer', ...span });
+        };
+        if (role === 'section') {
+          // Secció de vents: a l'uníson, harmonitzada a veus o amb contrapunt (el trombó). Al primer bloc, sense trompeta.
+          const texture = sec === lastChorus || kind === 'riff' || kind === 'outro' ? 'harmony' : textures[sections3++ % textures.length];
+          const players = firstLead ? ['sax', 'trombone'] : texture === 'unison' && play() < .5 ? pickOf([['trumpet', 'sax'], ['sax', 'trombone']]) : winds;
+          if (texture === 'counter' && mode !== 'riff') {
+            const top = firstLead ? 'sax' : pickOf(['trumpet', 'sax']);
+            add(sec, top, { line: mode, ...span }); add(sec, 'trombone', { line: 'counter', ...span });
+          } else {
+            for (const name of players) add(sec, name, { line: mode, ...span });
+            if (mode === 'theme') sec.texture = texture === 'unison' ? 'unison' : 'harmony';
+          }
+        } else if (winds.includes(role)) {
+          add(sec, role, { line: mode, ...span });
+          answer(role, kind === 'theme' ? .5 : 0);
+        } else if (role === 'keys') {
+          const name = unit.keys;
+          if (base.includes(name)) baseLine(sec, name, mode); else add(sec, name, { line: mode, ...span });
+          volume(sec, name, 3);
+          // L'orgue deixa el «bubble» per fer la melodia: el contratemps el mantenen la guitarra i, si no hi és, el piano.
+          if (name === 'organ' && !base.includes('piano') && play() < .6) add(sec, 'piano', { revision: 1, ...span });
+          if (name === 'piano' && !base.includes('organ')) add(sec, 'organ', { revision: 2, ...span });
+          answer(null, .75);
+        } else if (role === 'guitar') {
+          add(sec, 'guitar3', { line: mode, ...span });
+          volume(sec, 'guitar3', 3);
+          if (!base.includes('organ') && play() < .5) add(sec, 'organ', { revision: 2, ...span });
+          answer(null, .6);
+        } else if (role === 'bass') {
+          baseLine(sec, 'bass', mode);
+          volume(sec, 'bass', 6);
+          // El baix canta i l'orgue (si hi és) li respon; si no, un vent.
+          if (base.includes('organ') && play() < .6) baseLine(sec, 'organ', 'answer'); else answer(null, .5);
+        }
+        firstLead = false;
       }
     };
     // Punk instrumental (a l'estil del surf punk i dels instrumentals de garatge): la guitarra solista
@@ -649,7 +679,9 @@
       }
       if (sec.type === 'outro') { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
     };
+    if (instrumental) instrumentalSka();
     for (const sec of sections) {
+      if (instrumental) break;
       // Amb lletra, canten les seccions que en tenen; sense, les estrofes, pretornades i tornades.
       const sing = sheet.length ? !!sec.lyrics : vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
       const role = roles.get(sec);
@@ -665,8 +697,7 @@
         continue;
       }
       if (sing) add(sec, 'vocal', register ? { register } : {});
-      if (instrumental) instrumentalSka(sec);
-      else if (instrumentalPunk) instrumentalPunkSection(sec);
+      if (instrumentalPunk) instrumentalPunkSection(sec);
       else if (!punk) {
         if (sec.type === 'intro' || sec.type === 'outro') { add(sec, 'trumpet', { line: 'riff' }); add(sec, 'trombone', { line: 'riff' }); if (!mellow || sec.type === 'intro') add(sec, 'sax', { line: 'riff' }); }
         // Nutty: el piano ja omple l'estrofa i hi respon el saxo; l'orgue entra a la tornada.
@@ -712,7 +743,7 @@
       }
     }
     // També les formes que comencen directament per estrofa o tornada obren amb el duet.
-    if (!punk) for (const instrument of SKA_OPENING_WINDS) {
+    if (!punk && !instrumental) for (const instrument of SKA_OPENING_WINDS) {
       if (!layersOf.some(layer => layer.sec === sections[0] && layer.instrument === instrument)) add(sections[0], instrument, { line: 'riff' });
     }
     // ── Millor versió de cada línia pròpia (la mateixa per a seccions iguals) ──
@@ -725,6 +756,10 @@
       // La melodia de veu segueix la lletra de la secció (síl·labes, tòniques i versos repetits).
       if (layers.vocal !== undefined && sec.lyrics) { const info = engine.analyzeLyrics(sec.lyrics, settings.lang); if (info.syllables.length) Object.assign(part, info); }
       if (sec.phraseBars) part.phraseBars = sec.phraseBars;
+      // Ska instrumental: línies dels instruments de la base, textura dels vents i variació del tema.
+      if (sec.lines) part.lineModes = { ...sec.lines };
+      if (sec.texture) part.texture = sec.texture;
+      if (sec.themeVariant) part.themeVariant = sec.themeVariant;
       return part;
     };
     // ── Harmonia: es proven diverses combinacions i es queda la que dona més forma a la cançó ──
@@ -782,7 +817,7 @@
           for (let rev = 1; rev <= 30; rev++) {
             if (rev === avoid) continue;
             const part = partFor(layer.sec, { ...layers, [layer.instrument]: rev }, layer);
-            if (Object.keys(lineModes).length) part.lineModes = lineModes;
+            if (Object.keys(lineModes).length) part.lineModes = { ...(part.lineModes || {}), ...lineModes };
             const spec = engine.composeSongPart(settings, part), line = spec.lines[layer.instrument];
             const others = Object.entries(spec.lines).filter(([name]) => name !== layer.instrument).map(([, l]) => l);
             let score = lineScore(line, { chords: spec.chords, others });
@@ -794,7 +829,7 @@
         }
       }
       revisions[i] = revision;
-      const clip = { id: `${id}-c${i + 1}`, instrument: layer.instrument, start: layer.sec.start, bars: layer.sec.bars, revision: revision || 1, generated: true };
+      const clip = { id: `${id}-c${i + 1}`, instrument: layer.instrument, start: layer.sec.start + (layer.offset || 0), bars: layer.length ?? layer.sec.bars, revision: revision || 1, generated: true };
       for (const field of ['line', 'fx', 'register', 'feel']) if (layer[field] !== undefined) clip[field] = layer[field];
       clips.push(clip);
     });
@@ -848,7 +883,8 @@
     // compassos a l'inici de les estrofes (només la base, com un «riddim»), a la primera meitat del
     // pont, etc. Es calcula amb la cançó ja acabada (inici i final inclosos, que també poden fer
     // callar el tema). Atzar propi: la resta de la cançó no canvia.
-    if (instrumental || instrumentalPunk) {
+    // (L'ska instrumental ja reparteix el protagonisme amb els seus passatges rítmics: vegeu planInstrumentalSka.)
+    if (instrumentalPunk) {
       const breathe = rng((seed ^ 0x3c6ef372) >>> 0), target = .75 + breathe() * .15;
       const THEME = punk ? ['guitar3'] : ['trumpet', 'trombone', 'sax'];
       const inside = (c, sec) => c.start < sec.start + sec.bars && sec.start < c.start + c.bars;
@@ -978,6 +1014,109 @@
   }
   // Forma Skatalites: intro, tema A (estrofa) i B (tornada), d'un a tres solos, tema i coda.
   // Es tria la combinació de llargades que s'acosta més a la durada demanada.
+
+  // ── Ska instrumental: qui porta la melodia a cada moment ────────────
+  // Com una banda de ska jamaicà, la melodia passa d'un músic a l'altre per frases senceres (blocs de 4, 8 o
+  // 16 compassos, que coincideixen amb les seccions o amb les seves meitats). Repartiment de referència:
+  // secció de vents 30 %, saxo 15 %, trombó 10 %, trompeta 10 %, orgue o piano 15 %, guitarra 10 %, baix 5 %
+  // i passatges només rítmics 5 %. Els vents en porten entre el 50 i el 80 % segons la cançó (uns 65 % de mitjana).
+  const LEAD_SHARE = { section: 30, sax: 15, trombone: 10, trumpet: 10, keys: 15, guitar: 10, bass: 5, rhythm: 5 };
+  const WIND_ROLES = ['section', 'sax', 'trombone', 'trumpet'];
+  const LEAD_ROLES = Object.keys(LEAD_SHARE);
+  function windShareOf(leads) {
+    let wind = 0, total = 0;
+    for (const [, bars, role] of leads) { total += bars; if (WIND_ROLES.includes(role)) wind += bars; }
+    return total ? wind / total : 0;
+  }
+  function planInstrumentalSka({ sections, key, base, r, roles, lastChorus }) {
+    const ordered = [...sections].sort((a, b) => a.start - b.start), total = ordered.reduce((t, s) => t + s.bars, 0);
+    // Pes dels vents d'aquesta cançó, més sovint al voltant de 0,6: amb els blocs que sempre són de la secció
+    // (última tornada, interludis de riff), el resultat queda entre el 50 i el 80 %, amb una mitjana d'uns 65 %.
+    const wind = .44 + .32 * ((r() + r() + r()) / 3);
+    const target = Object.fromEntries(LEAD_ROLES.map(role => [role, total * (WIND_ROLES.includes(role) ? wind * LEAD_SHARE[role] / 65 : (1 - wind) * LEAD_SHARE[role] / 35)]));
+    const kindOf = sec => roles.get(sec) === 'riff' ? 'riff' : sec.type === 'intro' ? 'intro' : sec.type === 'outro' ? 'outro'
+      : sec.type === 'solo' || sec.type === 'bridge' ? 'solo' : 'theme';
+    // Orgue o piano: el que hi ha a la base (o el del subgènere); si hi són tots dos, s'alternen.
+    const keysPool = ['organ', 'piano'].filter(name => base.includes(name));
+    if (!keysPool.length) keysPool.push(['jamaican', 'rocksteady', 'bossreggae'].includes(key) ? 'organ' : ['nutty', 'skaswing'].includes(key) ? 'piano' : r() < .5 ? 'organ' : 'piano');
+    let keysTurn = Math.floor(r() * keysPool.length);
+    // Blocs: cada secció, o les seves dues meitats si és llarga (el protagonisme canvia a mitja secció, en una frase).
+    const units = [];
+    for (const sec of ordered) {
+      const kind = kindOf(sec);
+      if (sec.bars >= 16 && (kind === 'theme' || kind === 'solo') && sec !== lastChorus && r() < .5) {
+        const half = sec.bars / 2;
+        units.push({ sec, kind, offset: 0, bars: half, split: true }, { sec, kind, offset: half, bars: half, split: true });
+      } else units.push({ sec, kind, offset: 0, bars: sec.bars });
+    }
+    const assigned = Object.fromEntries(LEAD_ROLES.map(role => [role, 0]));
+    const allowed = (unit, first) => {
+      let list = unit.kind === 'intro' ? ['rhythm', 'keys', 'guitar', 'bass', 'section', 'sax', 'trombone']
+        : unit.kind === 'riff' ? ['section'] : unit.kind === 'outro' ? ['section', 'keys', 'guitar', 'sax', 'trombone']
+          : unit.kind === 'solo' ? ['sax', 'trombone', 'trumpet', 'keys', 'guitar', 'bass']
+            : unit.sec === lastChorus ? ['section'] : ['section', 'sax', 'trombone', 'trumpet', 'keys', 'guitar', ...(unit.sec.type === 'verse' ? ['bass'] : [])];
+      // Cap cançó no comença amb la trompeta de protagonista.
+      if (first) list = list.filter(role => role !== 'trumpet');
+      // Un instrument de la base (baix, i l'orgue o el piano si en formen part) porta la melodia de tota la secció.
+      if (unit.offset > 0 || unit.bars < unit.sec.bars) list = list.filter(role => role !== 'bass' && !(role === 'keys' && base.includes(keysPool[keysTurn % keysPool.length])));
+      return list.length ? list : ['section'];
+    };
+    const plan = [];
+    let previous = null, started = false;
+    for (let i = 0; i < units.length; i++) {
+      const unit = units[i];
+      // Passatges només rítmics: de vegades els 4 primers compassos d'una estrofa o tornada són només la base («riddim»).
+      // (Només en blocs de 8: queden dues frases de 4.)
+      if (started && unit.kind === 'theme' && unit.offset === 0 && unit.bars === 8 && unit.sec !== lastChorus
+        && target.rhythm - assigned.rhythm >= 3 && r() < .65) {
+        plan.push({ ...unit, bars: 4, role: 'rhythm' }); assigned.rhythm += 4;
+        unit.offset += 4; unit.bars -= 4;
+        previous = 'rhythm';
+      }
+      const first = !started;
+      let best = null, bestScore = -Infinity;
+      for (const role of allowed(unit, first)) {
+        // Fracció que encara li falta al seu objectiu (si se'l passa, negativa), amb una mica d'atzar.
+        let score = 2 * (target[role] - assigned[role] - unit.bars / 2) / Math.max(4, target[role]) + r() * .9;
+        if (role === previous) score -= 2.5;
+        // El baix, puntualment: si encara no ha cantat, té una mica més de possibilitats.
+        if (role === 'bass' && !assigned.bass && unit.kind !== 'intro') score += .9;
+        if (unit.kind === 'theme' && unit.sec.type === 'chorus' && role === 'section') score += .4;
+        if (unit.kind === 'solo' && ['sax', 'trombone', 'trumpet'].includes(role)) score += .4;
+        // Introduccions variades: sovint les obre la base, l'orgue o el piano, la guitarra o el baix.
+        if (unit.kind === 'intro') score += role === 'section' ? -.2 : role === 'rhythm' ? .9 : ['keys', 'guitar', 'bass'].includes(role) ? .3 : 0;
+        if (unit.kind === 'outro' && role === 'section') score += .6;
+        if (score > bestScore) { bestScore = score; best = role; }
+      }
+      plan.push({ ...unit, role: best }); assigned[best] += unit.bars;
+      if (best !== 'rhythm') started = true;
+      previous = best;
+    }
+    // Els vents, dins dels límits (50–80 %): si cal, es canvia el protagonista dels blocs més adequats.
+    const share = () => windShareOf(plan.map(u => [0, u.bars, u.role]));
+    const firstLead = () => plan.findIndex(u => u.role !== 'rhythm');
+    for (let tries = 0; tries < plan.length * 2 && (share() < .5 || share() > .8); tries++) {
+      const low = share() < .5;
+      const options = plan.map((u, i) => [u, i]).filter(([u, i]) => {
+        if (low === WIND_ROLES.includes(u.role) || u.sec === lastChorus) return false;
+        return allowed(u, i <= firstLead()).some(role => low === WIND_ROLES.includes(role));
+      }).sort((a, b) => b[0].bars - a[0].bars);
+      if (!options.length) break;
+      const [u, i] = options[0];
+      const choices = allowed(u, i <= firstLead()).filter(role => low === WIND_ROLES.includes(role) && role !== 'rhythm');
+      const pickRole = (choices.length ? choices : allowed(u, i <= firstLead()).filter(role => low === WIND_ROLES.includes(role)))
+        .sort((a, b) => (target[b] - assigned[b]) - (target[a] - assigned[a]))[0];
+      if (!pickRole) break;
+      assigned[u.role] -= u.bars; assigned[pickRole] += u.bars; u.role = pickRole;
+    }
+    // Dues meitats seguides amb el mateix protagonista són un sol bloc (no hi ha relleu).
+    for (let i = plan.length - 1; i > 0; i--) {
+      const a = plan[i - 1], b = plan[i];
+      if (a.sec === b.sec && a.role === b.role && a.offset + a.bars === b.offset) { a.bars += b.bars; plan.splice(i, 1); }
+    }
+    plan.forEach(u => { if (u.role === 'keys') u.keys = keysPool[keysTurn++ % keysPool.length]; });
+    return plan;
+  }
   function skatalitesPlan(bpm, target, r) {
     const seconds = bars => bars * 240 / bpm;
     let best = null;
@@ -1498,5 +1637,5 @@
     }
     return best.song;
   }
-  return { BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

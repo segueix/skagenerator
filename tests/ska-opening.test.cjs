@@ -44,10 +44,10 @@ function assertWindOpening(song, context) {
   }
 }
 
-test('tots els subgèneres de ska comencen amb la secció de vents sencera fent el riff', () => {
+test('les cançons de ska amb veu comencen amb la secció de vents sencera fent el riff', () => {
   for (const [key] of Object.entries(engine.SUBGENRES).filter(([, genre]) => genre.style === 'ska')) {
     for (const seed of [11, 22, 33, 44, 55, 66]) {
-      const song = builder.createAutoSong(engine, key, { seed, candidates: 1, vocal: seed % 2 === 0 });
+      const song = builder.createAutoSong(engine, key, { seed, candidates: 1 });
       assertWindOpening(song, `${key} ${seed}`);
       assert(!(song.sections[0].mute || []).includes('trumpet'), 'la trompeta no se silencia a la intro');
     }
@@ -77,4 +77,21 @@ test('el crescendo dels vents fa servir el control d\'expressió i no talla la n
   assert(ccs.every(e => e.controller <= 119 && Number.isFinite(e.value)));
   const ramp = ccs.filter(e => e.channel === 3 && e.controller === 11).map(e => e.value);
   assert.deepEqual(ramp, [112, 117, 122, 127], 'crescendo amb CC11');
+});
+
+test('ska instrumental: cap cançó comença amb la trompeta de protagonista, i les introduccions varien', () => {
+  const intros = new Set();
+  for (const [key] of Object.entries(engine.SUBGENRES).filter(([, genre]) => genre.style === 'ska')) for (const seed of [11, 22, 33, 44, 55, 66]) {
+    const song = builder.createAutoSong(engine, key, { seed, candidates: 1, vocal: false });
+    const leads = [...song.sections].sort((a, b) => a.start - b.start).flatMap(sec => sec.leads.map(([offset, bars, role]) => ({ sec, offset, role })));
+    const first = leads.find(l => l.role !== 'rhythm');
+    assert.notEqual(first.role, 'trumpet', `${key} ${seed}`);
+    intros.add(leads[0].role);
+    // La trompeta no toca la melodia del primer bloc, ni sola ni al capdamunt de la secció de vents.
+    if (first.role === 'section') {
+      const clips = song.clips.filter(c => c.start <= first.sec.start + first.offset && first.sec.start + first.offset < c.start + c.bars);
+      assert(!clips.some(c => c.instrument === 'trumpet' && ['theme', 'riff', 'lead'].includes(c.line)), `${key} ${seed}: trompeta al primer bloc`);
+    }
+  }
+  assert(intros.size >= 4, `introduccions: ${[...intros]}`);
 });
