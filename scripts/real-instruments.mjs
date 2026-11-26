@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, readdir, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import ROUND_ROBIN from '../round-robin.json' with { type: 'json' };
 import {
   BasicInstrument, BasicPreset, BasicSoundBank, EmptySample, GeneratorTypes, SampleTypes, SoundBankLoader, SpessaLog
@@ -239,6 +240,64 @@ export async function buildVsco(bank, config, log) {
   }
 }
 
+// ── Vents gravats propis (audio/samples): una gravació per nota, amb bucle a la part estable ──
+// Bucle: es busca, a la meitat estable de la nota, un tram d'un nombre sencer de períodes on
+// l'ona torna a ser igual que a l'inici; la cua del tram es fon amb el que hi ha abans de
+// l'inici, així el bucle no fa clic i les notes poden durar més que la gravació.
+function findLoop(data, rate, hz) {
+  const period = rate / hz, from = Math.round(data.length * .35), to = Math.round(data.length - rate * .16);
+  const cycles = Math.max(2, Math.round(rate * .12 / period)), span = 48;
+  let best = null;
+  for (let start = from; start < from + period * 6 && start + period * cycles + span < to; start++) {
+    if (!(data[start - 1] <= 0 && data[start] > 0)) continue;
+    for (let k = cycles; start + Math.round(k * period) + span < to && k <= cycles * 3; k++) {
+      const guess = Math.round(start + k * period);
+      for (let end = guess - 3; end <= guess + 3; end++) {
+        let error = 0;
+        for (let i = -span; i < span; i++) error += (data[start + i] - data[end + i]) ** 2;
+        if (!best || error < best.error) best = { start, end, error };
+      }
+    }
+  }
+  if (!best) return null;
+  const out = data.slice(0, best.end + 1), fade = Math.min(best.start, Math.round((best.end - best.start) / 2));
+  for (let i = 0; i < fade; i++) { const w = (i + 1) / fade, at = best.end - fade + i + 1; out[at] = data[at] * (1 - w) + data[best.start - fade + i + 1] * w; }
+  return { data: out, loop: [best.start, best.end] };
+}
+export async function buildLocalHorns(bank, specs = [], log) {
+  for (const spec of specs) {
+    const instrument = new BasicInstrument(); instrument.name = spec.name.slice(0, 19);
+    const notes = [...spec.notes].sort((a, b) => a.key - b.key);
+    const made = notes.map(entry => {
+      const wav = readWav(readFileSync(new URL('../' + spec.directory + entry.file, import.meta.url)));
+      const trimmed = trim(resample(wav.data, wav.rate, RATE), RATE, 10);
+      // L'afinació mesurada de la gravació (cents per sobre de la nota): es corregeix aquí.
+      const looped = findLoop(trimmed, RATE, 440 * 2 ** ((entry.key - 69) / 12 + entry.cents / 1200));
+      if (!looped) throw new Error(`${spec.name}: no hi ha bucle per a la nota ${entry.key}`);
+      level(looped.data, RATE, spec.levelDb);
+      return { entry, ...looped };
+    });
+    // Totes les notes amb la mateixa sonoritat sostinguda (la del bucle): algunes gravacions tenen
+    // l'atac molt més fort que la nota i, igualades només per l'atac, sonaven fins a 7 dB més fluixes.
+    const sustain = ({ data, loop: [a, z] }) => { let e = 0; for (let i = a; i < z; i++) e += data[i] * data[i]; return Math.sqrt(e / (z - a)); };
+    const middle = made.map(sustain).sort((a, b) => a - b)[made.length >> 1];
+    made.forEach(m => { let peak = 0; for (const x of m.data) peak = Math.max(peak, Math.abs(x)); const gain = Math.min(middle / sustain(m), .95 / peak); for (let i = 0; i < m.data.length; i++) m.data[i] *= gain; });
+    made.forEach(({ entry, data, loop }, ni) => {
+      const keyMin = ni === 0 ? 0 : Math.floor((notes[ni - 1].key + entry.key) / 2) + 1;
+      const keyMax = ni === notes.length - 1 ? 127 : Math.floor((entry.key + notes[ni + 1].key) / 2);
+      const sample = makeSample(bank, `L${spec.bank}${spec.program}${entry.key}`, data, RATE, entry.key, -entry.cents, loop);
+      const zone = instrument.createZone(sample);
+      zone.keyRange = { min: keyMin, max: keyMax };
+      zone.setGenerator(GeneratorTypes.sampleModes, 1);
+      zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+    });
+    bank.addInstruments(instrument);
+    const preset = new BasicPreset(bank); preset.name = spec.name.slice(0, 19); preset.program = spec.program; preset.bankMSB = spec.bank;
+    preset.createZone(instrument); bank.addPresets(preset);
+    log(`${spec.name}: ${notes.length} mostres amb bucle`);
+  }
+}
+
 // ── FreePats: SF2 existents, remostrejats i retallats ────────────────
 async function importFreePats(entry, log) {
   const sf2 = await extractSf2(await download(entry.url, entry.sha256));
@@ -411,12 +470,15 @@ export async function buildGuitarInstruments(entries, log = console.log) {
 export async function buildRealInstruments(config, log = console.log) {
   SpessaLog.setLogLevel(false, false, false);
   await mkdir(CACHE, { recursive: true });
-  const fingerprint = sha(JSON.stringify(config) + JSON.stringify(ROUND_ROBIN) + await readFile(new URL(import.meta.url)));
+  // (També el contingut de les mostres pròpies: si se'n canvia una, el banc es torna a construir.)
+  const localHashes = (config.localHorns || []).flatMap(spec => spec.notes.map(entry => sha(readFileSync(new URL('../' + spec.directory + entry.file, import.meta.url)))));
+  const fingerprint = sha(JSON.stringify(config) + JSON.stringify(ROUND_ROBIN) + await readFile(new URL(import.meta.url)) + localHashes.join(''));
   const cached = join(CACHE, `real-${fingerprint.slice(0, 16)}.sf2`);
   try { return loadBank(await readFile(cached)); } catch { /* Es construeix. */ }
   const own = new BasicSoundBank();
   own.soundBankInfo.name = 'Ska Generator real instruments';
   await buildVsco(own, config.vsco, log);
+  await buildLocalHorns(own, config.localHorns, log);
   await buildDrums(own, config.drums, log);
   if (config.organ) buildTonewheel(own, config.organ, log);
   const banks = [own];
