@@ -27,7 +27,7 @@ test('l’editor de l’inici és només dins de la Batucada, abans de començar
   assert(!html.includes('id="opening-open"') && !html.includes('id="opening-dialog"'), 'no és a la pantalla general');
   const setup = html.slice(html.indexOf('id="radio-batucada"'), html.indexOf('id="radio-player"'));
   assert.match(setup, /<details class="opening-panel" id="opening-panel">/);
-  for (const id of ['opening-row', 'opening-style', 'opening-bpm', 'opening-steps', 'opening-whistles', 'opening-use', 'opening-preview', 'opening-go']) assert(setup.includes(`id="${id}"`), id);
+  for (const id of ['opening-row', 'opening-rhythm', 'opening-whistles', 'opening-style', 'opening-bpm', 'opening-use', 'opening-preview', 'opening-go']) assert(setup.includes(`id="${id}"`), id);
   // La targeta de la Batucada obre la preparació; les altres emissores comencen de seguida.
   assert.match(radio, /button\.dataset\.station === 'batucada' \? openBatucadaSetup\(\) : chooseStation\(button\.dataset\.station\)/);
   // L'inici només s'aplica a la primera cançó (i només si es fa servir).

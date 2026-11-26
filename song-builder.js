@@ -1476,6 +1476,50 @@
   const REPIQUE_SOLOS = ['1011011010110111', '1111101110111011', '1011101101101111', '1101101101011011'];
   // Compassos de l'inici escollit: els que fan uns 6 segons al tempo de la cançó (entre 2 i 4).
   const openingBars = bpm => Math.max(2, Math.min(4, Math.round(6 * bpm / 240)));
+  // Inici compost sense haver d'editar cops: es tria el timbal de fons, un ritme fet i un patró de xiulets.
+  // Ritmes del timbal (setze caixetes per compàs, el mateix a tots els compassos de l'inici).
+  const OPENING_RHYTHMS = [
+    ['negres', 'Negres (un cop a cada temps)', '1000100010001000'], ['samba', 'Samba', '1000101010001010'],
+    ['samba2', 'Samba amb síncopa', '1001101010011010'], ['marxa', 'Marxa', '1000100010101010'],
+    ['corxeres', 'Corxeres', '1010101010101010'], ['reggae', 'Samba-reggae', '1000000010001000'],
+    ['ijexa', 'Ijexá', '1010110101011010'], ['maracatu', 'Maracatu', '1000001000100010'],
+    ['baiao', 'Baião', '1001001010010010'], ['funk', 'Samba-funk', '1000000010100000'],
+    ['clau', 'Clau', '1001001000101000'], ['sincopat', 'Sincopat', '1001001001001010'],
+    ['contratemps', 'Contratemps', '0010001000100010'], ['galop', 'Galop', '1011101110111011'],
+    ['semicorxeres', 'Semicorxeres (redoble continu)', '1111111111111111']
+  ];
+  // Patrons de xiulets del mestre: [compàs ('first' el primer, 'prev' el penúltim, 'last' l'últim), caixeta, curt o llarg].
+  // Els llargs duren temps i mig. Cada xiulet s'ajusta al cop del timbal més proper (vegeu openingFrom).
+  const OPENING_WHISTLES = [
+    ['dos-curts-llarg', 'Dos curts i un llarg', [['last', 0, 'short'], ['last', 4, 'short'], ['last', 8, 'long']]],
+    ['llarg-dos-curts', 'Un llarg i dos curts', [['last', 0, 'long'], ['last', 8, 'short'], ['last', 12, 'short']]],
+    ['llarg', 'Un llarg a l’inici', [['first', 0, 'long']]],
+    ['llarg-compte', 'Un llarg i el compte de quatre', [['first', 0, 'long'], ['last', 0, 'short'], ['last', 4, 'short'], ['last', 8, 'short'], ['last', 12, 'short']]],
+    ['compte', 'Compte de quatre curts', [['last', 0, 'short'], ['last', 4, 'short'], ['last', 8, 'short'], ['last', 12, 'short']]],
+    ['tres-curts', 'Tres curts abans d’entrar', [['last', 8, 'short'], ['last', 10, 'short'], ['last', 12, 'short']]],
+    ['dos-llargs', 'Dos llargs', [['first', 0, 'long'], ['last', 8, 'long']]],
+    ['pregunta', 'Pregunta i resposta', [['first', 0, 'long'], ['first', 8, 'short'], ['first', 10, 'short'], ['last', 8, 'long']]],
+    ['crida', 'Crida de samba (curt, curt, llarg a cada compàs)', [['prev', 0, 'short'], ['prev', 2, 'short'], ['prev', 4, 'long'], ['last', 0, 'short'], ['last', 2, 'short'], ['last', 4, 'long']]],
+    ['cap', 'Sense xiulets', []]
+  ];
+  // Construeix l'inici (vegeu engine.validBatucadaOpening) a partir de les tries: timbal (fila), ritme, redoble
+  // final i patró de xiulets. Els xiulets es col·loquen on cau un cop del timbal (a la mateixa caixeta o la més
+  // propera, fins a dues), perquè sonin junts amb el fons sigui quin sigui el ritme.
+  function openingFrom(engine, { row = 0, rhythm = 'samba', roll = true, whistles = 'dos-curts-llarg' } = {}, bpm = 120) {
+    const bars = openingBars(bpm), figure = (OPENING_RHYTHMS.find(([key]) => key === rhythm) || OPENING_RHYTHMS[1])[2];
+    const pattern = (OPENING_WHISTLES.find(([key]) => key === whistles) || OPENING_WHISTLES[0])[2];
+    const barOf = ref => ref === 'first' ? 0 : ref === 'prev' ? Math.max(0, bars - 2) : bars - 1;
+    const hitsOf = bar => roll && bar === bars - 1 ? engine.OPENING_ROLL : figure;
+    // (Si el cop més proper ja té xiulet, aquest es queda a la seva caixeta, que també cau a la graella del ritme.)
+    const placed = new Map();
+    for (const [ref, step, kind] of pattern) {
+      const bar = barOf(ref), hits = hitsOf(bar), free = at => at >= 0 && at < 16 && !placed.has(`${bar}:${at}`);
+      let at = [0, 1, -1, 2, -2].map(d => step + d).find(n => free(n) && hits[n] === '1');
+      if (at === undefined) at = [0, 1, -1, 2, -2].map(d => step + d).find(free);
+      if (at !== undefined) placed.set(`${bar}:${at}`, [bar, at, kind]);
+    }
+    return { row, steps: Array.from({ length: bars }, () => figure), whistles: [...placed.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]), roll: !!roll };
+  }
   function createBatucadaSong(engine, options = {}) {
     const seed = (options.seed >>> 0) || 1, r = rng(seed), pick = list => list[Math.floor(r() * list.length)];
     const rhythms = Object.keys(BATUCADA_STYLES).filter(key => engine.BATUCADA_RHYTHMS[key]);
@@ -1654,5 +1698,5 @@
     }
     return best.song;
   }
-  return { openingBars, LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { openingBars, OPENING_RHYTHMS, OPENING_WHISTLES, openingFrom, LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

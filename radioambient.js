@@ -2344,17 +2344,20 @@
             const intoNext = last && ending !== 'none' && part.next !== undefined && part.next !== 'end';
             if (intoNext || (type === 'outro' && !fading && bar === bars - 2)) { call(bar); continue; }
             // Abans d'una breca, el xiulet avisa (tres cops curts).
-            if (whistle && !fx.signal && breque && bar === bars - 2) [8, 10, 12].forEach(step => blow(bar, step, .09, 4));
+            // (Abans d'una aturada, el xiulet llarg i fort: vegeu més avall.)
             if (breque && bar === bars - 2) { pickupBar = bar; groove(bar); pickup(bar); continue; }
             groove(bar);
         }
-        // Senyal del mestre abans d'un canvi de ritme: un sol xiulet llarg (tres temps) i fort, al màxim, a l'últim
-        // compàs; després la colla canvia de ritme tota junta. (Si la secció acaba amb una aturada o un silenci, va al
-        // compàs d'abans: després del cop ja no sona res.)
+        // Senyals del mestre, forts (al màxim) i sempre als temps, perquè encaixin amb qualsevol ritme.
+        // · Canvi de ritme: un xiulet llarg (temps i mig) i dos de curts al tercer i al quart temps de l'últim compàs;
+        //   després la colla canvia tota junta. (Si la secció acaba amb una aturada o un silenci, al compàs d'abans.)
+        // · Aturada (cop de tots i silenci, o compàs de silenci) a mitja cançó: un sol xiulet llarg a la segona meitat
+        //   del penúltim compàs, que s'acaba just abans del cop.
+        const halt = !fading && type !== 'outro' && bars > 1 && ['break', 'stop', 'silence'].includes(ending);
         if (fx.signal) {
-            const at = Math.max(0, ['break', 'silence', 'stop'].includes(ending) && bars >= 2 ? bars - 2 : bars - 1);
-            blow(at, 0, beat * 3, 0, 127);
-        }
+            const at = Math.max(0, halt ? bars - 2 : bars - 1);
+            blow(at, 0, beat * 1.5, 0, 127); blow(at, 8, .14, 0, 127); blow(at, 12, .14, 0, 127);
+        } else if (halt) blow(bars - 2, 8, beat * 1.9, 0, 127);
         return line;
     }
 
@@ -3647,7 +3650,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
