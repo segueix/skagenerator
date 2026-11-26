@@ -24,11 +24,11 @@ test('els reguladors generals arriben als dos tipus de bateria i baix sense afec
 });
 test('el banc conté les mostres enregistrades dels instruments i els tres kits requerits', () => {
   assert(raw.byteLength > 1000000 && raw.byteLength < 40 * 1024 * 1024);
-  assert.equal(bank.presets.length, 36);
+  assert.equal(bank.presets.length, 37);
   for (const program of [53, 73, 79]) assert(bank.presets.some(p => p.bankMSB === 0 && p.program === program), `veu GM ${program}`);
   assert(bank.presets.some(p => p.bankMSB === 2 && p.program === 71), 'clarinet gravat');
-  // Instruments gravats: VSCO 2 CE (banc 2 i staccato al 3), la trompeta 2 (banc 5), FreePats (banc 2) i el kit Muldjord (64).
-  for (const [bankMSB, program] of [[2, 16], [2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57], [5, 56]])
+  // Instruments gravats: VSCO 2 CE (banc 2 i staccato al 3), la trompeta 2 i el trombó 2 (banc 5), FreePats (banc 2) i el kit Muldjord (64).
+  for (const [bankMSB, program] of [[2, 16], [2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57], [5, 56], [5, 57]])
     assert(bank.presets.some(p => p.bankMSB === bankMSB && p.program === program && !p.isGMGSDrum), `${bankMSB}:${program}`);
   assert(bank.presets.some(p => p.program === 69 && p.isGMGSDrum));
   for (const program of [16, 27, 28, 29, 30, 33, 34, 38, 56, 57, 59, 66, 81, 89]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));
@@ -42,10 +42,10 @@ test('la interpretació és reproduïble, només activa els instruments seleccio
   const guitar = ska.events.filter(e => e.type === 'on' && e.channel === 0);
   assert(Math.abs(guitar[0].time - spec.beat / 2) < .01);
   const muted = createPerformance({ ...spec, instruments: ['trumpet'] });
-  // Només trompetes (a l'ska, també la segona trompeta de la secció, als seus canals).
-  const trumpets = new Set(muted.channels.filter(c => c.instrument === 'trumpet').map(c => c.channel));
-  assert(muted.events.every(e => trumpets.has(e.channel)));
-  assert(muted.events.some(e => e.channel === 3));
+  // Només la secció de vents: a l'ska, amb les dues trompetes sempre sonen també els dos trombons; res més.
+  const horns = new Set(muted.channels.filter(c => c.instrument === 'trumpet' || c.instrument === 'trombone').map(c => c.channel));
+  assert(muted.events.every(e => horns.has(e.channel)));
+  assert(muted.events.some(e => e.channel === 3) && muted.events.some(e => e.channel === 4));
   const punkSpec = engine.composeSongPart({ ...settings, style: 'punk', bpm: 180 }, part);
   const punk = createPerformance(punkSpec);
   assert.equal(punk.channels.find(c => c.channel === 0).program, 30);

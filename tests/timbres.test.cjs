@@ -313,6 +313,37 @@ test('ska: una segona trompeta gravada dobla la principal a l\'uníson (més vol
   }
 });
 
+test('ska: amb les dues trompetes sempre sonen dos trombons (el principal i el gravat, a l\'uníson)', () => {
+  const real = require('../real-instruments.json').localHorns.find(h => h.name === 'Trombó 2 (gravat)');
+  assert.deepEqual([real.bank, real.program], [5, 57]);
+  assert.deepEqual(real.notes.map(n => n.key), [48, 50, 52, 53, 55, 57, 59, 60]);
+  for (const n of real.notes) assert(fs.existsSync(path.join(__dirname, '..', real.directory, n.file)), n.file);
+  const on = (music, channels) => music.events.filter(e => e.type === 'on' && channels.includes(e.channel));
+  const recorded = music => music.channels.find(p => p.bank === 5 && p.program === 57);
+  for (const instruments of [['trumpet', 'trombone'], ['trumpet']]) {
+    const spec = engine.composeSongPart({ ...config, instruments }, { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3 } });
+    const music = createPerformance(spec), tb = recorded(music);
+    assert(tb && tb.instrument === 'trombone', `${instruments}: trombó gravat`);
+    const lead = on(music, [4, 13]), doubled = on(music, [tb.channel]);
+    assert(lead.length > 0, `${instruments}: el trombó principal sona`);
+    assert.equal(doubled.length, lead.length, 'el segon trombó toca cada nota del principal');
+    doubled.forEach((e, i) => { assert(Math.abs(e.time - lead[i].time) < .03); assert.equal(e.note, lead[i].note > 67 ? lead[i].note - 12 : lead[i].note); });
+    // Sense trombó a la secció, el trombó segueix la trompeta nota a nota (amb trombó, toca la seva línia).
+    if (instruments.length === 1) assert.equal(lead.length, on(music, [3, 12]).length, 'un trombó per cada nota de trompeta');
+    assert(Math.sign(tb.pan - 64) !== Math.sign(music.channels.find(p => p.channel === 4).pan - 64), 'a l\'altre costat');
+  }
+  // Sense trombó a la secció, el trombó afegit harmonitza la trompeta per sota i segueix el seu volum.
+  const solo = engine.composeSongPart({ ...config, instruments: ['trumpet'], mix: { trumpet: { low: 0, mid: 0, high: 0, volume: -6 } } }, { ...part, type: 'chorus', layers: { trumpet: 2 } });
+  const music = createPerformance(solo), trumpet = on(music, [3, 12]), trombone = on(music, [4, 13]);
+  trombone.forEach((e, i) => assert(e.note < trumpet[i].note && e.note >= 45 && e.note <= 67));
+  assert.equal(music.mix.trombone.volume, -6);
+  // Sense les dues trompetes (un altre so de trompeta, o al punk), cap trombó afegit.
+  for (const other of [{ ...config, instruments: ['trumpet'], timbres: { trumpet: 'muted' } }, { ...config, style: 'punk', bpm: 180, instruments: ['trumpet'] }]) {
+    const perf = createPerformance(engine.composeSongPart(other, { ...part, layers: { trumpet: 2 } }));
+    assert(!perf.channels.some(p => p.bank === 5) && !perf.events.some(e => e.type === 'on' && e.channel === 4));
+  }
+});
+
 test('ska: riffs de la biblioteca, vents a tres veus, cops de secció, stop time i tornada shout', () => {
   const base = { seed: 4242, style: 'ska', bpm: 140, tonic: 0, mode: 'major', subgenre: 'twotone' };
   const horns = { instruments: ['trumpet', 'sax', 'trombone'], layers: { trumpet: 1, sax: 1, trombone: 1 }, lineModes: { trumpet: 'riff', sax: 'riff', trombone: 'riff' } };

@@ -1,0 +1,5 @@
+Vuit notes de trombó (Do3–Do4, escala de Do major), aportades pel propietari del projecte
+(fitxer «notes_trombo_netes.zip»). L'origen i la llicència de la gravació no s'han indicat.
+WAV mono, 48 kHz, 16 bits. Noms originals: Trombo_C3_Do3.wav … Trombo_C4_Do4.wav.
+Afinació mesurada (cèntims respecte de la nota): Do3 −10, Re3 −14, Mi3 −5, Fa3 +12,
+Sol3 −4, La3 −5, Si3 −8, Do4 −3. El build la corregeix nota a nota.

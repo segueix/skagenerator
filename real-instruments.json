@@ -190,6 +190,25 @@
         { "key": 69, "file": "trompeta2-69.wav", "cents": 14 },
         { "key": 70, "file": "trompeta2-70.wav", "cents": 33 }
       ]
+    },
+    {
+      "name": "Trombó 2 (gravat)",
+      "about": "Vuit notes de trombó (Do3–Do4) aportades pel propietari del projecte: vegeu audio/samples/trombo2/FONT.txt. «cents» és la desafinació mesurada de cada nota, que el build corregeix. A l'ska dobla el trombó principal quan sonen les dues trompetes.",
+      "bank": 5,
+      "program": 57,
+      "directory": "audio/samples/trombo2/",
+      "release": 0.16,
+      "levelDb": -12,
+      "notes": [
+        { "key": 48, "file": "trombo2-48.wav", "cents": -10 },
+        { "key": 50, "file": "trombo2-50.wav", "cents": -14 },
+        { "key": 52, "file": "trombo2-52.wav", "cents": -5 },
+        { "key": 53, "file": "trombo2-53.wav", "cents": 12 },
+        { "key": 55, "file": "trombo2-55.wav", "cents": -4 },
+        { "key": 57, "file": "trombo2-57.wav", "cents": -5 },
+        { "key": 59, "file": "trombo2-59.wav", "cents": -8 },
+        { "key": 60, "file": "trombo2-60.wav", "cents": -3 }
+      ]
     }
   ],
   "freepats": [
