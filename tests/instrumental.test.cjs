@@ -8,47 +8,127 @@ const SKA = Object.keys(engine.SUBGENRES).filter(key => engine.SUBGENRES[key].st
 const LEADS = ['trumpet', 'sax', 'trombone'];
 const inside = (clip, sec) => clip.start < sec.start + sec.bars && sec.start < clip.start + clip.bars;
 
-test('ska instrumental: sense veu ni lletra, tema als vents a cada estrofa i tornada, i almenys un solo', () => {
+// Part d'una secció tal com la construeix l'aplicació (instruments, capes, trams, línies i textura).
+function partOf(song, sec) {
+  const mute = sec.mute || [], base = song.base.instruments.filter(n => !mute.includes(n));
+  const clips = song.clips.filter(c => inside(c, sec) && !mute.includes(c.instrument));
+  const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: song.harmony[sec.type] || 1, groove: { ...song.settings.groove, ...(sec.groove || {}) },
+    instruments: [...new Set([...base, ...clips.map(c => c.instrument)])], layers: Object.fromEntries(clips.map(c => [c.instrument, c.revision])) };
+  const lineModes = { ...Object.fromEntries(Object.entries(sec.lines || {}).filter(([n]) => base.includes(n))), ...Object.fromEntries(clips.filter(c => c.line).map(c => [c.instrument, c.line])) };
+  if (Object.keys(lineModes).length) part.lineModes = lineModes;
+  const ranges = {};
+  for (const c of clips) (ranges[c.instrument] ||= []).push([Math.max(0, c.start - sec.start), Math.min(sec.bars, c.start + c.bars - sec.start)]);
+  for (const [n, list] of Object.entries(ranges)) if (list.length === 1 && list[0][0] === 0 && list[0][1] === sec.bars) delete ranges[n];
+  if (Object.keys(ranges).length) part.ranges = ranges;
+  for (const field of ['texture', 'themeVariant', 'entrance', 'exit', 'bpm', 'feel', 'transpose', 'volumes']) if (sec[field] !== undefined) part[field] = sec[field];
+  return part;
+}
+const { createPerformance } = require('../audio/performance.cjs');
+
+test('ska instrumental: el protagonisme passa d\'un músic a l\'altre per frases, amb diàlegs i el contratemps sempre', () => {
+  const textures = new Set(), roles = new Set(), orders = new Set();
+  let answered = 0, nonWind = 0, solos = 0, keysWithMelody = 0, keysUnits = 0;
   for (const key of SKA) for (const seed of [3, 14, 15, 92]) {
     const song = builder.createAutoSong(engine, key, { seed, vocal: false, candidates: 1 });
     const where = `${key} ${seed}`;
     assert(!song.clips.some(c => c.instrument === 'vocal'), `${where}: cap veu`);
     assert(song.sections.every(s => !s.lyrics), `${where}: cap lletra`);
-    const leadsIn = sec => song.clips.filter(c => inside(c, sec) && LEADS.includes(c.instrument) && !c.line);
-    // Els interludis de riff (solos de 4 compassos amb tots els vents fent el riff) no tenen solista.
-    const riffBreak = sec => sec.type === 'solo' && song.clips.filter(c => inside(c, sec) && LEADS.includes(c.instrument)).every(c => c.line === 'riff');
-    for (const sec of song.sections.filter(s => ['verse', 'chorus', 'solo'].includes(s.type) && !riffBreak(s)))
-      assert(leadsIn(sec).length, `${where}: la secció ${sec.type} té un vent amb melodia pròpia`);
-    assert(song.sections.some(s => s.type === 'solo' && !riffBreak(s) && leadsIn(s).length), `${where}: hi ha un solo`);
-    // Tema A (estrofa) i tema B (tornada) els fan vents diferents, excepte als subgèneres lents.
-    const leadOf = type => song.clips.find(c => !c.line && LEADS.includes(c.instrument) && song.sections.some(s => s.type === type && inside(c, s)))?.instrument;
-    if (!['rocksteady', 'bossreggae'].includes(key)) assert.notEqual(leadOf('verse'), leadOf('chorus'), where);
-    // Totes les seccions es poden compondre.
-    for (const sec of song.sections) {
-      const clips = song.clips.filter(c => inside(c, sec));
-      const part = { type: sec.type, bars: sec.bars, energy: sec.energy, revision: song.harmony[sec.type] || 1,
-        instruments: [...new Set([...song.base.instruments, ...clips.map(c => c.instrument)])],
-        layers: Object.fromEntries(clips.map(c => [c.instrument, c.revision])),
-        lineModes: Object.fromEntries(clips.filter(c => c.line).map(c => [c.instrument, c.line])) };
-      for (const field of ['entrance', 'exit', 'bpm', 'feel', 'transpose']) if (sec[field]) part[field] = sec[field];
-      assert.doesNotThrow(() => engine.composeSongPart(song.settings, part), where);
+    const ordered = [...song.sections].sort((a, b) => a.start - b.start);
+    orders.add(ordered.flatMap(s => s.leads.map(l => l[2])).join());
+    for (const sec of ordered) {
+      // Els canvis de protagonista respecten les frases: blocs de 4, 8 o 16 compassos que comencen a un múltiple de 4.
+      for (const [offset, bars, role] of sec.leads) {
+        roles.add(role);
+        assert(offset % 4 === 0 && (bars % 4 === 0 || bars === sec.bars), `${where}: bloc ${offset}+${bars}`);
+      }
+      const spec = engine.composeSongPart(song.settings, partOf(song, sec)), music = createPerformance(spec);
+      const lead = sec.leads[0][2];
+      if (sec.texture) textures.add(sec.texture);
+      if (song.clips.some(c => inside(c, sec) && c.line === 'counter')) textures.add('counter');
+      if (sec.type === 'solo' && ['sax', 'trombone', 'trumpet', 'keys', 'guitar', 'bass'].includes(lead)) solos++;
+      // Orgue, piano, guitarra o baix porten la melodia: la guitarra base continua fent el contratemps.
+      if (sec.leads.some(l => ['keys', 'guitar', 'bass'].includes(l[2]))) {
+        nonWind++;
+        if (song.clips.some(c => inside(c, sec) && c.line === 'answer') || Object.values(sec.lines || {}).includes('answer')) answered++;
+        const skank = music.events.filter(e => e.type === 'on' && e.channel === 0);
+        // (Amb swing, el contratemps cau una mica més tard de la meitat del temps.)
+        const offbeat = skank.filter(e => { const f = (e.time / spec.beat) % 1; return f > .3 && f < .85; }).length;
+        assert(skank.length && offbeat / skank.length > .5, `${where}: contratemps de la guitarra a la secció ${sec.type}`);
+      }
+      if (sec.leads.some(l => l[2] === 'keys')) {
+        keysUnits++;
+        if (Array.isArray(spec.lines.organ) || Array.isArray(spec.lines.piano)) keysWithMelody++;
+      }
+      // El tema torna a cada estrofa i tornada (excepte als passatges només rítmics).
+      if (['verse', 'chorus'].includes(sec.type) && sec.leads.some(l => l[2] !== 'rhythm'))
+        assert(Object.values(spec.lineModes).includes('theme') || Object.values(spec.lineModes).includes('counter'), `${where}: tema a la secció ${sec.type}`);
     }
   }
+  assert.equal(keysWithMelody, keysUnits, 'quan l\'orgue o el piano són protagonistes, toquen la melodia');
+  assert(solos > 0, 'hi ha solos');
+  for (const texture of ['harmony', 'unison', 'counter']) assert(textures.has(texture), `textura dels vents: ${texture}`);
+  for (const role of builder.LEAD_ROLES) assert(roles.has(role), `protagonista: ${role}`);
+  assert(answered / nonWind > .3, `diàlegs: ${answered} de ${nonWind}`);
+  assert(orders.size >= SKA.length * 4 - 2, 'l\'ordre dels protagonistes canvia d\'una cançó a l\'altra');
 });
 
-test('els solos llargs es reparteixen entre dos solistes', () => {
-  let traded = 0;
+test('ska instrumental: les seccions llargues de vegades canvien de protagonista a la meitat', () => {
+  let handovers = 0;
   for (const key of SKA) for (let seed = 1; seed <= 12; seed++) {
     const song = builder.createAutoSong(engine, key, { seed, vocal: false, candidates: 1 });
-    for (const sec of song.sections.filter(s => s.type === 'solo' && s.entrance && s.exit)) {
-      const [second, from] = Object.entries(sec.entrance).find(([name]) => LEADS.includes(name)) || [];
-      const [first, to] = Object.entries(sec.exit).find(([name]) => LEADS.includes(name)) || [];
-      if (!second) continue;
-      assert.notEqual(first, second); assert.equal(from, to); assert.equal(from * 2, sec.bars);
-      traded++;
+    for (const sec of song.sections.filter(s => s.bars >= 16 && s.leads.length === 2)) {
+      const [[, a, first], [offset, b, second]] = sec.leads;
+      if (offset !== sec.bars / 2) continue;
+      assert.notEqual(first, second); assert.equal(a, b);
+      handovers++;
     }
   }
-  assert(traded > 0, 'algun solo es reparteix');
+  assert(handovers > 0, 'algun relleu a mitja secció');
+});
+
+test('motor: tema amb variacions, secció a l\'uníson o harmonitzada, contrapunt, respostes i orgue, piano i baix melòdics', () => {
+  const settings = { seed: 41, style: 'ska', bpm: 132, tonic: 0, mode: 'major', subgenre: 'jamaican' };
+  const part = (extra) => ({ type: 'verse', bars: 8, energy: 70, revision: 1, ...extra });
+  const compose = extra => engine.composeSongPart(settings, part(extra));
+  // El tema és el mateix qui el toqui (cadascú al seu registre).
+  const sax = compose({ instruments: ['sax'], lineModes: { sax: 'theme' } }).lines.sax, organ = compose({ instruments: ['organ'], lineModes: { organ: 'theme' } }).lines.organ;
+  assert.deepEqual(sax.map(n => [n[0], n[1], n[2] % 12]), organ.map(n => [n[0], n[1], n[2] % 12]));
+  // Variacions: el tema canvia, però es reconeix (comparteix bona part de les notes).
+  for (const themeVariant of [1, 2, 3]) {
+    const varied = compose({ instruments: ['sax'], lineModes: { sax: 'theme' }, themeVariant }).lines.sax;
+    assert.notDeepEqual(varied, sax, `variació ${themeVariant}`);
+    const same = varied.filter(n => sax.some(m => m[0] === n[0] && m[1] === n[1] && m[2] === n[2])).length;
+    assert(same / sax.length > .25, `variació ${themeVariant}: es reconeix el tema`);
+  }
+  assert.throws(() => compose({ instruments: ['sax'], lineModes: { sax: 'theme' }, themeVariant: 4 }), /Variació/);
+  // Secció: a l'uníson tots fan les mateixes notes; harmonitzada, la de dalt fa el tema i les altres per sota.
+  const winds = { trumpet: 'theme', sax: 'theme', trombone: 'theme' }, instruments = ['trumpet', 'sax', 'trombone'];
+  const unison = compose({ instruments, lineModes: winds, texture: 'unison' }).lines;
+  assert.deepEqual(unison.trombone.map(n => n[2] % 12), unison.trumpet.map(n => n[2] % 12));
+  const harmony = compose({ instruments, lineModes: winds }).lines;
+  assert(harmony.sax.every((n, i) => n[2] % 12 !== harmony.trumpet[i][2] % 12 || n[2] < harmony.trumpet[i][2]));
+  assert.notDeepEqual(harmony.sax.map(n => n[2] % 12), harmony.trumpet.map(n => n[2] % 12));
+  // Contrapunt: notes llargues de l'acord, mai a l'uníson o a l'octava de la melodia al mateix moment.
+  const counter = compose({ instruments: ['sax', 'trombone'], lineModes: { sax: 'theme', trombone: 'counter' } });
+  assert(counter.lines.trombone.length && counter.lines.trombone.every(n => n[3] >= 1.5 && counter.chords[n[0]].pcs.includes(n[2] % 12)));
+  // Respostes: el trombó respon als silencis de l'orgue (gairebé no s'encavalquen).
+  const dialog = compose({ instruments: ['organ', 'trombone'], lineModes: { organ: 'theme', trombone: 'answer' } });
+  const span = n => [n[0] * 4 + n[1], n[0] * 4 + n[1] + n[3]];
+  const overlap = dialog.lines.trombone.reduce((t, n) => { const [a, b] = span(n); return t + dialog.lines.organ.reduce((u, m) => { const [c, d] = span(m); return u + Math.max(0, Math.min(b, d) - Math.max(a, c)); }, 0); }, 0);
+  const answerBeats = dialog.lines.trombone.reduce((t, n) => t + n[3], 0);
+  assert(dialog.lines.trombone.length && overlap <= answerBeats * .3, 'la resposta va als silencis');
+  // Orgue i piano amb melodia: la toquen (i no fan el seu acompanyament); el baix melòdic substitueix el patró.
+  for (const name of ['organ', 'piano']) {
+    const spec = compose({ instruments: [name, 'guitar'], lineModes: { [name]: 'theme' } }), music = createPerformance(spec);
+    const channel = music.channels.find(c => c.instrument === name).channel;
+    const played = music.events.filter(e => e.type === 'on' && e.channel === channel).map(e => e.note);
+    for (const [, , pitch] of spec.lines[name]) assert(played.includes(pitch), `${name}: nota ${pitch}`);
+    const plain = createPerformance(compose({ instruments: [name, 'guitar'] })).events.filter(e => e.type === 'on' && e.channel === channel).length;
+    assert(played.length < plain, `${name}: sense l'acompanyament de sempre`);
+  }
+  const bass = compose({ instruments: ['bass'], lineModes: { bass: 'lead' } });
+  assert.deepEqual(bass.bassLine.map(n => n[2]), bass.lines.bass.map(n => n[2]));
+  assert(bass.bassLine.every(n => n[2] >= 36 && n[2] <= 55), 'dins del registre del baix');
 });
 
 test('amb veu, l’arranjament de ska no canvia', () => {
@@ -87,10 +167,14 @@ test('punk instrumental: la guitarra solista fa un tema a l’estrofa, un altre 
   }
 });
 
-test('el mode «solista» de la guitarra 3 només és vàlid per a la guitarra 3', () => {
+test('modes de línia: cada mode només per als instruments que el poden tocar', () => {
   const settings = { seed: 5, style: 'punk', bpm: 180, tonic: 2, mode: 'major' }, part = { type: 'chorus', bars: 4, energy: 80, revision: 1 };
   assert.doesNotThrow(() => engine.composeSongPart(settings, { ...part, instruments: ['guitar3'], layers: { guitar3: 2 }, lineModes: { guitar3: 'lead' } }));
-  assert.throws(() => engine.composeSongPart(settings, { ...part, instruments: ['trumpet'], layers: { trumpet: 2 }, lineModes: { trumpet: 'lead' } }), /Mode de línia/);
+  // La melodia de solista (i el tema) també la poden portar els vents, l'orgue, el piano i el baix.
+  for (const name of ['trumpet', 'organ', 'piano', 'bass']) assert.doesNotThrow(() => engine.composeSongPart(settings, { ...part, instruments: [name], lineModes: { [name]: 'lead' } }), name);
+  assert.throws(() => engine.composeSongPart(settings, { ...part, instruments: ['guitar'], lineModes: { guitar: 'lead' } }), /Mode de línia/);
+  assert.throws(() => engine.composeSongPart(settings, { ...part, instruments: ['bass'], lineModes: { bass: 'counter' } }), /Mode de línia/);
+  assert.throws(() => engine.composeSongPart(settings, { ...part, instruments: ['bass'], lineModes: { bass: 'answer' } }), /Mode de línia/);
   const { createPerformance } = require('../audio/performance.cjs');
   const spec = engine.composeSongPart(settings, { ...part, instruments: ['guitar', 'guitar3'], layers: { guitar3: 2 }, lineModes: { guitar3: 'lead' } });
   const notes = createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 15);

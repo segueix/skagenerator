@@ -17,10 +17,12 @@
   const STACKABLE_GUITARS = ['guitar', 'guitar2']; // Diverses preses simultànies de la guitarra 1 i la 2.
   // Noms curts per a les etiquetes de la línia (hi caben al mòbil).
   const SHORT = { guitar: 'Guitarra 1', guitar2: 'Guitarra 2', guitar3: 'Guitarra 3', trombone: '2a veu vent', sax: 'Saxo', synthLead: 'Sinte melodia', synthPad: 'Sinte acords', synthBass: 'Baix sinte', piano: 'Piano', electronicDrums: 'Bat. electr.', vocal: 'Veu (guia)' };
-  const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'];
-  const LINES = [['own', 'Pròpia'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu']];
-  // La guitarra solista: arpegis (per defecte), riff, resposta o melodia pròpia de solista.
-  const GUITAR_LINES = [['own', 'Arpegis'], ['riff', 'Riff de la cançó'], ['answer', 'Respon a la veu'], ['lead', 'Melodia de solista']];
+  const LINE_INSTRUMENTS = ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3', 'organ', 'piano'];
+  // Modes de línia: riff, resposta a la melodia (o a la veu), tema de la cançó, melodia de solista i contrapunt.
+  // (Cada instrument només els que pot tocar: vegeu engine.validLineMode.)
+  const LINE_NAMES = { riff: 'Riff de la cançó', answer: 'Respon a la melodia', theme: 'Tema de la cançó', lead: 'Melodia de solista', counter: 'Contrapunt' };
+  const OWN_LINE = { guitar3: 'Arpegis', organ: 'Acompanyament', piano: 'Acompanyament' };
+  const linesFor = instrument => [['own', OWN_LINE[instrument] || 'Pròpia'], ...Object.entries(LINE_NAMES).filter(([mode]) => engine.validLineMode(instrument, mode))];
   const defaultFx = () => ({ type: 'none', drive: 50, tone: 50 });
   const VOICE_EFFECTS = audioUtils.VOICE_EFFECTS, VOICE_EQ_KEYS = audioUtils.VOICE_EQ_KEYS;
   const flatVoiceEq = () => ({ low: 0, mid: 0, high: 0 });
@@ -212,6 +214,9 @@
         || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || ['hits', 'shout', 'pickup', 'bassBreak', 'pedal'].some(f => s[f] !== undefined && typeof s[f] !== 'boolean') || (s.bassSolo !== undefined && (!Number.isInteger(s.bassSolo) || s.bassSolo < 1 || s.bassSolo > 8 || s.bassSolo > s.bars)) || (s.stopTime !== undefined && (!Number.isInteger(s.stopTime) || s.stopTime < 1 || s.stopTime > 8 || s.stopTime > s.bars)) || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
         || ['entrance', 'exit'].some(f => s[f] !== undefined && (!s[f] || typeof s[f] !== 'object' || Array.isArray(s[f]) || Object.entries(s[f]).some(([n, b]) => !Object.hasOwn(INSTRUMENTS, n) || !Number.isInteger(b) || b < 0 || b > MAX_SECTION))) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
         || !validBaseEdits(s) || (s.batucadaPattern !== undefined && !engine.validBatucadaPattern(s.batucadaPattern)) || !engine.validBatucadaFx(s.batucada) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
+        || (s.lines !== undefined && (!s.lines || typeof s.lines !== 'object' || Array.isArray(s.lines) || Object.entries(s.lines).some(([n, mode]) => !engine.validLineMode(n, mode))))
+        || (s.texture !== undefined && !['unison', 'harmony'].includes(s.texture)) || (s.themeVariant !== undefined && (!Number.isInteger(s.themeVariant) || s.themeVariant < 0 || s.themeVariant > 3))
+        || (s.leads !== undefined && (!Array.isArray(s.leads) || s.leads.some(l => !Array.isArray(l) || l.length !== 3 || !Number.isInteger(l[0]) || !Number.isInteger(l[1]) || l[0] < 0 || l[1] < 1 || l[0] + l[1] > s.bars || !builder.LEAD_ROLES.includes(l[2]))))
         || (s.feel !== undefined && (!s.feel || typeof s.feel !== 'object' || Object.values(s.feel).some(f => ![.5, 2].includes(f)))) || (s.energy !== undefined && (!Number.isInteger(s.energy) || s.energy < 10 || s.energy > 100)) || (s.mix !== undefined && (!s.mix || typeof s.mix !== 'object' || Array.isArray(s.mix))) || typeof s.lyrics !== 'string' || s.lyrics.length > 5000) fail('Secció no vàlida');
       ids.add(s.id); end = s.start + s.bars;
     }
@@ -226,7 +231,7 @@
       if (c.fx !== undefined && !GUITARS.includes(c.instrument)) fail('Efecte no vàlid');
       if (c.feel !== undefined && ![.5, 2].includes(c.feel)) fail('Ritme no vàlid');
       if (c.register !== undefined && (c.instrument !== 'vocal' || ![-1, 1].includes(c.register))) fail('Registre no vàlid');
-      if (c.line !== undefined && (!LINE_INSTRUMENTS.includes(c.instrument) || !(['riff', 'answer'].includes(c.line) || c.line === 'lead' && c.instrument === 'guitar3'))) fail('Línia no vàlida');
+      if (c.line !== undefined && (!LINE_INSTRUMENTS.includes(c.instrument) || !engine.validLineMode(c.instrument, c.line))) fail('Línia no vàlida');
       if (c.edge !== undefined && typeof c.edge !== 'boolean') fail('Instrument no vàlid');
       if (c.color !== undefined && (!engine.COLOR_INSTRUMENTS.includes(c.instrument) || !Object.hasOwn(engine.COLOR_FX, c.color))) fail('Efecte de color no vàlid');
       ids.add(c.id);
@@ -343,6 +348,10 @@
       if (sec.batucada) part.batucada = { ...sec.batucada };
       if (sec.patterns) { const layers = {}; for (const [name, index] of Object.entries(sec.patterns)) if (base.includes(name)) layers[name] = index + 1; if (Object.keys(layers).length) part.layers = layers; }
       if (sec.feel && Object.keys(sec.feel).length) part.feel = { ...sec.feel };
+      // Ska instrumental: línies dels instruments de la base (orgue, piano, baix), textura dels vents i variació del tema.
+      if (sec.lines) part.lineModes = Object.fromEntries(Object.entries(sec.lines).filter(([name]) => base.includes(name)));
+      if (sec.texture) part.texture = sec.texture;
+      if (sec.themeVariant) part.themeVariant = sec.themeVariant;
       if (['intro', 'verse', 'chorus'].includes(sec.type)) part.variantIndex = (harmony - 1) % 5;
     }
     // La guitarra 1 de la base continua sonant; cada clip de guitarra 1 o 2
@@ -358,7 +367,7 @@
       if (Object.keys(extra.timbres).length) part.timbres = { ...(part.timbres || {}), ...extra.timbres };
       if (Object.keys(extra.fx).length) part.fx = extra.fx;
       if (Object.keys(extra.feel).length) part.feel = { ...(part.feel || {}), ...extra.feel };
-      if (Object.keys(extra.lineModes).length) part.lineModes = extra.lineModes;
+      if (Object.keys(extra.lineModes).length) part.lineModes = { ...(part.lineModes || {}), ...extra.lineModes };
       if (Object.keys(extra.colors).length) part.colors = extra.colors;
       // La melodia de veu segueix la lletra de la secció: una frase per vers.
       if ('vocal' in extra.layers) {
@@ -1712,7 +1721,7 @@
     };
     const feelSelect = select('RITME', FEELS, String(clip.feel ?? 1), value => changeClipTone(clip, { feel: Number(value) }));
     const lineSelect = LINE_INSTRUMENTS.includes(clip.instrument)
-      ? select('LÍNIA', clip.instrument === 'guitar3' ? GUITAR_LINES : LINES, clip.line || 'own', value => changeClipTone(clip, { line: value })) : null;
+      ? select('LÍNIA', linesFor(clip.instrument), clip.line || 'own', value => changeClipTone(clip, { line: value })) : null;
     if (clip.instrument === 'vocal') {
       box.classList.add('only-feel');
       box.append(feelSelect, select('REGISTRE', [['-1', 'Greu (veu d’home)'], ['0', 'Mitjà'], ['1', 'Agut (veu de dona)']], String(clip.register ?? 0),

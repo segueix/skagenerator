@@ -492,7 +492,8 @@ function createPerformance(spec) {
       const pitch = punk || k % 4 === 0 ? chord.root : k % 4 === 1 ? nearest(chord.root + 4, chord.pcs, chord.root, chord.root + 12) : k % 4 === 2 ? chord.root + 7 : chord.root + 12;
       note(2, pitch, t0 + t * beat, ending ? bar * .8 : beat * (punk ? .43 : .8), k % 2 ? 88 : 103, .003);
     });
-    if (has('organ')) {
+    // (Quan l'orgue o el piano porten la melodia, no fan el seu acompanyament: el contratemps el manté la guitarra.)
+    if (has('organ') && !Array.isArray(spec.lines?.organ)) {
       // Orgue: contratemps, «bubble», sostingut, blanques o síncopa.
       const organPatterns = [[[.5, .38], [1.5, .38], [2.5, .38], [3.5, .38]],
         [[.5, .22], [.75, .16], [1.5, .22], [1.75, .16], [2.5, .22], [2.75, .16], [3.5, .22], [3.75, .16]],
@@ -501,7 +502,7 @@ function createPerformance(spec) {
       for (const [t, length] of organ) chord.notes.forEach((pitch, k) =>
         note(11, pitch + (length < 1 ? 12 : 0), t0 + t * beat + k * .003, length * beat, (t % 1 === .5 ? 74 : 60) - (soft ? 8 : 0), .003));
     }
-    if (has('piano')) {
+    if (has('piano') && !Array.isArray(spec.lines?.piano)) {
       // Piano vertical: contratemps, «bounce» de music-hall (baix a l'esquerra, acords a la dreta),
       // boogie (baix caminant a corxeres), acords llargs o corxeres martellejades.
       const pattern = (spec.layers?.piano ?? 0) % 5, drop = soft ? 8 : 0;
@@ -602,6 +603,21 @@ function createPerformance(spec) {
         if (has('synthBass')) note(7,Math.max(24,pitch-12),(b*4+t)*beat,length*beat,Math.min(127,Math.round(105*strength)),0);
       }
   }
+  // Orgue i piano amb melodia (tema, solo, riff o respostes): l'orgue, lligat i amb l'octava de sota més fluixa
+  // (a l'estil de l'orgue de l'ska jamaicà); el piano, a octaves, com la mà dreta d'un pianista de ska.
+  for (const [name, channel] of [['organ', 11], ['piano', PIANO]]) {
+    const melody = spec.lines?.[name];
+    if (!has(name) || !Array.isArray(melody)) continue;
+    melody.forEach(([b, t, pitch, duration], i) => {
+      if (finale && b === spec.chords.length - 1) return; // l'últim compàs és el cop final de tota la banda
+      const at = b * bar + t * beat, next = melody[i + 1];
+      const legato = next && Math.abs(next[0] * 4 + next[1] - (b * 4 + t + duration)) < .01;
+      const length = Math.max(.06, duration * beat - (legato ? .01 : name === 'piano' ? .02 : .05));
+      const force = t % 1 === 0 ? 92 : 84;
+      note(channel, pitch, at, length, force, .004);
+      note(channel, pitch - 12, at + .002, length, force - (name === 'organ' ? 26 : 14), .004);
+    });
+  }
   // Melodia de veu: lligada (com si es cantés) i amb la mateixa articulació
   // expressiva dels metalls: entrada suau, crescendo i vibrato a les notes llargues.
   const vocalLine = Array.isArray(spec.lines?.vocal) ? spec.lines.vocal : spec.melody;
@@ -675,7 +691,9 @@ function createPerformance(spec) {
       horn(channel, played, at, length, force, accent, connected, slurred, joinedPrevious, endsPhrase);
       // Amb la secció repartint-se l'acord (riff o resposta), el segon músic dobla la seva veu a
       // l'uníson (més cos sense embrutar l'acord); amb una melodia pròpia, fa la tercera per sota.
-      const unison = ['riff', 'answer'].includes(spec.lineModes?.[instrument]);
+      // (També quan la secció toca el tema a l'uníson o ja harmonitzada a veus: el segon músic dobla la seva veu.)
+      const themeWinds = ['trumpet', 'sax', 'trombone'].filter(name => ['theme', 'counter'].includes(spec.lineModes?.[name])).length;
+      const unison = ['riff', 'answer'].includes(spec.lineModes?.[instrument]) || (themeWinds >= 2 && ['theme', 'counter'].includes(spec.lineModes?.[instrument]));
       if (SECOND[channel] !== undefined)
         horn(SECOND[channel], unison ? played : thirdBelow(played, chord, lowest), at, length, force - (spec.shout ? 4 : 10), accent, connected, slurred, joinedPrevious, endsPhrase);
       // (El tercer trompetista dobla la principal: si la nota anterior l'ha tocada una octava avall

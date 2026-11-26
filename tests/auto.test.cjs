@@ -543,21 +543,30 @@ test('punk: les guitarres solistes triades es poden fer sonar per torns', () => 
   }
 });
 
-test('ska instrumental: els vents ocupen entre el 75 i el 90 % dels compassos', () => {
-  const HORNS = ['trumpet', 'trombone', 'sax'];
-  const occupancy = song => {
-    let total = 0, on = 0;
-    for (const sec of song.sections) for (let b = 0; b < sec.bars; b++) {
-      total++;
-      const bar = sec.start + b;
-      if (song.clips.some(c => HORNS.includes(c.instrument) && c.start <= bar && bar < c.start + c.bars && !(sec.mute || []).includes(c.instrument)
-        && (sec.entrance?.[c.instrument] ?? 0) <= b && b < (sec.exit?.[c.instrument] ?? sec.bars))) on++;
+test('ska instrumental: els vents porten la melodia entre el 50 i el 80 % (uns 65 % de mitjana) i la resta es reparteix com una banda', () => {
+  const shares = [], bars = Object.fromEntries(builder.LEAD_ROLES.map(role => [role, 0]));
+  let total = 0;
+  for (const key of ['jamaican', 'rocksteady', 'twotone', 'nutty', 'bossreggae', 'skaswing', 'skapunk']) for (let seed = 1; seed <= 12; seed++) {
+    const song = builder.createAutoSong(engine, key, { seed: seed * 7, vocal: false, minutes: 2 + seed % 3, candidates: 1 });
+    const leads = song.sections.flatMap(sec => sec.leads);
+    // Cada compàs té un protagonista (o és un passatge rítmic), sense forats ni encavalcaments.
+    for (const sec of song.sections) {
+      const covered = sec.leads.map(([offset, n]) => [offset, offset + n]).sort((a, b) => a[0] - b[0]);
+      assert.equal(covered[0][0], 0); assert.equal(covered.at(-1)[1], sec.bars);
+      covered.forEach(([from], i) => i && assert.equal(from, covered[i - 1][1]));
     }
-    return on / total;
-  };
-  for (const key of ['jamaican', 'rocksteady', 'twotone', 'nutty', 'bossreggae', 'skaswing', 'skapunk']) for (const seed of [7, 70, 700]) {
-    const value = occupancy(builder.createAutoSong(engine, key, { seed, vocal: false, minutes: 3 }));
-    assert(value >= .74 && value <= .91, `${key} ${seed}: ${(value * 100).toFixed(0)} %`);
+    const share = builder.windShareOf(leads);
+    assert(share >= .5 && share <= .8, `${key} ${seed}: vents ${(share * 100).toFixed(0)} %`);
+    shares.push(share);
+    for (const [, n, role] of leads) { bars[role] += n; total += n; }
+  }
+  const mean = shares.reduce((a, b) => a + b) / shares.length;
+  assert(mean > .6 && mean < .7, `mitjana dels vents: ${(mean * 100).toFixed(1)} %`);
+  assert(Math.max(...shares) - Math.min(...shares) > .15, 'el pes dels vents varia d\'una cançó a l\'altra');
+  // Repartiment de referència (en % de compassos), amb marge.
+  for (const [role, share] of Object.entries(builder.LEAD_SHARE)) {
+    const got = 100 * bars[role] / total;
+    assert(Math.abs(got - share) <= (role === 'section' ? 7 : 4), `${role}: ${got.toFixed(1)} % (referència ${share} %)`);
   }
 });
 

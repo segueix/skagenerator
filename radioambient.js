@@ -2729,6 +2729,106 @@
         }
         return [second, third];
     }
+    // ── Repartiment de la melodia (ska instrumental) ──────────────────────
+    // Modes de línia de cada instrument: riff de la cançó, resposta (frases breus als buits de la melodia
+    // principal), melodia de solista pròpia, tema de la cançó (el mateix a cada estrofa o tornada, amb
+    // variacions) i contrapunt (notes llargues de l'acord que es mouen en sentit contrari a la melodia).
+    const LINE_MODE_INSTRUMENTS = {
+        riff: ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3', 'organ', 'piano', 'bass'],
+        answer: ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3', 'organ', 'piano'],
+        lead: ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3', 'organ', 'piano', 'bass'],
+        theme: ['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3', 'organ', 'piano', 'bass'],
+        counter: ['trumpet', 'trombone', 'sax', 'guitar3', 'organ']
+    };
+    const validLineMode = (name, mode) => Object.hasOwn(LINE_MODE_INSTRUMENTS, mode) && LINE_MODE_INSTRUMENTS[mode].includes(name);
+    // Registre de cada instrument quan porta una línia (la frase es mou sencera d'octava i només es pleguen les notes que en surten).
+    const LINE_RANGES = { trumpet: [60, 81], sax: [55, 76], trombone: [45, 67], synthLead: [60, 84], guitar3: [62, 81], organ: [60, 84], piano: [60, 84], bass: [36, 55] };
+    function fitRange(line, [lo, hi]) {
+        if (!line.length) return line;
+        let best = 0, inside = -1;
+        for (const k of [0, -1, 1, -2, 2, -3]) { const n = line.filter(([, , p]) => p + 12 * k >= lo && p + 12 * k <= hi).length; if (n > inside) { inside = n; best = k; } }
+        return line.map(([b, t, p, d]) => { let q = p + 12 * best; while (q > hi) q -= 12; while (q < lo) q += 12; return [b, t, q, d]; });
+    }
+    // Variacions del tema quan torna: 1 anticipacions (notes a temps avançades mig temps, a l'estil de l'ska),
+    // 2 notes de pas als salts de tercera, 3 eco del motiu (la segona meitat de cada frase de quatre compassos
+    // repeteix la primera, ajustada als acords). 0, el tema tal com és.
+    function varyTheme(notes, variant, chords, scalePcs, bars) {
+        const v = variant === 3 && bars < 4 ? 1 : variant;
+        if (!v) return notes;
+        const copy = notes.map(n => n.slice()).sort((a, b) => a[0] * 4 + a[1] - (b[0] * 4 + b[1]));
+        const at = n => n[0] * 4 + n[1], end = n => at(n) + n[3];
+        if (v === 1) {
+            // Les notes a temps que tenen lloc abans entren mig temps abans (l'última de cada frase, no: és la resolució).
+            for (let i = 1; i < copy.length - 1; i++) {
+                const n = copy[i], prev = copy[i - 1];
+                if (n[1] % 1 === 0 && end(prev) <= at(n) - .5 && at(n) - .5 >= 0) { const t = at(n) - .5; n[0] = Math.floor(t / 4); n[1] = t % 4; n[3] += .5; }
+            }
+            if (copy.some((n, i) => at(n) !== at(notes[i]))) return copy;
+            // Sense lloc per avançar-ne cap: les notes llargues a temps entren mig temps més tard (tocat «endarrerit»).
+            let moved = false;
+            for (const n of copy.slice(1, -1)) if (n[1] % 1 === 0 && n[3] >= 1) { n[1] += .5; n[3] -= .5; moved = true; }
+            return moved ? copy : varyTheme(notes, 2, chords, scalePcs, bars);
+        }
+        if (v === 2) {
+            const out = [];
+            copy.forEach((n, i) => {
+                const next = copy[i + 1], leap = next ? Math.abs(next[2] - n[2]) : 0;
+                if (next && n[3] >= 1 && leap >= 3 && leap <= 5 && Math.abs(end(n) - at(next)) < .01) {
+                    const dir = Math.sign(next[2] - n[2]);
+                    let q = n[2] + dir; while (!scalePcs.includes(((q % 12) + 12) % 12)) q += dir;
+                    if (q !== next[2]) { const t = end(n) - .5; out.push([n[0], n[1], n[2], n[3] - .5], [Math.floor(t / 4), t % 4, q, .5]); return; }
+                }
+                out.push(n);
+            });
+            return out;
+        }
+        const out = [];
+        for (const n of copy) {
+            const pos = n[0] % 4;
+            if (pos >= 2) continue;
+            out.push(n);
+            const b = n[0] + 2;
+            if (b >= bars) continue;
+            const chord = chords[b];
+            out.push([b, n[1], n[1] % 1 === 0 ? nearestTone(n[2], chord.pcs, n[2] - 5, n[2] + 5) : moveByScale(n[2], 0, scalePcs, chord, n[2] - 5, n[2] + 5), n[3]]);
+        }
+        return out.sort((a, b) => at(a) - at(b));
+    }
+    // Respiració de les frases (pregunta i resposta): el tema i les melodies de solista callen al final de cada
+    // frase de dos compassos (temps i mig) i de quatre (dos temps), on hi caben les respostes dels altres músics.
+    function breatheLine(line) {
+        const restAt = b => b % 4 === 3 ? 2 : 2.5; // als compassos senars (final de frase)
+        const out = [];
+        for (const [b, t, p, d] of line) {
+            if (b % 2 === 1) { if (t < restAt(b)) out.push([b, t, p, Math.max(.25, Math.min(d, restAt(b) - t))]); continue; }
+            out.push([b, t, p, Math.min(d, 4 + restAt(b + 1) - t)]);
+        }
+        return out;
+    }
+    // Contrapunt: dues notes llargues per compàs, de l'acord, que es mouen poc i en sentit contrari a la melodia
+    // (i mai a l'uníson o a l'octava de la nota que sona).
+    function counterLine(lead, chords, bars, [lo, hi]) {
+        const out = [];
+        let prev = Math.round((lo + hi) / 2);
+        for (let b = 0; b < bars; b++) for (const half of [0, 2]) {
+            const chord = chords[b], seg = lead.filter(n => n[0] === b && n[1] >= half && n[1] < half + 2);
+            const dir = seg.length > 1 ? Math.sign(seg.at(-1)[2] - seg[0][2]) : 0;
+            const sounding = lead.find(n => n[0] === b && n[1] <= half && n[1] + n[3] > half) || seg[0];
+            let best = null, bestScore = Infinity;
+            for (let p = lo; p <= hi; p++) {
+                const pc = ((p % 12) + 12) % 12;
+                if (!chord.pcs.includes(pc)) continue;
+                let score = Math.abs(p - prev);
+                if (dir && Math.sign(p - prev) === dir) score += 3;
+                if (pc === ((chord.root % 12) + 12) % 12) score += 1.5;
+                if (sounding && ((sounding[2] - p) % 12 + 12) % 12 === 0) score += 6;
+                if (score < bestScore) { bestScore = score; best = p; }
+            }
+            if (best === null) continue;
+            out.push([b, half, best, 1.9]); prev = best;
+        }
+        return out;
+    }
     // Respostes: fragments del riff als silencis de la veu (pregunta i resposta).
     // Variant (versió de la capa menys 1): 0 com sempre; 1 el fragment al revés (mirall);
     // 2 el mateix fragment començant més amunt (seqüència); 3 més avall i al revés.
@@ -3037,9 +3137,11 @@
         if (part.pedal !== undefined && typeof part.pedal !== 'boolean') throw new Error('Pedal no vàlid');
         if (part.stopTime !== undefined && (!Number.isInteger(part.stopTime) || part.stopTime < 1 || part.stopTime > 8)) throw new Error('Stop time no vàlid');
         if (part.lineModes !== undefined && (!part.lineModes || typeof part.lineModes !== 'object' || Array.isArray(part.lineModes)
-            || Object.entries(part.lineModes).some(([name, mode]) => !['trumpet', 'trombone', 'sax', 'synthLead', 'guitar3'].includes(name)
-                || !(['riff', 'answer'].includes(mode) || mode === 'lead' && name === 'guitar3'))))
+            || Object.entries(part.lineModes).some(([name, mode]) => !validLineMode(name, mode))))
             throw new Error('Mode de línia no vàlid');
+        // Secció de vents que toca el tema: tots a l'uníson (cadascú al seu registre) o harmonitzada a veus.
+        if (part.texture !== undefined && !['unison', 'harmony'].includes(part.texture)) throw new Error('Textura dels vents no vàlida');
+        if (part.themeVariant !== undefined && (!Number.isInteger(part.themeVariant) || part.themeVariant < 0 || part.themeVariant > 3)) throw new Error('Variació del tema no vàlida');
         if (part.syllables !== undefined && (!Array.isArray(part.syllables) || part.syllables.length > 32
             || part.syllables.some(n => !Number.isInteger(n) || n < 1 || n > 24))) throw new Error('Síl·labes de la lletra no vàlides');
         if (part.stress !== undefined && (!Array.isArray(part.stress) || part.stress.length > 32 || part.stress.some(list => !Array.isArray(list)
@@ -3301,18 +3403,43 @@
         }
         if (part.lineModes) {
             const riff = composeRiff(settings.seed >>> 0, settings.style === 'punk', settings.subgenre);
-            const voiceLine = lines.vocal || null;
-            for (const [name, how] of Object.entries(part.lineModes)) {
-                if (!(name in layers)) continue;
-                // Guitarra solista amb melodia pròpia (tema o solo), com un vent.
-                if (how === 'lead') { lines[name] = ownLine(name, layers[name], saltOf(name), 72); continue; }
+            // (Els instruments de la base —orgue, piano, baix— no tenen capa: també poden portar una línia.)
+            const plays = name => name in layers || instruments.includes(name);
+            const modes = Object.entries(part.lineModes).filter(([name]) => plays(name));
+            // (Al punk, la guitarra solista i els vents mantenen la manera de sempre: només s'ajusta el registre a l'ska.)
+            const fit = (name, line) => LINE_RANGES[name] && (settings.style === 'ska' || ['organ', 'piano', 'bass'].includes(name)) ? fitRange(line, LINE_RANGES[name]) : line;
+            // Tema de la cançó: el mateix per a totes les seccions iguals (depèn de la cançó i dels acords), amb variacions quan torna.
+            let theme = null;
+            const themeLine = () => theme ??= varyTheme(ownLine('theme', 1, saltOf('theme'), 72), part.themeVariant || 0, chords, ctx.scalePcs, bars);
+            // Primer, les melodies (tema i solos); després el riff, i al final les respostes i els contrapunts, que
+            // s'hi han d'encaixar.
+            // (A l'ska, el tema i els solos respiren al final de cada frase.)
+            const phrase = line => settings.style === 'ska' ? breatheLine(line) : line;
+            for (const [name, how] of modes) {
+                if (how === 'lead') lines[name] = fit(name, phrase(ownLine(name, layers[name] || 1, saltOf(name), 72)));
+                if (how === 'theme') lines[name] = fit(name, phrase(themeLine()));
+            }
+            const themeWinds = ['trumpet', 'sax', 'trombone'].filter(name => part.lineModes[name] === 'theme' && plays(name));
+            if (themeWinds.length >= 2 && part.texture !== 'unison') {
+                // Harmonitzada: la veu de dalt fa el tema i les altres es reparteixen l'acord per sota.
+                const [top, ...rest] = themeWinds, [second, third] = voiceSection(lines[top], chords, ctx.scalePcs);
+                rest.forEach((name, i) => { lines[name] = fit(name, i === 0 ? second : third); });
+            }
+            const leader = name => { for (const how of ['theme', 'lead']) for (const [other, mode] of modes) if (other !== name && mode === how && lines[other]) return lines[other]; return null; };
+            for (const [name, how] of modes) {
+                if (how === 'lead' || how === 'theme') continue;
+                if (how === 'counter') { lines[name] = counterLine(leader(name) || themeLine(), chords, bars, LINE_RANGES[name]); continue; }
+                const voiceLine = lines.vocal || leader(name);
                 // Hardcore: el riff es mou per semitons (riff cromàtic).
                 const riffScale = settings.subgenre === 'hardcore' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : ctx.scalePcs;
                 const line = how === 'riff' ? realizeRiff(riff, chords, bars, riffScale, 0, bars * 4, null, settings.style === 'ska') : answerLine(riff, chords, bars, ctx.scalePcs, voiceLine, (layers[name] || 1) - 1);
                 // Trombó/segona veu: el riff harmonitzat una tercera per sota.
                 // També a les respostes: amb la trompeta, el trombó fa la segona veu i no l'uníson.
-                lines[name] = name === 'trombone' && (how === 'riff' || how === 'answer') ? harmonize(line, chords, ctx.scalePcs) : line;
+                lines[name] = name === 'trombone' && (how === 'riff' || how === 'answer') ? harmonize(line, chords, ctx.scalePcs)
+                    : ['organ', 'piano', 'bass'].includes(name) || (name === 'guitar3' && settings.style === 'ska') ? fit(name, line) : line;
             }
+            // Baix melòdic: la seva línia substitueix el patró del baix (sempre dins del registre del baix).
+            if (Array.isArray(lines.bass)) bassLine.splice(0, bassLine.length, ...lines.bass.map(([b, t, p, d]) => [b, t, p, Math.min(d, 4 - t), t % 1 === 0 ? 1.1 : 1]));
             // Secció de vents a tres veus: quan la trompeta fa el riff o la resposta i el saxo o el trombó
             // la toquen amb ella, no van en terceres paral·leles sinó repartint-se l'acord (veus tancades):
             // trompeta a dalt, saxo la nota de l'acord de sota i trombó la següent.
@@ -3462,7 +3589,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
