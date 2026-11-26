@@ -12,7 +12,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23172c28'/%3E%3Cpath d='M12 28V15l16-4v13M12 19l16-4' stroke='%23d5f28b' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="radio.css">
   <script>document.documentElement.classList.add('radio-on')</script>
-  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="lyrics-ca.js"></script><script defer src="lyrics.js"></script><script defer src="song-builder.js"></script><script defer src="app.js"></script><script defer src="browser-singing.js"></script><script defer src="umidaji-browser.js"></script><script defer src="radio.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script><script defer src="radioambient.js"></script><script defer src="sample-audio.js"></script><script defer src="audio-utils.js"></script><script defer src="lyrics-ca.js"></script><script defer src="lyrics.js"></script><script defer src="song-builder.js"></script><script defer src="app.js"></script><script defer src="browser-singing.js"></script><script defer src="umidaji-browser.js"></script><script defer src="radio.js"></script><script defer src="visualizer.js"></script>
 </head>
 <body>
   <div class="radio" id="radio">
@@ -52,6 +52,41 @@
       <p class="radio-foot">Cada cançó es compon i es grava al teu dispositiu mentre sona l’anterior. La primera vegada es baixen els instruments (uns 50 MB): millor amb wifi.</p>
     </section>
 
+    <section class="radio-screen radio-batucada-setup" id="radio-batucada" aria-labelledby="radio-batucada-title" hidden>
+      <p class="radio-kicker">ABANS DE COMENÇAR</p>
+      <h1 id="radio-batucada-title">Batucada</h1>
+      <p class="opening-help">Si vols, compon els primers segons de la primera cançó: un instrument sol, el seu ritme i els xiulets del mestre. Després hi entra tota la batucada i la cançó es genera a partir d’aquí. Un cop sona, ja no es pot canviar.</p>
+      <details class="opening-panel" id="opening-panel">
+        <summary><span>🥁 Compon l’inici</span> <small id="opening-summary"></small></summary>
+        <div class="opening-form">
+          <label class="opening-check opening-use"><input type="checkbox" id="opening-use" checked> Comença la primera cançó amb aquest inici</label>
+          <div class="opening-row">
+            <label>Instrument <select id="opening-row"></select></label>
+            <label>Estil <select id="opening-style"></select></label>
+          </div>
+          <label class="opening-tempo">Tempo <input type="range" id="opening-bpm" min="94" max="144" step="1"><output id="opening-length"></output></label>
+          <fieldset class="opening-grid-box">
+            <legend>Ritme de l’instrument</legend>
+            <div class="opening-row">
+              <label>Patró <select id="opening-preset"></select></label>
+              <label class="opening-check"><input type="checkbox" id="opening-roll" checked> Redoble que creix a l’últim compàs</label>
+            </div>
+            <div class="opening-grid" id="opening-steps"></div>
+          </fieldset>
+          <fieldset class="opening-grid-box">
+            <legend>Xiulets <small id="opening-whistle-count"></small></legend>
+            <p class="opening-help">Toca una casella: xiulet curt (●), llarg (—) o res.</p>
+            <div class="opening-grid" id="opening-whistles"></div>
+            <button type="button" class="opening-link" id="opening-whistle-clear">Treu tots els xiulets</button>
+          </fieldset>
+        </div>
+      </details>
+      <p class="opening-status" id="opening-status" role="status"></p>
+      <div class="opening-actions">
+        <button type="button" class="radio-button" id="opening-preview">▶ Escolta l’inici</button>
+        <button type="button" class="radio-button primary" id="opening-go">▶ Comença la batucada</button>
+      </div>
+    </section>
     <section class="radio-screen radio-player" id="radio-player" aria-label="Reproductor" hidden>
       <div class="player-stage">
         <div class="player-disc" id="radio-disc" aria-hidden="true"><span class="disc-label" id="radio-disc-label">SKA</span></div>
@@ -67,7 +102,7 @@
         <h2 id="radio-title">Radio Spam</h2>
         <p class="player-meta" id="radio-meta"></p>
         <p class="player-section" id="radio-section" aria-live="off"></p>
-        <div class="player-kit" id="radio-kit" hidden><p class="player-kit-title">Ara sonen</p><ul aria-label="Instruments de la batucada (s’encenen quan sonen)"></ul></div>
+        <div class="player-kit" id="radio-kit" hidden><p class="player-kit-title">Ara sonen</p><ul aria-label="Instruments de la batucada (s’encenen quan sonen)"></ul><button type="button" class="radio-button player-visualizer" id="radio-visualizer">🎬 Visualitzador VaTuCalla!</button></div>
         <div class="player-lyrics" id="radio-lyrics" hidden><p class="lyric-now" id="radio-lyric-now">♪</p><p class="lyric-next" id="radio-lyric-next"></p></div>
       </div>
       <div class="player-progress">

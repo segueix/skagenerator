@@ -556,3 +556,34 @@ test('cada nota del kit de batucada se sap de quin instrument és (per mostrar q
   const line = engine.composeSongPart(song.settings, { ...song.sections[1], instruments: ['drums'], revision: 1 }).batucadaLine;
   assert(line.length && line.every(h => engine.batucadaRowOf(h[2]) >= 0));
 });
+
+test('inici compost: l\'instrument, el ritme i els xiulets triats sonen els primers ~6 s, i després la cançó', () => {
+  const builder = require('../song-builder.js');
+  const opening = { row: 10, steps: ['1000101010001010', '1000101010001010', '1000100010001000'], whistles: [[0, 0, 'long'], [1, 8, 'short'], [1, 10, 'short'], [2, 4, 'long']], roll: true };
+  assert(engine.validBatucadaOpening(opening));
+  for (const bad of [{ ...opening, row: 9 }, { ...opening, steps: [] }, { ...opening, steps: ['101'] }, { ...opening, whistles: [[0, 16, 'short']] }, { ...opening, whistles: [[0, 0, 'mig']] }, { ...opening, extra: 1 }])
+    assert(!engine.validBatucadaOpening(bad), JSON.stringify(bad));
+  // Uns 6 segons: entre 2 i 4 compassos segons el tempo.
+  assert.deepEqual([94, 110, 132, 144].map(builder.openingBars), [2, 3, 3, 4]);
+  for (const rhythm of ['samba', 'reggae', 'ijexa', 'percudium']) {
+    const song = builder.createBatucadaSong(engine, { seed: 21, rhythm, bpm: 120, opening });
+    const [first, second] = [...song.sections].sort((a, b) => a.start - b.start);
+    assert.equal(first.type, 'intro'); assert.deepEqual(first.batucada.opening, opening);
+    assert.equal(first.bars, builder.openingBars(song.settings.bpm === 100 && song.sections[0].bpm ? song.sections[0].bpm : song.settings.bpm));
+    assert(!song.settings.countIn, 'sense compte d\'entrada: l\'inici és el triat');
+    const line = engine.composeSongPart(song.settings, { ...first, instruments: ['drums'], revision: 1 }).batucadaLine;
+    // Només el tabal (negra o corxera) i el xiulet, un sol músic.
+    assert(line.every(h => [84, 85, engine.BATUCADA_WHISTLE.note].includes(h[2]) && !h[6]), `${rhythm}: només l'instrument triat`);
+    const whistles = line.filter(h => h[2] === engine.BATUCADA_WHISTLE.note).map(h => [h[0], h[1] * 4, h[4] > .3 ? 'long' : 'short']);
+    assert.deepEqual(whistles, opening.whistles.filter(([b]) => b < first.bars).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(([b, s, k]) => [b, s, k]));
+    // Primers compassos amb el ritme triat; l'últim, el redoble que creix.
+    const beats = bar => line.filter(h => h[0] === bar && h[2] !== engine.BATUCADA_WHISTLE.note).map(h => h[1] * 4);
+    assert.deepEqual(beats(0), [0, 4, 6, 8, 12, 14]);
+    const roll = line.filter(h => h[0] === first.bars - 1 && h[2] !== engine.BATUCADA_WHISTLE.note);
+    assert(roll.length === 12 && roll.at(-1)[3] > roll[0][3], 'redoble que creix');
+    // Després entra tota la batucada.
+    const after = engine.composeSongPart(song.settings, { ...second, instruments: ['drums'], revision: 1, ...(second.batucadaPattern ? { batucadaPattern: second.batucadaPattern } : {}) }).batucadaLine;
+    assert(new Set(after.map(h => engine.batucadaRowOf(h[2]))).size >= 6, `${rhythm}: entra tota la colla`);
+  }
+  assert.throws(() => builder.createBatucadaSong(engine, { seed: 1, opening: { ...opening, row: 99 } }), /Inici/);
+});
