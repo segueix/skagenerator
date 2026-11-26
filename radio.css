@@ -313,3 +313,30 @@ body.vtc-open { overflow: hidden; }
   .opening-cell { height: 28px; border-radius: 5px; font-size: 12px; }
   .opening-form select { min-width: 130px; }
 }
+/* Historial: cerca, ordre, llistes, selecció, neteja i «Desfés». */
+.history-tools { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.history-tools input, .history-tools select, .history-manage select, .history-bulk select, .history-list-select {
+  min-height: 40px; padding: 8px 12px; border-radius: 12px; border: 1.5px solid var(--r-line); background: var(--r-card); color: var(--r-text); font: inherit; font-size: 14px; }
+.history-tools input { min-width: 0; }
+.history-manage, .history-list-tools, .history-bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.history-manage select { flex: 0 1 auto; }
+.history-list-tools span { font-weight: 800; margin-right: 4px; }
+.history-bulk { position: sticky; top: 0; z-index: 2; padding: 10px; border-radius: 14px; background: var(--r-card-2); border: 1.5px solid var(--st); }
+.history-bulk span { font-weight: 800; margin-right: auto; }
+.history-bulk .danger { border-color: #f87171; color: #fecaca; }
+.history-bulk button:disabled, .history-bulk select:disabled { opacity: .45; }
+.history-pick { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--st); }
+.history-item.picked { border-color: var(--st); background: color-mix(in srgb, var(--st) 8%, var(--r-card)); }
+.history-tags { color: var(--st); font-size: 12px; font-weight: 700; }
+.history-list-select { min-height: 44px; }
+.history-undo { position: sticky; bottom: 8px; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px;
+  border-radius: 14px; background: #fff; color: #14121d; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); }
+.history-undo .radio-chip { background: #14121d; color: #fff; }
+.history-undo[hidden], .history-bulk[hidden], .history-list-tools[hidden] { display: none; }
+/* (Els desplegables de l'historial, a la seva mida i en fila: no ocupen tota l'amplada.) */
+.radio .history-manage select, .radio .history-bulk select, .radio .history-tools select, .radio .history-list-select { width: auto; max-width: 100%; }
+.history-manage > *, .history-list-tools > * { flex: 0 1 auto; }
+.history-undo { bottom: 72px; }
+.radio .history-manage select { width: 9.5em; }
+.history-manage { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.history-manage::-webkit-scrollbar { display: none; }

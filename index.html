@@ -124,7 +124,7 @@
     <section class="radio-screen radio-history" id="radio-history" aria-labelledby="radio-history-title" hidden>
       <div class="history-head"><h2 id="radio-history-title">Historial</h2><button type="button" class="radio-icon" id="radio-history-close" aria-label="Tanca l’historial">×</button></div>
       <p class="history-summary" id="radio-history-summary"></p>
-      <div class="history-filters" role="group" aria-label="Filtre de l’historial">
+      <div class="history-filters" id="history-filters" role="group" aria-label="Filtre de l’historial">
         <button type="button" class="radio-chip" data-filter="all" aria-pressed="true">Totes</button>
         <button type="button" class="radio-chip" data-filter="ska" aria-pressed="false">Ska</button>
         <button type="button" class="radio-chip" data-filter="punk" aria-pressed="false">Punk</button>
@@ -132,6 +132,31 @@
         <button type="button" class="radio-chip" data-filter="up" aria-pressed="false">👍</button>
         <button type="button" class="radio-chip" data-filter="down" aria-pressed="false">👎</button>
         <button type="button" class="radio-chip" data-filter="comment" aria-pressed="false">💬</button>
+      </div>
+      <div class="history-tools">
+        <input type="search" id="history-search" placeholder="Cerca per títol, estil o comentari" aria-label="Cerca a l’historial">
+        <select id="history-sort" aria-label="Ordena l’historial">
+          <option value="recent">Més recents</option><option value="old">Més antigues</option><option value="title">Títol A–Z</option>
+          <option value="plays">Més sonades</option><option value="votes">Millor valorades</option><option value="long">Més llargues</option>
+        </select>
+      </div>
+      <div class="history-manage">
+        <button type="button" class="radio-chip" id="history-select" aria-pressed="false">☑ Selecciona</button>
+        <select id="history-clean" aria-label="Neteja l’historial"><option value="">🧹 Neteja…</option></select>
+        <button type="button" class="radio-chip" id="history-new-list">＋ Llista nova</button>
+      </div>
+      <div class="history-list-tools" id="history-list-tools" hidden>
+        <span id="history-list-name"></span>
+        <button type="button" class="radio-chip" id="history-list-rename">✎ Reanomena</button>
+        <button type="button" class="radio-chip" id="history-list-delete">Esborra la llista</button>
+      </div>
+      <div class="history-bulk" id="history-bulk" hidden>
+        <span id="history-bulk-count">0 seleccionades</span>
+        <button type="button" class="radio-chip" id="history-bulk-all">Totes</button>
+        <button type="button" class="radio-chip" id="history-bulk-none">Cap</button>
+        <select id="history-bulk-list" aria-label="Afegeix les seleccionades a una llista"></select>
+        <button type="button" class="radio-chip danger" id="history-bulk-delete">🗑 Esborra</button>
+        <button type="button" class="radio-chip" id="history-bulk-done">Fet</button>
       </div>
       <div class="history-actions">
         <button type="button" class="radio-button primary" id="radio-export">⇩ Exporta per millorar</button>
@@ -141,6 +166,7 @@
       <p class="history-operation" id="radio-history-status" role="status"></p>
       <ol class="history-list" id="radio-history-list"></ol>
       <p class="history-empty" id="radio-history-empty" hidden>Encara no ha sonat cap cançó. Tria una emissora i comença a escoltar.</p>
+      <div class="history-undo" id="history-undo" role="status" hidden><span id="history-undo-text"></span><button type="button" class="radio-chip" id="history-undo-go">↶ Desfés</button></div>
     </section>
     <p class="radio-toast" id="radio-toast" role="status" aria-live="polite"></p>
   </div>
