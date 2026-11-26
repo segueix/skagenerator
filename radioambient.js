@@ -1979,6 +1979,19 @@
     const BATUCADA_TUTTI = ['1001001000101000', '1000100010101010', '1011010010110100', '1001001001001010', '1010001010100010', '1110111011100000'];
     // Opcions de batucada d'una secció: moment clau (puja molt), xiulet del mestre, convenção de tots i cadena de cuíca.
     // counter: a la banda, el segon músic de surdo 3, caixa i tamborim toca una altra figura alhora (0–3).
+    // Inici escollit (els primers segons de la cançó): un instrument sol (qualsevol peça menys el xiulet) amb
+    // el seu ritme compàs a compàs (setze caixetes), xiulets del mestre curts o llargs on es vulgui, i,
+    // si es vol, un redoble que creix a l'últim compàs. Després entra tota la batucada.
+    const OPENING_ROLL = '1010101011111111';
+    function validBatucadaOpening(o) {
+        return !!o && typeof o === 'object' && !Array.isArray(o)
+            && Object.keys(o).every(key => ['row', 'steps', 'whistles', 'roll'].includes(key))
+            && Number.isInteger(o.row) && o.row >= 0 && o.row < BATUCADA.length && BATUCADA[o.row].note !== BATUCADA_WHISTLE.note
+            && Array.isArray(o.steps) && o.steps.length >= 1 && o.steps.length <= 4 && o.steps.every(row => typeof row === 'string' && /^[01]{16}$/.test(row))
+            && Array.isArray(o.whistles) && o.whistles.length <= 32 && o.whistles.every(w => Array.isArray(w) && w.length === 3 && Number.isInteger(w[0]) && w[0] >= 0 && w[0] < 4
+                && Number.isInteger(w[1]) && w[1] >= 0 && w[1] < 16 && ['short', 'long'].includes(w[2]))
+            && (o.roll === undefined || typeof o.roll === 'boolean');
+    }
     function validBatucadaFx(fx) {
         return fx === undefined || !!fx && typeof fx === 'object' && !Array.isArray(fx) && Object.entries(fx).every(([key, value]) =>
             key === 'peak' || key === 'whistle' ? typeof value === 'boolean'
@@ -1986,6 +1999,7 @@
                 : key === 'cuica' ? Number.isInteger(value) && value >= 0 && value < CUICA_CHAINS.length
                 : key === 'counter' ? Number.isInteger(value) && value >= 0 && value < 4
                 : key === 'intro' ? ['timbal', 'caixa', 'repique'].includes(value)
+                : key === 'opening' ? validBatucadaOpening(value)
                 : key === 'dialog' ? value === 1 || value === 2 || value === 3
                 : key === 'finale' ? typeof value === 'boolean' : false);
     }
@@ -2260,6 +2274,17 @@
         };
         // Entrada de caixa o repique (Percudium): un sol músic fa un ritme i, alhora, el mestre xiula dos
         // xiulets curts i un de llarg; l'últim compàs creix i, a la secció següent, entren tots.
+        // Inici escollit: l'instrument tria el seu ritme compàs a compàs (si n'hi ha menys, es repeteix l'últim)
+        // i els xiulets sonen on s'han posat (curts, 0,12 s; llargs, temps i mig). Amb redoble, l'últim compàs creix.
+        const opening = (bar, last) => {
+            const o = fx.opening, roll = last && o.roll, figure = roll ? OPENING_ROLL : o.steps[Math.min(bar, o.steps.length - 1)];
+            for (let step = 0; step < 16; step++) {
+                if (figure[step] !== '1') continue;
+                const note = o.row === TABAL_ROW ? tabalNote(bar, step, figure) : undefined;
+                add(bar, step, o.row, roll ? step * 3 - 18 : step % 4 === 0 ? 4 : 0, false, [0], note);
+            }
+            for (const [b, step, kind] of o.whistles) if (b === bar) blow(bar, step, kind === 'long' ? beat * 1.5 : .12, kind === 'long' ? 8 : 6);
+        };
         const INTRO_FIGURES = { caixa: ['1111111111111111', '1111111111111111'], repique: ['1011011010110110', '1011011011111111'] };
         const solo = (bar, last) => {
             const row = fx.intro === 'caixa' ? 3 : 4, figure = INTRO_FIGURES[fx.intro][last ? 1 : 0];
@@ -2268,6 +2293,7 @@
             for (let step = 0; step < 16; step++) if (figure[step] === '1') add(bar, step, row, last ? step * 1.5 : 0, false, [0]);
         };
         for (let bar = 0; bar < bars; bar++) {
+            if (fx.opening) { opening(bar, bar === bars - 1); continue; }
             if (fx.intro === 'caixa' || fx.intro === 'repique') { solo(bar, bar === bars - 1); continue; }
             if (fx.intro === 'timbal') { timbal(bar, bar === bars - 1); continue; }
             if (fx.finale && type === 'outro') { finale(bar); continue; }
@@ -3589,7 +3615,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

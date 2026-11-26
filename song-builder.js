@@ -1470,6 +1470,8 @@
     ['de la plaça', 'del barri', 'de mitjanit', 'al carrer', 'de foc', 'del port', 'de la Rambla', 'sense fre', 'de festa major', 'del sud']];
   // Figures de solo del repique: denses, amb accents desplaçats.
   const REPIQUE_SOLOS = ['1011011010110111', '1111101110111011', '1011101101101111', '1101101101011011'];
+  // Compassos de l'inici escollit: els que fan uns 6 segons al tempo de la cançó (entre 2 i 4).
+  const openingBars = bpm => Math.max(2, Math.min(4, Math.round(6 * bpm / 240)));
   function createBatucadaSong(engine, options = {}) {
     const seed = (options.seed >>> 0) || 1, r = rng(seed), pick = list => list[Math.floor(r() * list.length)];
     const rhythms = Object.keys(BATUCADA_STYLES).filter(key => engine.BATUCADA_RHYTHMS[key]);
@@ -1481,7 +1483,12 @@
       let roll = r() * total;
       rhythm = pool.find(key => (roll -= BATUCADA_STYLES[key].weight) < 0) || pool[0];
     }
-    const [low, high] = BATUCADA_STYLES[rhythm].bpm, bpm = low + Math.floor(r() * (high - low + 1));
+    // (Un tempo triat es manté dins del de l'estil; la tirada es fa igualment perquè la resta de la cançó no canviï.)
+    const [low, high] = BATUCADA_STYLES[rhythm].bpm, drawn = low + Math.floor(r() * (high - low + 1));
+    const bpm = Number.isInteger(options.bpm) ? Math.max(low, Math.min(high, options.bpm)) : drawn;
+    // Inici escollit (vegeu openingBars): uns 6 segons amb l'instrument, el ritme i els xiulets triats.
+    const opening = options.opening && engine.validBatucadaOpening(options.opening) ? options.opening : null;
+    if (options.opening && !opening) throw new Error('Inici de batucada no vàlid');
     // La cuíca de la graella no sona: la cuíca només toca als seus arranjaments (solos de cuíca).
     // Al Percudium, la caixa (contínua) no canvia: la densitat és el seu caràcter.
     const variation = (key = rhythm) => engine.generateBatucadaPattern(key, Math.floor(r() * 4294967295) + 1)
@@ -1505,7 +1512,8 @@
     // Durada: entre 2 i 4 minuts (o la que es demani), sense passar dels límits de la cançó.
     const minutes = Math.max(1.5, Math.min(5, options.minutes ?? 2 + r() * 2));
     const barSeconds = 240 / bpm, target = Math.min(240, Math.round(minutes * 60 / barSeconds));
-    const plan = [{ type: 'intro', bars: 4, energy: 84, pattern: base, rhythm }];
+    const openingBlock = () => ({ type: 'intro', bars: openingBars(bpm), energy: 90, pattern: base, rhythm, opening });
+    const plan = [opening ? openingBlock() : { type: 'intro', bars: 4, energy: 84, pattern: base, rhythm }];
     // Entre volta i volta: canvi de ritme, paradinha, solo de repique, solo de cuíca o convenção.
     const change = others.map(key => () => ({ type: 'verse', bars: 8, energy: 90, pattern: otherPattern[key], rhythm: key }));
     // Solo de cuíca: les frases enregistrades, amb la batucada al darrere.
@@ -1528,8 +1536,9 @@
     // tots els instruments al màxim volum.
     if (alone) {
       plan.length = 0;
-      plan.push({ type: 'intro', bars: 2, energy: 92, pattern: base, rhythm, intro: r() < .5 ? 'caixa' : 'repique' });
-      bars = 2;
+      const soloIntro = r() < .5 ? 'caixa' : 'repique';
+      plan.push(opening ? openingBlock() : { type: 'intro', bars: 2, energy: 92, pattern: base, rhythm, intro: soloIntro });
+      bars = plan[0].bars;
       let dialogs = Math.floor(r() * 3), changes = 0;
       const dialog = (pattern, ending) => ({ type: 'bridge', bars: 8, energy: 92, pattern, rhythm, dialog: 1 + dialogs++ % 3, ending });
       const rhythmChange = () => { const key = others[changes++ % others.length]; return { type: 'verse', bars: 8, energy: 94, pattern: otherPattern[key], rhythm: key }; };
@@ -1591,7 +1600,7 @@
       // El mestre xiula a l'entrada, abans de cada breca i de cada canvi de ritme, i al final.
       const whistle = i === 0 || !!block.ending || block.type === 'outro' || (next && next.rhythm !== block.rhythm) || !!next?.tutti || r() < .2;
       const fx = { ...(block.peak ? { peak: true } : {}), ...(whistle ? { whistle: true } : {}), ...(block.tutti ? { tutti: block.tutti } : {}),
-        ...(block.intro ? { intro: block.intro } : {}), ...(block.dialog ? { dialog: block.dialog } : {}), ...(block.finale ? { finale: true } : {}),
+        ...(block.intro ? { intro: block.intro } : {}), ...(block.opening ? { opening: block.opening } : {}), ...(block.dialog ? { dialog: block.dialog } : {}), ...(block.finale ? { finale: true } : {}),
         ...(block.cuica !== undefined && !block.tutti ? { cuica: block.cuica } : {}),
         // Contraritmes: a la meitat de les seccions fortes, el segon músic fa una altra figura.
         // (Al Percudium, a totes: ritmes diferents alhora.)
@@ -1615,7 +1624,7 @@
     const endings = engine.BATUCADA_ENDINGS.filter(e => e !== figure.slice(8));
     const motif = { figure, ending: endings[Math.floor(own() * endings.length)] };
     const settings = { style: 'ska', bpm: Math.max(100, bpm), tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
-      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', batucadaMotif: motif, countIn: !alone,
+      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', batucadaMotif: motif, countIn: !alone && !opening,
       // Percudium: brillant, amb més caixa, repique i tamborim, però amb els surdos al seu so original (sense retallar-ne els greus).
       // Les altres batucades, 2 dB per sota: amb tres músics per peça i el mode «foc», el final i els cops de tots
       // arribaven massa forts al limitador i es distorsionaven.
@@ -1637,5 +1646,5 @@
     }
     return best.song;
   }
-  return { LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { openingBars, LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });
