@@ -21,3 +21,16 @@ test('visualitzador VaTuCalla!: es carrega a la web, es publica i es veu per sob
   // Cinc dissenys: l'Infinit i quatre de brasilers i de dibuixos animats.
   for (const design of ['infinit', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: \\{`), design);
 });
+
+test('l’editor de l’inici és només dins de la Batucada, abans de començar, i es pot plegar', () => {
+  const html = read('index.html'), radio = read('radio.js');
+  assert(!html.includes('id="opening-open"') && !html.includes('id="opening-dialog"'), 'no és a la pantalla general');
+  const setup = html.slice(html.indexOf('id="radio-batucada"'), html.indexOf('id="radio-player"'));
+  assert.match(setup, /<details class="opening-panel" id="opening-panel">/);
+  for (const id of ['opening-row', 'opening-style', 'opening-bpm', 'opening-steps', 'opening-whistles', 'opening-use', 'opening-preview', 'opening-go']) assert(setup.includes(`id="${id}"`), id);
+  // La targeta de la Batucada obre la preparació; les altres emissores comencen de seguida.
+  assert.match(radio, /button\.dataset\.station === 'batucada' \? openBatucadaSetup\(\) : chooseStation\(button\.dataset\.station\)/);
+  // L'inici només s'aplica a la primera cançó (i només si es fa servir).
+  assert.match(radio, /customOpening = design\.use !== false \?/);
+  assert.match(radio, /const custom = customOpening; customOpening = null;/);
+});

@@ -640,8 +640,9 @@
   // ── Pantalles ────────────────────────────────────────────────────────
   let historyOpen = false, filter = 'all';
   function showScreen(name) {
-    $('radio-home').hidden = name !== 'home'; $('radio-player').hidden = name !== 'player';
-    $('radio-back').hidden = name !== 'player';
+    $('radio-home').hidden = name !== 'home'; $('radio-player').hidden = name !== 'player'; $('radio-batucada').hidden = name !== 'batucada';
+    $('radio-back').hidden = name === 'home';
+    if (name !== 'batucada') stopPreview?.();
     $('radio-back').setAttribute('aria-label', station ? 'Canvia d’emissora' : 'Torna a les emissores');
     $('radio').dataset.station = name === 'player' ? station || (current ? styleOf(current.song) : '') : '';
   }
@@ -726,7 +727,7 @@
   const OPENING_PRESETS = [['negres', 'Negres', '1000100010001000'], ['corxeres', 'Corxeres', '1010101010101010'], ['samba', 'Samba', '1000101010001010'],
     ['clau', 'Clau', '1001001000101000'], ['galop', 'Galop', '1011101110111011'], ['contratemps', 'Contratemps', '0010001000100010'], ['semicorxeres', 'Semicorxeres', '1111111111111111']];
   let customOpening = null;
-  const openingDialog = $('opening-dialog'), previewAudio = new Audio();
+  const openingPanel = $('opening-panel'), previewAudio = new Audio();
   let design = (() => {
     try { const saved = JSON.parse(localStorage.getItem(OPENING_KEY)); if (saved && engine.BATUCADA_RHYTHMS[saved.style]) return saved; } catch {}
     return { row: 0, style: 'samba', bpm: 132, preset: 'negres', steps: ['1000100010001000', '1000100010001000', '1000101010001010'], roll: true,
@@ -754,7 +755,7 @@
     const grid = (box, cell) => {
       box.replaceChildren(...design.steps.map((_, b) => {
         const line = document.createElement('div'); line.className = 'opening-bar';
-        const label = document.createElement('span'); label.textContent = `Comp. ${b + 1}`; line.append(label);
+        const label = document.createElement('span'); label.textContent = innerWidth < 560 ? `${b + 1}` : `Comp. ${b + 1}`; line.append(label);
         for (let step = 0; step < 16; step++) line.append(cell(b, step));
         return line;
       }));
@@ -780,6 +781,13 @@
     });
     const short = design.whistles.filter(w => w[2] === 'short').length, long = design.whistles.length - short;
     $('opening-whistle-count').textContent = `· ${short} curt${short === 1 ? '' : 's'} i ${long} llarg${long === 1 ? '' : 's'}`;
+    // Resum a la capçalera (també amb l'editor plegat): què obrirà la cançó, o si no s'utilitza.
+    const use = design.use !== false;
+    $('opening-use').checked = use;
+    $('opening-summary').textContent = use
+      ? `${engine.BATUCADA[design.row].name} · ${bars} compassos · ${design.whistles.length} xiulet${design.whistles.length === 1 ? '' : 's'}`
+      : 'no s’utilitza: inici a l’atzar';
+    openingPanel.open = !!design.open;
   }
   function changed() { saveDesign(); renderOpening(); }
   $('opening-row').addEventListener('change', event => { design.row = Number(event.target.value); changed(); });
@@ -792,8 +800,15 @@
   });
   $('opening-roll').addEventListener('change', event => { design.roll = event.target.checked; changed(); });
   $('opening-whistle-clear').addEventListener('click', () => { design.whistles = []; changed(); });
-  $('opening-open').addEventListener('click', () => { renderOpening(); $('opening-status').textContent = ''; openingDialog.showModal(); });
-  openingDialog.addEventListener('close', () => previewAudio.pause());
+  $('opening-use').addEventListener('change', event => { design.use = event.target.checked; changed(); });
+  // L'editor es pot plegar quan no es fa servir i desplegar quan cal (es recorda).
+  openingPanel.addEventListener('toggle', () => { if (design.open !== openingPanel.open) { design.open = openingPanel.open; saveDesign(); } });
+  // Pantalla de la Batucada abans de començar: només aquí es compon l'inici (mai mentre sona una cançó).
+  function openBatucadaSetup() {
+    renderOpening(); $('opening-status').textContent = '';
+    showScreen('batucada');
+  }
+  function stopPreview() { previewing++; previewAudio.pause(); }
   // Escolta només l'inici (la ràdio es posa en pausa).
   let previewing = 0;
   $('opening-preview').addEventListener('click', async () => {
@@ -810,11 +825,10 @@
       status.textContent = `Sona l’inici (${(first.frames / RATE).toFixed(1).replace('.', ',')} s).`;
     } catch (error) { if (mine === previewing) status.textContent = `No s’ha pogut preparar: ${reasonOf(error)}`; }
   });
-  // Genera la cançó: l'emissora Batucada comença amb aquest inici (les cançons següents, com sempre).
+  // Comença: l'emissora Batucada (la primera cançó, amb aquest inici si es fa servir; les següents, com sempre).
   $('opening-go').addEventListener('click', () => {
-    previewAudio.pause(); previewing++;
-    customOpening = { style: design.style, bpm: design.bpm, opening: openingOf() };
-    openingDialog.close();
+    stopPreview();
+    customOpening = design.use !== false ? { style: design.style, bpm: design.bpm, opening: openingOf() } : null;
     chooseStation('batucada');
   });
   // Visualitzador VaTuCalla!: la cançó que sona, a pantalla completa (la ràdio es posa en pausa).
@@ -1115,7 +1129,8 @@
   }
   $('to-radio').addEventListener('click', () => setView('radio'));
 
-  for (const button of document.querySelectorAll('[data-station]')) button.addEventListener('click', () => chooseStation(button.dataset.station));
+  // La Batucada passa primer per la seva pantalla (inici compost); les altres emissores comencen de seguida.
+  for (const button of document.querySelectorAll('[data-station]')) button.addEventListener('click', () => button.dataset.station === 'batucada' ? openBatucadaSetup() : chooseStation(button.dataset.station));
   const instrumentalToggle = $('radio-instrumental');
   instrumentalToggle.checked = instrumental;
   instrumentalToggle.addEventListener('change', () => {
@@ -1165,7 +1180,7 @@
   if (new URLSearchParams(location.search).has('emissora')) setView('radio');
   openSharedStation();
   for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { filter = button.dataset.filter; renderHistory(); });
-  $('radio-back').addEventListener('click', () => { if (historyOpen) openHistory(false); else leaveStation(); });
+  $('radio-back').addEventListener('click', () => { if (historyOpen) openHistory(false); else if (!$('radio-batucada').hidden) showScreen('home'); else leaveStation(); });
   $('radio-play').addEventListener('click', togglePlay);
   $('radio-skip').addEventListener('click', skip);
   $('radio-retry').addEventListener('click', () => { failures = 0; setPrep({ stage: 'compose', value: 0 }); if (waiting) playSilence(); fill(session); });
