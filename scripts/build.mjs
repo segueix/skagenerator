@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { prepareSoundBank } from './prepare-soundbank.mjs';
 import { buildSharePages } from './share-pages.mjs';
 await mkdir('dist', { recursive: true });
-for (const file of ['veu.html', 'veu.js', 'index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'browser-singing.js', 'umidaji-browser.js', 'matxa-singer.js', 'world.js', 'matxa-worker.js']) await copyFile(file, `dist/${file}`);
+for (const file of ['veu.html', 'veu.js', 'index.html', 'styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'visualizer.js', 'browser-singing.js', 'umidaji-browser.js', 'matxa-singer.js', 'world.js', 'matxa-worker.js']) await copyFile(file, `dist/${file}`);
 await mkdir('dist/vendor/world', { recursive: true });
 await copyFile('vendor/world/world.wasm', 'dist/vendor/world/world.wasm');
 await cp('licenses', 'dist/licenses', { recursive: true });
@@ -41,7 +41,7 @@ let umidaji = await readFile('dist/umidaji-browser.js', 'utf8');
 umidaji = umidaji.replace("'umidaji-worker.js'", "'umidaji-worker.js?v=" + await hash('umidaji-worker.js') + "'");
 await writeFile('dist/umidaji-browser.js', umidaji);
 let html = await readFile('dist/index.html', 'utf8');
-for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'matxa-singer.js', 'browser-singing.js', 'umidaji-browser.js'])
+for (const file of ['styles.css', 'app.js', 'radioambient.js', 'sample-audio.js', 'audio-utils.js', 'lyrics-ca.js', 'lyrics.js', 'song-builder.js', 'radio.js', 'radio.css', 'visualizer.js', 'matxa-singer.js', 'browser-singing.js', 'umidaji-browser.js'])
   html = html.replaceAll(`"${file}"`, `"${file}?v=${await hash(file)}` + '"');
 await writeFile('dist/index.html', html);
 // Pàgines i imatges per compartir les emissores (WhatsApp…), i les etiquetes generals de la pàgina principal.

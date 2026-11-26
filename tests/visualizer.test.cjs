@@ -1,0 +1,22 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+
+test('visualitzador VaTuCalla!: es carrega a la web, es publica i es veu per sobre de la ràdio', () => {
+  const html = read('index.html'), build = read('scripts/build.mjs'), css = read('radio.css'), radio = read('radio.js'), viz = read('visualizer.js');
+  assert.match(html, /<script defer src="visualizer.js"><\/script>/);
+  assert.match(html, /id="radio-visualizer"/);
+  assert.equal((build.match(/'visualizer\.js'/g) || []).length, 2, 'es copia i entra a la llista de recursos');
+  // La ràdio amaga tot el que no és seu: el visualitzador n'ha de quedar fora.
+  assert.match(css, /body > :not\(\.radio\):not\(dialog\):not\(\.vtc\) \{ display: none !important; \}/);
+  assert.match(radio, /window\.VaTuCalla\.open\(/);
+  // Nom del projecte a baix a la dreta, títol a dalt i centrat, i exportació a MP4 (o WebM).
+  assert.match(viz, /const PROJECT = 'VaTuCalla!'/);
+  assert.match(viz, /ctx\.textAlign = 'right'; ctx\.textBaseline = 'bottom'/);
+  assert.match(viz, /ctx\.textAlign = 'center'; ctx\.textBaseline = 'top'/);
+  assert.match(viz, /'video\/mp4;codecs=avc1\.640028,mp4a\.40\.2'/);
+  assert.match(viz, /infinit: \{/);
+});

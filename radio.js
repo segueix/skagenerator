@@ -716,6 +716,13 @@
     for (let i = lo; i < kitHits.length && kitHits[i][0] <= t + KIT_BEFORE; i++) on.add(kitHits[i][1]);
     kitChips.forEach((chip, row) => chip.classList.toggle('on', on.has(row)));
   }
+  // Visualitzador VaTuCalla!: la cançó que sona, a pantalla completa (la ràdio es posa en pausa).
+  $('radio-visualizer').addEventListener('click', () => {
+    if (!current || !kitHits.length || !window.VaTuCalla) return;
+    audio.pause();
+    window.VaTuCalla.open({ id: current.id, url: current.url, title: current.song.title, hits: kitHits, names: engine.BATUCADA.map(p => p.name) })
+      .catch(() => { window.VaTuCalla.close(); });
+  });
   function kitLoop() { cancelAnimationFrame(kitFrame); renderKit(); if (!audio.paused && !kit.hidden) kitFrame = requestAnimationFrame(kitLoop); }
   audio.addEventListener('play', kitLoop);
   audio.addEventListener('seeked', renderKit);
