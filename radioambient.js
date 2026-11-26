@@ -1919,16 +1919,31 @@
         samba: { name: 'Samba', steps: BATUCADA.map(piece => piece.steps) },
         reggae: { name: 'Samba-reggae', steps: ['0000000010001000', '1000100000000000', '0000001000000010', '1001001000101000',
             '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000', '0000000000000000',
-            '1001001000100010', '1000000010000010'] },
+            '1001001000100010', '1000100010101000'] },
         ijexa: { name: 'Ijexá', steps: ['1000000010000000', '0000100000001000', '0000000000100000', '0000000000000000',
             '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000',
-            '1000100010001000', '1000001010000010'] },
+            '1000100010001000', '1000100110001001'] },
         // Percudium: a partir d'un enregistrament de referència (uns 97 BPM). Textura molt densa (caixa i xocalho
         // a totes les semicorxeres, tamborim atapeït), accents sincopats a les semicorxeres 1, 7, 10 i 14 i el pes
         // del so als mitjos (caixa, repique i tamborim) més que als surdos.
         percudium: { name: 'Percudium', steps: ['1000000010000000', '0000001000000100', '0010000000100010', '1111111111111111',
             '1000001001100110', '1011011011110110', '1000001001000100', '1111111111111111', '0000000000000000', '0000000000000000',
-            '1010101110101011', '1000001010001000'] }
+            '1010101110101011', '1000101010001000'] },
+        // Maracatu (de baque virado, Recife): les alfaies —surdos i bombo— fan la figura sincopada i greu,
+        // la caixa de guerra va rodolant amb accents, el gonguê (agogô) marca i el mineiro (xocalho) no para.
+        maracatu: { name: 'Maracatu', steps: ['1000001000000010', '0010000010100000', '1001001010010010', '1011101110111011',
+            '0000000100000001', '0000000000000000', '1010010010100100', '1111111111111111', '0000000000000000', '0000000000000000',
+            '1001001010010010', '1001101010001010'] },
+        // Baião (nord-est): la zabumba —surdo 1, tabal i bombo— fa el «1 . . 1 . . 1 .» que balla, el triangle
+        // (xocalho) amb accents, la caixa als contratemps i el surdo 2 tanca cada compàs.
+        baiao: { name: 'Baião', steps: ['1001001010010010', '1000000010000000', '0000100000001000', '0010001000100010',
+            '0000001000000010', '1011011010110110', '1000100010001000', '1011101110111011', '0000000000000000', '0000000000000000',
+            '1001001010010010', '1001101010011010'] },
+        // Samba-funk: surdos amb el «groove» del funk (cops a l'u i al «i» del tres), caixa al contratemps del
+        // segon i el quart temps (backbeat), tamborim i tabal sincopats i xocalho en corxeres.
+        funk: { name: 'Samba-funk', steps: ['1000000010100000', '0000100000001000', '0010001000100100', '0000100100001000',
+            '0001000000010010', '1010001010100010', '1000001000100000', '1010101010101010', '0000000000000000', '0000000000000000',
+            '1000101000101000', '1000100010001010'] }
     };
     // Biblioteca de figures per generar variacions: els surdos 1 i 2 i el xocalho (el pols) no canvien.
     const BATUCADA_FIGURES = {
@@ -1939,7 +1954,7 @@
         6: ['1000001000001000', '1010001010100010', '1000100010101000', '1010110101011010'],
         8: ['0000000100000000', '0001000100010001', '0100000001000000', '0000000000000000'],
         10: ['1000101010001010', '1001001000100010', '1010101110101011', '1000100010001000'],
-        11: ['1000100010001010', '1000000010000010', '1000001010000010', '1000001010001000']
+        11: ['1000100010001010', '1000100010001000', '1000100110001001', '1001100010011000']
     };
     // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
     const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .74, 78: .82, [BATUCADA_WHISTLE.note]: .66,
@@ -1955,6 +1970,9 @@
         reggae: { feel: [0, .034, 0, .03], abafado: false, agogo: 'gaaaaaaaaaaaaaaa' },
         ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' },
         // accents: semicorxeres accentuades (en lloc dels accents de cada temps); gain: pes de cada peça.
+        maracatu: { feel: [0, .018, 0, .012], abafado: false, agogo: 'gaaagaagaaagaaga' },
+        baiao: { feel: [0, .03, 0, .022], abafado: false, agogo: 'gaaagaaagaaagaaa' },
+        funk: { feel: [0, .035, 0, .035], abafado: false, agogo: 'gaaaaagaaaagaaaa' },
         percudium: { feel: [0, .02, -.005, -.025], abafado: true, agogo: 'gaaaaaaaagaaaaaa', accents: '1000001001000100', graces: true, room: 44, spread: 1.6, doubleAll: true, max: true,
             gain: { 38: 1.42, 50: 1.1, 54: 1.08, 69: .88, 67: 1, 68: 1 } }
     };
@@ -2000,6 +2018,7 @@
                 : key === 'counter' ? Number.isInteger(value) && value >= 0 && value < 4
                 : key === 'intro' ? ['timbal', 'caixa', 'repique'].includes(value)
                 : key === 'opening' ? validBatucadaOpening(value)
+                : key === 'signal' ? typeof value === 'boolean'
                 : key === 'dialog' ? value === 1 || value === 2 || value === 3
                 : key === 'finale' ? typeof value === 'boolean' : false);
     }
@@ -2130,7 +2149,8 @@
         // de 2/4 (passos 0 i 8) i marge a la resta; a l'últim compàs de cada frase de quatre, tot al marge (pregunta),
         // i el primer temps de la frase següent, al centre i més fort (resolució). Abans de cada represa (crida i breca),
         // dos cops curts de marge que la colla resol al primer temps amb el centre.
-        const bomboNote = (bar, step) => step % 8 === 0 && !(bar % 4 === 3 && step > 0) ? BOMBO_CENTRAL : BOMBO_MARGE;
+        // (El centre, el cop greu, marca tots els temps: és el bombo de fons que porta el pols de tota la colla.)
+        const bomboNote = (bar, step) => step % 4 === 0 && !(bar % 4 === 3 && step >= 8) ? BOMBO_CENTRAL : BOMBO_MARGE;
         const bomboPlays = pattern[BOMBO_ROW]?.includes('1');
         let pickupBar = -1;
         const pickup = bar => { if (bomboPlays) { add(bar, 13, BOMBO_ROW, -2, true, everyone, BOMBO_MARGE); add(bar, 14, BOMBO_ROW, 4, true, everyone, BOMBO_MARGE); } };
@@ -2139,7 +2159,8 @@
         const add = (bar, step, row, extra = 0, tight = false, players = everyone, note = undefined) => {
             if ((bar * 4 + step / 4) * beat >= stopAt) return;
             // Diàleg: el grup que parla puja el volum; la resta, una mica més fluix.
-            if (voice !== null && row !== 8 && row !== 9) extra += BATUCADA_DIALOG[voice].includes(row) ? DIALOG_UP : DIALOG_DOWN;
+            // (Els surdos 1 i 2 i el bombo són el fons que marca el pols: quan parla un altre grup, no baixen.)
+            if (voice !== null && row !== 8 && row !== 9) extra += BATUCADA_DIALOG[voice].includes(row) ? DIALOG_UP : [0, 1, BOMBO_ROW].includes(row) ? 0 : DIALOG_DOWN;
             // L'agogô alterna les dues campanes segons el ritme.
             const pitch = note ?? (row === 8 && chain ? chain[cuicaIndex++ % chain.length]
                 : row === 6 && style.agogo[step] === 'g' ? AGOGO_LOW : row === TABAL_ROW ? tabalNote(bar, step)
@@ -2229,7 +2250,7 @@
         // Amb frase de cançó, abans de la tornada el repique toca sol el final de la frase (la segona meitat del
         // compàs B) i la resta li deixa espai: la caixa manté el moviment amb cops fluixos i els surdos, el pols.
         const call = bar => {
-            if (fx.whistle) { blow(bar, 0, beat * .9, 6); blow(bar, 8, .1); blow(bar, 10, .1); }
+            if (fx.whistle && !fx.signal) { blow(bar, 0, beat * .9, 6); blow(bar, 8, .1); blow(bar, 10, .1); }
             if (motif && part.next === 'chorus') {
                 groove(bar, 8);
                 for (let step = 8; step < 16; step++) {
@@ -2319,9 +2340,17 @@
             const intoNext = last && ending !== 'none' && part.next !== undefined && part.next !== 'end';
             if (intoNext || (type === 'outro' && !fading && bar === bars - 2)) { call(bar); continue; }
             // Abans d'una breca, el xiulet avisa (tres cops curts).
-            if (fx.whistle && breque && bar === bars - 2) [8, 10, 12].forEach(step => blow(bar, step, .09, 4));
+            if (fx.whistle && !fx.signal && breque && bar === bars - 2) [8, 10, 12].forEach(step => blow(bar, step, .09, 4));
             if (breque && bar === bars - 2) { pickupBar = bar; groove(bar); pickup(bar); continue; }
             groove(bar);
+        }
+        // Senyal del mestre abans d'un canvi de ritme: un xiulet llarg (dos temps) i, al compàs següent, el compte
+        // de quatre xiulets curts als temps; després la colla canvia de ritme tota junta. (Si la secció acaba amb
+        // una aturada o un silenci, el compte va al compàs d'abans: després del cop ja no sona res.)
+        if (fx.signal && bars >= 2) {
+            const count = ['break', 'silence', 'stop'].includes(ending) ? bars - 2 : bars - 1;
+            if (count - 1 >= 0) blow(count - 1, 0, beat * 2, 12);
+            [0, 4, 8, 12].forEach(step => blow(count, step, .13, 12));
         }
         return line;
     }

@@ -42,6 +42,35 @@ async function load(base, file, rate, localDirectory) {
   return resample(wav.data, wav.rate, rate);
 }
 
+// Harmònics càlids per als tambors greus (surdos i bombo de la batucada): la seva nota (57–100 Hz) no surt pels
+// altaveus petits (mòbil, portàtil) i el pols de la colla es perdia. A partir del greu del tambor (filtrat per
+// sota de 160 Hz) es generen els harmònics 2n i 3r (rectificació i corba suau), es filtren entre 90 i 450 Hz
+// (sense el to metàl·lic dels aguts) i se sumen a la gravació: l'oïda hi «sent» la nota encara que l'altaveu
+// no la reprodueixi. amount: quantitat (0–1). highpass: tall greu dels harmònics (Hz); al bombo (61 Hz), més amunt
+// i més pronunciat, perquè el seu 2n harmònic (122 Hz) tampoc no surt pels altaveus petits i cal el 3r i el 4t.
+export function addWarmth(a, rate, amount, highpass = 100) {
+  let peak = 0; for (const x of a) peak = Math.max(peak, Math.abs(x));
+  if (!peak || !amount) return a;
+  const pole = hz => Math.exp(-2 * Math.PI * hz / rate);
+  const low = pole(160), hp = pole(highpass), lp = pole(420), steep = highpass > 100;
+  const h = new Float32Array(a.length);
+  let l1 = 0, l2 = 0, hpIn = 0, hpOut = 0, hpIn2 = 0, hpOut2 = 0, o1 = 0, o2 = 0, energy = 0, added = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i] / peak;
+    l1 = l1 * low + x * (1 - low); l2 = l2 * low + l1 * (1 - low);
+    // 2n harmònic (rectificació) i 3r (cub), tots dos de la part greu del cop.
+    const f = Math.max(-1, Math.min(1, l2 * 2)), shaped = Math.abs(f) + .5 * f * f * f;
+    hpOut = hp * (hpOut + shaped - hpIn); hpIn = shaped;
+    let band = hpOut;
+    if (steep) { hpOut2 = hp * (hpOut2 + hpOut - hpIn2); hpIn2 = hpOut; band = hpOut2; }
+    o1 = o1 * lp + band * (1 - lp); o2 = o2 * lp + o1 * (1 - lp);
+    h[i] = o2; energy += a[i] * a[i]; added += o2 * o2;
+  }
+  // Els harmònics, amb una energia d'«amount» respecte de la del cop (p. ex. 0,25 = un 25 %).
+  const k = added ? Math.sqrt(amount * energy / added) : 0;
+  for (let i = 0; i < a.length; i++) a[i] += k * h[i];
+  return a;
+}
 // Sonoritat de referència de cada peça (dB RMS en finestres de 400 ms de la capa
 // més forta), mesurada al kit Muldjord: així tots els kits sonen equilibrats i es poden intercanviar.
 const TARGET = { 35: -20.9, 36: -20.9, 37: -24.7, 38: -20.8, 40: -20.9, 41: -19.7, 42: -31.7, 43: -19.7, 44: -31.7, 45: -20.3, 46: -23.1, 47: -20.3,
@@ -87,6 +116,7 @@ async function buildKit(bank, kit, log) {
       const length = Math.max(...parts.map(([a]) => a.length)), data = new Float32Array(length);
       for (const [a, gain] of parts) for (let i = 0; i < a.length; i++) data[i] += a[i] * gain;
       const out = piece.loopSamples ? data : trim(data, RATE, piece.seconds);
+      if (piece.warmth) addWarmth(out, RATE, piece.warmth, piece.warmthHighpass);
       cache.set(id, out); audio.push(out);
     }
     // La capa més forta a la sonoritat de referència i cada capa inferior 3,5 dB per

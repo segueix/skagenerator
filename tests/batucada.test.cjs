@@ -52,15 +52,17 @@ test('bombo: el centre resol i el marge pregunta, segons la frase', () => {
   assert(engine.validBatucadaPattern(empty) && engine.validBatucadaPattern(empty.slice(0, 9)), 'patrons antics');
   assert.deepEqual(play(empty), []);
   const bombo = line => line.filter(h => h[2] === 86 || h[2] === 87);
-  // Centre als dos temps forts de cada compàs de 2/4 (passos 0 i 8) i marge a la resta.
+  // El centre (greu) a tots els temps: el bombo de fons que porta el pols; el marge, a les subdivisions.
   const one = bombo(play([...empty, '1000101010001010']));
-  assert.deepEqual(one.map(h => [h[1], h[2]]), [[0, 86], [1, 87], [1.5, 87], [2, 86], [3, 87], [3.5, 87]]);
+  assert.deepEqual(one.map(h => [h[1], h[2]]), [[0, 86], [1, 86], [1.5, 87], [2, 86], [3, 86], [3.5, 87]]);
   // El primer temps de la frase, més fort (resolució).
   assert(one[0][3] > one[3][3]);
   const four = bombo(play([...empty, '1000100010001000'], { bars: 4 }));
-  // A l'últim compàs de la frase de quatre, tot al marge (pregunta); al primer, el centre.
-  assert.deepEqual(four.filter(h => h[0] === 3).map(h => h[2]), [86, 87, 87, 87]);
-  assert.deepEqual(four.filter(h => h[0] === 0).map(h => h[2]), [86, 87, 86, 87]);
+  // A la segona meitat de l'últim compàs de la frase de quatre, al marge (pregunta); al primer, tot al centre.
+  assert.deepEqual(four.filter(h => h[0] === 3).map(h => h[2]), [86, 86, 87, 87]);
+  assert.deepEqual(four.filter(h => h[0] === 0).map(h => h[2]), [86, 86, 86, 86]);
+  // Tots els ritmes porten el bombo a tots els temps.
+  for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) assert([0, 4, 8, 12].every(step => rhythm.steps[11][step] === '1'), `${key}: bombo a tots els temps`);
   // Abans de la represa (crida cap a la secció següent): dos cops curts de marge a l'últim temps...
   const call = bombo(play([...empty, '1000100010001000'], { bars: 2, next: 'chorus' })).filter(h => h[0] === 1 && h[1] >= 3);
   assert.deepEqual(call.map(h => [h[1], h[2]]), [[3.25, 87], [3.5, 87]]);
@@ -125,7 +127,7 @@ test('el tabal i el bombo toquen a tots els estils de samba, també als cops de 
 
 const hitsAt = (line, bar) => line.filter(([b]) => b === bar);
 test('ritmes de batucada predefinits i variacions generades vàlides i reproduïbles', () => {
-  assert.deepEqual(Object.keys(engine.BATUCADA_RHYTHMS), ['samba', 'reggae', 'ijexa', 'percudium']);
+  assert.deepEqual(Object.keys(engine.BATUCADA_RHYTHMS), ['samba', 'reggae', 'ijexa', 'percudium', 'maracatu', 'baiao', 'funk']);
   for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) {
     assert(engine.validBatucadaPattern(rhythm.steps), key);
     const spec = engine.composeSongPart({ ...settings, batucadaRhythm: key }, { ...part, bars: 1 });
@@ -211,7 +213,7 @@ test('ràdio Batucada: cançons només de batucada amb el tempo i la forma de ca
     });
     assert.deepEqual(builder.createBatucadaSong(engine, { seed }), song, 'reproduïble');
   }
-  assert.deepEqual([...rhythms].sort(), ['ijexa', 'percudium', 'reggae', 'samba']);
+  assert.deepEqual([...rhythms].sort(), ['baiao', 'funk', 'ijexa', 'maracatu', 'percudium', 'reggae', 'samba']);
   // No repeteix el ritme de la cançó anterior si no se n'hi demana un.
   for (let seed = 1; seed <= 20; seed++) assert.notEqual(builder.createBatucadaSong(engine, { seed, avoidRhythm: 'samba' }).settings.batucadaRhythm, 'samba');
   assert.equal(builder.createBatucadaSong(engine, { seed: 3, rhythm: 'ijexa' }).settings.batucadaRhythm, 'ijexa');
@@ -465,11 +467,14 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
   const rowOf = note => [35, 43, 47].includes(note) ? [35, 43, 47].indexOf(note) : note === engine.AGOGO_LOW ? 6 : note === 85 ? 10 : note === 87 ? 11 : engine.BATUCADA.findIndex(p => p.note === note);
   const group = row => engine.BATUCADA_DIALOG.findIndex(g => g.includes(row));
   const plain = compose({ type: 'bridge', bars: 6 }), dialog = compose({ type: 'bridge', bars: 6, batucada: { dialog: 1 } });
-  const avg = (line, bar, g) => { const hits = line.filter(h => h[0] === bar && !h[6] && Number.isInteger(h[1] * 4) && group(rowOf(h[2])) === g); return hits.reduce((t, h) => t + h[3], 0) / hits.length; };
+  // (Els surdos 1 i 2 i el bombo són el fons que porta el pols: quan parla un altre grup, no baixen.)
+  const FOUNDATION = [0, 1, 11];
+  const avg = (line, bar, g, foundation = false) => { const hits = line.filter(h => h[0] === bar && !h[6] && Number.isInteger(h[1] * 4) && group(rowOf(h[2])) === g && FOUNDATION.includes(rowOf(h[2])) === foundation); return hits.reduce((t, h) => t + h[3], 0) / hits.length; };
   for (const bar of [0, 1, 2, 3]) {
     const speaking = bar % 2, silent = 1 - speaking;
     assert(avg(dialog, bar, speaking) > avg(plain, bar, speaking) + 8, `parla (${bar})`);
     assert(avg(dialog, bar, silent) < avg(plain, bar, silent) - 6 && avg(dialog, bar, silent) > 30, `replica fluix però sona (${bar})`);
+    if (silent === 0) assert(Math.abs(avg(dialog, bar, 0, true) - avg(plain, bar, 0, true)) < 1, `el fons no baixa (${bar})`);
   }
   assert.deepEqual(dialog.filter(h => h[0] === 5).map(h => h[3]), plain.filter(h => h[0] === 5).map(h => h[3]), 'al final, tots igual');
   // Per mitjos compassos, i amb un tercer grup que s'hi afegeix a la segona meitat.
@@ -586,4 +591,29 @@ test('inici compost: l\'instrument, el ritme i els xiulets triats sonen els prim
     assert(new Set(after.map(h => engine.batucadaRowOf(h[2]))).size >= 6, `${rhythm}: entra tota la colla`);
   }
   assert.throws(() => builder.createBatucadaSong(engine, { seed: 1, opening: { ...opening, row: 99 } }), /Inici/);
+});
+
+test('canvi de ritme: el mestre l\'avisa amb un xiulet llarg i el compte de quatre xiulets curts', () => {
+  const builder = require('../song-builder.js'), W = engine.BATUCADA_WHISTLE.note;
+  let checked = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const song = builder.createBatucadaSong(engine, { seed });
+    const ordered = [...song.sections].sort((a, b) => a.start - b.start);
+    ordered.forEach((sec, i) => {
+      const next = ordered[i + 1], changes = next && (next.batucadaPattern || song.settings.batucadaPattern)[0] !== (sec.batucadaPattern || song.settings.batucadaPattern)[0];
+      if (!sec.batucada?.signal) return;
+      const part = { ...sec, instruments: ['drums'], revision: 1, next: next?.type ?? 'end' };
+      const line = engine.composeSongPart(song.settings, part).batucadaLine.filter(h => h[2] === W);
+      const count = ['break', 'silence', 'stop'].includes(sec.ending) ? sec.bars - 2 : sec.bars - 1;
+      assert.deepEqual(line.filter(h => h[0] === count).map(h => h[1]), [0, 1, 2, 3], `seed ${seed}: compte de quatre`);
+      assert(line.some(h => h[0] === count - 1 && h[1] === 0 && h[4] > .4), `seed ${seed}: xiulet llarg abans`);
+      checked++;
+    });
+    // Cada canvi de ritme porta el senyal.
+    ordered.forEach((sec, i) => { const next = ordered[i + 1]; if (next && engine.BATUCADA_RHYTHMS && sec.batucada?.signal === undefined) {
+      const rhythmOf = s => Object.keys(engine.BATUCADA_RHYTHMS).find(k => engine.BATUCADA_RHYTHMS[k].steps[0] === (s.batucadaPattern || song.settings.batucadaPattern)[0] && engine.BATUCADA_RHYTHMS[k].steps[1] === (s.batucadaPattern || song.settings.batucadaPattern)[1]);
+      if (rhythmOf(sec) && rhythmOf(next) && rhythmOf(sec) !== rhythmOf(next)) assert.fail(`seed ${seed}: canvi de ritme sense senyal`);
+    } });
+  }
+  assert(checked >= 10, `senyals comprovats: ${checked}`);
 });

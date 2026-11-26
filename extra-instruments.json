@@ -8,14 +8,14 @@
    "pieces": {
     "84": {"seconds": 0.5, "choke": 4, "layers": [[["tabal-negra.wav", 1]]]},
     "85": {"seconds": 0.245, "choke": 4, "layers": [[["tabal-corxera.wav", 1]]]},
-    "86": {"seconds": 0.64, "choke": 5, "layers": [[["bombo-cop-central.wav", 1]]]},
-    "87": {"seconds": 0.28, "choke": 5, "layers": [[["bombo-cop-marge.wav", 1]]]},
+    "86": {"warmth": 0.35, "warmthHighpass": 150, "seconds": 0.64, "choke": 5, "layers": [[["bombo-cop-central.wav", 1]]]},
+    "87": {"warmth": 0.15, "seconds": 0.28, "choke": 5, "layers": [[["bombo-cop-marge.wav", 1]]]},
     "71": {
      "seconds": 0.24,
      "loopSamples": [3104, 7396],
      "layers": [[["xiulet.wav", 1]]]
     },
-    "36": {
+    "36": {"warmth": 0.25, 
      "seconds": 0.45,
      "choke": 1,
      "layers": [
@@ -27,7 +27,7 @@
       ]
      ]
     },
-    "41": {
+    "41": {"warmth": 0.25, 
      "seconds": 0.39,
      "choke": 2,
      "layers": [
@@ -39,7 +39,7 @@
       ]
      ]
     },
-    "45": {
+    "45": {"warmth": 0.2, 
      "seconds": 0.67,
      "choke": 3,
      "layers": [
@@ -130,17 +130,17 @@
      "seconds": 0.3,
      "layers": [[["cuica-glissando.wav", 1]]]
     },
-    "35": {
+    "35": {"warmth": 0.25, 
      "seconds": 0.22,
      "choke": 1,
      "layers": [[["surdo-1-apagat.wav", 1]]]
     },
-    "43": {
+    "43": {"warmth": 0.25, 
      "seconds": 0.22,
      "choke": 2,
      "layers": [[["surdo-2-apagat.wav", 1]]]
     },
-    "47": {
+    "47": {"warmth": 0.2, 
      "seconds": 0.22,
      "choke": 3,
      "layers": [[["surdo-3-apagat.wav", 1]]]

@@ -58,7 +58,7 @@
   // Adreça de cada emissora (?emissora=batucada) i, a la Batucada, de l'estil triat (&estil=percudium):
   // es pot compartir l'emissora; cadascú hi sentirà les seves cançons, compostes al seu dispositiu.
   const STATION_SLUGS = { ska: 'ska', punk: 'punk', mix: 'ska-punk', batucada: 'batucada' };
-  const STYLE_SLUGS = { samba: 'samba', reggae: 'samba-reggae', ijexa: 'ijexa', percudium: 'percudium' };
+  const STYLE_SLUGS = { samba: 'samba', reggae: 'samba-reggae', ijexa: 'ijexa', percudium: 'percudium', maracatu: 'maracatu', baiao: 'baiao', funk: 'samba-funk' };
   const fromSlug = (map, slug) => Object.keys(map).find(key => map[key] === String(slug || '').toLowerCase()) || null;
   // Emissora a què pertany una cançó (les de batucada són d'estil ska però només hi sona la batucada).
   const styleOf = song => builder.isBatucadaSong(song) ? 'batucada' : song.settings.style;
