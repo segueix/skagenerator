@@ -98,7 +98,8 @@
     // Si no hi cap tot, cauen primer les més antigues sense vot ni comentari.
     while (list.length > HISTORY_MAX) {
       let drop = -1;
-      for (let i = list.length - 1; i >= 0; i--) if (!list[i].vote && !list[i].comment) { drop = i; break; }
+      // (Les cançons de les llistes pròpies tampoc no cauen soles.)
+      for (let i = list.length - 1; i >= 0; i--) if (!list[i].vote && !list[i].comment && !list[i].lists?.length) { drop = i; break; }
       list.splice(drop < 0 ? list.length - 1 : drop, 1);
     }
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); memoryHistory = null; }
@@ -890,6 +891,61 @@
   $('radio-down').addEventListener('click', () => current && vote(current.id, -1));
 
   // ── Historial ────────────────────────────────────────────────────────
+  // Organització de l'historial: cerca, ordre, llistes pròpies, selecció de diverses cançons i neteja ràpida
+  // (sempre amb «Desfés» en lloc de demanar confirmació).
+  const LISTS_KEY = 'radiospam.lists', SORT_KEY = 'radiospam.historySort';
+  let query = '', selecting = false, sortBy = (() => { try { return localStorage.getItem(SORT_KEY) || 'recent'; } catch { return 'recent'; } })();
+  const selected = new Set();
+  const listNames = () => {
+    let saved = []; try { saved = JSON.parse(localStorage.getItem(LISTS_KEY)) || []; } catch {}
+    return [...new Set([...saved, ...readHistory().flatMap(e => e.lists || [])])].filter(n => typeof n === 'string' && n.trim()).sort((a, b) => a.localeCompare(b, 'ca'));
+  };
+  const saveListNames = names => { try { localStorage.setItem(LISTS_KEY, JSON.stringify([...new Set(names)])); } catch {} };
+  const SORTS = {
+    recent: (a, b) => (b.lastPlayed || b.created || 0) - (a.lastPlayed || a.created || 0),
+    old: (a, b) => (a.lastPlayed || a.created || 0) - (b.lastPlayed || b.created || 0),
+    title: (a, b) => (a.title || '').localeCompare(b.title || '', 'ca'),
+    plays: (a, b) => (b.plays || 1) - (a.plays || 1) || SORTS.recent(a, b),
+    votes: (a, b) => (b.vote || 0) - (a.vote || 0) || SORTS.recent(a, b),
+    long: (a, b) => (b.seconds || 0) - (a.seconds || 0)
+  };
+  // Cançons que no es poden esborrar ara mateix (sonen, es reprodueixen o s'hi genera la veu).
+  const busy = id => current?.id === id || historyVoice?.id === id || historyPlayback?.id === id;
+  let undoTimer = 0, undoList = null;
+  function removeSongs(ids, what) {
+    const list = readHistory(), keep = [], gone = [], blocked = [];
+    list.forEach((entry, index) => { if (!ids.has(entry.id)) keep.push(entry); else if (busy(entry.id)) { blocked.push(entry); keep.push(entry); } else gone.push(entry); });
+    if (!gone.length) { if (blocked.length) toast('Espera que acabi la reproducció o la generació de veu per esborrar aquesta cançó.'); return; }
+    undoList = list; writeHistory(keep);
+    for (const entry of gone) selected.delete(entry.id);
+    renderHistory();
+    clearTimeout(undoTimer);
+    $('history-undo-text').textContent = `${what || (gone.length === 1 ? `«${gone[0].title}» esborrada` : `${gone.length} cançons esborrades`)}${blocked.length ? ` (${blocked.length} en ús no s’ha esborrat)` : ''}.`;
+    $('history-undo').hidden = false;
+    undoTimer = setTimeout(() => { $('history-undo').hidden = true; undoList = null; }, 8000);
+  }
+  function undoRemove() {
+    if (!undoList) return;
+    // Es recupera l'historial d'abans, mantenint els canvis fets després (vots, comentaris i cançons noves).
+    const now = new Map(readHistory().map(e => [e.id, e]));
+    const fresh = readHistory().filter(e => !undoList.some(o => o.id === e.id));
+    writeHistory([...fresh, ...undoList.map(e => now.get(e.id) || e)]);
+    undoList = null; clearTimeout(undoTimer); $('history-undo').hidden = true;
+    renderHistory();
+  }
+  function setLists(ids, name, add) {
+    const list = readHistory();
+    for (const entry of list) if (ids.has(entry.id)) {
+      const names = new Set(entry.lists || []);
+      if (add) names.add(name); else names.delete(name);
+      if (names.size) entry.lists = [...names]; else delete entry.lists;
+    }
+    writeHistory(list);
+  }
+  function askListName(title, value = '') {
+    const name = (window.prompt(title, value) || '').trim().slice(0, 40);
+    return name || null;
+  }
   const FILTERS = { all: () => true, ska: e => e.style === 'ska', punk: e => e.style === 'punk', batucada: e => e.style === 'batucada', up: e => e.vote === 1, down: e => e.vote === -1, comment: e => !!e.comment?.trim() };
   const dateText = ms => { try { return new Date(ms).toLocaleString('ca', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
   function make(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; }
@@ -1028,15 +1084,27 @@
     const all = readHistory();
     $('radio-history-count').textContent = all.length || '';
     if (!historyOpen) return;
-    const list = all.filter(FILTERS[filter] || FILTERS.all), box = $('radio-history-list');
+    if (filter.startsWith('list:') && !listNames().includes(filter.slice(5))) filter = 'all';
+    const words = query.trim().toLocaleLowerCase('ca').split(/\s+/).filter(Boolean);
+    const matches = e => !words.length || words.every(w => `${e.title || ''} ${subgenreName(e.subgenre || e.style)} ${e.style || ''} ${e.comment || ''} ${(e.lists || []).join(' ')}`.toLocaleLowerCase('ca').includes(w));
+    const inFilter = filter.startsWith('list:') ? e => (e.lists || []).includes(filter.slice(5)) : FILTERS[filter] || FILTERS.all;
+    const list = all.filter(e => inFilter(e) && matches(e)).sort(SORTS[sortBy] || SORTS.recent), box = $('radio-history-list');
+    renderHistoryTools(all, list);
     // No es redibuixa mentre s'escriu un comentari de la llista.
     if (box.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;
     const up = all.filter(e => e.vote === 1).length, down = all.filter(e => e.vote === -1).length, commented = all.filter(e => e.comment?.trim()).length;
     $('radio-history-summary').textContent = all.length ? `${all.length} ${all.length === 1 ? 'cançó' : 'cançons'} · 👍 ${up} · 👎 ${down} · 💬 ${commented}` : '';
     box.replaceChildren();
     for (const entry of list) {
-      const item = make('li', `history-item ${entry.style}${current?.id === entry.id ? ' now' : ''}`);
+      const item = make('li', `history-item ${entry.style}${current?.id === entry.id ? ' now' : ''}${selected.has(entry.id) ? ' picked' : ''}`);
       const head = make('div', 'history-row'), text = make('div', 'history-text');
+      // Mode de selecció: una casella per cançó.
+      if (selecting) {
+        const pick = make('input', 'history-pick'); pick.type = 'checkbox'; pick.checked = selected.has(entry.id);
+        pick.setAttribute('aria-label', `Selecciona «${entry.title}»`);
+        pick.addEventListener('change', () => { if (pick.checked) selected.add(entry.id); else selected.delete(entry.id); item.classList.toggle('picked', pick.checked); renderHistoryTools(readHistory(), null); });
+        head.append(pick);
+      }
       text.append(make('strong', '', entry.title || 'Sense títol'),
         make('small', '', [subgenreName(entry.subgenre || entry.style), clock(entry.seconds || 0), entry.song?.settings && !builder.isBatucadaSong(entry.song) ? keyName(entry.song) : '', dateText(entry.lastPlayed || entry.created),
           entry.plays > 1 ? `sonada ${entry.plays} cops` : '', current?.id === entry.id ? 'sonant ara' : ''].filter(Boolean).join(' · ')));
@@ -1046,15 +1114,12 @@
         button.setAttribute('aria-label', `${label}: ${entry.title}`); button.setAttribute('aria-pressed', String(entry.vote === value));
         button.addEventListener('click', () => vote(entry.id, value)); votes.append(button);
       }
+      // Esborrar: de seguida, amb «Desfés» uns segons.
       const remove = make('button', 'history-remove', '×'); remove.type = 'button'; remove.setAttribute('aria-label', `Esborra de l’historial: ${entry.title}`);
-      remove.addEventListener('click', () => {
-        if (current?.id === entry.id || historyVoice?.id === entry.id || historyPlayback?.id === entry.id) {
-          toast('Espera que acabi la reproducció o la generació de veu per esborrar aquesta cançó.'); return;
-        }
-        if (!window.confirm(`Esborrar «${entry.title}» de l’historial?`)) return;
-        writeHistory(readHistory().filter(e => e.id !== entry.id)); renderHistory();
-      });
+      remove.addEventListener('click', () => removeSongs(new Set([entry.id])));
       head.append(text, votes, remove);
+      // Llistes de la cançó (com etiquetes) i menú per afegir-la o treure-la de les llistes.
+      if (entry.lists?.length) text.append(make('span', 'history-tags', entry.lists.map(n => `📁 ${n}`).join('  ')));
       const actions = make('div', 'history-song-actions');
       const hasVoice = savedTakes.has(entry.id) || !!sungById(entry.id) || (current?.id === entry.id && current.sung);
       const play = make('button', 'radio-button', hasVoice ? '▶ Reprodueix cantada' : '▶ Reprodueix');
@@ -1062,6 +1127,18 @@
       play.setAttribute('aria-label', `${play.textContent}: ${entry.title}`);
       play.addEventListener('click', () => playHistory(entry));
       actions.append(play);
+      const lists = make('select', 'history-list-select'); lists.setAttribute('aria-label', `Llistes de «${entry.title}»`);
+      lists.append(new Option('📁 Llistes…', ''));
+      for (const name of listNames()) lists.append(new Option(`${(entry.lists || []).includes(name) ? '✓' : '＋'} ${name}`, name));
+      lists.append(new Option('＋ Llista nova…', '__new__'));
+      lists.addEventListener('change', () => {
+        let name = lists.value; if (!name) return;
+        if (name === '__new__') { name = askListName('Nom de la llista nova:'); if (!name) { renderHistory(); return; } saveListNames([...listNames(), name]); }
+        const inside = (entry.lists || []).includes(name) && lists.value !== '__new__';
+        setLists(new Set([entry.id]), name, !inside);
+        toast(inside ? `Treta de «${name}».` : `Afegida a «${name}».`); renderHistory();
+      });
+      actions.append(lists);
       if (!hasVoice) {
         const voice = make('button', 'radio-button', historyVoice?.id === entry.id ? 'Generant veu…' : '🎤 Genera veu');
         voice.type = 'button';
@@ -1085,6 +1162,35 @@
     $('radio-history-empty').hidden = list.length > 0;
     $('radio-history-empty').textContent = all.length ? 'Cap cançó amb aquest filtre.' : 'Encara no ha sonat cap cançó. Tria una emissora i comença a escoltar.';
     for (const button of document.querySelectorAll('[data-filter]')) button.setAttribute('aria-pressed', String(button.dataset.filter === filter));
+  }
+  // Barra d'eines de l'historial: filtres de llista, neteja ràpida (amb el nombre de cançons), selecció i llista activa.
+  function renderHistoryTools(all, shown) {
+    const filters = $('history-filters');
+    filters.querySelectorAll('.list-chip').forEach(chip => chip.remove());
+    for (const name of listNames()) {
+      const chip = make('button', 'radio-chip list-chip', `📁 ${name} (${all.filter(e => (e.lists || []).includes(name)).length})`);
+      chip.type = 'button'; chip.setAttribute('aria-pressed', String(filter === `list:${name}`));
+      chip.addEventListener('click', () => { filter = `list:${name}`; renderHistory(); });
+      filters.append(chip);
+    }
+    const month = Date.now() - 30 * 24 * 3600 * 1000;
+    const CLEAN = [['down', 'les 👎', e => e.vote === -1], ['plain', 'les que no tenen vot, comentari ni llista', e => !e.vote && !e.comment?.trim() && !e.lists?.length],
+      ['old', 'les de fa més d’un mes (sense 👍 ni llista)', e => (e.lastPlayed || e.created || 0) < month && e.vote !== 1 && !e.lists?.length]];
+    const clean = $('history-clean');
+    clean.replaceChildren(new Option('🧹 Neteja…', ''), ...CLEAN.map(([key, label, test]) => { const n = all.filter(test).length, o = new Option(`Esborra ${label} (${n})`, key); o.disabled = !n; return o; }));
+    clean.onchange = () => { const rule = CLEAN.find(([key]) => key === clean.value); clean.value = ''; if (rule) removeSongs(new Set(all.filter(rule[2]).map(e => e.id)), `Esborrades ${rule[1]}`); };
+    $('history-select').setAttribute('aria-pressed', String(selecting));
+    $('history-bulk').hidden = !selecting;
+    $('history-bulk-count').textContent = `${selected.size} seleccionad${selected.size === 1 ? 'a' : 'es'}`;
+    $('history-bulk-delete').disabled = !selected.size;
+    const bulkList = $('history-bulk-list');
+    bulkList.replaceChildren(new Option('📁 Afegeix a…', ''), ...listNames().map(n => new Option(n, n)), new Option('＋ Llista nova…', '__new__'));
+    if (filter.startsWith('list:')) bulkList.append(new Option(`Treu de «${filter.slice(5)}»`, '__out__'));
+    bulkList.disabled = !selected.size;
+    if (shown) $('history-bulk-all').dataset.ids = JSON.stringify(shown.map(e => e.id));
+    const listName = filter.startsWith('list:') ? filter.slice(5) : '';
+    $('history-list-tools').hidden = !listName;
+    $('history-list-name').textContent = listName ? `Llista «${listName}»` : '';
   }
   function openHistory(open) {
     historyOpen = open; $('radio-history').hidden = !open; $('radio').classList.toggle('history-open', open);
@@ -1180,6 +1286,42 @@
   if (new URLSearchParams(location.search).has('emissora')) setView('radio');
   openSharedStation();
   for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { filter = button.dataset.filter; renderHistory(); });
+  $('history-search').addEventListener('input', event => { query = event.target.value; renderHistory(); });
+  $('history-sort').value = SORTS[sortBy] ? sortBy : 'recent';
+  $('history-sort').addEventListener('change', event => { sortBy = event.target.value; try { localStorage.setItem(SORT_KEY, sortBy); } catch {} renderHistory(); });
+  $('history-select').addEventListener('click', () => { selecting = !selecting; if (!selecting) selected.clear(); renderHistory(); });
+  $('history-bulk-done').addEventListener('click', () => { selecting = false; selected.clear(); renderHistory(); });
+  $('history-bulk-all').addEventListener('click', () => { for (const id of JSON.parse($('history-bulk-all').dataset.ids || '[]')) selected.add(id); renderHistory(); });
+  $('history-bulk-none').addEventListener('click', () => { selected.clear(); renderHistory(); });
+  $('history-bulk-delete').addEventListener('click', () => removeSongs(new Set(selected)));
+  $('history-bulk-list').addEventListener('change', event => {
+    let name = event.target.value; event.target.value = '';
+    if (!name || !selected.size) return;
+    if (name === '__out__') { const from = filter.slice(5); setLists(new Set(selected), from, false); toast(`${selected.size} tretes de «${from}».`); renderHistory(); return; }
+    if (name === '__new__') { name = askListName('Nom de la llista nova:'); if (!name) return; saveListNames([...listNames(), name]); }
+    setLists(new Set(selected), name, true); toast(`${selected.size} afegides a «${name}».`); renderHistory();
+  });
+  $('history-new-list').addEventListener('click', () => {
+    const name = askListName('Nom de la llista nova:');
+    if (!name) return;
+    saveListNames([...listNames(), name]); filter = `list:${name}`; renderHistory();
+    toast(`Llista «${name}» creada: afegeix-hi cançons amb el menú 📁 de cada una o amb «Selecciona».`);
+  });
+  $('history-list-rename').addEventListener('click', () => {
+    const from = filter.slice(5), to = askListName('Nou nom de la llista:', from);
+    if (!to || to === from) return;
+    const list = readHistory();
+    for (const entry of list) if (entry.lists?.includes(from)) entry.lists = [...new Set(entry.lists.map(n => n === from ? to : n))];
+    writeHistory(list); saveListNames(listNames().filter(n => n !== from).concat(to)); filter = `list:${to}`; renderHistory();
+  });
+  $('history-list-delete').addEventListener('click', () => {
+    const name = filter.slice(5);
+    if (!window.confirm(`Esborrar la llista «${name}»? Les cançons es queden a l’historial.`)) return;
+    const list = readHistory();
+    for (const entry of list) if (entry.lists?.includes(name)) { entry.lists = entry.lists.filter(n => n !== name); if (!entry.lists.length) delete entry.lists; }
+    writeHistory(list); saveListNames(listNames().filter(n => n !== name)); filter = 'all'; renderHistory();
+  });
+  $('history-undo-go').addEventListener('click', undoRemove);
   $('radio-back').addEventListener('click', () => { if (historyOpen) openHistory(false); else if (!$('radio-batucada').hidden) showScreen('home'); else leaveStation(); });
   $('radio-play').addEventListener('click', togglePlay);
   $('radio-skip').addEventListener('click', skip);
