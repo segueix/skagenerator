@@ -1943,7 +1943,7 @@
         ijexa: { feel: [0, .024, 0, .02], abafado: false, agogo: 'aagaaaagaaagaaga' },
         // accents: semicorxeres accentuades (en lloc dels accents de cada temps); gain: pes de cada peça.
         percudium: { feel: [0, .02, -.005, -.025], abafado: true, agogo: 'gaaaaaaaagaaaaaa', accents: '1000001001000100', graces: true, room: 44, spread: 1.6, doubleAll: true, max: true,
-            gain: { 36: .8, 41: .8, 45: .84, 35: .8, 43: .8, 47: .84, 38: 1.42, 50: 1.1, 54: 1.08, 69: .88, 67: 1, 68: 1 } }
+            gain: { 38: 1.42, 50: 1.1, 54: 1.08, 69: .88, 67: 1, 68: 1 } }
     };
     // Surdo apagat («abafado») de cada surdo i campana greu de l'agogô.
     const SURDO_MUTED = { 0: 35, 1: 43, 2: 47 }, AGOGO_LOW = 68;
@@ -2076,10 +2076,9 @@
             const doubled = BATUCADA_DOUBLED.has(row) || sound.doubleAll && (row === 4 || row === 6);
             const others = doubled ? players.filter(p => p > 0) : [];
             const lead = !doubled || players.includes(0);
-            // Als surdos, els altres músics bastant més fluixos: tres còpies gairebé iguals d'un cop greu
-            // farien un efecte de filtre (so metàl·lic, «industrial»); així el surdo principal mana.
-            const share = row <= 2 ? .64 : .9;
-            for (const p of others) line.push([bar, step / 4, pitch, Math.round(velocity * (share - p * .04)), null, tight ? 1 : 0, p]);
+            // (Als surdos, els altres músics també toquen gairebé tan fort com el principal: el so original de la
+            // batucada. El to metàl·lic que hi havia el feia la reverberació, i ara els surdos són secs.)
+            for (const p of others) line.push([bar, step / 4, pitch, Math.round(velocity * (.9 - p * .04)), null, tight ? 1 : 0, p]);
             if (!lead) return;
             if (pitch === BATUCADA_WHISTLE.note) {
                 const at = (bar * 4 + step / 4) * beat;

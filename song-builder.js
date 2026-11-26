@@ -1472,10 +1472,10 @@
     // L'estil ska no baixa de 100 BPM: si el ritme va més lent (Percudium), cada secció porta el seu tempo.
     const settings = { style: 'ska', bpm: Math.max(100, bpm), tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
       batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', countIn: !alone,
-      // Percudium: el so als mitjos i brillant (menys greus de surdo, més caixa, repique i tamborim).
+      // Percudium: brillant, amb més caixa, repique i tamborim, però amb els surdos al seu so original (sense retallar-ne els greus).
       // Les altres batucades, 2 dB per sota: amb tres músics per peça i el mode «foc», el final i els cops de tots
       // arribaven massa forts al limitador i es distorsionaven.
-      mix: alone ? { drums: { low: -8, mid: 0, high: 2, volume: 1 } } : { drums: { low: 0, mid: 0, high: 0, volume: -2 } }, humanize: compact ? .1 : .3 };
+      mix: alone ? { drums: { low: 0, mid: 0, high: 2, volume: -3 } } : { drums: { low: 0, mid: 0, high: 0, volume: -3 } }, humanize: compact ? .1 : .3 };
     return { version: 3, title, settings, base: { instruments: ['drums'], revision: 1, generated: true }, harmony: {}, sections, clips: [] };
   }
   // Una cançó és de batucada si només hi sona el kit de batucada.

@@ -224,9 +224,9 @@ test('banda: les peces es doblen o tripliquen, cada músic al seu canal, i poden
   const count = (line, note, player) => line.filter(h => h[2] === note && (h[6] || 0) === player).length;
   for (const note of [36, 41, 45, 38, 54, 69]) for (const player of [0, 1, 2]) assert.equal(count(trio, note, player), count(solo, note, 0), `${note}/${player}`);
   for (const note of [50, 67]) assert.equal(count(trio, note, 1) + count(trio, note, 2), 0, `${note} d'un sol músic`);
-  // Als surdos, els altres músics toquen bastant més fluix (si no, les còpies fan un efecte de filtre metàl·lic).
+  // Als surdos, els altres músics toquen gairebé tan fort com el principal (so original de la batucada).
   const velocity = (note, player) => trio.find(h => h[2] === note && (h[6] || 0) === player)[3];
-  for (const note of [36, 41, 45]) assert(velocity(note, 1) <= velocity(note, 0) * .7, `${note}`);
+  for (const note of [36, 41, 45]) assert(velocity(note, 1) >= velocity(note, 0) * .8, `${note}`);
   assert(velocity(38, 1) >= velocity(38, 0) * .8, 'la caixa, gairebé igual');
   // Cada músic té canal propi, obert a una banda i desafinat uns cents; un pèl a destemps.
   const perf = createPerformance({ ...compose(3), humanize: 0 });
@@ -312,10 +312,11 @@ test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments i sala,
   const caixa = step => line.find(h => h[0] === 0 && h[2] === 38 && h[1] * 4 === step)[3];
   for (const step of [0, 6, 9, 13]) assert(caixa(step) > caixa(step + 1));
   assert.equal(st.accents, '1000001001000100');
-  // Els surdos pesen menys i la caixa més que al samba.
+  // La caixa pesa més que al samba; els surdos, amb el seu pes original (sense rebaixar).
   const samba = engine.composeSongPart({ ...settings, batucadaBand: 3 }, { ...part, bars: 1, energy: 90 }).batucadaLine;
   const first = (l, n) => l.find(h => h[2] === n && !h[6])[3];
-  assert(first(line, 36) < first(samba, 36) && first(line, 38) > first(samba, 38));
+  assert(first(line, 38) > first(samba, 38));
+  for (const note of [35, 36, 41, 43, 45, 47]) assert.equal(st.gain[note], undefined, `surdo ${note}`);
   // Sala i separació dels músics. Sense compressió de bloc: amb tants cops al màxim, movia el guany al ritme
   // de l'ona i distorsionava el final i els cops de tots.
   assert.equal(spec.batucadaRoom, st.room);
@@ -328,7 +329,7 @@ test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments i sala,
     assert.equal(song.settings.batucadaRhythm, 'percudium');
     assert.equal(song.settings.batucadaBand, 3);
     assert(song.settings.bpm >= 100 && secs.every(sec => (sec.bpm ?? song.settings.bpm) >= 94 && (sec.bpm ?? song.settings.bpm) <= 108));
-    assert(song.settings.mix.drums.low < 0 && song.settings.mix.drums.high > 0);
+    assert(song.settings.mix.drums.low === 0 && song.settings.mix.drums.high > 0);
     assert(secs.filter(sec => sec.energy >= 84 && sec.type !== 'intro' && !sec.batucada?.tutti && !sec.batucada?.finale).every(sec => sec.batucada?.counter !== undefined));
     // La caixa contínua es manté a totes les variacions.
     assert([song.settings.batucadaPattern, ...secs.map(sec => sec.batucadaPattern).filter(Boolean)].every(p => p[3] === '1'.repeat(16) || p[4] !== undefined));
