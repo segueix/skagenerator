@@ -9,11 +9,14 @@ export const SHARE_PAGES = [
   { path: 'ska/', station: 'ska', query: 'emissora=ska', label: 'Ska', image: 'ska.jpg', sub: 'Jamaicà, rocksteady, 2-tone, ska-punk… cançons noves, compostes al teu dispositiu.' },
   { path: 'punk/', station: 'punk', query: 'emissora=punk', label: 'Punk', image: 'punk.jpg', sub: 'Punk del 77, Oi!, hardcore, pop-punk… cançons noves, compostes al teu dispositiu.' },
   { path: 'ska-punk/', station: 'mix', query: 'emissora=ska-punk', label: 'Ska-Punk', image: 'ska-punk.jpg', sub: 'Una de ska, una de punk. Cançons noves, compostes al teu dispositiu.' },
-  { path: 'batucada/', station: 'batucada', query: 'emissora=batucada', label: 'Batucada', image: 'batucada.jpg', sub: 'Només percussió: samba, samba-reggae, ijexá i Percudium.' },
+  { path: 'batucada/', station: 'batucada', query: 'emissora=batucada', label: 'Batucada', image: 'batucada.jpg', sub: 'Només percussió: samba, samba-reggae, ijexá, maracatu, baião, samba-funk i Percudium.' },
   { path: 'batucada/samba/', station: 'batucada', query: 'emissora=batucada&estil=samba', label: 'Samba', image: 'batucada-samba.jpg', sub: 'Batucada de samba: surdos, caixes, repiques i tamborins.' },
   { path: 'batucada/samba-reggae/', station: 'batucada', query: 'emissora=batucada&estil=samba-reggae', label: 'Samba-reggae', image: 'batucada-samba-reggae.jpg', sub: 'Batucada de samba-reggae, a ritme de Salvador.' },
   { path: 'batucada/ijexa/', station: 'batucada', query: 'emissora=batucada&estil=ijexa', label: 'Ijexá', image: 'batucada-ijexa.jpg', sub: 'Batucada d’ijexá: agogô de dues campanes i surdos.' },
-  { path: 'batucada/percudium/', station: 'batucada', query: 'emissora=batucada&estil=percudium', label: 'Percudium', image: 'batucada-percudium.jpg', sub: 'Batucada saturada de tambors: diàlegs, aturades i represes.' }
+  { path: 'batucada/percudium/', station: 'batucada', query: 'emissora=batucada&estil=percudium', label: 'Percudium', image: 'batucada-percudium.jpg', sub: 'Batucada saturada de tambors: diàlegs, aturades i represes.' },
+  { path: 'batucada/maracatu/', station: 'batucada', query: 'emissora=batucada&estil=maracatu', label: 'Maracatu', image: 'batucada.jpg', sub: 'Batucada de maracatu: alfaies greus, caixa de guerra i gonguê.' },
+  { path: 'batucada/baiao/', station: 'batucada', query: 'emissora=batucada&estil=baiao', label: 'Baião', image: 'batucada.jpg', sub: 'Batucada de baião: el ritme de la zabumba i el triangle.' },
+  { path: 'batucada/samba-funk/', station: 'batucada', query: 'emissora=batucada&estil=samba-funk', label: 'Samba-funk', image: 'batucada.jpg', sub: 'Batucada de samba-funk: surdos amb groove i caixa al contratemps.' }
 ];
 // Text del títol de l'enllaç: «Escolta Punk a Ràdio SPAM» (a la Batucada amb estil, «Escolta Batucada Percudium…»).
 export const shareTitle = p => `Escolta ${p.station === 'batucada' && p.path !== 'batucada/' ? `Batucada ${p.label}` : p.label} a Ràdio SPAM`;

@@ -1463,6 +1463,10 @@
     samba: { bpm: [124, 144], weight: 3 },
     reggae: { bpm: [106, 118], weight: 2 },
     ijexa: { bpm: [108, 122], weight: 1 },
+    // Ritmes brasilers amb una altra base de surdos i bombo, perquè les cançons no sonin totes iguals.
+    maracatu: { bpm: [96, 112], weight: 2 },
+    baiao: { bpm: [112, 128], weight: 2 },
+    funk: { bpm: [100, 112], weight: 2 },
     // Percudium: més lent i molt dens, sense canvis de ritme (el groove és el protagonista).
     percudium: { bpm: [94, 102], weight: 2, alone: true }
   };
@@ -1599,7 +1603,9 @@
       if (tempoOf(block.rhythm) !== Math.max(100, bpm)) sec.bpm = tempoOf(block.rhythm);
       // El mestre xiula a l'entrada, abans de cada breca i de cada canvi de ritme, i al final.
       const whistle = i === 0 || !!block.ending || block.type === 'outro' || (next && next.rhythm !== block.rhythm) || !!next?.tutti || r() < .2;
-      const fx = { ...(block.peak ? { peak: true } : {}), ...(whistle ? { whistle: true } : {}), ...(block.tutti ? { tutti: block.tutti } : {}),
+      // Abans d'un canvi de ritme, el mestre ho avisa: xiulet llarg i el compte de quatre xiulets curts.
+      const signal = !!next && next.rhythm !== block.rhythm;
+      const fx = { ...(block.peak ? { peak: true } : {}), ...(whistle ? { whistle: true } : {}), ...(signal ? { signal: true } : {}), ...(block.tutti ? { tutti: block.tutti } : {}),
         ...(block.intro ? { intro: block.intro } : {}), ...(block.opening ? { opening: block.opening } : {}), ...(block.dialog ? { dialog: block.dialog } : {}), ...(block.finale ? { finale: true } : {}),
         ...(block.cuica !== undefined && !block.tutti ? { cuica: block.cuica } : {}),
         // Contraritmes: a la meitat de les seccions fortes, el segon músic fa una altra figura.
