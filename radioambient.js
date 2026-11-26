@@ -1997,6 +1997,13 @@
     // el repique, l'agogô, la cuíca i el xiulet són d'un sol músic.
     const BATUCADA_BAND = [1, 2, 3], BATUCADA_DOUBLED = new Set([0, 1, 2, 3, 5, 7]), BATUCADA_COUNTER = [2, 3, 5];
 
+    // Quin instrument de la graella (fila de BATUCADA) toca cada nota del kit: cops apagats, campana greu,
+    // variants de la cuíca i articulacions del tabal i del bombo compten com el seu instrument.
+    const BATUCADA_NOTE_ROWS = Object.fromEntries([
+        ...BATUCADA.map((piece, row) => [piece.note, row]),
+        ...Object.entries(SURDO_MUTED).map(([row, note]) => [note, Number(row)]),
+        [AGOGO_LOW, 6], ...Object.keys(CUICA_VARIANTS).map(note => [note, 8]), [TABAL_CORXERA, TABAL_ROW], [BOMBO_MARGE, BOMBO_ROW]]);
+    const batucadaRowOf = note => BATUCADA_NOTE_ROWS[note] ?? -1;
     function validBatucadaPattern(pattern) {
         // (Els patrons desats abans del xiulet, del tabal i del bombo tenen menys files: les que falten no sonen.)
         return Array.isArray(pattern) && pattern.length >= 9 && pattern.length <= BATUCADA.length
@@ -3413,7 +3420,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

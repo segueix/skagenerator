@@ -331,6 +331,17 @@
     return stored;
   }
 
+  // Batucada: cada cop de la secció com a [segon de la cançó, instrument de la graella], ordenats i sense
+  // repetir els dels altres músics de la mateixa peça (sonen alhora).
+  function batucadaHits(spec, at) {
+    const seen = new Set(), hits = [];
+    for (const [bar, beat, note] of spec.batucadaLine) {
+      const row = engine.batucadaRowOf(note), time = at + (bar * 4 + beat) * spec.beat, key = `${Math.round(time * 1000)}:${row}`;
+      if (row < 0 || seen.has(key)) continue;
+      seen.add(key); hits.push([time, row]);
+    }
+    return hits.sort((a, b) => a[0] - b[0]);
+  }
   async function renderBand(song, plan, withVoice, active, progress) {
     const bars = plan.reduce((n, { seg }) => n + seg.bars, 0), parts = [], lengths = [], timeline = [];
     let done = 0;
@@ -351,7 +362,8 @@
       if (!active()) throw CANCELLED;
       if (seg.section?.fade) data = audioUtils.applyFade(data, Math.min(frames, data[0].length), seg.section.fade);
       parts.push(data); lengths.push(Math.min(frames, data[0].length));
-      timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lyricLines(song, seg, spec, at) });
+      timeline.push({ at, name: seg.section ? engine.SONG_PARTS[seg.section.type].name : 'Base', bpm, lines: lyricLines(song, seg, spec, at),
+        ...(Array.isArray(spec.batucadaLine) ? { hits: batucadaHits(spec, at) } : {}) });
       done += seg.bars;
       progress('render', done / bars);
     }
@@ -687,8 +699,29 @@
     if ('mediaSession' in navigator) { try { navigator.mediaSession.playbackState = isPlaying ? 'playing' : current ? 'paused' : 'none'; } catch {} }
     renderPrep(); renderProgress();
   }
+  // Batucada: el reproductor mostra tots els instruments del kit i s'encén cada un en el moment que sona.
+  const kit = $('radio-kit'), kitChips = engine.BATUCADA.map(({ name }) => {
+    const chip = document.createElement('li'); chip.textContent = name; kit.querySelector('ul').append(chip); return chip;
+  });
+  const KIT_BEFORE = .03, KIT_AFTER = .16; // el cop s'encén un instant abans i es manté uns 160 ms
+  let kitFor = null, kitHits = [], kitFrame = 0;
+  function renderKit() {
+    if (kitFor !== current) { kitFor = current; kitHits = (current?.timeline || []).flatMap(mark => mark.hits || []); }
+    kit.hidden = !current || !onTrack || !kitHits.length;
+    if (kit.hidden) return;
+    const t = audio.currentTime || 0, on = new Set();
+    // Primer cop que encara pot estar encès (cerca binària) i, a partir d'aquí, els que cauen a la finestra.
+    let lo = 0, hi = kitHits.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (kitHits[mid][0] < t - KIT_AFTER) lo = mid + 1; else hi = mid; }
+    for (let i = lo; i < kitHits.length && kitHits[i][0] <= t + KIT_BEFORE; i++) on.add(kitHits[i][1]);
+    kitChips.forEach((chip, row) => chip.classList.toggle('on', on.has(row)));
+  }
+  function kitLoop() { cancelAnimationFrame(kitFrame); renderKit(); if (!audio.paused && !kit.hidden) kitFrame = requestAnimationFrame(kitLoop); }
+  audio.addEventListener('play', kitLoop);
+  audio.addEventListener('seeked', renderKit);
   let seeking = false;
   function renderProgress() {
+    renderKit();
     if (!current || !onTrack) { $('radio-seek').value = 0; $('radio-time').textContent = '0:00'; $('radio-section').textContent = ''; return; }
     const t = Math.min(current.seconds, audio.currentTime || 0);
     if (!seeking) $('radio-seek').value = Math.round(t / current.seconds * 1000);
