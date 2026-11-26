@@ -492,3 +492,14 @@ test('els surdos de la batucada no van a la reverberació (sonaven com un to met
   const ska = createPerformance(engine.composeSongPart({ ...settings, timbres: {}, instruments: ['drums'] }, { ...part, bars: 1 }));
   assert(ska.channels.every(c => !c.dryKeys), 'les bateries de l\'ska no canvien');
 });
+
+test('cada nota del kit de batucada se sap de quin instrument és (per mostrar què sona al reproductor)', () => {
+  for (const note of Object.keys(kit.pieces).map(Number)) assert(engine.batucadaRowOf(note) >= 0, `nota ${note}`);
+  for (const [row, piece] of engine.BATUCADA.entries()) assert.equal(engine.batucadaRowOf(piece.note), row);
+  assert.deepEqual([35, 43, 47, 68, 83, 85, 87].map(engine.batucadaRowOf), [0, 1, 2, 6, 8, 10, 11]);
+  assert.equal(engine.batucadaRowOf(60), -1);
+  // Una cançó de la ràdio Batucada: tots els cops es poden atribuir a un instrument.
+  const song = require('../song-builder.js').createBatucadaSong(engine, { seed: 5 });
+  const line = engine.composeSongPart(song.settings, { ...song.sections[1], instruments: ['drums'], revision: 1 }).batucadaLine;
+  assert(line.length && line.every(h => engine.batucadaRowOf(h[2]) >= 0));
+});
