@@ -18,5 +18,6 @@ test('visualitzador VaTuCalla!: es carrega a la web, es publica i es veu per sob
   assert.match(viz, /ctx\.textAlign = 'right'; ctx\.textBaseline = 'bottom'/);
   assert.match(viz, /ctx\.textAlign = 'center'; ctx\.textBaseline = 'top'/);
   assert.match(viz, /'video\/mp4;codecs=avc1\.640028,mp4a\.40\.2'/);
-  assert.match(viz, /infinit: \{/);
+  // Cinc dissenys: l'Infinit i quatre de brasilers i de dibuixos animats.
+  for (const design of ['infinit', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: \\{`), design);
 });
