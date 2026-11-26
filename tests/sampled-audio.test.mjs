@@ -296,15 +296,35 @@ test('orgue de rodes: bucles exactes, percussió que s’apaga i el Leslie gira 
 
 test('el limitador abaixa els pics abans que arribin (sense deformar l\'ona) i després recupera el volum', async () => {
   const { limitPeaks } = await import('../audio/render.mjs');
-  const n = 8000, l = new Float32Array(n), r = new Float32Array(n);
+  const n = 16000, l = new Float32Array(n), r = new Float32Array(n);
   for (let i = 0; i < n; i++) l[i] = r[i] = .5 * Math.sin(i / 5) * (i >= 4000 && i < 4060 ? 3 : 1);
   const before = Float32Array.from(l);
   limitPeaks(l, r, 22050, .8);
   let peak = 0; for (const v of l) peak = Math.max(peak, Math.abs(v));
   assert(peak <= .8001, `pic ${peak}`);
-  assert.deepEqual([...l.slice(0, 3800)], [...before.slice(0, 3800)], 'lluny del pic, igual');
-  assert(Math.abs(l[7900] / before[7900] - 1) < .08, 'recupera el volum (en uns 80 ms)');
+  assert.deepEqual([...l.slice(0, 3500)], [...before.slice(0, 3500)], 'lluny del pic (més de 16 ms abans), igual');
+  assert(Math.abs(l[15900] / before[15900] - 1) < .08, 'recupera el volum (en uns 200 ms)');
   const quiet = Float32Array.from({ length: 100 }, (_, i) => .3 * Math.sin(i)), copy = Float32Array.from(quiet);
   limitPeaks(quiet, Float32Array.from(quiet), 22050, .8);
   assert.deepEqual([...quiet], [...copy], 'sense pics, no toca res');
+});
+
+test('batucada: el final i els cops de tots arriben nets al limitador (no l\'obliguen a aixafar el so)', async () => {
+  const extraRaw = await readFile(new URL('../dist/assets/extra-instruments.sf2', import.meta.url));
+  const extra = parseSoundBank(extraRaw.buffer.slice(extraRaw.byteOffset, extraRaw.byteOffset + extraRaw.byteLength));
+  const builder = (await import('../song-builder.js')).default;
+  for (const [rhythm, seed] of [['percudium', 12], ['samba', 11], ['reggae', 4]]) {
+    const song = builder.createBatucadaSong(engine, { seed, rhythm }), st = song.settings;
+    const pick = [song.sections.length - 1, song.sections.findIndex(s => s.ending)];
+    for (const i of pick) {
+      const sec = song.sections[i];
+      const spec = engine.composeSongPart(st, { type: sec.type, bars: sec.bars, energy: sec.energy, revision: 1, instruments: ['drums'],
+        next: song.sections[i + 1]?.type ?? 'end', ...(sec.ending ? { ending: sec.ending } : {}), ...(sec.closing ? { closing: sec.closing } : {}),
+        ...(sec.batucadaPattern ? { batucadaPattern: sec.batucadaPattern } : {}), ...(sec.batucada ? { batucada: sec.batucada } : {}),
+        ...(sec.volumes ? { volumes: sec.volumes } : {}), ...(sec.bpm ? { bpm: sec.bpm } : {}) });
+      let least = 1;
+      await renderSampledPart(bank, spec, 22050, { extra, onLimit: g => { least = g; } });
+      assert(20 * Math.log10(least) > -4, `${rhythm} · ${sec.type}: el limitador abaixa ${(20 * Math.log10(least)).toFixed(1)} dB`);
+    }
+  }
 });

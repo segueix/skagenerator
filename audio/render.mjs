@@ -239,11 +239,12 @@ function fxFor(score, patch) {
   const clampPct = v => Math.max(0, Math.min(100, v));
   return { ...fx, drive: clampPct(fx.drive + patch.fxTweak.drive), tone: clampPct(fx.tone + patch.fxTweak.tone) };
 }
-// Limitador de pics (estèreo enllaçat): el guany necessari en cada punt és el mínim dels 6 ms següents
-// (anticipació) i es recupera en uns 80 ms; una mitjana mòbil de 3 ms el fa baixar sense salts i, quan
+// Limitador de pics (estèreo enllaçat): el guany necessari en cada punt és el mínim dels 16 ms següents
+// (anticipació) i es recupera en uns 200 ms; una mitjana mòbil de 8 ms el fa baixar sense salts i, quan
 // arriba el pic, ja és tan baix com cal.
 export function limitPeaks(left, right, sampleRate, ceiling = .8) {
-  const length = left.length, ahead = Math.max(1, Math.round(.003 * sampleRate)), release = 1 - Math.exp(-1 / (.08 * sampleRate));
+  // (Transicions de 8 ms i recuperació de 200 ms: més ràpid, el guany seguiria cada cop i el deformaria.)
+  const length = left.length, ahead = Math.max(1, Math.round(.008 * sampleRate)), release = 1 - Math.exp(-1 / (.2 * sampleRate));
   const need = new Float32Array(length);
   let over = false;
   for (let i = 0; i < length; i++) {
@@ -251,7 +252,7 @@ export function limitPeaks(left, right, sampleRate, ceiling = .8) {
     need[i] = peak > ceiling ? ceiling / peak : 1;
     if (need[i] < 1) over = true;
   }
-  if (!over) return;
+  if (!over) return null;
   // Mínim en una finestra que mira endavant (cua monòtona).
   const target = new Float32Array(length), queue = new Int32Array(length);
   let head = 0, tail = 0;
@@ -270,6 +271,7 @@ export function limitPeaks(left, right, sampleRate, ceiling = .8) {
     smooth[i] = sum / Math.min(i + 1, ahead);
   }
   for (let i = 0; i < length; i++) { left[i] *= smooth[i]; right[i] *= smooth[i]; }
+  return smooth;
 }
 
 export async function renderSampledPart(bank, spec, sampleRate = 44100, options = {}) {
@@ -357,10 +359,10 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     if (masterEq) for (let i = 0; i < length; i++) { left[i] = masterEq.process(0, left[i]); right[i] = masterEq.process(1, right[i]); }
     if (options.raw) return [left, right]; // Només per a proves: sense dinàmica ni nivell.
     // Compressor de bus suau (2,5:1) per cohesionar la banda.
-    // Amb «glue» (Percudium) la compressió és més ferma: la banda sona com un sol bloc, com en un disc masteritzat.
-    // (Atac de 5 ms: més ràpid, el compressor seguiria l'ona dels surdos i la distorsionaria.)
-    const attack = Math.exp(-1 / ((score.glue ? .005 : .012) * sampleRate)), release = Math.exp(-1 / ((score.glue ? .15 : .3) * sampleRate));
-    const threshold = score.glue ? .07 : .16, ratio = score.glue ? 3.5 : 2.2;
+    // (Un compressor més ràpid o més fort, com el que havia tingut el Percudium, mou el guany al ritme de l'ona
+    // dels surdos quan tot pica al màxim i distorsiona el final i els cops de tots.)
+    const attack = Math.exp(-1 / (.012 * sampleRate)), release = Math.exp(-1 / (.3 * sampleRate));
+    const threshold = .16, ratio = 2.2;
     let envelope = 0, peak = 0;
     for (let i = 0; i < length; i++) {
       if (!Number.isFinite(left[i]) || !Number.isFinite(right[i])) throw new Error('El motor ha produït àudio no vàlid');
@@ -373,8 +375,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // Nivell fix per a tota la cançó: cada secció rep el mateix guany, de manera
     // que un instrument que passa d'una secció a l'altra no canvia de volum. Les
     // seccions plenes sonen més fortes perquè hi toquen més instruments.
-    // (Amb «glue», es recupera el nivell que treu la compressió.)
-    const gain = SONG_GAIN * 10 ** (((master.volume || 0) + (score.glue ? 6 : 0)) / 20);
+    const gain = SONG_GAIN * 10 ** ((master.volume || 0) / 20);
     const fade = Math.round(.4 * sampleRate);
     const soft = x => { const a = Math.abs(x); return a < .82 ? x : Math.sign(x) * (.82 + .11 * Math.tanh((a - .82) / .11)); };
     for (let i = 0; i < length; i++) {
@@ -384,7 +385,9 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // Limitador amb anticipació: abans d'un pic que passaria del sostre, abaixa el volum de mica en mica
     // (sense deformar l'ona) i el recupera després. Sense ell, els atacs forts (cops de tots, percussió
     // amb molts músics) arribaven al saturador final i sonaven distorsionats. El saturador queda de seguretat.
-    limitPeaks(left, right, sampleRate, .8);
+    const limited = limitPeaks(left, right, sampleRate, .8);
+    // (Per a les proves: quant ha hagut d'abaixar el limitador, com a molt.)
+    if (options.onLimit) { let least = 1; if (limited) for (const g of limited) if (g < least) least = g; options.onLimit(least); }
     for (let i = 0; i < length; i++) { left[i] = soft(left[i]); right[i] = soft(right[i]); }
     options.onProgress?.(1);
     return [left, right];

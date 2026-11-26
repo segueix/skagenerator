@@ -1459,7 +1459,8 @@
         ...(band > 1 && !block.tutti && !block.finale && block.energy >= 84 && block.type !== 'intro' && (alone || r() < .5) ? { counter: Math.floor(r() * 4) } : {}) };
       if (Object.keys(fx).length) sec.batucada = fx;
       // Als moments clau també puja el volum general de la secció.
-      if (block.master) sec.volumes = { master: 3 };
+      // (+1 dB: la batucada ja és molt plena i, més fort, el limitador hauria d'aixafar el final i els cops de tots.)
+      if (block.master) sec.volumes = { master: 1 };
       sections.push(sec); at += block.bars;
     });
     // De vegades l'última tornada s'accelera una mica, com quan la batucada s'escalfa.
@@ -1472,7 +1473,9 @@
     const settings = { style: 'ska', bpm: Math.max(100, bpm), tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
       batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', countIn: !alone,
       // Percudium: el so als mitjos i brillant (menys greus de surdo, més caixa, repique i tamborim).
-      ...(alone ? { mix: { drums: { low: -8, mid: 0, high: 2, volume: 1 } } } : {}), humanize: compact ? .1 : .3 };
+      // Les altres batucades, 2 dB per sota: amb tres músics per peça i el mode «foc», el final i els cops de tots
+      // arribaven massa forts al limitador i es distorsionaven.
+      mix: alone ? { drums: { low: -8, mid: 0, high: 2, volume: 1 } } : { drums: { low: 0, mid: 0, high: 0, volume: -2 } }, humanize: compact ? .1 : .3 };
     return { version: 3, title, settings, base: { instruments: ['drums'], revision: 1, generated: true }, harmony: {}, sections, clips: [] };
   }
   // Una cançó és de batucada si només hi sona el kit de batucada.
