@@ -11,6 +11,7 @@
     "86": {"warmth": 0.35, "warmthHighpass": 150, "seconds": 0.64, "choke": 5, "layers": [[["bombo-cop-central.wav", 1]]]},
     "87": {"warmth": 0.15, "seconds": 0.28, "choke": 5, "layers": [[["bombo-cop-marge.wav", 1]]]},
     "71": {
+     "levelDb": -9,
      "seconds": 0.24,
      "loopSamples": [3104, 7396],
      "layers": [[["xiulet.wav", 1]]]

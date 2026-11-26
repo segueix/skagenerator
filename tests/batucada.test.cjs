@@ -249,14 +249,15 @@ test('dinàmica: a poca energia el volum baixa poc i als moments clau puja molt'
 test('xiulet del mestre, convenção de tots junts i cadena de cuíca amb distorsions', () => {
   const play = (p, extra = {}) => engine.composeSongPart({ ...settings, ...extra }, { ...part, ...p }).batucadaLine;
   const whistle = engine.BATUCADA_WHISTLE.note;
-  // Xiulet a l'entrada (llarg i tres curts) i abans de la crida del repique.
-  const entry = play({ bars: 2, countIn: true, batucada: { whistle: true } }).filter(h => h[0] === 0 && h[2] === whistle);
+  // Xiulet a l'entrada (llarg i tres curts) i abans de la crida del repique, només a la intro.
+  const entry = play({ type: 'intro', bars: 2, countIn: true, batucada: { whistle: true } }).filter(h => h[0] === 0 && h[2] === whistle);
   assert.deepEqual(entry.map(h => h[1]), [0, 2, 2.5, 3]);
   assert(entry[0][4] > entry[1][4]);
-  assert(play({ bars: 2, next: 'chorus', batucada: { whistle: true } }).some(h => h[0] === 1 && h[2] === whistle));
+  assert(play({ type: 'intro', bars: 2, next: 'verse', batucada: { whistle: true } }).some(h => h[0] === 1 && h[2] === whistle));
   assert(!play({ bars: 2, next: 'chorus' }).some(h => h[2] === whistle));
-  // Abans d'una breca, tres xiulets curts.
-  assert.equal(play({ bars: 3, next: 'verse', ending: 'break', batucada: { whistle: true } }).filter(h => h[0] === 1 && h[2] === whistle).length, 3);
+  // Fora de la intro, el mestre no xiula: ni a la crida, ni abans d'una breca, ni al final (tampoc a les cançons desades abans).
+  for (const p of [{ bars: 2, next: 'chorus' }, { bars: 3, next: 'verse', ending: 'break' }, { type: 'outro', bars: 4, batucada: { whistle: true, finale: true } }])
+    assert(!play({ ...p, batucada: { whistle: true, ...(p.batucada || {}) } }).some(h => h[2] === whistle), JSON.stringify(p));
   // Convenção: totes les peces toquen la mateixa figura, a temps exacte.
   const tutti = '1001001000101000', line = play({ bars: 1, batucada: { tutti } });
   const steps = new Set(line.map(h => h[1] * 4));
@@ -296,7 +297,8 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     const average = secs.reduce((t, sec) => t + sec.energy * sec.bars, 0) / song.settings.bars;
     assert(average >= 84, `energia mitjana ${average}`);
     assert(secs.filter(sec => sec.energy < 60).length <= 1);
-    assert(secs.filter(sec => sec.ending).every(sec => sec.batucada?.whistle));
+    // El xiulet només és a l'inici (la primera secció).
+    assert(secs.slice(1).every(sec => !sec.batucada?.whistle), `xiulet fora de l'inici (${seed})`);
     // (El Percudium té convenções però conserva una mica de soltesa entre músics.)
     if (song.settings.batucadaRhythm !== 'percudium' && secs.some(sec => sec.batucada?.tutti)) { compact++; assert(song.settings.humanize < .2); }
     if (secs.some(sec => sec.batucada?.cuica !== undefined)) chains++;
@@ -517,7 +519,7 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
     const changes = secs.filter(sec => rhythmOf(sec) && rhythmOf(sec) !== 'percudium');
     assert(changes.length >= 1, `canvis de ritme (${seed})`);
     assert(changes.every(sec => (sec.bpm ?? song.settings.bpm) === bpm), 'mateix tempo');
-    assert(changes.every(sec => secs[secs.indexOf(sec) - 1].batucada?.whistle), 'el mestre avisa del canvi');
+    assert(changes.every(sec => secs[secs.indexOf(sec) - 1].batucada?.signal), 'el mestre avisa del canvi');
     assert.equal(song.settings.countIn, false);
     assert(secs[1].batucada?.peak && secs[1].volumes?.master > 0, 'entren tots amb potència');
     assert(secs.some(sec => sec.batucada?.dialog), 'diàlegs');
@@ -593,7 +595,7 @@ test('inici compost: l\'instrument, el ritme i els xiulets triats sonen els prim
   assert.throws(() => builder.createBatucadaSong(engine, { seed: 1, opening: { ...opening, row: 99 } }), /Inici/);
 });
 
-test('canvi de ritme: el mestre l\'avisa amb un xiulet llarg i el compte de quatre xiulets curts', () => {
+test('canvi de ritme: el mestre l\'avisa amb un sol xiulet llarg i fort', () => {
   const builder = require('../song-builder.js'), W = engine.BATUCADA_WHISTLE.note;
   let checked = 0;
   for (let seed = 1; seed <= 20; seed++) {
@@ -604,9 +606,11 @@ test('canvi de ritme: el mestre l\'avisa amb un xiulet llarg i el compte de quat
       if (!sec.batucada?.signal) return;
       const part = { ...sec, instruments: ['drums'], revision: 1, next: next?.type ?? 'end' };
       const line = engine.composeSongPart(song.settings, part).batucadaLine.filter(h => h[2] === W);
-      const count = ['break', 'silence', 'stop'].includes(sec.ending) ? sec.bars - 2 : sec.bars - 1;
-      assert.deepEqual(line.filter(h => h[0] === count).map(h => h[1]), [0, 1, 2, 3], `seed ${seed}: compte de quatre`);
-      assert(line.some(h => h[0] === count - 1 && h[1] === 0 && h[4] > .4), `seed ${seed}: xiulet llarg abans`);
+      const at = ['break', 'silence', 'stop'].includes(sec.ending) && sec.bars >= 2 ? sec.bars - 2 : sec.bars - 1;
+      // Un sol xiulet: a l'u de l'últim compàs, de tres temps i al màxim (127).
+      assert.equal(line.length, 1, `seed ${seed}: un sol xiulet`);
+      assert.deepEqual([line[0][0], line[0][1], line[0][3]], [at, 0, 127], `seed ${seed}: al lloc i fort`);
+      assert(line[0][4] >= 3 * 60 / (sec.bpm || song.settings.bpm) - .01 || sec.ending, `seed ${seed}: llarg`);
       checked++;
     });
     // Cada canvi de ritme porta el senyal.

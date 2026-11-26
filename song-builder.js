@@ -1601,9 +1601,11 @@
       if (block.ending) sec.ending = block.ending;
       if (block.type === 'outro' && closing !== 'hit') sec.closing = closing;
       if (tempoOf(block.rhythm) !== Math.max(100, bpm)) sec.bpm = tempoOf(block.rhythm);
-      // El mestre xiula a l'entrada, abans de cada breca i de cada canvi de ritme, i al final.
-      const whistle = i === 0 || !!block.ending || block.type === 'outro' || (next && next.rhythm !== block.rhythm) || !!next?.tutti || r() < .2;
-      // Abans d'un canvi de ritme, el mestre ho avisa: xiulet llarg i el compte de quatre xiulets curts.
+      // El mestre xiula a l'inici i, com a senyal fort i llarg, abans de cada canvi de ritme (vegeu signal).
+      // (Abans el mestre xiulava també abans de cada breca, al final i a l'atzar; ara només a l'inici. La tirada
+      // es manté perquè la resta de la cançó no canviï.)
+      const whistle = i === 0; r();
+      // Abans d'un canvi de ritme, el mestre ho avisa amb un xiulet llarg i fort.
       const signal = !!next && next.rhythm !== block.rhythm;
       const fx = { ...(block.peak ? { peak: true } : {}), ...(whistle ? { whistle: true } : {}), ...(signal ? { signal: true } : {}), ...(block.tutti ? { tutti: block.tutti } : {}),
         ...(block.intro ? { intro: block.intro } : {}), ...(block.opening ? { opening: block.opening } : {}), ...(block.dialog ? { dialog: block.dialog } : {}), ...(block.finale ? { finale: true } : {}),
