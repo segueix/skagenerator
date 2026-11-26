@@ -183,6 +183,7 @@
     if (st.batucadaWhistleMs !== undefined && !engine.BATUCADA_WHISTLE.durations.includes(st.batucadaWhistleMs)) fail('Durada del xiulet no vàlida');
     if (st.batucadaRhythm !== undefined && !Object.hasOwn(engine.BATUCADA_RHYTHMS, st.batucadaRhythm)) fail('Ritme de batucada no vàlid');
     if (st.batucadaBand !== undefined && !engine.BATUCADA_BAND.includes(st.batucadaBand)) fail('Banda de batucada no vàlida');
+    if (!engine.validBatucadaMotif(st.batucadaMotif)) fail('Frase de batucada no vàlida');
     if (st.batucadaSurdo3 !== undefined && !engine.SURDO3_MODES.includes(st.batucadaSurdo3)) fail('Surdo 3 no vàlid');
     if (!validTimbres(st.timbres) || !validGroove(st.groove, st.style)) fail('Sons o patrons no vàlids');
     if (!validBaseVolume(st.baseVolume)) fail('Volums generals de la base no vàlids');
@@ -1281,11 +1282,13 @@
       const pattern = [...batucadaPattern()];
       pattern[row] = pattern[row].slice(0, step) + (event.target.checked ? '1' : '0') + pattern[row].slice(step + 1);
       st.batucadaPattern = pattern;
+      // La frase de la cançó la toca el tabal: si se n'edita la fila, mana la graella.
+      if (row === engine.BATUCADA.findIndex(p => p.name === 'Tabal')) delete st.batucadaMotif;
     }
     else if (id === 'batucada-whistle-ms') st.batucadaWhistleMs = Number(event.target.value);
     else if (id === 'batucada-surdo3') { if (event.target.value === 'grid') delete st.batucadaSurdo3; else st.batucadaSurdo3 = event.target.value; }
     else if (id === 'batucada-band') { const n = Number(event.target.value); if (n === 1) delete st.batucadaBand; else st.batucadaBand = n; }
-    else if (id === 'batucada-rhythm') { st.batucadaRhythm = event.target.value; delete st.batucadaPattern; }
+    else if (id === 'batucada-rhythm') { st.batucadaRhythm = event.target.value; delete st.batucadaPattern; delete st.batucadaMotif; }
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
     else if (id === 'song-subgenre') {
       const key = event.target.value, sg = engine.SUBGENRES[key];
@@ -2297,6 +2300,7 @@
   const setBatucada = pattern => {
     const st = song.settings, replay = playing?.kind;
     if (pattern) st.batucadaPattern = pattern; else delete st.batucadaPattern;
+    delete st.batucadaMotif; // graella nova: el tabal toca el que hi ha a la graella
     stop(); save(); updateSettingsUI(); render();
     if (replay) play(replay);
   };

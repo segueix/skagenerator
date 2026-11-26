@@ -40,7 +40,7 @@ test('tabal: mostra llarga per a negres, curta per a cops seguits i patrons anti
   assert.deepEqual(createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 9).map(e => e.note), [84, 85, 84, 84]);
 });
 
-test('bombo: cop al centre a l\'inici de cada temps i al marge a la resta', () => {
+test('bombo: el centre resol i el marge pregunta, segons la frase', () => {
   const row = engine.BATUCADA.findIndex(p => p.name === 'Bombo');
   assert.equal(row, 11);
   assert.equal(kit.pieces[86].layers[0][0][0], 'bombo-cop-central.wav');
@@ -48,12 +48,65 @@ test('bombo: cop al centre a l\'inici de cada temps i al marge a la resta', () =
   assert.equal(kit.pieces[86].choke, kit.pieces[87].choke);
   assert.notEqual(kit.pieces[86].choke, kit.pieces[84].choke);
   const empty = Array(11).fill('0'.repeat(16));
-  const play = pattern => engine.composeSongPart({ ...settings, batucadaPattern: pattern }, { ...part, bars: 1 });
+  const play = (pattern, p = {}) => engine.composeSongPart({ ...settings, batucadaPattern: pattern }, { ...part, bars: 1, ...p }).batucadaLine;
   assert(engine.validBatucadaPattern(empty) && engine.validBatucadaPattern(empty.slice(0, 9)), 'patrons antics');
-  assert.deepEqual(play(empty).batucadaLine, []);
-  const spec = play([...empty, '1000101000001010']);
-  assert.deepEqual(spec.batucadaLine.map(h => [h[1], h[2]]), [[0, 86], [1, 86], [1.5, 87], [3, 86], [3.5, 87]]);
-  assert.deepEqual(createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 9).map(e => e.note), [86, 86, 87, 86, 87]);
+  assert.deepEqual(play(empty), []);
+  const bombo = line => line.filter(h => h[2] === 86 || h[2] === 87);
+  // Centre als dos temps forts de cada compàs de 2/4 (passos 0 i 8) i marge a la resta.
+  const one = bombo(play([...empty, '1000101010001010']));
+  assert.deepEqual(one.map(h => [h[1], h[2]]), [[0, 86], [1, 87], [1.5, 87], [2, 86], [3, 87], [3.5, 87]]);
+  // El primer temps de la frase, més fort (resolució).
+  assert(one[0][3] > one[3][3]);
+  const four = bombo(play([...empty, '1000100010001000'], { bars: 4 }));
+  // A l'últim compàs de la frase de quatre, tot al marge (pregunta); al primer, el centre.
+  assert.deepEqual(four.filter(h => h[0] === 3).map(h => h[2]), [86, 87, 87, 87]);
+  assert.deepEqual(four.filter(h => h[0] === 0).map(h => h[2]), [86, 87, 86, 87]);
+  // Abans de la represa (crida cap a la secció següent): dos cops curts de marge a l'últim temps...
+  const call = bombo(play([...empty, '1000100010001000'], { bars: 2, next: 'chorus' })).filter(h => h[0] === 1 && h[1] >= 3);
+  assert.deepEqual(call.map(h => [h[1], h[2]]), [[3.25, 87], [3.5, 87]]);
+  assert(call[1][3] > call[0][3], 'creixen');
+  // ... i abans d'una breca, també; la breca és un cop de centre amb tota la colla.
+  const brk = bombo(play([...empty, '1000100010001010'], { bars: 3, next: 'verse', ending: 'break' }));
+  assert.deepEqual(brk.filter(h => h[0] === 1 && h[1] >= 3).map(h => [h[1], h[2]]), [[3.25, 87], [3.5, 87]]);
+  assert.deepEqual(brk.filter(h => h[0] === 2).map(h => [h[1], h[2]]), [[0, 86]]);
+  // Final de tots: quatre cops de marge que creixen i el cop final al centre.
+  const end = bombo(engine.composeSongPart({ ...settings, batucadaRhythm: 'percudium' }, { ...part, type: 'outro', bars: 2, batucada: { finale: true } }).batucadaLine).filter(h => h[0] === 1 && !h[6]);
+  assert.deepEqual(end.map(h => [h[1], h[2]]), [[0, 87], [.5, 87], [1, 87], [1.5, 87], [2, 86]]);
+});
+
+test('frase de la cançó: el tabal toca A A A B i el repique recupera el final abans de la tornada', () => {
+  const builder = require('../song-builder.js');
+  assert(engine.BATUCADA_MOTIFS.every(f => /^[01]{16}$/.test(f)) && engine.BATUCADA_ENDINGS.every(e => /^[01]{8}$/.test(e)));
+  assert(engine.validBatucadaMotif(undefined) && !engine.validBatucadaMotif({ figure: '1', ending: '10101010' }) && !engine.validBatucadaMotif({ figure: '0'.repeat(16), ending: '10101010' }));
+  const motifs = new Set();
+  for (let seed = 1; seed <= 30; seed++) {
+    const song = builder.createBatucadaSong(engine, { seed });
+    const m = song.settings.batucadaMotif;
+    assert(engine.validBatucadaMotif(m) && m && engine.BATUCADA_MOTIFS.includes(m.figure) && engine.BATUCADA_ENDINGS.includes(m.ending));
+    assert.notEqual(m.ending, m.figure.slice(8), 'el final canvia');
+    motifs.add(JSON.stringify(m));
+  }
+  assert(motifs.size >= 12, 'cada cançó, la seva frase');
+  const motif = { figure: '1000101000101000', ending: '11011000' };
+  const st = { ...settings, batucadaRhythm: 'samba', batucadaMotif: motif };
+  const line = engine.composeSongPart(st, { ...part, bars: 8, energy: 80 }).batucadaLine;
+  const tabal = bar => line.filter(h => h[0] === bar && (h[2] === 84 || h[2] === 85) && !h[6]).map(h => h[1] * 4);
+  const steps = figure => [...figure].flatMap((c, i) => c === '1' ? [i] : []);
+  for (const bar of [0, 1, 2, 4, 5, 6]) assert.deepEqual(tabal(bar), steps(motif.figure), `A al compàs ${bar}`);
+  for (const bar of [3, 7]) assert.deepEqual(tabal(bar), steps(motif.figure.slice(0, 8) + motif.ending), `B al compàs ${bar}`);
+  // La frase sona per sobre del tabal de la graella.
+  const plain = engine.composeSongPart({ ...settings, batucadaRhythm: 'samba' }, { ...part, bars: 1, energy: 80 }).batucadaLine.filter(h => h[2] === 84 || h[2] === 85);
+  assert(Math.max(...line.filter(h => h[0] === 0 && (h[2] === 84 || h[2] === 85)).map(h => h[3])) > Math.max(...plain.map(h => h[3])));
+  // Crida abans de la tornada: a la segona meitat de l'últim compàs, el repique toca el final de la frase; la caixa, fluixa.
+  const call = engine.composeSongPart(st, { ...part, bars: 2, energy: 80, next: 'chorus' }).batucadaLine.filter(h => h[0] === 1 && h[1] >= 2 && !h[6]);
+  assert.deepEqual(call.filter(h => h[2] === 50).map(h => h[1] * 4 - 8), steps(motif.ending));
+  const snare = call.filter(h => h[2] === 38);
+  assert(snare.length === 8 && snare.every(h => h[3] < 80), 'la caixa manté el moviment, fluixa');
+  assert(!call.some(h => [54, 67, 68, 69, 84, 85].includes(h[2])), 'la resta deixa espai');
+  // Sense frase (cançons de l'editor) o en una convenção, el tabal toca la graella.
+  const tutti = engine.composeSongPart(st, { ...part, bars: 1, energy: 80, batucada: { tutti: '1000100010001000' } }).batucadaLine.filter(h => (h[2] === 84 || h[2] === 85) && !h[6]);
+  assert.deepEqual(tutti.map(h => h[1] * 4), [0, 4, 8, 12]);
+  assert.throws(() => engine.composeSongPart({ ...st, batucadaMotif: { figure: 'x' } }, part));
 });
 
 test('el tabal i el bombo toquen a tots els estils de samba, també als cops de tots i a les cançons generades', () => {

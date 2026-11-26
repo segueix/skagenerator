@@ -1470,8 +1470,13 @@
     let title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
     for (let tries = 0; taken.has(title.toLowerCase()) && tries < 40; tries++) title = `${pick(BATUCADA_TITLES[0])} ${pick(BATUCADA_TITLES[1])}`;
     // L'estil ska no baixa de 100 BPM: si el ritme va més lent (Percudium), cada secció porta el seu tempo.
+    // Frase de la cançó (tabal, A A A B) i el seu final, que el repique recupera abans de cada tornada.
+    // (Amb un generador a part: la resta de la cançó no canvia.)
+    const own = rng(seed ^ 0x6d07a5), figure = engine.BATUCADA_MOTIFS[Math.floor(own() * engine.BATUCADA_MOTIFS.length)];
+    const endings = engine.BATUCADA_ENDINGS.filter(e => e !== figure.slice(8));
+    const motif = { figure, ending: endings[Math.floor(own() * endings.length)] };
     const settings = { style: 'ska', bpm: Math.max(100, bpm), tonic: 0, mode: 'major', seed, bars: at, timbres: { drums: 'batucada' },
-      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', countIn: !alone,
+      batucadaRhythm: rhythm, batucadaPattern: base, batucadaBand: band, batucadaSurdo3: 'improv', batucadaMotif: motif, countIn: !alone,
       // Percudium: brillant, amb més caixa, repique i tamborim, però amb els surdos al seu so original (sense retallar-ne els greus).
       // Les altres batucades, 2 dB per sota: amb tres músics per peça i el mode «foc», el final i els cops de tots
       // arribaven massa forts al limitador i es distorsionaven.
