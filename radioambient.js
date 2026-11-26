@@ -1957,7 +1957,7 @@
         11: ['1000100010001010', '1000100010001000', '1000100110001001', '1001100010011000']
     };
     // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
-    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .74, 78: .82, [BATUCADA_WHISTLE.note]: .66,
+    const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .74, 78: .82, [BATUCADA_WHISTLE.note]: .55,
         79: .8, 80: .84, 81: .78, 82: .78, 83: .8, 35: .8, 43: .78, 47: .76, 68: .78, [TABAL_NEGRA]: .70, [TABAL_CORXERA]: .70,
         [BOMBO_CENTRAL]: .92, [BOMBO_MARGE]: .84 };
     // Balanç de cada ritme (micro-temps): desplaçament de cada semicorxera del temps, en fraccions de temps.
@@ -2188,11 +2188,15 @@
             line.push(hit);
         };
         // Xiulet del mestre (avisos): durada en segons.
-        const blow = (bar, step, seconds, extra = 0) => {
+        // (velocity: força exacta; el senyal de canvi de ritme va al màxim, per sobre de tota la colla.)
+        const blow = (bar, step, seconds, extra = 0, velocity = null) => {
             const at = (bar * 4 + step / 4) * beat;
             if (at >= stopAt) return;
-            line.push([bar, step / 4, BATUCADA_WHISTLE.note, force(BATUCADA_WHISTLE.note, 0, extra), Math.min(seconds, stopAt - at)]);
+            line.push([bar, step / 4, BATUCADA_WHISTLE.note, velocity ?? force(BATUCADA_WHISTLE.note, 0, extra), Math.min(seconds, stopAt - at)]);
         };
+        // El xiulet del mestre només sona a l'inici de la cançó (i com a senyal abans d'un canvi de ritme): a la resta
+        // de seccions no se'n fa cas, tampoc a les cançons desades abans.
+        const whistle = !!fx.whistle && type === 'intro';
         // Cop de tota la batucada (aturades i final), a temps exacte. Al Percudium, ben fort però sense forçar-lo
         // a 127 (24 notes a 127 alhora obligaven el limitador a aixafar el so: es distorsionava).
         const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => [...pieces, ...extraRows].forEach(row =>
@@ -2250,7 +2254,7 @@
         // Amb frase de cançó, abans de la tornada el repique toca sol el final de la frase (la segona meitat del
         // compàs B) i la resta li deixa espai: la caixa manté el moviment amb cops fluixos i els surdos, el pols.
         const call = bar => {
-            if (fx.whistle && !fx.signal) { blow(bar, 0, beat * .9, 6); blow(bar, 8, .1); blow(bar, 10, .1); }
+            if (whistle && !fx.signal) { blow(bar, 0, beat * .9, 6); blow(bar, 8, .1); blow(bar, 10, .1); }
             if (motif && part.next === 'chorus') {
                 groove(bar, 8);
                 for (let step = 8; step < 16; step++) {
@@ -2284,7 +2288,7 @@
                 // (Força moderada: 24 notes alhora ja sonen molt fort; més fort, el limitador hauria d'aixafar-les.)
                 for (let step = 0; step < 16; step++) if (BATUCADA_TUTTI[1][step] === '1') [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row =>
                     add(bar, step, row, 0, true, everyone, row === TABAL_ROW ? tabalNote(bar, step, BATUCADA_TUTTI[1]) : undefined));
-                if (bar === bars - 2 && fx.whistle) [8, 10, 12].forEach(step => blow(bar, step, .1, 8));
+                if (bar === bars - 2 && whistle) [8, 10, 12].forEach(step => blow(bar, step, .1, 8));
                 return;
             }
             // (El cop final, el més fort de tots, també per sobre dels accents dels cops que creixen.)
@@ -2320,7 +2324,7 @@
             if (fx.finale && type === 'outro') { finale(bar); continue; }
             if (bar === 0 && part.countIn) {
                 // Entrada: el mestre xiula (llarg i tres curts) i el repique compta.
-                if (fx.whistle) { blow(bar, 0, beat * 1.5, 6); [8, 10, 12].forEach(step => blow(bar, step, .1)); }
+                if (whistle) { blow(bar, 0, beat * 1.5, 6); [8, 10, 12].forEach(step => blow(bar, step, .1)); }
                 for (let t = 0; t < 4; t++) add(bar, t * 4, 4, t === 3 ? 14 : 4);
                 continue;
             }
@@ -2340,18 +2344,20 @@
             const intoNext = last && ending !== 'none' && part.next !== undefined && part.next !== 'end';
             if (intoNext || (type === 'outro' && !fading && bar === bars - 2)) { call(bar); continue; }
             // Abans d'una breca, el xiulet avisa (tres cops curts).
-            if (fx.whistle && !fx.signal && breque && bar === bars - 2) [8, 10, 12].forEach(step => blow(bar, step, .09, 4));
+            // (Abans d'una aturada, el xiulet llarg i fort: vegeu més avall.)
             if (breque && bar === bars - 2) { pickupBar = bar; groove(bar); pickup(bar); continue; }
             groove(bar);
         }
-        // Senyal del mestre abans d'un canvi de ritme: un xiulet llarg (dos temps) i, al compàs següent, el compte
-        // de quatre xiulets curts als temps; després la colla canvia de ritme tota junta. (Si la secció acaba amb
-        // una aturada o un silenci, el compte va al compàs d'abans: després del cop ja no sona res.)
-        if (fx.signal && bars >= 2) {
-            const count = ['break', 'silence', 'stop'].includes(ending) ? bars - 2 : bars - 1;
-            if (count - 1 >= 0) blow(count - 1, 0, beat * 2, 12);
-            [0, 4, 8, 12].forEach(step => blow(count, step, .13, 12));
-        }
+        // Senyals del mestre, forts (al màxim) i sempre als temps, perquè encaixin amb qualsevol ritme.
+        // · Canvi de ritme: un xiulet llarg (temps i mig) i dos de curts al tercer i al quart temps de l'últim compàs;
+        //   després la colla canvia tota junta. (Si la secció acaba amb una aturada o un silenci, al compàs d'abans.)
+        // · Aturada (cop de tots i silenci, o compàs de silenci) a mitja cançó: un sol xiulet llarg a la segona meitat
+        //   del penúltim compàs, que s'acaba just abans del cop.
+        const halt = !fading && type !== 'outro' && bars > 1 && ['break', 'stop', 'silence'].includes(ending);
+        if (fx.signal) {
+            const at = Math.max(0, halt ? bars - 2 : bars - 1);
+            blow(at, 0, beat * 1.5, 0, 127); blow(at, 8, .14, 0, 127); blow(at, 12, .14, 0, 127);
+        } else if (halt) blow(bars - 2, 8, beat * 1.9, 0, 127);
         return line;
     }
 
@@ -3644,7 +3650,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

@@ -121,7 +121,8 @@ async function buildKit(bank, kit, log) {
     }
     // La capa més forta a la sonoritat de referència i cada capa inferior 3,5 dB per
     // sota: el timbre canvia amb la força, però sense els salts de 20 dB de la gravació.
-    audio.forEach((a, i) => louden(a, (TARGET[piece.of ?? gm] ?? -18) - (audio.length - 1 - i) * 3.5, RATE, .4));
+    // (levelDb: sonoritat pròpia d'una peça; p. ex. el xiulet del mestre, que ha de sentir-se per sobre de tota la colla.)
+    audio.forEach((a, i) => louden(a, (piece.levelDb ?? TARGET[piece.of ?? gm] ?? -18) - (audio.length - 1 - i) * 3.5, RATE, .4));
   }
   const instrument = new BasicInstrument(); instrument.name = kit.name.slice(0, 19);
   const made = new Map();

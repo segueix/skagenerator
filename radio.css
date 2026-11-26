@@ -290,29 +290,11 @@ body.vtc-open { overflow: hidden; }
 .opening-tempo { grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
 .opening-tempo output { color: var(--r-muted); font-variant-numeric: tabular-nums; }
 .opening-check { display: flex !important; grid-auto-flow: column; align-items: center; gap: 8px; font-weight: 500 !important; }
-.opening-grid-box { margin: 0; padding: 12px; border: 1px solid var(--r-line); border-radius: 16px; display: grid; gap: 10px; min-width: 0; }
-.opening-grid-box legend { padding: 0 6px; font-weight: 800; }
-.opening-grid-box legend small { color: var(--r-muted); font-weight: 600; }
-.opening-grid { display: grid; gap: 6px; overflow-x: auto; }
-.opening-bar { display: grid; grid-template-columns: 54px repeat(16, minmax(22px, 1fr)); gap: 3px; align-items: center; min-width: 470px; }
-.opening-bar > span { color: var(--r-muted); font-size: 12px; font-weight: 700; }
-.opening-cell { height: 30px; padding: 0; line-height: 1; border: 1px solid var(--r-line); border-radius: 7px; background: var(--r-card-2); color: var(--st-text); font: 800 15px/1 'Manrope', sans-serif; cursor: pointer; }
-.opening-cell:nth-child(4n + 2) { border-color: #5a5470; }
-.opening-cell[aria-pressed="true"], .opening-cell.short, .opening-cell.long { background: var(--st); border-color: var(--st); }
-.opening-cell.long { background: #ff8c1a; border-color: #ff8c1a; }
-.opening-cell:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .opening-link { justify-self: start; padding: 6px 0; border: 0; background: none; color: var(--r-muted); font: inherit; text-decoration: underline; cursor: pointer; }
 .opening-status { margin: 0; min-height: 1.2em; color: var(--r-muted); }
 .opening-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .opening-actions .primary { background: var(--st); color: var(--st-text); }
-@media (max-width: 560px) {
-  .opening-form { padding: 0 12px 14px; }
-  .opening-grid-box { padding: 10px 8px; }
-  .opening-bar { grid-template-columns: 34px repeat(16, minmax(0, 1fr)); gap: 2px; min-width: 0; }
-  .opening-bar > span { font-size: 10px; }
-  .opening-cell { height: 28px; border-radius: 5px; font-size: 12px; }
-  .opening-form select { min-width: 130px; }
-}
+@media (max-width: 560px) { .opening-form { padding: 0 12px 14px; } .opening-form select { min-width: 0; width: 100%; } }
 /* Historial: cerca, ordre, llistes, selecció, neteja i «Desfés». */
 .history-tools { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .history-tools input, .history-tools select, .history-manage select, .history-bulk select, .history-list-select {
@@ -340,3 +322,10 @@ body.vtc-open { overflow: hidden; }
 .radio .history-manage select { width: 9.5em; }
 .history-manage { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .history-manage::-webkit-scrollbar { display: none; }
+
+/* Inici compost en tres passos: timbal de fons, ritme i xiulets. */
+.opening-steps-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 12px; }
+.opening-steps-list li { counter-increment: step; display: grid; gap: 6px; padding: 12px 12px 12px 46px; position: relative; border: 1px solid var(--r-line); border-radius: 16px; }
+.opening-steps-list li::before { content: counter(step); position: absolute; left: 12px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--st); color: var(--st-text); font-weight: 800; display: grid; place-items: center; font-size: 13px; }
+.opening-steps-list label { display: grid; gap: 4px; font-weight: 700; font-size: 13px; }
+.opening-steps-list .opening-check { display: flex; font-weight: 500; }

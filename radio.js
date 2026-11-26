@@ -722,85 +722,53 @@
     kitChips.forEach((chip, row) => chip.classList.toggle('on', on.has(row)));
   }
   // ── Compon l'inici de la batucada ────────────────────────────────────
-  // Els primers segons (uns 6): l'instrument que obre, el seu ritme compàs a compàs, els xiulets del mestre
-  // (curts o llargs, on es vulgui) i, si es vol, un redoble final. Després es genera la resta de la cançó.
+  // Els primers segons (uns 6), en tres passos i sense editar cops: el timbal (o instrument) de fons, el seu ritme
+  // (patrons fets, amb redoble final si es vol) i els xiulets del mestre (deu patrons; per defecte, dos curts i un
+  // llarg), que s'ajusten sols al ritme triat (vegeu builder.openingFrom). Després es genera la resta de la cançó.
   const OPENING_KEY = 'radiospam-batucada-opening';
-  const OPENING_PRESETS = [['negres', 'Negres', '1000100010001000'], ['corxeres', 'Corxeres', '1010101010101010'], ['samba', 'Samba', '1000101010001010'],
-    ['clau', 'Clau', '1001001000101000'], ['galop', 'Galop', '1011101110111011'], ['contratemps', 'Contratemps', '0010001000100010'], ['semicorxeres', 'Semicorxeres', '1111111111111111']];
   let customOpening = null;
   const openingPanel = $('opening-panel'), previewAudio = new Audio();
   let design = (() => {
-    try { const saved = JSON.parse(localStorage.getItem(OPENING_KEY)); if (saved && engine.BATUCADA_RHYTHMS[saved.style]) return saved; } catch {}
-    return { row: 0, style: 'samba', bpm: 132, preset: 'negres', steps: ['1000100010001000', '1000100010001000', '1000101010001010'], roll: true,
-      whistles: [[0, 0, 'long'], [0, 8, 'short'], [0, 10, 'short']] };
+    const fresh = { row: 0, style: 'samba', bpm: 132, rhythm: 'samba', roll: true, whistles: 'dos-curts-llarg' };
+    try {
+      const saved = JSON.parse(localStorage.getItem(OPENING_KEY));
+      // (Els inicis desats amb l'editor antic, de caselles, passen als patrons fets.)
+      if (saved && engine.BATUCADA_RHYTHMS[saved.style]) return { ...fresh, ...saved,
+        rhythm: builder.OPENING_RHYTHMS.some(([k]) => k === saved.rhythm) ? saved.rhythm : fresh.rhythm,
+        whistles: builder.OPENING_WHISTLES.some(([k]) => k === saved.whistles) ? saved.whistles : fresh.whistles };
+    } catch {}
+    return fresh;
   })();
-  const openingOf = () => ({ row: design.row, steps: design.steps.slice(), whistles: design.whistles.map(w => w.slice()), roll: !!design.roll });
+  const openingOf = () => builder.openingFrom(engine, design, design.bpm);
   const saveDesign = () => { try { localStorage.setItem(OPENING_KEY, JSON.stringify(design)); } catch {} };
   for (const [row, piece] of engine.BATUCADA.entries()) if (piece.note !== engine.BATUCADA_WHISTLE.note)
     $('opening-row').append(new Option(row === 0 ? `${piece.name} (timbal)` : piece.name, String(row)));
   for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) if (builder.BATUCADA_STYLES[key]) $('opening-style').append(new Option(rhythm.name, key));
-  for (const [key, name] of OPENING_PRESETS) $('opening-preset').append(new Option(name, key));
-  $('opening-preset').append(new Option('A mida', 'custom'));
+  for (const [key, name] of builder.OPENING_RHYTHMS) $('opening-rhythm').append(new Option(name, key));
+  for (const [key, name] of builder.OPENING_WHISTLES) $('opening-whistles').append(new Option(name, key));
   function renderOpening() {
     const [low, high] = builder.BATUCADA_STYLES[design.style].bpm;
     design.bpm = Math.max(low, Math.min(high, design.bpm));
-    const bars = builder.openingBars(design.bpm);
-    // Tants compassos com caben en uns 6 segons: si en sobren o en falten, es retallen o es repeteix l'últim.
-    design.steps = Array.from({ length: bars }, (_, b) => design.steps[Math.min(b, design.steps.length - 1)] || '1000100010001000');
-    design.whistles = design.whistles.filter(([b]) => b < bars);
+    const bars = builder.openingBars(design.bpm), opening = openingOf();
     $('opening-row').value = String(design.row); $('opening-style').value = design.style;
+    $('opening-rhythm').value = design.rhythm; $('opening-whistles').value = design.whistles; $('opening-roll').checked = !!design.roll;
     Object.assign($('opening-bpm'), { min: low, max: high, value: design.bpm });
     $('opening-length').textContent = `${design.bpm} BPM · ${bars} compassos · ${(bars * 240 / design.bpm).toFixed(1).replace('.', ',')} s`;
-    $('opening-preset').value = OPENING_PRESETS.some(([key, , steps]) => key === design.preset && design.steps.every(s => s === steps)) ? design.preset : 'custom';
-    $('opening-roll').checked = !!design.roll;
-    const grid = (box, cell) => {
-      box.replaceChildren(...design.steps.map((_, b) => {
-        const line = document.createElement('div'); line.className = 'opening-bar';
-        const label = document.createElement('span'); label.textContent = innerWidth < 560 ? `${b + 1}` : `Comp. ${b + 1}`; line.append(label);
-        for (let step = 0; step < 16; step++) line.append(cell(b, step));
-        return line;
-      }));
-    };
-    grid($('opening-steps'), (b, step) => {
-      const on = design.steps[b][step] === '1', roll = design.roll && b === design.steps.length - 1;
-      const button = Object.assign(document.createElement('button'), { type: 'button', className: 'opening-cell', disabled: roll });
-      button.setAttribute('aria-pressed', String(roll ? '1010101011111111'[step] === '1' : on));
-      button.setAttribute('aria-label', `Compàs ${b + 1}, temps ${1 + Math.floor(step / 4)}, subdivisió ${1 + step % 4}`);
-      button.addEventListener('click', () => { const row = design.steps[b]; design.steps[b] = row.slice(0, step) + (on ? '0' : '1') + row.slice(step + 1); design.preset = 'custom'; changed(); });
-      return button;
-    });
-    grid($('opening-whistles'), (b, step) => {
-      const whistle = design.whistles.find(([wb, ws]) => wb === b && ws === step), kind = whistle?.[2];
-      const button = Object.assign(document.createElement('button'), { type: 'button', className: `opening-cell${kind ? ` ${kind}` : ''}`, textContent: kind === 'long' ? '—' : kind === 'short' ? '●' : '' });
-      button.setAttribute('aria-label', `Xiulet al compàs ${b + 1}, temps ${1 + Math.floor(step / 4)}, subdivisió ${1 + step % 4}: ${kind === 'long' ? 'llarg' : kind === 'short' ? 'curt' : 'cap'}`);
-      button.addEventListener('click', () => {
-        design.whistles = design.whistles.filter(w => w !== whistle);
-        if (!kind) design.whistles.push([b, step, 'short']); else if (kind === 'short') design.whistles.push([b, step, 'long']);
-        changed();
-      });
-      return button;
-    });
-    const short = design.whistles.filter(w => w[2] === 'short').length, long = design.whistles.length - short;
-    $('opening-whistle-count').textContent = `· ${short} curt${short === 1 ? '' : 's'} i ${long} llarg${long === 1 ? '' : 's'}`;
+    const short = opening.whistles.filter(w => w[2] === 'short').length, long = opening.whistles.length - short;
+    $('opening-whistle-count').textContent = opening.whistles.length ? `${short} curt${short === 1 ? '' : 's'} i ${long} llarg${long === 1 ? '' : 's'}, sobre els cops del timbal` : 'cap xiulet';
     // Resum a la capçalera (també amb l'editor plegat): què obrirà la cançó, o si no s'utilitza.
-    const use = design.use !== false;
+    const use = design.use !== false, rhythmName = builder.OPENING_RHYTHMS.find(([k]) => k === design.rhythm)[1].replace(/ \(.*\)$/, '');
     $('opening-use').checked = use;
-    $('opening-summary').textContent = use
-      ? `${engine.BATUCADA[design.row].name} · ${bars} compassos · ${design.whistles.length} xiulet${design.whistles.length === 1 ? '' : 's'}`
-      : 'no s’utilitza: inici a l’atzar';
+    $('opening-summary').textContent = use ? `${engine.BATUCADA[design.row].name} · ${rhythmName} · ${builder.OPENING_WHISTLES.find(([k]) => k === design.whistles)[1].toLowerCase()}` : 'no s’utilitza: inici a l’atzar';
     openingPanel.open = !!design.open;
   }
   function changed() { saveDesign(); renderOpening(); }
   $('opening-row').addEventListener('change', event => { design.row = Number(event.target.value); changed(); });
   $('opening-style').addEventListener('change', event => { design.style = event.target.value; changed(); });
   $('opening-bpm').addEventListener('input', event => { design.bpm = Number(event.target.value); changed(); });
-  $('opening-preset').addEventListener('change', event => {
-    const preset = OPENING_PRESETS.find(([key]) => key === event.target.value);
-    if (preset) { design.preset = preset[0]; design.steps = design.steps.map(() => preset[2]); }
-    changed();
-  });
+  $('opening-rhythm').addEventListener('change', event => { design.rhythm = event.target.value; changed(); });
+  $('opening-whistles').addEventListener('change', event => { design.whistles = event.target.value; changed(); });
   $('opening-roll').addEventListener('change', event => { design.roll = event.target.checked; changed(); });
-  $('opening-whistle-clear').addEventListener('click', () => { design.whistles = []; changed(); });
   $('opening-use').addEventListener('change', event => { design.use = event.target.checked; changed(); });
   // L'editor es pot plegar quan no es fa servir i desplegar quan cal (es recorda).
   openingPanel.addEventListener('toggle', () => { if (design.open !== openingPanel.open) { design.open = openingPanel.open; saveDesign(); } });
