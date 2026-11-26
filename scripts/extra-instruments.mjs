@@ -5,6 +5,7 @@
 // - Virtuosity Drums: kit de club de jazz (micròfons propers + sala) i el seu micròfon lo-fi.
 // - Growlybass (Karoryfer): Squier Jazz Bass amb dits, directe.
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BasicInstrument, BasicPreset, BasicSoundBank, GeneratorTypes, SpessaLog } from 'spessasynth_core';
@@ -16,7 +17,16 @@ const sha = data => createHash('sha256').update(data).digest('hex');
 let flac;
 async function decode(path) {
   const data = await readFile(path);
-  if (!(path instanceof URL ? path.pathname : path).toLowerCase().endsWith('.flac')) return readWav(data);
+  const name = (path instanceof URL ? path.pathname : path).toLowerCase();
+  // Mostres pròpies Opus: es descodifiquen només en compilar el banc SF2, no al navegador.
+  if (name.endsWith('.opus')) {
+    const result = spawnSync('ffmpeg', ['-v', 'error', '-i', 'pipe:0', '-f', 'f32le', '-ac', '1', '-ar', '48000', 'pipe:1'], { input: data, maxBuffer: 1024 * 1024 });
+    if (result.error || result.status !== 0 || !result.stdout?.length || result.stdout.length % 4) throw new Error('No es pot descodificar la mostra ' + name + ': cal FFmpeg al PATH. ' + (result.error || result.stderr));
+    const mono = new Float32Array(result.stdout.length / 4);
+    for (let i = 0; i < mono.length; i++) mono[i] = result.stdout.readFloatLE(i * 4);
+    return { data: mono, rate: 48000 };
+  }
+  if (!name.endsWith('.flac')) return readWav(data);
   if (!flac) { const { FLACDecoder } = await import('@wasm-audio-decoders/flac'); flac = new FLACDecoder(); await flac.ready; }
   await flac.reset();
   const { channelData, sampleRate } = await flac.decodeFile(new Uint8Array(data));

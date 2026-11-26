@@ -1208,7 +1208,7 @@
   // Patró de batucada actual: l'editat a mà o el del ritme triat.
   const batucadaPattern = () => {
     const pattern = song.settings.batucadaPattern ?? (engine.BATUCADA_RHYTHMS[song.settings.batucadaRhythm] || engine.BATUCADA_RHYTHMS.samba).steps;
-    return engine.BATUCADA.map((piece, row) => pattern[row] ?? piece.steps);
+    return engine.BATUCADA.map((piece, row) => pattern[row] ?? '0000000000000000');
   };
   function updateSettingsUI() {
     const st = song.settings, profile = STYLES[st.style];
