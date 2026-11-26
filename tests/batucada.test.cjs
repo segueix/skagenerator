@@ -6,10 +6,10 @@ const kit = require('../extra-instruments.json').kits.find(k => k.name === 'Batu
 const settings = { seed: 7, style: 'ska', bpm: 120, tonic: 0, mode: 'major', timbres: { drums: 'batucada' } };
 const part = { type: 'verse', bars: 2, energy: 65, revision: 1, instruments: ['drums'] };
 test('cada fila de batucada sona només a la nota i al pas escollits', () => {
-  assert.equal(engine.BATUCADA.length, 11);
+  assert.equal(engine.BATUCADA.length, 12);
   // Les deu files de la graella i les cinc variants distorsionades de la cuíca.
   // (més els tres surdos apagats i la campana greu de l'agogô).
-  assert.equal(Object.keys(kit.pieces).length, 11 + Object.keys(engine.CUICA_VARIANTS).length - 1 + 3 + 1 + 1); // corxera del tabal
+  assert.equal(Object.keys(kit.pieces).length, 12 + Object.keys(engine.CUICA_VARIANTS).length - 1 + 3 + 1 + 1 + 1); // corxera del tabal i marge del bombo
   for (const note of [...Object.values(engine.SURDO_MUTED), engine.AGOGO_LOW]) assert(kit.pieces[note], `peça ${note}`);
   for (const note of Object.keys(engine.CUICA_VARIANTS)) assert(kit.pieces[note], `cuíca ${note}`);
   for (const [row, piece] of engine.BATUCADA.entries()) {
@@ -17,10 +17,12 @@ test('cada fila de batucada sona només a la nota i al pas escollits', () => {
     const pattern = Array(engine.BATUCADA.length).fill('0'.repeat(16));
     pattern[row] = '0010000000000000';
     const spec = engine.composeSongPart({ ...settings, batucadaPattern: pattern }, part);
-    assert.deepEqual(spec.batucadaLine.map(hit => hit.slice(0, 3)), [[0, .5, piece.note], [1, .5, piece.note]]);
+    // (Al bombo, un cop fora de l'inici del temps és al marge.)
+    const note = piece.name === 'Bombo' ? 87 : piece.note;
+    assert.deepEqual(spec.batucadaLine.map(hit => hit.slice(0, 3)), [[0, .5, note], [1, .5, note]]);
     const perf = createPerformance(spec);
     assert.equal(perf.channels.find(c => c.channel === 9).program, kit.program);
-    assert.deepEqual(perf.events.filter(e => e.type === 'on' && e.channel === 9).map(e => e.note), [piece.note, piece.note]);
+    assert.deepEqual(perf.events.filter(e => e.type === 'on' && e.channel === 9).map(e => e.note), [note, note]);
   }
 });
 
@@ -38,6 +40,36 @@ test('tabal: mostra llarga per a negres, curta per a cops seguits i patrons anti
   assert.deepEqual(createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 9).map(e => e.note), [84, 85, 84, 84]);
 });
 
+test('bombo: cop al centre a l\'inici de cada temps i al marge a la resta', () => {
+  const row = engine.BATUCADA.findIndex(p => p.name === 'Bombo');
+  assert.equal(row, 11);
+  assert.equal(kit.pieces[86].layers[0][0][0], 'bombo-cop-central.opus');
+  assert.equal(kit.pieces[87].layers[0][0][0], 'bombo-cop-marge.opus');
+  assert.equal(kit.pieces[86].choke, kit.pieces[87].choke);
+  assert.notEqual(kit.pieces[86].choke, kit.pieces[84].choke);
+  const empty = Array(11).fill('0'.repeat(16));
+  const play = pattern => engine.composeSongPart({ ...settings, batucadaPattern: pattern }, { ...part, bars: 1 });
+  assert(engine.validBatucadaPattern(empty) && engine.validBatucadaPattern(empty.slice(0, 9)), 'patrons antics');
+  assert.deepEqual(play(empty).batucadaLine, []);
+  const spec = play([...empty, '1000101000001010']);
+  assert.deepEqual(spec.batucadaLine.map(h => [h[1], h[2]]), [[0, 86], [1, 86], [1.5, 87], [3, 86], [3.5, 87]]);
+  assert.deepEqual(createPerformance(spec).events.filter(e => e.type === 'on' && e.channel === 9).map(e => e.note), [86, 86, 87, 86, 87]);
+});
+
+test('el tabal i el bombo toquen a tots els estils de samba, també als cops de tots i a les cançons generades', () => {
+  const builder = require('../song-builder.js');
+  for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) {
+    assert.equal(rhythm.steps.length, engine.BATUCADA.length, key);
+    assert(rhythm.steps[10].includes('1') && rhythm.steps[11].includes('1'), `${key}: tabal i bombo`);
+    const line = engine.composeSongPart({ ...settings, batucadaRhythm: key }, { ...part, bars: 2, next: 'verse', ending: 'break' }).batucadaLine;
+    const stop = hitsAt(line, 1).map(h => h[2]);
+    assert(stop.some(n => n === 84 || n === 85) && stop.includes(86), `${key}: aturada amb tabal i bombo`);
+    const song = builder.createBatucadaSong(engine, { seed: 11, rhythm: key });
+    const notes = new Set(song.sections.flatMap(sec => engine.composeSongPart(song.settings, { ...sec, instruments: ['drums'], revision: 1 }).batucadaLine?.map(h => h[2]) || []));
+    assert([84, 85].some(n => notes.has(n)) && [86, 87].some(n => notes.has(n)), `${key}: cançó amb tabal i bombo`);
+  }
+});
+
 const hitsAt = (line, bar) => line.filter(([b]) => b === bar);
 test('ritmes de batucada predefinits i variacions generades vàlides i reproduïbles', () => {
   assert.deepEqual(Object.keys(engine.BATUCADA_RHYTHMS), ['samba', 'reggae', 'ijexa', 'percudium']);
@@ -47,7 +79,7 @@ test('ritmes de batucada predefinits i variacions generades vàlides i reproduï
     // Els surdos apagats s'afegeixen al patró i la campana greu de l'agogô compta com a agogô.
     const muted = new Set(Object.values(engine.SURDO_MUTED));
     // (Els arrossegaments del Percudium cauen entre semicorxeres i no són del patró.)
-    spec.batucadaLine = spec.batucadaLine.filter(h => !muted.has(h[2]) && Number.isInteger(h[1] * 4)).map(h => h[2] === engine.AGOGO_LOW ? [h[0], h[1], 67, h[3]] : h[2] === 85 ? [h[0], h[1], 84, h[3]] : h);
+    spec.batucadaLine = spec.batucadaLine.filter(h => !muted.has(h[2]) && Number.isInteger(h[1] * 4)).map(h => h[2] === engine.AGOGO_LOW ? [h[0], h[1], 67, h[3]] : h[2] === 85 ? [h[0], h[1], 84, h[3]] : h[2] === 87 ? [h[0], h[1], 86, h[3]] : h);
     const expected = rhythm.steps.flatMap((row, i) => [...row].map((on, step) => on === '1' ? [step / 4, engine.BATUCADA[i].note] : null)).filter(Boolean);
     assert.deepEqual(new Set(spec.batucadaLine.map(([, t, n]) => `${t}:${n}`)), new Set(expected.map(([t, n]) => `${t}:${n}`)));
     const variants = new Set();
@@ -377,7 +409,7 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
     assert(line.filter(h => h[0] === 0 && h[2] === note).length >= 8, 'fa un ritme');
   }
   // Diàleg: tots continuen tocant, però el grup que parla puja el volum i els altres l'abaixen.
-  const rowOf = note => [35, 43, 47].includes(note) ? [35, 43, 47].indexOf(note) : note === engine.AGOGO_LOW ? 6 : engine.BATUCADA.findIndex(p => p.note === note);
+  const rowOf = note => [35, 43, 47].includes(note) ? [35, 43, 47].indexOf(note) : note === engine.AGOGO_LOW ? 6 : note === 85 ? 10 : note === 87 ? 11 : engine.BATUCADA.findIndex(p => p.note === note);
   const group = row => engine.BATUCADA_DIALOG.findIndex(g => g.includes(row));
   const plain = compose({ type: 'bridge', bars: 6 }), dialog = compose({ type: 'bridge', bars: 6, batucada: { dialog: 1 } });
   const avg = (line, bar, g) => { const hits = line.filter(h => h[0] === bar && !h[6] && Number.isInteger(h[1] * 4) && group(rowOf(h[2])) === g); return hits.reduce((t, h) => t + h[3], 0) / hits.length; };
@@ -456,7 +488,7 @@ test('els surdos de la batucada no van a la reverberació (sonaven com un to met
   const perf = createPerformance(engine.composeSongPart({ ...settings, batucadaBand: 3 }, { ...part, bars: 1 }));
   const drums = perf.channels.filter(c => c.drums && c.program === 71);
   assert.equal(drums.length, 3);
-  for (const channel of drums) assert.deepEqual(channel.dryKeys, [35, 36, 41, 43, 45, 47]);
+  for (const channel of drums) assert.deepEqual(channel.dryKeys, [35, 36, 41, 43, 45, 47, 86, 87]);
   const ska = createPerformance(engine.composeSongPart({ ...settings, timbres: {}, instruments: ['drums'] }, { ...part, bars: 1 }));
   assert(ska.channels.every(c => !c.dryKeys), 'les bateries de l\'ska no canvien');
 });

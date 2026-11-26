@@ -1896,6 +1896,9 @@
     const BATUCADA_WHISTLE = { note: 71, durations: [100, 200, 350, 500, 750, 1000], defaultDuration: 350 };
     // Dues articulacions del tabal enregistrat: negra (84) i corxera (85).
     const TABAL_NEGRA = 84, TABAL_CORXERA = 85, TABAL_ROW = 10;
+    // Dos cops del bombo enregistrat: al centre de la pell (86, greu i llarg) i a prop del marge (87, sec).
+    // Una sola fila a la graella: els cops a l'inici de cada temps són al centre i la resta, al marge.
+    const BOMBO_CENTRAL = 86, BOMBO_MARGE = 87, BOMBO_ROW = 11;
     const BATUCADA = [
         { note: 36, name: 'Surdo 1', steps: '0000100000001000' },
         { note: 41, name: 'Surdo 2', steps: '1000000010000000' },
@@ -1907,21 +1910,25 @@
         { note: 69, name: 'Chocalho', steps: '1010101010101010' },
         { note: 78, name: 'Cuíca', steps: '0000000100000000' },
         { note: BATUCADA_WHISTLE.note, name: 'Xiulet', steps: '0000000000000000' },
-        { note: TABAL_NEGRA, name: 'Tabal', steps: '1000101010001010' }
+        { note: TABAL_NEGRA, name: 'Tabal', steps: '1000101010001010' },
+        { note: BOMBO_CENTRAL, name: 'Bombo', steps: '1000100010001010' }
     ];
 
     // Ritmes de batucada predefinits (setze caixetes per compàs, en l'ordre de BATUCADA).
     const BATUCADA_RHYTHMS = {
         samba: { name: 'Samba', steps: BATUCADA.map(piece => piece.steps) },
         reggae: { name: 'Samba-reggae', steps: ['0000000010001000', '1000100000000000', '0000001000000010', '1001001000101000',
-            '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000', '0000000000000000', '0000000000000000'] },
+            '0000000100000001', '0000100000001000', '1000000010000000', '1000100010001000', '0000000000000000', '0000000000000000',
+            '1001001000100010', '1000000010000010'] },
         ijexa: { name: 'Ijexá', steps: ['1000000010000000', '0000100000001000', '0000000000100000', '0000000000000000',
-            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000', '0000000000000000'] },
+            '0000000000000000', '0000000000000000', '1010110101011010', '1010101010101010', '0000000000000000', '0000000000000000',
+            '1000100010001000', '1000001010000010'] },
         // Percudium: a partir d'un enregistrament de referència (uns 97 BPM). Textura molt densa (caixa i xocalho
         // a totes les semicorxeres, tamborim atapeït), accents sincopats a les semicorxeres 1, 7, 10 i 14 i el pes
         // del so als mitjos (caixa, repique i tamborim) més que als surdos.
         percudium: { name: 'Percudium', steps: ['1000000010000000', '0000001000000100', '0010000000100010', '1111111111111111',
-            '1000001001100110', '1011011011110110', '1000001001000100', '1111111111111111', '0000000000000000', '0000000000000000', '0000000000000000'] }
+            '1000001001100110', '1011011011110110', '1000001001000100', '1111111111111111', '0000000000000000', '0000000000000000',
+            '1010101110101011', '1000001010001000'] }
     };
     // Biblioteca de figures per generar variacions: els surdos 1 i 2 i el xocalho (el pols) no canvien.
     const BATUCADA_FIGURES = {
@@ -1930,11 +1937,14 @@
         4: ['0000001000000001', '1000001010000010', '0010001000100010', '0000000100000101'],
         5: ['1001001000101000', '1011011010110110', '1010101010101010', '1101011011010110'],
         6: ['1000001000001000', '1010001010100010', '1000100010101000', '1010110101011010'],
-        8: ['0000000100000000', '0001000100010001', '0100000001000000', '0000000000000000']
+        8: ['0000000100000000', '0001000100010001', '0100000001000000', '0000000000000000'],
+        10: ['1000101010001010', '1001001000100010', '1010101110101011', '1000100010001000'],
+        11: ['1000100010001010', '1000000010000010', '1000001010000010', '1000001010001000']
     };
     // Força relativa de cada peça: els surdos manen i el xocalho fa de coixí.
     const BATUCADA_GAIN = { 36: 1, 41: .96, 45: .9, 38: .74, 50: .86, 54: .8, 67: .76, 69: .74, 78: .82, [BATUCADA_WHISTLE.note]: .66,
-        79: .8, 80: .84, 81: .78, 82: .78, 83: .8, 35: .8, 43: .78, 47: .76, 68: .78, [TABAL_NEGRA]: .70, [TABAL_CORXERA]: .70 };
+        79: .8, 80: .84, 81: .78, 82: .78, 83: .8, 35: .8, 43: .78, 47: .76, 68: .78, [TABAL_NEGRA]: .70, [TABAL_CORXERA]: .70,
+        [BOMBO_CENTRAL]: .92, [BOMBO_MARGE]: .84 };
     // Balanç de cada ritme (micro-temps): desplaçament de cada semicorxera del temps, en fraccions de temps.
     // Al samba la segona semicorxera s'endarrereix i la quarta s'avança (aproximació als estudis de
     // micro-temps del samba); el samba-reggae i l'ijexá tenen un balanç més arrodonit, cap a l'endarrere.
@@ -1981,13 +1991,15 @@
     }
     // Diàleg: grups que es responen (surdos / caixa i repique / tamborim, agogô i xocalho). Tots continuen
     // tocant, però el grup que parla puja el volum i la resta l'abaixa una mica.
-    const BATUCADA_DIALOG = [[0, 1, 2], [3, 4], [5, 6, 7]], DIALOG_UP = 16, DIALOG_DOWN = -12;
+    // (El bombo parla amb els surdos i el tabal, amb la caixa i el repique.)
+    const BATUCADA_DIALOG = [[0, 1, 2, BOMBO_ROW], [3, 4, TABAL_ROW], [5, 6, 7]], DIALOG_UP = 16, DIALOG_DOWN = -12;
     // Banda: quants músics toquen cada peça (1, 2 o 3). Surdos, caixa, tamborim i xocalho es doblen;
     // el repique, l'agogô, la cuíca i el xiulet són d'un sol músic.
     const BATUCADA_BAND = [1, 2, 3], BATUCADA_DOUBLED = new Set([0, 1, 2, 3, 5, 7]), BATUCADA_COUNTER = [2, 3, 5];
 
     function validBatucadaPattern(pattern) {
-        return Array.isArray(pattern) && [BATUCADA.length - 2, BATUCADA.length - 1, BATUCADA.length].includes(pattern.length)
+        // (Els patrons desats abans del xiulet, del tabal i del bombo tenen menys files: les que falten no sonen.)
+        return Array.isArray(pattern) && pattern.length >= 9 && pattern.length <= BATUCADA.length
             && pattern.every(row => typeof row === 'string' && /^[01]{16}$/.test(row));
     }
     function batucadaRows(settings = {}) {
@@ -2013,7 +2025,8 @@
         const fx = part.batucada || {};
         if (!validBatucadaFx(fx)) throw new Error('Opcions de batucada no vàlides');
         // Convenção: tots els instruments (menys el xiulet) toquen la mateixa figura, junts.
-        const rows = fx.tutti ? pattern.map((row, i) => i === 9 || (i === TABAL_ROW && !row.includes('1')) ? row : fx.tutti) : pattern;
+        // (El tabal i el bombo, només si toquen al patró.)
+        const rows = fx.tutti ? pattern.map((row, i) => i === 9 || (i >= TABAL_ROW && !row.includes('1')) ? row : fx.tutti) : pattern;
         // Ritme de la secció (pels surdos 1 i 2): en depenen el balanç, els surdos apagats i les campanes de l'agogô.
         const style = BATUCADA_FEEL[batucadaRhythmOf(pattern, settings.batucadaRhythm)];
         // El so (pes de cada peça, cops al màxim, peces doblades) és el de la cançó: quan el Percudium
@@ -2067,22 +2080,26 @@
         let voice = null;
         // La graella té una sola fila de tabal. Si el proper cop cau abans d'una negra,
         // es fa servir la mostra curta original (també en semicorxeres); si no, la llarga.
-        const tabalNote = (bar, step) => {
+        // (Als cops de tots, la figura que toquen tots junts: figure.)
+        const tabalNote = (bar, step, figure = rows[TABAL_ROW]) => {
             for (let gap = 1; gap < 4; gap++) {
                 const next = step + gap;
                 if (next >= 16 && bar + 1 >= bars) break;
                 if ((bar * 4 + next / 4) * beat >= stopAt) break;
-                if (rows[TABAL_ROW]?.[next % 16] === '1') return TABAL_CORXERA;
+                if (figure?.[next % 16] === '1') return TABAL_CORXERA;
             }
             return TABAL_NEGRA;
         };
+        // Tabal i bombo als cops de tots (aturades, final i convenções), si toquen al patró.
+        const extraRows = [TABAL_ROW, BOMBO_ROW].filter(row => pattern[row]?.includes('1'));
         const add = (bar, step, row, extra = 0, tight = false, players = everyone, note = undefined) => {
             if ((bar * 4 + step / 4) * beat >= stopAt) return;
             // Diàleg: el grup que parla puja el volum; la resta, una mica més fluix.
-            if (voice !== null && row < 8) extra += BATUCADA_DIALOG[voice].includes(row) ? DIALOG_UP : DIALOG_DOWN;
+            if (voice !== null && row !== 8 && row !== 9) extra += BATUCADA_DIALOG[voice].includes(row) ? DIALOG_UP : DIALOG_DOWN;
             // L'agogô alterna les dues campanes segons el ritme.
             const pitch = note ?? (row === 8 && chain ? chain[cuicaIndex++ % chain.length]
-                : row === 6 && style.agogo[step] === 'g' ? AGOGO_LOW : row === TABAL_ROW ? tabalNote(bar, step) : BATUCADA[row].note);
+                : row === 6 && style.agogo[step] === 'g' ? AGOGO_LOW : row === TABAL_ROW ? tabalNote(bar, step)
+                : row === BOMBO_ROW ? (step % 4 === 0 ? BOMBO_CENTRAL : BOMBO_MARGE) : BATUCADA[row].note);
             const velocity = force(pitch, step, extra);
             const hit = [bar, step / 4, pitch, velocity];
             // Els altres músics: una mica més fluixos, cadascun amb el seu temps.
@@ -2113,7 +2130,8 @@
         };
         // Cop de tota la batucada (aturades i final), a temps exacte. Al Percudium, ben fort però sense forçar-lo
         // a 127 (24 notes a 127 alhora obligaven el limitador a aixafar el so: es distorsionava).
-        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => pieces.forEach(row => add(bar, step, row, sound.max ? 16 : extra, true));
+        const unison = (bar, step, extra = 14, pieces = [0, 1, 2, 3, 4, 5, 6]) => [...pieces, ...extraRows].forEach(row =>
+            add(bar, step, row, sound.max ? 16 : extra, true, everyone, row === TABAL_ROW ? TABAL_NEGRA : undefined));
         // Diàleg: en cada moment parla un grup. 1: surdos i caixes es responen compàs a compàs;
         // 2: cada mig compàs; 3: primer dialoguen dos grups i, a la segona meitat, s'hi afegeix el tercer.
         // Els dos últims compassos de la secció, tots igual.
@@ -2182,13 +2200,15 @@
         const finale = bar => {
             if (bar < bars - 1) {
                 // (Força moderada: 24 notes alhora ja sonen molt fort; més fort, el limitador hauria d'aixafar-les.)
-                for (let step = 0; step < 16; step++) if (BATUCADA_TUTTI[1][step] === '1') [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, 0, true));
+                for (let step = 0; step < 16; step++) if (BATUCADA_TUTTI[1][step] === '1') [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row =>
+                    add(bar, step, row, 0, true, everyone, row === TABAL_ROW ? tabalNote(bar, step, BATUCADA_TUTTI[1]) : undefined));
                 if (bar === bars - 2 && fx.whistle) [8, 10, 12].forEach(step => blow(bar, step, .1, 8));
                 return;
             }
             // (El cop final, el més fort de tots, també per sobre dels accents dels cops que creixen.)
-            [0, 2, 4, 6].forEach((step, k) => [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, step, row, k * 3, true)));
-            [0, 1, 2, 3, 4, 5, 6, 7].forEach(row => add(bar, 8, row, 24, true));
+            [0, 2, 4, 6].forEach((step, k) => [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row =>
+                add(bar, step, row, k * 3, true, everyone, row === TABAL_ROW ? TABAL_CORXERA : undefined)));
+            [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row => add(bar, 8, row, 24, true, everyone, row === TABAL_ROW ? TABAL_NEGRA : undefined));
         };
         // Entrada de caixa o repique (Percudium): un sol músic fa un ritme i, alhora, el mestre xiula dos
         // xiulets curts i un de llarg; l'últim compàs creix i, a la secció següent, entren tots.
