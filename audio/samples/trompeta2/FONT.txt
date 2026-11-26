@@ -1,0 +1,14 @@
+Vuit notes de trompeta extretes de la gravació aportada.
+Font de l'àudio: @lunatrumpet, «Escala de Do Mayor en Trompeta» (YouTube).
+Els noms indiquen primer la nota escrita per a trompeta en si bemoll i després la nota de concert.
+Els WAV són estèreo, 48 kHz, 16 bits, amb el to original. S'hi ha aplicat un filtre de greus,
+un ajust de nivell i un fos curt als extrems del tall. La freqüència és orientativa.
+
+01_Do4_Si-bemoll3.wav  |  4.925–5.897 s  |  238.6 Hz
+02_Re4_Do4.wav  |  5.903–6.876 s  |  269.2 Hz
+03_Mi4_Re4.wav  |  6.881–7.852 s  |  298.6 Hz
+04_Fa4_Mi-bemoll4.wav  |  7.853–8.863 s  |  316.8 Hz
+05_Sol4_Fa4.wav  |  8.866–9.842 s  |  354.8 Hz
+06_La4_Sol4.wav  |  9.843–10.798 s  |  397.7 Hz
+07_Si4_La4.wav  |  10.804–11.753 s  |  443.4 Hz
+08_Do5_Si-bemoll4.wav  |  11.759–13.174 s  |  474.7 Hz

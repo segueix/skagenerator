@@ -171,6 +171,27 @@
       "Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v3_rr1_sum.wav"
     ]
   },
+  "localHorns": [
+    {
+      "name": "Trompeta 2 (gravada)",
+      "about": "Vuit notes de trompeta (Si♭3–Si♭4 de concert) extretes d'un vídeo de @lunatrumpet, «Escala de Do Mayor en Trompeta» (YouTube): vegeu audio/samples/trompeta2/FONT.txt. La gravació sona uns 30 cèntims alta: «cents» és la desafinació mesurada de cada nota, que el build corregeix. A l'ska dobla la trompeta principal.",
+      "bank": 5,
+      "program": 56,
+      "directory": "audio/samples/trompeta2/",
+      "release": 0.14,
+      "levelDb": -12,
+      "notes": [
+        { "key": 58, "file": "trompeta2-58.wav", "cents": 40 },
+        { "key": 60, "file": "trompeta2-60.wav", "cents": 50 },
+        { "key": 62, "file": "trompeta2-62.wav", "cents": 28 },
+        { "key": 63, "file": "trompeta2-63.wav", "cents": 31 },
+        { "key": 65, "file": "trompeta2-65.wav", "cents": 31 },
+        { "key": 67, "file": "trompeta2-67.wav", "cents": 25 },
+        { "key": 69, "file": "trompeta2-69.wav", "cents": 14 },
+        { "key": 70, "file": "trompeta2-70.wav", "cents": 33 }
+      ]
+    }
+  ],
   "freepats": [
     {
       "name": "Finger Bass YR",

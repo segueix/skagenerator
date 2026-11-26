@@ -18,7 +18,8 @@ let flac;
 async function decode(path) {
   const data = await readFile(path);
   const name = (path instanceof URL ? path.pathname : path).toLowerCase();
-  // Mostres pròpies Opus: es descodifiquen només en compilar el banc SF2, no al navegador.
+  // Mostres pròpies Opus: es descodifiquen només en compilar el banc SF2, no al navegador. Cal FFmpeg,
+  // que la màquina de GitHub Actions no té: les mostres del repositori es desen en WAV.
   if (name.endsWith('.opus')) {
     const result = spawnSync('ffmpeg', ['-v', 'error', '-i', 'pipe:0', '-f', 'f32le', '-ac', '1', '-ar', '48000', 'pipe:1'], { input: data, maxBuffer: 1024 * 1024 });
     if (result.error || result.status !== 0 || !result.stdout?.length || result.stdout.length % 4) throw new Error('No es pot descodificar la mostra ' + name + ': cal FFmpeg al PATH. ' + (result.error || result.stderr));

@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const engine = require('../radioambient.js');
 const { createPerformance } = require('../audio/performance.cjs');
 const builder = require('../song-builder.js');
+const fs = require('node:fs');
+const path = require('node:path');
 const config = { seed: 771, style: 'ska', bpm: 128, tonic: 0, mode: 'major',
   instruments: ['guitar', 'bass', 'drums'] };
 const part = { type: 'verse', bars: 4, energy: 60, revision: 1 };
@@ -280,6 +282,34 @@ test('ska: secció de vents doblada (segona veu una tercera per sota) i vents qu
       const horns = song.clips.filter(c => c.start === sec.start && ['trumpet', 'trombone', 'sax'].includes(c.instrument)).map(c => c.instrument);
       assert(horns.includes('trumpet') && horns.includes('trombone'), `tornada amb secció: ${horns}`);
     }
+  }
+});
+
+test('ska: una segona trompeta gravada dobla la principal a l\'uníson (més volum), i al punk no hi és', () => {
+  const real = require('../real-instruments.json').localHorns.find(h => h.name === 'Trompeta 2 (gravada)');
+  assert.deepEqual([real.bank, real.program], [5, 56]);
+  assert.deepEqual(real.notes.map(n => n.key), [58, 60, 62, 63, 65, 67, 69, 70]);
+  for (const n of real.notes) assert(fs.existsSync(path.join(__dirname, '..', real.directory, n.file)), n.file);
+  const spec = engine.composeSongPart({ ...config, instruments: ['trumpet', 'trombone', 'sax'] }, { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3, sax: 4 } });
+  const music = createPerformance(spec);
+  const extra = music.channels.filter(p => p.bank === 5 && p.program === 56);
+  assert.equal(extra.length, 1);
+  assert.equal(extra[0].instrument, 'trumpet');
+  const lead = music.channels.find(p => p.channel === 3);
+  assert(Math.sign(extra[0].pan - 64) !== Math.sign(lead.pan - 64), 'a l\'altre costat');
+  const on = channels => music.events.filter(e => e.type === 'on' && channels.includes(e.channel));
+  const first = on([3, 12]), doubled = on([extra[0].channel]);
+  assert.equal(doubled.length, first.length, 'cada nota de la principal');
+  doubled.forEach((e, i) => {
+    assert(Math.abs(e.time - first[i].time) < .03, 'alhora');
+    assert.equal(e.note, first[i].note > 74 ? first[i].note - 12 : first[i].note, 'uníson (o octava avall a dalt de tot)');
+    assert(e.note <= 74, 'dins del registre de les gravacions');
+  });
+  assert(doubled.some(e => e.note === first[doubled.indexOf(e)].note), 'sobretot a l\'uníson');
+  // Amb un altre so de trompeta triat, o al punk, la secció queda com era.
+  for (const other of [{ ...config, instruments: ['trumpet'], timbres: { trumpet: 'muted' } }, { ...config, style: 'punk', bpm: 180, instruments: ['trumpet'] }]) {
+    const perf = createPerformance(engine.composeSongPart(other, { ...part, layers: { trumpet: 2 } }));
+    assert(!perf.channels.some(p => p.bank === 5), JSON.stringify(other.timbres || other.style));
   }
 });
 
