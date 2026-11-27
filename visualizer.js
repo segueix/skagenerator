@@ -439,6 +439,164 @@
       }
     },
 
+    alertes: {
+      name: 'Alerta!', ownNames: true,
+      // Sàtira naïf de les alertes meteorològiques al mòbil: a un mòbil inventat hi van arribant avisos (amb vibració
+      // i un bot), mentre al fons fa just el temps contrari del que diu l'avís. Un vianant va equipat per a l'avís
+      // (paraigua sota un sol de justícia, ventall sota la neu…). Els avisos canvien cada pocs segons, amb un cop de
+      // caixa, repique, tamborim, tabal o un xiulet; els surdos i el bombo fan vibrar el mòbil. Als últims segons
+      // arriba l'avís final: «Mireu per la finestra».
+      draw(ctx, w, h, f, state) {
+        const s = Math.min(w, h), wide = w >= h, INK = '#2b1b3d';
+        const ALERTS = [
+          ['Pluges torrencials!', 'No sortiu de casa.', 'sol', 'paraigua'],
+          ['Onada de calor extrema!', 'Beveu molta aigua.', 'neu', 'ventall'],
+          ['Nevades intenses!', 'Cadenes obligatòries.', 'sol', 'bufanda'],
+          ['Sequera extrema!', 'Estalvieu cada gota.', 'pluja', 'ventall'],
+          ['Tempesta elèctrica!', 'Allunyeu-vos dels arbres.', 'arc', 'casc'],
+          ['Sol radiant tot el dia!', 'Crema solar i ulleres.', 'pluja', 'ulleres'],
+          ['Fred polar!', 'Abrigueu-vos bé.', 'sol', 'bufanda'],
+          ['Calamarsa gegant!', 'Guardeu el cotxe.', 'arc', 'casc'],
+          ['Cel serè i calor!', 'Aneu a la platja.', 'neu', 'ulleres'],
+          ['Inundacions!', 'Pugeu als pisos alts.', 'sol', 'paraigua'],
+          ['Vent huracanat!', 'Lligueu els testos.', 'arc', 'casc'],
+          ['Boira densa!', 'Visibilitat zero.', 'arc', 'paraigua']
+        ];
+        const st = state.alertes ??= { index: 0, born: 0, shake: 0, sway: 0, rain: [], snow: [], history: [], weather: 'sol', from: 'sol', fade: 1 };
+        st.sway += f.dt * (1 + f.level * 2); st.shake = Math.max(0, st.shake - f.dt * 2.5); st.fade = Math.min(1, st.fade + f.dt * 1.6);
+        const ending = f.duration && f.t > f.duration - 3.5;
+        // Avís nou: cada pocs segons, amb un cop de caixa, repique, tamborim, tabal o un xiulet.
+        if (f.t < st.born) Object.assign(st, { index: 0, born: f.t, history: [] });
+        for (const hit of f.fresh) {
+          if ([0, 1, 2, 11].includes(hit.row)) st.shake = Math.max(st.shake, .35);
+          if ([3, 4, 5, 9, 10].includes(hit.row) && f.t - st.born > 4.2 && !ending) {
+            st.history.unshift(ALERTS[st.index % ALERTS.length]); st.history.length = Math.min(st.history.length, 2);
+            st.index++; st.born = f.t; st.shake = 1;
+          }
+        }
+        const alert = ALERTS[st.index % ALERTS.length], weather = ending ? 'arc' : alert[2];
+        if (weather !== st.weather) { st.from = st.weather; st.weather = weather; st.fade = 0; st.rain = []; st.snow = []; }
+        const wob = k => Math.sin(k * 12.9898 + Math.floor(f.t * 6) * 1.7) * s * .003;
+        const poly = (pts, fill, seed = 0, lw = s * .006) => { ctx.beginPath(); pts.forEach(([x, y], i) => ctx.lineTo(x + wob(i + seed), y + wob(i * 3 + seed))); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke(); };
+        const circle = (x, y, r, fill) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = s * .006; ctx.strokeStyle = INK; ctx.stroke(); };
+        ctx.globalCompositeOperation = 'source-over'; ctx.lineJoin = ctx.lineCap = 'round';
+        const ground = h * (wide ? .74 : .78);
+        // ── El temps que fa de debò (el contrari de l'avís), amb una fosa quan canvia.
+        const SKY = { sol: ['#ffb347', '#ffe08a'], pluja: ['#5b6b80', '#9aa7b8'], neu: ['#b8c9dc', '#eef3f8'], arc: ['#6ec6ff', '#c9f0ff'] };
+        const sky = (key, alpha) => { const g = ctx.createLinearGradient(0, 0, 0, ground); g.addColorStop(0, SKY[key][0]); g.addColorStop(1, SKY[key][1]); ctx.globalAlpha = alpha; ctx.fillStyle = g; ctx.fillRect(0, 0, w, ground); ctx.globalAlpha = 1; };
+        sky(st.from, 1); sky(st.weather, st.fade);
+        const sunX = w * (wide ? .2 : .16), sunY = h * (wide ? .22 : .13);
+        if (st.weather === 'sol' || st.weather === 'arc') {
+          ctx.globalAlpha = st.fade;
+          const r = s * (st.weather === 'sol' ? .1 : .06) * (1 + f.bass * .12);
+          for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2 + st.sway * .25; poly([[sunX + Math.cos(a - .09) * r * 1.15, sunY + Math.sin(a - .09) * r * 1.15], [sunX + Math.cos(a) * r * 1.7, sunY + Math.sin(a) * r * 1.7], [sunX + Math.cos(a + .09) * r * 1.15, sunY + Math.sin(a + .09) * r * 1.15]], k % 2 ? '#ff8c42' : '#ffd23f', k); }
+          circle(sunX, sunY, r, '#ffd23f');
+          ctx.fillStyle = INK; for (const dx of [-.35, .35]) { ctx.beginPath(); ctx.arc(sunX + r * dx, sunY - r * .15, r * .09, 0, Math.PI * 2); ctx.fill(); }
+          ctx.lineWidth = s * .005; ctx.beginPath(); ctx.arc(sunX, sunY + r * .1, r * .45, .2, Math.PI - .2); ctx.stroke();
+          if (st.weather === 'sol') {
+            // Calor: ones que pugen del terra.
+            ctx.strokeStyle = 'rgba(255, 120, 60, .35)'; ctx.lineWidth = s * .004;
+            for (let k = 0; k < 6; k++) { const x = w * (k + .5) / 6; ctx.beginPath(); for (let y = ground; y > ground - s * .25; y -= s * .01) ctx.lineTo(x + Math.sin(y / (s * .03) + st.sway * 3 + k) * s * .01, y); ctx.stroke(); }
+          } else {
+            // Arc de Sant Martí.
+            ['#ff5d5d', '#ff9f43', '#ffd23f', '#7bd389', '#4d9de0', '#8e6cf0'].forEach((c, k) => { ctx.strokeStyle = c; ctx.lineWidth = s * .018; ctx.beginPath(); ctx.arc(w * .5, ground, s * (.62 - k * .018), Math.PI * 1.05, Math.PI * 1.95); ctx.stroke(); });
+          }
+          ctx.globalAlpha = 1;
+        }
+        if (st.weather === 'pluja' || st.weather === 'neu') {
+          ctx.globalAlpha = st.fade;
+          for (const [cx, cy, r] of [[.2, .12, .08], [.5, .08, .1], [.8, .13, .09], [.35, .2, .07], [.68, .22, .07]]) {
+            const x = w * cx + Math.sin(st.sway * .3 + cx * 9) * s * .02, c = st.weather === 'pluja' ? '#7d8796' : '#ffffff';
+            circle(x - s * r * .6, h * cy + s * .01, s * r * .55, c); circle(x + s * r * .6, h * cy + s * .015, s * r * .5, c); circle(x, h * cy - s * .01, s * r * .7, c);
+          }
+          ctx.globalAlpha = 1;
+        }
+        // Gotes o flocs que cauen (només amb pluja o neu).
+        const list = st.weather === 'pluja' ? st.rain : st.snow;
+        if (st.weather === 'pluja' || st.weather === 'neu') for (let i = 0; i < (st.weather === 'pluja' ? 10 : 4); i++) list.push({ x: Math.random() * w, y: -s * .02, v: s * (st.weather === 'pluja' ? 1.3 : .18) * (.8 + Math.random() * .4), ph: Math.random() * 6 });
+        st.rain = st.rain.filter(p => p.y < ground); st.snow = st.snow.filter(p => p.y < ground);
+        ctx.strokeStyle = '#d8e6ff'; ctx.lineWidth = s * .004;
+        for (const p of st.rain) { p.y += p.v * f.dt; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - s * .006, p.y + s * .03); ctx.stroke(); }
+        ctx.fillStyle = '#ffffff';
+        for (const p of st.snow) { p.y += p.v * f.dt; p.x += Math.sin(f.t * 2 + p.ph) * s * .002; ctx.beginPath(); ctx.arc(p.x, p.y, s * .008, 0, Math.PI * 2); ctx.fill(); }
+        // Terra: platja amb sorra quan fa sol, neu, toll o gespa.
+        const GROUND = { sol: '#f6d58e', pluja: '#6f8f5e', neu: '#f4f8ff', arc: '#7bd389' };
+        ctx.fillStyle = GROUND[st.weather]; ctx.fillRect(0, ground, w, h - ground);
+        ctx.strokeStyle = INK; ctx.lineWidth = s * .006; ctx.beginPath(); ctx.moveTo(0, ground); for (let x = 0; x <= w; x += w / 30) ctx.lineTo(x, ground + wob(x)); ctx.stroke();
+        if (st.weather === 'pluja') for (let k = 0; k < 5; k++) { ctx.fillStyle = '#5a7fa8'; ctx.beginPath(); ctx.ellipse(w * (k + .5) / 5, ground + (h - ground) * (.3 + (k % 2) * .3), s * .07, s * .015, 0, 0, Math.PI * 2); ctx.fill(); }
+        // ── El vianant, equipat per a l'avís (no per al temps que fa).
+        const px = wide ? w * .3 : w * .2, py = ground + (h - ground) * .45, u = s * (wide ? .06 : .075), prop = ending ? 'ulleres' : alert[3];
+        const bob = Math.sin(st.sway * 2) * u * .05;
+        ctx.save(); ctx.translate(px, py + bob);
+        ctx.fillStyle = '#3d3a4b'; ctx.fillRect(-u * .5, -u * .9, u * .4, u * .85); ctx.fillRect(u * .1, -u * .9, u * .4, u * .85);
+        poly([[-u * .8, -u * 2.6], [u * .8, -u * 2.6], [u * .9, -u * .9], [-u * .9, -u * .9]], prop === 'bufanda' ? '#6a4c93' : prop === 'ventall' || prop === 'ulleres' ? '#ff8fab' : '#ffd23f', 2);
+        circle(0, -u * 3.3, u * .75, '#f6d5b8');
+        ctx.fillStyle = INK; for (const dx of [-.28, .28]) { ctx.beginPath(); ctx.arc(u * dx, -u * 3.4, u * .08, 0, Math.PI * 2); ctx.fill(); }
+        // Cara: confós (boca en ziga-zaga) perquè el temps no és el que li han dit.
+        ctx.lineWidth = s * .005; ctx.beginPath(); for (let k = 0; k <= 4; k++) ctx.lineTo(-u * .25 + k * u * .125, -u * 3.05 + (k % 2 ? -u * .06 : u * .06)); ctx.stroke();
+        if (prop === 'paraigua') {
+          ctx.strokeStyle = INK; ctx.lineWidth = s * .006; ctx.beginPath(); ctx.moveTo(u * .9, -u * 1.8); ctx.lineTo(u * .9, -u * 4.6); ctx.stroke();
+          poly([[u * .9 - u * 1.6, -u * 4.4], [u * .9, -u * 5.4], [u * .9 + u * 1.6, -u * 4.4]], '#4d9de0', 5);
+        } else if (prop === 'ventall') {
+          ctx.save(); ctx.translate(u * 1.1, -u * 2.8); ctx.rotate(Math.sin(st.sway * 8) * .4);
+          poly([[0, 0], [u * .9, -u * .6], [u * .9, u * .6]], '#ff5d8f', 7); ctx.restore();
+        } else if (prop === 'bufanda') {
+          ctx.fillStyle = '#e63946'; ctx.fillRect(-u * .7, -u * 2.75, u * 1.4, u * .3); ctx.fillRect(u * .2, -u * 2.6, u * .3, u * .9);
+          poly([[-u * .75, -u * 3.7], [u * .75, -u * 3.7], [u * .5, -u * 4.3], [-u * .5, -u * 4.3]], '#e63946', 8); circle(0, -u * 4.4, u * .18, '#ffffff');
+        } else if (prop === 'casc') {
+          ctx.beginPath(); ctx.arc(0, -u * 3.6, u * .82, Math.PI, 0); ctx.closePath(); ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.lineWidth = s * .006; ctx.strokeStyle = INK; ctx.stroke();
+        } else if (prop === 'ulleres') {
+          ctx.fillStyle = INK; for (const dx of [-.3, .3]) { ctx.beginPath(); ctx.ellipse(u * dx, -u * 3.4, u * .22, u * .16, 0, 0, Math.PI * 2); ctx.fill(); }
+          ctx.fillRect(-u * .1, -u * 3.45, u * .2, u * .05);
+        }
+        ctx.restore();
+        // ── El mòbil inventat: vibra amb els greus i amb cada avís nou.
+        const phW = s * (wide ? .36 : .5), phH = phW * 1.9, phX = wide ? w * .68 : w * .56, phY = wide ? h * .48 : h * .4;
+        const jig = Math.sin(f.t * 90) * st.shake * s * .012;
+        ctx.save(); ctx.translate(phX + jig, phY); ctx.rotate(-.04 + jig / s);
+        if (st.shake > .2) { ctx.strokeStyle = INK; ctx.lineWidth = s * .005; for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) { const x = sx * (phW / 2 + s * (.03 + k * .02)); ctx.beginPath(); ctx.moveTo(x, -phH * .12 + k * s * .01); ctx.lineTo(x + sx * s * .015, 0); ctx.lineTo(x, phH * .12 - k * s * .01); ctx.stroke(); } }
+        ctx.fillStyle = '#2b2d42'; ctx.strokeStyle = INK; ctx.lineWidth = s * .008;
+        ctx.beginPath(); ctx.roundRect(-phW / 2, -phH / 2, phW, phH, phW * .14); ctx.fill(); ctx.stroke();
+        const sw = phW * .9, sh = phH * .9;
+        const screen = ctx.createLinearGradient(0, -sh / 2, 0, sh / 2); screen.addColorStop(0, '#b388eb'); screen.addColorStop(1, '#ff8fab');
+        ctx.fillStyle = screen; ctx.beginPath(); ctx.roundRect(-sw / 2, -sh / 2, sw, sh, phW * .1); ctx.fill();
+        ctx.fillStyle = '#2b2d42'; ctx.beginPath(); ctx.roundRect(-phW * .14, -sh / 2 + phW * .03, phW * .28, phW * .06, phW * .03); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = `${Math.round(phW * .07)}px ${FONT}`; ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left'; ctx.fillText('12:00', -sw / 2 + phW * .06, -sh / 2 + phW * .06);
+        ctx.textAlign = 'right'; ctx.fillText('▮▮▮ 3%', sw / 2 - phW * .06, -sh / 2 + phW * .06);
+        // Targeta de l'avís (entra amb un bot des de dalt) i, a sota, els avisos anteriors, més petits.
+        const card = (y, [title, body], scale, alpha, red) => {
+          const cw = sw * .9 * scale, chH = phW * .62 * scale;
+          ctx.save(); ctx.globalAlpha = alpha; ctx.translate(0, y);
+          ctx.fillStyle = '#fff8e7'; ctx.strokeStyle = INK; ctx.lineWidth = s * .005; ctx.beginPath(); ctx.roundRect(-cw / 2, 0, cw, chH, phW * .05); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = red ? '#e63946' : '#8d8d99'; ctx.beginPath(); ctx.roundRect(-cw / 2, 0, cw, chH * .28, [phW * .05, phW * .05, 0, 0]); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.font = `${Math.round(phW * .058 * scale)}px ${FONT}`; ctx.fillText('⚠ ALERTA · Avís meteorològic', -cw / 2 + phW * .04, chH * .14, cw * .9);
+          ctx.fillStyle = INK; ctx.font = `${Math.round(phW * .075 * scale)}px ${FONT}`;
+          let fsz = phW * .075 * scale; while (ctx.measureText(title).width > cw * .9 && fsz > 6) { fsz -= 1; ctx.font = `${Math.round(fsz)}px ${FONT}`; }
+          ctx.fillText(title, -cw / 2 + phW * .04, chH * .48);
+          ctx.font = `${Math.round(phW * .055 * scale)}px ${FONT}`; ctx.fillStyle = '#5c5470'; ctx.fillText(body, -cw / 2 + phW * .04, chH * .74, cw * .9);
+          ctx.restore();
+          return chH;
+        };
+        const age = f.t - st.born, drop = age < .35 ? 1 - Math.sin(age / .35 * Math.PI / 2) : 0, bounce = age < .6 ? Math.sin(age / .6 * Math.PI * 3) * (1 - age / .6) * phW * .03 : 0;
+        const top = -sh / 2 + phW * .16;
+        ctx.save(); ctx.beginPath(); ctx.roundRect(-sw / 2, -sh / 2, sw, sh, phW * .1); ctx.clip();
+        const current = ending ? ['ALERTA FINAL:', 'Mireu per la finestra.'] : alert;
+        let y = top + card(top - drop * phH * .4 + bounce, current, 1, 1, true) + phW * .05;
+        for (const [k, old] of st.history.entries()) { if (ending) break; y += card(y, old, .82, .75 - k * .2, false) * 1 + phW * .04; }
+        ctx.restore();
+        ctx.restore();
+        // ── Rètol: el temps que fa de debò, en lletres grans de colors (contradiu l'avís).
+        const REAL = { sol: 'Fa un sol de justícia', pluja: 'Plou a bots i barrals', neu: 'Neva a tot neva', arc: 'Cel net i arc de Sant Martí' };
+        const real = ending ? 'Avui fa el temps que fa' : REAL[st.weather], fs = Math.round(s * (wide ? .06 : .062));
+        ctx.font = `${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const fit = Math.min(1, w * .9 / ctx.measureText(real).width), ry = wide ? h * .92 : h * .9;
+        ctx.save(); ctx.translate(wide ? w * .3 : w / 2, ry); ctx.scale(fit * (wide ? Math.min(1, w * .5 / (ctx.measureText(real).width * fit)) : 1), fit * (wide ? Math.min(1, w * .5 / (ctx.measureText(real).width * fit)) : 1));
+        ctx.lineWidth = fs * .18; ctx.strokeStyle = INK; ctx.strokeText(real, 0, 0); ctx.fillStyle = { sol: '#ffd23f', pluja: '#9fd3ff', neu: '#ffffff', arc: '#7bd389' }[st.weather]; ctx.fillText(real, 0, 0);
+        ctx.restore();
+      }
+    },
+
     tambors: {
       name: 'Tambors animats', ownNames: true,
       // Dibuixos animats: els instruments de la batucada amb ulls, que salten i s'aixafen quan sonen i
