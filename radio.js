@@ -233,6 +233,8 @@
       const custom = customOpening; customOpening = null;
       const song = studio.validateSong(builder.createBatucadaSong(engine, { seed: studio.newSeed(), avoidRhythm: lastSubgenre, ...(chosenStyle ? { rhythm: chosenStyle } : {}),
         ...(custom ? { rhythm: custom.style, bpm: custom.bpm, opening: custom.opening } : {}),
+        // Short: 60–90 segons, intensa i amb canvis de ritme.
+        ...(shortMode ? { short: true } : {}),
         avoidTitles: [...queue.map(t => t.song.title), ...all.slice(0, 150).map(e => e.title)].filter(Boolean) }));
       lastSubgenre = song.settings.batucadaRhythm;
       return { id: studio.uid(), replay: false, song };
@@ -722,63 +724,141 @@
     kitChips.forEach((chip, row) => chip.classList.toggle('on', on.has(row)));
   }
   // ── Compon l'inici de la batucada ────────────────────────────────────
-  // Els primers segons (uns 6), en tres passos i sense editar cops: el timbal (o instrument) de fons, el seu ritme
-  // (patrons fets, amb redoble final si es vol) i els xiulets del mestre (deu patrons; per defecte, dos curts i un
-  // llarg), que s'ajusten sols al ritme triat (vegeu builder.openingFrom). Després es genera la resta de la cançó.
-  const OPENING_KEY = 'radiospam-batucada-opening';
-  let customOpening = null;
+  // Els primers segons, sense editar cops. Amb patrons: el timbal de fons, el seu ritme (patrons fets, amb redoble
+  // final si es vol) i els xiulets del mestre (deu patrons, que s'ajusten sols al ritme; vegeu builder.openingFrom).
+  // Amb la veu: es grava uns segons («ta ta ta taaa»), se n'extreuen els cops, la força, els llargs i el tempo
+  // (builder.extractVoiceRhythm) i la frase sona dues o tres vegades amb un xiulet llarg abans d'entrar la colla
+  // (builder.voiceOpening); cal escoltar-la abans de començar. Volum del timbal i del xiulet, de fluix a molt fort:
+  // després, tota la colla s'adapta al del timbal i els xiulets de la cançó al del xiulet.
+  const OPENING_KEY = 'radiospam-batucada-opening', SHORT_KEY = 'radiospam.batucadaShort';
+  const LEVEL_NAMES = ['Fluix', 'Suau', 'Normal', 'Fort', 'Molt fort'];
+  let customOpening = null, validated = false, recording = null;
+  let shortMode = (() => { try { return localStorage.getItem(SHORT_KEY) === '1'; } catch { return false; } })();
   const openingPanel = $('opening-panel'), previewAudio = new Audio();
   let design = (() => {
-    const fresh = { row: 0, style: 'samba', bpm: 132, rhythm: 'samba', roll: true, whistles: 'dos-curts-llarg' };
+    const fresh = { row: 0, style: 'samba', bpm: 132, rhythm: 'samba', roll: true, whistles: 'dos-curts-llarg', mode: 'patterns', level: 3, whistleLevel: 4 };
     try {
       const saved = JSON.parse(localStorage.getItem(OPENING_KEY));
       // (Els inicis desats amb l'editor antic, de caselles, passen als patrons fets.)
       if (saved && engine.BATUCADA_RHYTHMS[saved.style]) return { ...fresh, ...saved,
         rhythm: builder.OPENING_RHYTHMS.some(([k]) => k === saved.rhythm) ? saved.rhythm : fresh.rhythm,
-        whistles: builder.OPENING_WHISTLES.some(([k]) => k === saved.whistles) ? saved.whistles : fresh.whistles };
+        whistles: builder.OPENING_WHISTLES.some(([k]) => k === saved.whistles) ? saved.whistles : fresh.whistles,
+        mode: saved.mode === 'voice' && saved.voice ? 'voice' : 'patterns',
+        level: [1, 2, 3, 4, 5].includes(saved.level) ? saved.level : 3, whistleLevel: [1, 2, 3, 4, 5].includes(saved.whistleLevel) ? saved.whistleLevel : 4 };
     } catch {}
     return fresh;
   })();
-  const openingOf = () => builder.openingFrom(engine, design, design.bpm);
+  const voiceMode = () => design.mode === 'voice' && !!design.voice;
+  const openingOf = () => voiceMode()
+    ? builder.voiceOpening(design.voice, { row: design.row, level: design.level, whistleLevel: design.whistleLevel })
+    : builder.openingFrom(engine, design, design.bpm);
   const saveDesign = () => { try { localStorage.setItem(OPENING_KEY, JSON.stringify(design)); } catch {} };
   for (const [row, piece] of engine.BATUCADA.entries()) if (piece.note !== engine.BATUCADA_WHISTLE.note)
     $('opening-row').append(new Option(row === 0 ? `${piece.name} (timbal)` : piece.name, String(row)));
   for (const [key, rhythm] of Object.entries(engine.BATUCADA_RHYTHMS)) if (builder.BATUCADA_STYLES[key]) $('opening-style').append(new Option(rhythm.name, key));
   for (const [key, name] of builder.OPENING_RHYTHMS) $('opening-rhythm').append(new Option(name, key));
   for (const [key, name] of builder.OPENING_WHISTLES) $('opening-whistles').append(new Option(name, key));
+  // La frase gravada, en text: ● fort, ○ normal, · fluix, — llarg, i un espai per temps.
+  const voiceText = rhythm => {
+    let text = '';
+    for (let step = 0; step < rhythm.length; step++) {
+      const note = rhythm.notes.find(n => n.step === step);
+      if (step && step % 4 === 0) text += ' ';
+      text += note ? ['·', '○', '●'][note.strength - 1] + (note.long ? '—' : '') : '_';
+    }
+    return text.replace(/_+$/, '');
+  };
   function renderOpening() {
     const [low, high] = builder.BATUCADA_STYLES[design.style].bpm;
     design.bpm = Math.max(low, Math.min(high, design.bpm));
-    const bars = builder.openingBars(design.bpm), opening = openingOf();
+    const opening = openingOf(), bars = opening.steps.length, voice = voiceMode();
     $('opening-row').value = String(design.row); $('opening-style').value = design.style;
     $('opening-rhythm').value = design.rhythm; $('opening-whistles').value = design.whistles; $('opening-roll').checked = !!design.roll;
+    for (const radio of document.querySelectorAll('[name="opening-mode"]')) radio.checked = radio.value === design.mode;
+    $('opening-voice').hidden = design.mode !== 'voice';
+    for (const item of document.querySelectorAll('.opening-pattern-only')) item.hidden = design.mode === 'voice';
     Object.assign($('opening-bpm'), { min: low, max: high, value: design.bpm });
     $('opening-length').textContent = `${design.bpm} BPM · ${bars} compassos · ${(bars * 240 / design.bpm).toFixed(1).replace('.', ',')} s`;
+    $('opening-level').value = design.level; $('opening-level-name').textContent = LEVEL_NAMES[design.level - 1];
+    $('opening-whistle-level').value = design.whistleLevel; $('opening-whistle-level-name').textContent = LEVEL_NAMES[design.whistleLevel - 1];
     const short = opening.whistles.filter(w => w[2] === 'short').length, long = opening.whistles.length - short;
     $('opening-whistle-count').textContent = opening.whistles.length ? `${short} curt${short === 1 ? '' : 's'} i ${long} llarg${long === 1 ? '' : 's'}, sobre els cops del timbal` : 'cap xiulet';
+    if (design.voice) {
+      const v = design.voice, reps = v.length === 16 ? 3 : 2, soft = v.notes.filter(n => n.strength === 1).length, strong = v.notes.filter(n => n.strength === 3).length;
+      $('opening-voice-result').textContent = `${voiceText(v)}  ·  ${v.notes.length} cops (${strong} forts, ${soft} fluixos${v.notes.some(n => n.long) ? `, ${v.notes.filter(n => n.long).length} llargs` : ''}) · ${v.bpm} BPM · ${v.length / 16 === 1 ? 'un compàs' : 'dos compassos'} que sona ${reps} vegades · timbal triat: ${engine.BATUCADA[v.row].name}.`;
+    } else $('opening-voice-result').textContent = 'Encara no has gravat cap ritme.';
     // Resum a la capçalera (també amb l'editor plegat): què obrirà la cançó, o si no s'utilitza.
-    const use = design.use !== false, rhythmName = builder.OPENING_RHYTHMS.find(([k]) => k === design.rhythm)[1].replace(/ \(.*\)$/, '');
+    const use = design.use !== false;
     $('opening-use').checked = use;
-    $('opening-summary').textContent = use ? `${engine.BATUCADA[design.row].name} · ${rhythmName} · ${builder.OPENING_WHISTLES.find(([k]) => k === design.whistles)[1].toLowerCase()}` : 'no s’utilitza: inici a l’atzar';
+    $('opening-summary').textContent = !use ? 'no s’utilitza: inici a l’atzar'
+      : voice ? `🎤 ${engine.BATUCADA[design.row].name} · ritme gravat · xiulet llarg`
+        : `${engine.BATUCADA[design.row].name} · ${builder.OPENING_RHYTHMS.find(([k]) => k === design.rhythm)[1].replace(/ \(.*\)$/, '')} · ${builder.OPENING_WHISTLES.find(([k]) => k === design.whistles)[1].toLowerCase()}`;
     openingPanel.open = !!design.open;
+    $('batucada-short').checked = shortMode;
+    // Amb la veu: primer cal gravar i escoltar l'inici (validar-lo) abans de començar.
+    const waiting = use && design.mode === 'voice' && (!design.voice || !validated);
+    $('opening-go').disabled = waiting;
+    if (waiting) $('opening-status').textContent = design.voice ? 'Escolta l’inici per validar-lo abans de començar.' : 'Grava el ritme amb la veu (o tria «Patrons fets»).';
   }
   function changed() { saveDesign(); renderOpening(); }
-  $('opening-row').addEventListener('change', event => { design.row = Number(event.target.value); changed(); });
+  $('opening-row').addEventListener('change', event => { design.row = Number(event.target.value); validated = false; changed(); });
   $('opening-style').addEventListener('change', event => { design.style = event.target.value; changed(); });
   $('opening-bpm').addEventListener('input', event => { design.bpm = Number(event.target.value); changed(); });
   $('opening-rhythm').addEventListener('change', event => { design.rhythm = event.target.value; changed(); });
   $('opening-whistles').addEventListener('change', event => { design.whistles = event.target.value; changed(); });
   $('opening-roll').addEventListener('change', event => { design.roll = event.target.checked; changed(); });
   $('opening-use').addEventListener('change', event => { design.use = event.target.checked; changed(); });
+  $('opening-level').addEventListener('input', event => { design.level = Number(event.target.value); changed(); });
+  $('opening-whistle-level').addEventListener('input', event => { design.whistleLevel = Number(event.target.value); changed(); });
+  for (const radio of document.querySelectorAll('[name="opening-mode"]')) radio.addEventListener('change', () => { design.mode = radio.value; $('opening-status').textContent = ''; changed(); });
+  $('batucada-short').addEventListener('change', event => { shortMode = event.target.checked; try { localStorage.setItem(SHORT_KEY, shortMode ? '1' : '0'); } catch {} });
+  // Gravació del ritme amb la veu: compte enrere, sis segons (o fins que s'atura) i detecció dels cops.
+  $('opening-record').addEventListener('click', async () => {
+    const button = $('opening-record'), result = $('opening-voice-result');
+    if (recording) { if (recording.state !== 'inactive') recording.stop(); return; }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { result.textContent = 'Aquest navegador no pot gravar amb el micròfon.'; return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (error) { result.textContent = `No es pot fer servir el micròfon: ${reasonOf(error)}`; return; }
+    stopPreview(); audio.pause();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)(), analyser = ctx.createAnalyser(), wave = new Float32Array(1024);
+    analyser.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(analyser);
+    button.disabled = true;
+    for (const n of [3, 2, 1]) { button.textContent = `Prepara’t… ${n}`; await new Promise(r => setTimeout(r, 600)); }
+    const rec = new MediaRecorder(stream), chunks = [];
+    rec.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    const stopped = new Promise(resolve => { rec.onstop = resolve; });
+    recording = rec; rec.start();
+    button.disabled = false; button.textContent = '■ Atura'; button.classList.add('recording'); result.textContent = 'Gravant… marca el ritme amb la veu.';
+    const meter = () => { if (recording !== rec) return; analyser.getFloatTimeDomainData(wave); let peak = 0; for (const v of wave) peak = Math.max(peak, Math.abs(v)); $('opening-meter').style.width = `${Math.min(100, peak * 160)}%`; requestAnimationFrame(meter); };
+    meter();
+    const timer = setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 6000);
+    await stopped; clearTimeout(timer); recording = null;
+    stream.getTracks().forEach(track => track.stop());
+    button.textContent = '● Torna a gravar (6 s)'; button.classList.remove('recording'); $('opening-meter').style.width = '0';
+    try {
+      const decoded = await ctx.decodeAudioData(await new Blob(chunks, { type: rec.mimeType }).arrayBuffer());
+      const mono = new Float32Array(decoded.length);
+      for (let c = 0; c < decoded.numberOfChannels; c++) { const data = decoded.getChannelData(c); for (let i = 0; i < mono.length; i++) mono[i] += data[i] / decoded.numberOfChannels; }
+      const rhythm = builder.extractVoiceRhythm(mono, decoded.sampleRate);
+      if (!rhythm) { result.textContent = 'No s’ha sentit cap ritme: torna-ho a provar, més a prop del micròfon i marcant bé cada «ta».'; return; }
+      design.voice = rhythm; design.row = rhythm.row; design.bpm = rhythm.bpm; validated = false;
+      // L'estil de la cançó s'ajusta perquè el tempo gravat hi càpiga (si no, es mantindria l'estil però canviaria el tempo).
+      const fits = key => { const [a, b] = builder.BATUCADA_STYLES[key].bpm; return rhythm.bpm >= a && rhythm.bpm <= b; };
+      if (!fits(design.style)) design.style = Object.keys(builder.BATUCADA_STYLES).find(key => fits(key) && !builder.BATUCADA_STYLES[key].alone) || design.style;
+      changed();
+    } catch (error) { result.textContent = `No s’ha pogut analitzar la gravació: ${reasonOf(error)}`; }
+    finally { ctx.close().catch(() => {}); }
+  });
   // L'editor es pot plegar quan no es fa servir i desplegar quan cal (es recorda).
   openingPanel.addEventListener('toggle', () => { if (design.open !== openingPanel.open) { design.open = openingPanel.open; saveDesign(); } });
   // Pantalla de la Batucada abans de començar: només aquí es compon l'inici (mai mentre sona una cançó).
   function openBatucadaSetup() {
-    renderOpening(); $('opening-status').textContent = '';
+    $('opening-status').textContent = ''; renderOpening();
     showScreen('batucada');
   }
   function stopPreview() { previewing++; previewAudio.pause(); }
-  // Escolta només l'inici (la ràdio es posa en pausa).
+  // Escolta només l'inici (la ràdio es posa en pausa). Amb la veu, escoltar-lo el valida.
   let previewing = 0;
   $('opening-preview').addEventListener('click', async () => {
     const mine = ++previewing, status = $('opening-status');
@@ -791,13 +871,15 @@
       URL.revokeObjectURL(previewAudio.src);
       previewAudio.src = URL.createObjectURL(await wavBlob(data, 0));
       audio.pause(); await previewAudio.play();
-      status.textContent = `Sona l’inici (${(first.frames / RATE).toFixed(1).replace('.', ',')} s).`;
+      if (voiceMode()) validated = true;
+      renderOpening();
+      status.textContent = `Sona l’inici (${(first.frames / RATE).toFixed(1).replace('.', ',')} s).${voiceMode() ? ' Si t’agrada, ja pots començar la batucada.' : ''}`;
     } catch (error) { if (mine === previewing) status.textContent = `No s’ha pogut preparar: ${reasonOf(error)}`; }
   });
   // Comença: l'emissora Batucada (la primera cançó, amb aquest inici si es fa servir; les següents, com sempre).
   $('opening-go').addEventListener('click', () => {
     stopPreview();
-    customOpening = design.use !== false ? { style: design.style, bpm: design.bpm, opening: openingOf() } : null;
+    customOpening = design.use !== false && (design.mode !== 'voice' || design.voice) ? { style: design.style, bpm: design.bpm, opening: openingOf() } : null;
     chooseStation('batucada');
   });
   // Visualitzador VaTuCalla!: la cançó que sona, a pantalla completa (la ràdio es posa en pausa).

@@ -11,68 +11,257 @@
   // Color de cada instrument (to HSL), en l'ordre de la graella de la batucada.
   const hueOf = row => (row * 137.5 + 20) % 360;
 
+  // ── La colla: dibuixos de retalls de paper ────────────────────────────
+  // Una colla de batucada d'homes d'entre 40 i 55 anys (cabells foscos o amb canes a les temples, entrades,
+  // bigotis, barbes curtes i alguns amb ulleres), en formació: els surdos i el bombo al darrere; la caixa, el
+  // repique, el tabal i el tamborim al mig; l'agogô, el xocalho i la cuíca al davant, i el mestre al capdavant,
+  // amb el xiulet a la boca i el seu repique. Cadascú toca el seu instrument quan sona i en surt una bafarada
+  // amb el so (BUM!, TÁ!, FIUUU!…). Samarretes de colors, a la plaça.
+  const INK = '#2a1d2e';
+  const SKIN = ['#f6d5b8', '#f1c9a5', '#fadcc4', '#efc19c', '#f8d9bf', '#f3cdb0', '#f5d0ad', '#fbe0cb', '#eec4a2', '#f7d6bb', '#f2cbaa', '#f9dcc6'];
+  const HAIR = ['#2b1d14', '#3b2a1e', '#1a1a1a', '#5a3d28', '#4a4038', '#2b1d14', '#6b4a2f', '#1a1a1a', '#3b2a1e', '#5f5650', '#2b1d14', '#4a3326'];
+  // Trets de cada músic (fila de la graella): pentinat, pèl a la cara, ulleres i canes.
+  const LOOKS = [
+    { hair: 'curt', face: 'bigoti', glasses: 'rodones', grey: true }, { hair: 'entrades', face: 'barba' }, { hair: 'arrissat', face: 'res' },
+    { hair: 'ratlla', face: 'perilla', glasses: 'quadrades' }, { hair: 'curt', face: 'tres-dies' }, { hair: 'entrades', face: 'bigoti', glasses: 'quadrades', grey: true },
+    { hair: 'cua', face: 'barba' }, { hair: 'calb', face: 'perilla', glasses: 'rodones' }, { hair: 'ratlla', face: 'res' },
+    { hair: 'curt', face: 'bigoti', glasses: 'quadrades', grey: true }, { hair: 'arrissat', face: 'tres-dies', glasses: 'rodones' }, { hair: 'entrades', face: 'barba', grey: true }
+  ];
+  const WORDS = ['BUM!', 'BOM!', 'DUM!', 'TÁ!', 'TRRÁ!', 'TIC!', 'DLING!', 'XIC-XIC!', 'UÍ-UÍ!', 'FIUUU!', 'PAM!', 'BOOM!'];
+  const SECTION = row => row <= 2 || row === 11 ? 0 : [3, 4, 10].includes(row) ? 1 : row === 9 ? 3 : 2;
+  const VARIANTS = {
+    colors: { head: 1, body: 1,
+      shirt: row => ['#e63946', '#2a9d8f', '#264653', '#f4a261', '#6a4c93', '#1d3557', '#ff7f11', '#06a77d', '#b5179e', '#3a86ff', '#8338ec', '#d62828'][row],
+      trousers: () => '#3d3a4b', hat: row => row === 2 ? 'gorra' : row === 8 ? 'barret' : null }
+  };
+
+  function collaBackground(ctx, w, h, f, st, s, ground) {
+    const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#7cc6ff'); sky.addColorStop(1, '#ffe7b0');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+    for (let i = 0, x = -s * .05; x < w; i++) {
+      const bw = s * (.2 + (i * 37 % 10) / 50), bh = s * (.2 + (i * 53 % 10) / 40);
+      ctx.fillStyle = ['#f4a261', '#e9c46a', '#e76f51', '#f6bd60', '#d4a373'][i % 5]; ctx.fillRect(x, ground - bh, bw, bh + 2);
+      ctx.fillStyle = 'rgba(40, 30, 60, .25)';
+      for (let wx = x + bw * .18; wx < x + bw * .8; wx += bw * .32) for (let wy = ground - bh + bh * .15; wy < ground - bh * .3; wy += bh * .3) ctx.fillRect(wx, wy, bw * .16, bh * .14);
+      x += bw;
+    }
+    ctx.strokeStyle = '#5b4636'; ctx.lineWidth = s * .003; ctx.beginPath(); ctx.moveTo(0, h * .2);
+    ctx.quadraticCurveTo(w / 2, h * .28 + f.bass * s * .03, w, h * .2); ctx.stroke();
+    for (let k = 0; k < 18; k++) {
+      const x = (k + .5) / 18 * w, tt = (k + .5) / 18, y = h * .2 + (h * .08 + f.bass * s * .03) * 2 * tt * (1 - tt);
+      ctx.fillStyle = ['#e63946', '#ffd23f', '#06d6a0', '#118ab2', '#ff7f11'][k % 5];
+      ctx.beginPath(); ctx.moveTo(x - s * .018, y); ctx.lineTo(x + s * .018, y); ctx.lineTo(x + Math.sin(st.sway + k) * s * .004, y + s * .04); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#c9b18a'; ctx.fillRect(0, ground, w, h - ground);
+    ctx.fillStyle = 'rgba(120, 90, 60, .18)';
+    for (let y = ground + s * .03; y < h; y += s * .05) ctx.fillRect(0, y, w, s * .004);
+  }
+
+  // Un músic dret, amb els peus a (0, 0) i mida u; e = força del cop (1 just quan pica).
+  function drawMusician(ctx, u, row, e, f, st, V) {
+    const L = LOOKS[row], skin = SKIN[row], hair = HAIR[row], B = V.body;
+    const legs = u * .7 * B, top = -(legs + u * 1.8 * B), belly = -legs - u * .55 * B, chest = top + u * .55, shoulderY = top + u * .25;
+    const shirt = V.shirt(row);
+    ctx.lineJoin = ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = u * .09;
+    // Cames, sabates i cos (la samarreta).
+    ctx.fillStyle = V.trousers(row); ctx.fillRect(-u * .55, -legs, u * .45, legs - u * .05); ctx.fillRect(u * .1, -legs, u * .45, legs - u * .05);
+    ctx.fillStyle = '#20151c'; ctx.beginPath(); ctx.ellipse(-u * .38, -u * .05, u * .38, u * .14, 0, 0, Math.PI * 2); ctx.ellipse(u * .38, -u * .05, u * .38, u * .14, 0, 0, Math.PI * 2); ctx.fill();
+    const torso = () => { ctx.beginPath(); ctx.moveTo(-u * .9, top); ctx.lineTo(u * .9, top); ctx.quadraticCurveTo(u * 1.25, (top - legs) / 2, u * .95, -legs); ctx.lineTo(-u * .95, -legs); ctx.quadraticCurveTo(-u * 1.25, (top - legs) / 2, -u * .9, top); ctx.closePath(); };
+    ctx.fillStyle = shirt; torso(); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = u * .09; torso(); ctx.stroke();
+    // Coll en V.
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.moveTo(-u * .28, top); ctx.lineTo(0, top + u * .3); ctx.lineTo(u * .28, top); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Braços, baquetes i tambors.
+    const arm = (sx, hx, hy) => { ctx.strokeStyle = shirt; ctx.lineWidth = u * .34; ctx.beginPath(); ctx.moveTo(sx, shoulderY); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = skin; ctx.strokeStyle = INK; ctx.lineWidth = u * .07; ctx.beginPath(); ctx.arc(hx, hy, u * .2, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); };
+    const stick = (hx, hy, a, len = u * .9, color = '#e9d8a6') => { ctx.strokeStyle = color; ctx.lineWidth = u * .1; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + Math.cos(a) * len, hy + Math.sin(a) * len); ctx.stroke(); };
+    const drum = (dy, rw, rh, color, rim = '#d8d8e0') => {
+      ctx.fillStyle = color; ctx.strokeStyle = INK; ctx.lineWidth = u * .08;
+      ctx.beginPath(); ctx.rect(-rw, dy, rw * 2, rh); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, dy + rh, rw, rw * .25, 0, 0, Math.PI); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = rim; ctx.lineWidth = u * .05; ctx.beginPath();
+      for (let z = 0; z <= 6; z++) ctx.lineTo(-rw + z * rw / 3, dy + (z % 2 ? rh * .85 : rh * .15)); ctx.stroke();
+      ctx.fillStyle = '#fff8e7'; ctx.strokeStyle = INK; ctx.lineWidth = u * .08; ctx.beginPath(); ctx.ellipse(0, dy, rw, rw * .25, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // Corretja a l'espatlla.
+      ctx.strokeStyle = '#3b2a1e'; ctx.lineWidth = u * .1; ctx.beginPath(); ctx.moveTo(-rw * .7, dy); ctx.lineTo(-u * .55, top + u * .05); ctx.stroke();
+    };
+    const lift = (1 - e) * u * .7 + Math.sin(st.sway * 2 + row) * u * .05;
+    if (row <= 2 || row === 11) {
+      // Surdos i bombo: tambor gran a la panxa i maceta.
+      const dy = belly - u * .55;
+      drum(dy, u * 1.05, u * 1.1, ['#c0c0c8', '#a8a8b8', '#9090a0', '#8b3a3a'][Math.min(row, 3)]);
+      arm(-u * .8, -u * .85, dy + u * .1);
+      const hx = u * .55, hy = dy - u * .3 - lift, a = Math.PI * .75 - (1 - e) * .5;
+      arm(u * .8, hx, hy); stick(hx, hy, a, u * .8);
+      ctx.fillStyle = '#fff8e7'; ctx.strokeStyle = INK; ctx.lineWidth = u * .07; ctx.beginPath(); ctx.arc(hx + Math.cos(a) * u * .8, hy + Math.sin(a) * u * .8, u * .17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (row === 3 || row === 4 || row === 10 || row === 9) {
+      // Caixa, repique, tabal i el repique del mestre: tambor petit i dues baquetes que piquen alternant.
+      const dy = belly - u * .25, l = (1 - e) * u * .55, alt = Math.sin(f.t * 18) > 0 && e > .3;
+      drum(dy, u * .8, u * .55, { 3: '#d9d9e0', 4: '#f0c419', 10: '#a0522d', 9: '#d4af37' }[row]);
+      if (row === 9) {
+        // El mestre: amb una mà toca; amb l'altra, quan xiula, aixeca la baqueta per marcar l'entrada.
+        arm(-u * .8, -u * .5, dy - u * .3 - l * .5); stick(-u * .5, dy - u * .3 - l * .5, Math.PI * .15, u * .75);
+        const up = e > .05, hx = up ? u * 1.15 : u * .5, hy = up ? top - u * 1.2 - e * u * .3 : dy - u * .3;
+        arm(u * .8, hx, hy); stick(hx, hy, up ? -Math.PI * .4 : Math.PI * .85, u * .75);
+      } else {
+        arm(-u * .8, -u * .5, dy - u * .3 - (alt ? 0 : l)); arm(u * .8, u * .5, dy - u * .3 - (alt ? l : 0));
+        stick(-u * .5, dy - u * .3 - (alt ? 0 : l), Math.PI * .15, u * .75); stick(u * .5, dy - u * .3 - (alt ? l : 0), Math.PI * .85, u * .75);
+      }
+    } else if (row === 5) {
+      // Tamborim: a la mà esquerra, davant del pit, i la baqueta a la dreta (es gira una mica quan pica).
+      const cx = -u * .55, cy = chest + u * .1;
+      arm(-u * .8, cx - u * .1, cy + u * .25);
+      ctx.save(); ctx.translate(cx, cy); ctx.scale(1, .85 + e * .1);
+      ctx.fillStyle = '#fff8e7'; ctx.strokeStyle = INK; ctx.lineWidth = u * .08; ctx.beginPath(); ctx.arc(0, 0, u * .48, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#222'; ctx.lineWidth = u * .12; ctx.beginPath(); ctx.arc(0, 0, u * .48, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      const hx = u * .6, hy = chest - lift * .6; arm(u * .8, hx, hy); stick(hx, hy, Math.PI * 1.05 + e * .45, u * .95, '#222');
+    } else if (row === 6) {
+      // Agogô: les dues campanes de costat davant del pit i la baqueta de fusta.
+      arm(-u * .8, -u * .75, chest + u * .35);
+      ctx.fillStyle = '#e8c547'; ctx.strokeStyle = INK; ctx.lineWidth = u * .07;
+      ctx.beginPath(); ctx.moveTo(-u * .75, chest + u * .35); ctx.quadraticCurveTo(-u * .4, chest + u * .7, -u * .1, chest + u * .4); ctx.stroke();
+      for (const [cx, r] of [[-u * .5, u * .32], [u * .05, u * .25]]) {
+        ctx.save(); ctx.translate(cx, chest); ctx.rotate(-.5);
+        ctx.beginPath(); ctx.moveTo(-r * .45, -r * 1.2); ctx.lineTo(r * .45, -r * 1.2); ctx.lineTo(r, r * .6); ctx.lineTo(-r, r * .6); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+      const hx = u * .75, hy = chest - u * .1 - lift * .5; arm(u * .8, hx, hy); stick(hx, hy, Math.PI * 1.05 + e * .3, u * 1.05, '#6b4f2a');
+    } else if (row === 7) {
+      // Xocalho: el marc de platerets davant del pit, que es remena a dreta i esquerra.
+      const dx = Math.sin(f.t * 30) * e * u * .25, y = chest + u * .15;
+      arm(-u * .8, -u * .95 + dx, y + u * .17); arm(u * .8, u * .95 + dx, y + u * .17);
+      ctx.fillStyle = '#b08968'; ctx.strokeStyle = INK; ctx.lineWidth = u * .07; ctx.beginPath(); ctx.roundRect(-u * 1.1 + dx, y, u * 2.2, u * .36, u * .1); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffd23f'; for (let j = -3; j <= 3; j++) { ctx.beginPath(); ctx.ellipse(j * u * .28 + dx, y + u * .18, u * .1, u * .13, 0, 0, Math.PI * 2); ctx.fill(); ctx.lineWidth = u * .03; ctx.stroke(); }
+    } else {
+      // Cuíca: el tambor estirat, de costat sota el braç; la mà de dins frega la canya i la de fora prem la pell.
+      const y = belly - u * .45, rub = Math.sin(f.t * 22) * e * u * .25;
+      ctx.fillStyle = '#c0c0c8'; ctx.strokeStyle = INK; ctx.lineWidth = u * .08;
+      ctx.beginPath(); ctx.rect(-u * 1.2, y - u * .45, u * 1.5, u * .9); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#7d7d8a'; ctx.lineWidth = u * .05; for (const k of [-.2, .15]) { ctx.beginPath(); ctx.moveTo(-u * 1.2, y + k * u * 2); ctx.lineTo(u * .3, y + k * u * 2); ctx.stroke(); }
+      ctx.fillStyle = '#fff8e7'; ctx.strokeStyle = INK; ctx.lineWidth = u * .08; ctx.beginPath(); ctx.ellipse(u * .3, y, u * .2, u * .45, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-u * 1.2, y, u * .2, u * .45, 0, 0, Math.PI * 2); ctx.fillStyle = '#c0c0c8'; ctx.fill(); ctx.stroke();
+      arm(-u * .8, -u * .7 + rub, y - u * .1); arm(u * .8, u * .42, y - u * .15);
+    }
+    // Cap, orelles i pentinat.
+    const hr = u * 1.05 * V.head, hy = top - hr * .82;
+    const head = () => { ctx.beginPath(); ctx.ellipse(0, hy, hr, hr * .95, 0, 0, Math.PI * 2); };
+    ctx.fillStyle = skin; ctx.strokeStyle = INK; ctx.lineWidth = u * .08;
+    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sx * hr, hy + hr * .05, hr * .2, hr * .28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    head(); ctx.fill();
+    const grey = L.grey ? '#9c9a98' : hair;
+    ctx.save(); head(); ctx.clip();
+    ctx.fillStyle = hair;
+    if (L.hair === 'calb') { ctx.fillRect(-hr * 1.1, hy - hr * .35, hr * .32, hr * .45); ctx.fillRect(hr * .78, hy - hr * .35, hr * .32, hr * .45); }
+    else {
+      ctx.beginPath(); ctx.ellipse(0, hy - hr * .8, hr * 1.1, hr * .5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(-hr * 1.1, hy - hr * .6, hr * .26, hr * .62); ctx.fillRect(hr * .84, hy - hr * .6, hr * .26, hr * .62);
+      if (L.hair === 'entrades') { ctx.fillStyle = skin; for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sx * hr * .42, hy - hr * .5, hr * .28, hr * .26, 0, 0, Math.PI * 2); ctx.fill(); } }
+      if (L.hair === 'ratlla') { ctx.strokeStyle = skin; ctx.lineWidth = u * .05; ctx.beginPath(); ctx.moveTo(-hr * .35, hy - hr); ctx.lineTo(-hr * .3, hy - hr * .55); ctx.stroke(); }
+    }
+    // Canes a les temples.
+    if (L.grey) { ctx.fillStyle = grey; ctx.fillRect(-hr * 1.1, hy - hr * .45, hr * .3, hr * .5); ctx.fillRect(hr * .8, hy - hr * .45, hr * .3, hr * .5); }
+    // Pèl a la cara: barba curta, perilla o barba de tres dies.
+    ctx.fillStyle = L.grey ? '#77716c' : hair;
+    if (L.face === 'barba') { ctx.beginPath(); ctx.ellipse(0, hy + hr * .7, hr * .95, hr * .5, 0, 0, Math.PI * 2); ctx.fill(); }
+    if (L.face === 'tres-dies') { ctx.globalAlpha = .28; ctx.beginPath(); ctx.ellipse(0, hy + hr * .65, hr * .95, hr * .5, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.restore();
+    if (L.hair === 'arrissat') { ctx.fillStyle = hair; for (let k = 0; k < 9; k++) { const a = Math.PI * (1.1 + k * .1); ctx.beginPath(); ctx.arc(Math.cos(a) * hr * .92, hy + Math.sin(a) * hr * .88, hr * .2, 0, Math.PI * 2); ctx.fill(); } }
+    if (L.hair === 'cua') { ctx.fillStyle = hair; ctx.beginPath(); ctx.ellipse(-hr * 1.05, hy + hr * .1, hr * .16, hr * .35, .4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = INK; ctx.lineWidth = u * .08; head(); ctx.stroke();
+    // Barret: gorra o barret de palla.
+    const hat = V.hat(row);
+    if (hat === 'gorra') { ctx.fillStyle = '#4a5d23'; ctx.beginPath(); ctx.ellipse(0, hy - hr * .5, hr * .98, hr * .5, 0, Math.PI, 0); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.roundRect(-hr * .1, hy - hr * .58, hr * 1.25, hr * .14, hr * .07); ctx.fill(); ctx.stroke(); }
+    else if (hat === 'barret') { ctx.fillStyle = '#f2e8cf'; ctx.beginPath(); ctx.ellipse(0, hy - hr * .6, hr * 1.25, hr * .18, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.roundRect(-hr * .6, hy - hr * 1.15, hr * 1.2, hr * .55, hr * .15); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#e63946'; ctx.fillRect(-hr * .6, hy - hr * .75, hr * 1.2, hr * .12); }
+    // Ulls (es tanquen quan pica fort), celles fosques, nas, ulleres i bigoti o perilla.
+    for (const sx of [-1, 1]) {
+      const ex = sx * hr * .34, ey = hy - hr * .02;
+      if (e > .6 && row !== 9) { ctx.strokeStyle = INK; ctx.lineWidth = u * .08; ctx.beginPath(); ctx.moveTo(ex - hr * .13, ey); ctx.lineTo(ex + hr * .13, ey); ctx.stroke(); }
+      else { ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = u * .05; ctx.beginPath(); ctx.ellipse(ex, ey, hr * .16, hr * .19, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(ex + sx * hr * .03, ey + hr * .03, hr * .07, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = L.grey ? '#5a5552' : hair; ctx.lineWidth = u * .11; ctx.beginPath(); ctx.moveTo(ex - sx * hr * .16, ey - hr * .3 - e * hr * .06); ctx.lineTo(ex + sx * hr * .18, ey - hr * .33 - e * hr * .06); ctx.stroke();
+      ctx.strokeStyle = INK; ctx.lineWidth = u * .07;
+      if (L.glasses === 'rodones') { ctx.beginPath(); ctx.arc(ex, ey, hr * .27, 0, Math.PI * 2); ctx.stroke(); }
+      if (L.glasses === 'quadrades') { ctx.beginPath(); ctx.roundRect(ex - hr * .29, ey - hr * .22, hr * .58, hr * .44, hr * .08); ctx.stroke(); }
+    }
+    if (L.glasses) { ctx.beginPath(); ctx.moveTo(-hr * .08, hy - hr * .04); ctx.lineTo(hr * .08, hy - hr * .04); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(150, 70, 50, .35)'; ctx.beginPath(); ctx.ellipse(0, hy + hr * .2, hr * .13, hr * .1, 0, 0, Math.PI * 2); ctx.fill();
+    const blowing = row === 9 && e > .05, my = hy + hr * .48;
+    if (row !== 9) {
+      ctx.strokeStyle = INK; ctx.lineWidth = u * .07; ctx.beginPath();
+      if (e > .3) ctx.ellipse(0, my, hr * .14, hr * .11 * (1 + e), 0, 0, Math.PI * 2); else ctx.arc(0, my - hr * .08, hr * .2, Math.PI * .2, Math.PI * .8);
+      ctx.stroke();
+    }
+    if (L.face === 'bigoti') { ctx.fillStyle = L.grey ? '#77716c' : hair; ctx.beginPath(); ctx.ellipse(-hr * .17, hy + hr * .35, hr * .22, hr * .09, -.2, 0, Math.PI * 2); ctx.ellipse(hr * .17, hy + hr * .35, hr * .22, hr * .09, .2, 0, Math.PI * 2); ctx.fill(); }
+    if (L.face === 'perilla') { ctx.fillStyle = hair; ctx.beginPath(); ctx.moveTo(-hr * .2, hy + hr * .68); ctx.lineTo(hr * .2, hy + hr * .68); ctx.lineTo(0, hy + hr * .98); ctx.closePath(); ctx.fill(); }
+    if (row === 9) {
+      // El xiulet de samba (apito): broquet a la boca, cambra rodona amb l'escletxa a dalt i l'anella del cordó.
+      // Quan xiula, les galtes s'inflen i en surten ratlles de so.
+      if (blowing) { ctx.fillStyle = 'rgba(230, 110, 110, .45)'; for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * hr * .45, hy + hr * .38, hr * (.17 + e * .08), 0, Math.PI * 2); ctx.fill(); } }
+      ctx.save(); ctx.translate(0, my); ctx.scale(1.45, 1.45); ctx.translate(0, -my);
+      const wx = hr * .02, wy = my, metal = ctx.createLinearGradient(0, wy - hr * .25, 0, wy + hr * .25);
+      metal.addColorStop(0, '#f5f5f7'); metal.addColorStop(.5, '#b8bcc6'); metal.addColorStop(1, '#7d828e');
+      ctx.fillStyle = INK; ctx.beginPath(); ctx.ellipse(0, wy, hr * .12, hr * .09, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = metal; ctx.strokeStyle = INK; ctx.lineWidth = u * .05;
+      ctx.beginPath(); ctx.roundRect(wx, wy - hr * .09, hr * .42, hr * .18, hr * .04); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(wx + hr * .62, wy + hr * .03, hr * .24, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = INK; ctx.beginPath(); ctx.roundRect(wx + hr * .44, wy - hr * .22, hr * .16, hr * .08, hr * .02); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = u * .045; ctx.beginPath(); ctx.arc(wx + hr * .92, wy + hr * .03, hr * .07, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = '#e63946'; ctx.lineWidth = u * .06; ctx.beginPath(); ctx.moveTo(wx * 1.45 + hr * 1.42, wy + hr * .09);
+      ctx.quadraticCurveTo(hr * 1.2, top + u * .2, u * .15, top + u * .35); ctx.quadraticCurveTo(-hr * .6, top + u * .1, -hr * .7, hy + hr * .75); ctx.stroke();
+      if (blowing) { ctx.strokeStyle = `rgba(255, 255, 255, ${e})`; ctx.lineWidth = u * .07; for (const k of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(hr * 1.55, wy + k * hr * .25); ctx.lineTo(hr * (1.9 + e * .3), wy + k * hr * .45); ctx.stroke(); } }
+    }
+    return top - hr * 1.9;
+  }
+
+  const collaDesign = (name, look) => ({
+    name, ownNames: true,
+    draw(ctx, w, h, f, state) {
+      const s = Math.min(w, h), wide = w >= h, V = VARIANTS[look], st = state['colla-' + look] ??= { sway: 0, confetti: [] };
+      st.sway += f.dt * (1.2 + f.level * 3);
+      ctx.globalCompositeOperation = 'source-over';
+      const ground = h * (wide ? .42 : .45);
+      collaBackground(ctx, w, h, f, st, s, ground);
+      // Formació (de darrere a davant): les files es veuen escalonades perquè no es tapin, i la del davant deixa el
+      // centre lliure per al mestre.
+      const LINES = [[0, 1, 2, 11], [3, 4, 10, 5], [6, 7, 8], [9]];
+      const depth = wide ? [.5, .65, .8, .92] : [.46, .61, .76, .91], unit = s * (wide ? .041 : .054) / Math.max(1, V.body * .92);
+      const PLACE = wide ? [[.17, .39, .61, .83], [.07, .29, .71, .93], [.18, .34, .76], [.5]] : [[.14, .38, .62, .86], [.1, .3, .7, .9], [.13, .32, .8], [.55]];
+      const hitOf = row => f.hits.reduce((m, x) => x.row === row ? Math.max(m, 1 - x.age / .3) : m, 0);
+      const bubbles = [];
+      for (const [li, line] of LINES.entries()) for (const [pi, row] of line.entries()) {
+        const u = unit * (.82 + li * .1), e = Math.max(0, hitOf(row)), x = w * PLACE[li][pi], y = h * depth[li];
+        const bob = Math.sin(st.sway + row * 1.7) * u * .05 + e * u * .12;
+        ctx.save(); ctx.translate(x, y + bob);
+        const headTop = drawMusician(ctx, u, row, e, f, st, V);
+        ctx.restore();
+        // Nom de l'instrument, als peus (més viu quan sona).
+        ctx.font = `${Math.round(u * .42)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.lineWidth = u * .12; ctx.strokeStyle = INK; ctx.lineJoin = 'round'; ctx.strokeText(f.names[row] || '', x, y + u * .15);
+        ctx.fillStyle = e > 0 ? '#ffd23f' : '#fff8e7'; ctx.fillText(f.names[row] || '', x, y + u * .15);
+        if (e > 0) bubbles.push({ x: x + (x < w / 2 ? 1 : -1) * u * 1.2, y: y + headTop - u * .2, u, e, word: WORDS[row], row, side: x < w / 2 ? -1 : 1 });
+      }
+      // Bafarades al damunt de tothom: el so de cada cop, amb la cua cap a qui toca.
+      for (const b of bubbles) {
+        ctx.font = `${Math.round(b.u * (.62 + b.e * .15))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(b.word).width + b.u * .7, th = b.u * 1.05;
+        ctx.save(); ctx.translate(b.x, b.y - (1 - b.e) * b.u * .4); ctx.globalAlpha = Math.min(1, b.e * 2.5);
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = b.u * .08;
+          ctx.beginPath(); ctx.roundRect(-tw / 2, -th / 2, tw, th, th * .45);
+          ctx.moveTo(b.side * tw * .12, th / 2 - 1); ctx.lineTo(b.side * tw * .32, th / 2 + b.u * .55); ctx.lineTo(b.side * tw * .3 - b.side * b.u * .35, th / 2 - 1);
+          ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#fff'; ctx.fillRect(b.side * tw * .14 - b.u * .25, th / 2 - b.u * .1, b.u * .5, b.u * .14);
+        ctx.fillStyle = `hsl(${hueOf(b.row)}, 80%, 35%)`; ctx.fillText(b.word, 0, b.u * .03);
+        ctx.restore();
+      }
+    }
+  });
+
   // ── Dissenys ──────────────────────────────────────────────────────────
   // draw(ctx, w, h, frame, state): frame = { t, dt, bass, mid, high, level, hits: [{ row, age }] (cops dels últims 0,9 s),
   // fresh (els cops que acaben de començar en aquest fotograma), names };
   // state és la memòria entre fotogrames (cada disseny hi guarda la seva sota el seu nom).
   const DESIGNS = {
-    infinit: {
-      name: 'Infinit',
-      // Lemniscata de Bernoulli (∞): diverses cintes de colors que giren i bateguen amb els greus; cada cop
-      // d'instrument fa un esclat del seu color en el seu punt de la corba, que hi corre per sobre.
-      draw(ctx, w, h, f, state) {
-        // (En vertical, una mica més petit: les cintes no surten tant pels costats quan bateguen.)
-        const s = Math.min(w, h) * (w < h ? .86 : 1), cx = w / 2, cy = h / 2;
-        // Rastre: cada fotograma esborra una mica l'anterior (formes que no s'acaben mai).
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = `rgba(6, 4, 14, ${0.16 + 0.1 * (1 - f.level)})`;
-        ctx.fillRect(0, 0, w, h);
-        ctx.globalCompositeOperation = 'lighter';
-        const curve = (t, scale, twist) => {
-          const d = 1 + Math.sin(t) ** 2, x = Math.cos(t) / d, y = Math.sin(t) * Math.cos(t) / d;
-          const c = Math.cos(twist), sn = Math.sin(twist);
-          return [cx + scale * (x * c - y * sn), cy + scale * (x * sn + y * c)];
-        };
-        const layers = 7, pulse = 1 + f.bass * 0.35;
-        for (let k = 0; k < layers; k++) {
-          const scale = s * (0.36 + k * 0.022) * pulse, twist = f.t * (0.05 + k * 0.012) * (k % 2 ? -1 : 1);
-          const hue = (f.t * 24 + k * 34) % 360;
-          ctx.strokeStyle = `hsla(${hue}, 95%, ${48 + f.mid * 22}%, ${0.18 + f.level * 0.35})`;
-          ctx.lineWidth = s * (0.002 + f.mid * 0.006) * (1 + k * 0.15);
-          ctx.beginPath();
-          for (let i = 0; i <= 240; i++) {
-            const t = (i / 240) * Math.PI * 2, wobble = 1 + 0.06 * Math.sin(t * (3 + k) + f.t * 2) * (0.3 + f.high);
-            const [x, y] = curve(t, scale * wobble, twist);
-            if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-          }
-          ctx.stroke();
-        }
-        // Esclats: cada instrument té el seu lloc a la corba; el cop hi corre i s'esvaeix.
-        for (const hit of f.hits) {
-          const life = 1 - hit.age / 0.9;
-          if (life <= 0) continue;
-          const t = (hit.row / 12) * Math.PI * 2 + f.t * 0.6 + hit.age * 2.2;
-          const [x, y] = curve(t, s * 0.4 * pulse, f.t * 0.05);
-          const r = s * (0.015 + (1 - life) * 0.09);
-          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-          g.addColorStop(0, `hsla(${hueOf(hit.row)}, 100%, 70%, ${0.9 * life})`);
-          g.addColorStop(1, `hsla(${hueOf(hit.row)}, 100%, 50%, 0)`);
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-        }
-        // Espurnes dels aguts.
-        for (const p of state.sparks) {
-          p.x += p.vx * f.dt; p.y += p.vy * f.dt; p.life -= f.dt;
-          ctx.fillStyle = `hsla(${p.hue}, 100%, 75%, ${Math.max(0, p.life)})`;
-          ctx.fillRect(p.x, p.y, s * 0.004, s * 0.004);
-        }
-        state.sparks = state.sparks.filter(p => p.life > 0);
-        for (let i = 0; i < Math.round(f.high * 6); i++) {
-          const a = Math.random() * Math.PI * 2, v = s * (0.1 + Math.random() * 0.3);
-          state.sparks.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, hue: (f.t * 40 + Math.random() * 120) % 360 });
-        }
-      }
-    },
+    colla: collaDesign('La colla', 'colors'),
 
     tambors: {
       name: 'Tambors animats', ownNames: true,
@@ -458,7 +647,7 @@
     // Cops nous des del fotograma anterior (cadascun una sola vegada; si es torna enrere, es comença de nou).
     if (t + .02 < lastT - .05) lastT = t - 1 / 60;
     const fresh = hits.filter(hit => hit.at > lastT); lastT = Math.max(lastT, t + .02);
-    const design = DESIGNS[ui.design.value] || DESIGNS.infinit;
+    const design = DESIGNS[ui.design.value] || DESIGNS.colla;
     design.draw(sceneCtx, scene.width, scene.height, { t, dt, ...bands, hits, fresh, names: song.names }, state);
     ctx.globalCompositeOperation = 'copy'; ctx.drawImage(scene, 0, 0); ctx.globalCompositeOperation = 'source-over';
     overlay(canvas.width, canvas.height, hits, design);

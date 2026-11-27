@@ -329,3 +329,23 @@ body.vtc-open { overflow: hidden; }
 .opening-steps-list li::before { content: counter(step); position: absolute; left: 12px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--st); color: var(--st-text); font-weight: 800; display: grid; place-items: center; font-size: 13px; }
 .opening-steps-list label { display: grid; gap: 4px; font-weight: 700; font-size: 13px; }
 .opening-steps-list .opening-check { display: flex; font-weight: 500; }
+
+/* Batucada: Short, mode de l'inici (patrons o veu), gravació i volums. */
+.opening-short { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 18px; border: 1.5px solid var(--st); background: color-mix(in srgb, var(--st) 10%, var(--r-card)); cursor: pointer; }
+.opening-short input { width: 22px; height: 22px; accent-color: var(--st); flex-shrink: 0; }
+.opening-short span { display: grid; gap: 2px; }
+.opening-short small { color: var(--r-muted); }
+.opening-modes { display: flex; gap: 8px; flex-wrap: wrap; }
+.opening-modes label { display: flex; gap: 8px; align-items: center; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--r-line); cursor: pointer; font-weight: 700; }
+.opening-modes label:has(input:checked) { border-color: var(--st); background: color-mix(in srgb, var(--st) 14%, transparent); }
+.opening-modes input { accent-color: var(--st); }
+.opening-voice { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--r-line); border-radius: 16px; }
+.opening-voice[hidden], .opening-pattern-only[hidden] { display: none; }
+.opening-meter { flex: 1; min-width: 80px; height: 10px; border-radius: 99px; background: var(--r-card-2); overflow: hidden; }
+.opening-meter i { display: block; height: 100%; width: 0; background: var(--st); transition: width .08s linear; }
+#opening-record.recording { border-color: #f87171; color: #fecaca; }
+.opening-volumes { display: grid; gap: 10px; }
+.opening-volumes label { display: grid; grid-template-columns: 9em 1fr 6em; align-items: center; gap: 10px; font-weight: 700; font-size: 13px; }
+.opening-volumes output { color: var(--r-muted); font-weight: 600; }
+.opening-actions .primary:disabled { opacity: .45; }
+@media (max-width: 560px) { .opening-volumes label { grid-template-columns: 1fr auto; } .opening-volumes label input { grid-column: 1 / -1; grid-row: 2; } }

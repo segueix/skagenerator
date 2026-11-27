@@ -2001,12 +2001,19 @@
     // el seu ritme compàs a compàs (setze caixetes), xiulets del mestre curts o llargs on es vulgui, i,
     // si es vol, un redoble que creix a l'últim compàs. Després entra tota la batucada.
     const OPENING_ROLL = '1010101011111111';
+    // accents: força de cada cop (1 fluix, 2 normal, 3 fort), compàs a compàs com steps; level i whistleLevel:
+    // volum del timbal i del xiulet, de 1 (fluix) a 5 (molt fort). Fins a 8 compassos (una frase gravada amb la veu,
+    // repetida dues o tres vegades).
+    const VOLUME_LEVELS = [1, 2, 3, 4, 5];
+    const LEVEL_EXTRA = [-30, -16, 0, 10, 20], WHISTLE_VELOCITY = [60, 80, 100, 115, 127], ACCENT_EXTRA = { 1: -16, 2: 0, 3: 12 };
     function validBatucadaOpening(o) {
         return !!o && typeof o === 'object' && !Array.isArray(o)
-            && Object.keys(o).every(key => ['row', 'steps', 'whistles', 'roll'].includes(key))
+            && Object.keys(o).every(key => ['row', 'steps', 'whistles', 'roll', 'accents', 'level', 'whistleLevel'].includes(key))
             && Number.isInteger(o.row) && o.row >= 0 && o.row < BATUCADA.length && BATUCADA[o.row].note !== BATUCADA_WHISTLE.note
-            && Array.isArray(o.steps) && o.steps.length >= 1 && o.steps.length <= 4 && o.steps.every(row => typeof row === 'string' && /^[01]{16}$/.test(row))
-            && Array.isArray(o.whistles) && o.whistles.length <= 32 && o.whistles.every(w => Array.isArray(w) && w.length === 3 && Number.isInteger(w[0]) && w[0] >= 0 && w[0] < 4
+            && Array.isArray(o.steps) && o.steps.length >= 1 && o.steps.length <= 8 && o.steps.every(row => typeof row === 'string' && /^[01]{16}$/.test(row))
+            && (o.accents === undefined || Array.isArray(o.accents) && o.accents.length === o.steps.length && o.accents.every(row => typeof row === 'string' && /^[0-3]{16}$/.test(row)))
+            && (o.level === undefined || VOLUME_LEVELS.includes(o.level)) && (o.whistleLevel === undefined || VOLUME_LEVELS.includes(o.whistleLevel))
+            && Array.isArray(o.whistles) && o.whistles.length <= 32 && o.whistles.every(w => Array.isArray(w) && w.length === 3 && Number.isInteger(w[0]) && w[0] >= 0 && w[0] < 8
                 && Number.isInteger(w[1]) && w[1] >= 0 && w[1] < 16 && ['short', 'long'].includes(w[2]))
             && (o.roll === undefined || typeof o.roll === 'boolean');
     }
@@ -2082,6 +2089,7 @@
         // canvia de ritme, continua sonant com el Percudium.
         const sound = BATUCADA_FEEL[settings.batucadaRhythm] || style;
         if (settings.batucadaSurdo3 !== undefined && !SURDO3_MODES.includes(settings.batucadaSurdo3)) throw new Error('Surdo 3 no vàlid');
+        if (settings.batucadaWhistleLevel !== undefined && !VOLUME_LEVELS.includes(settings.batucadaWhistleLevel)) throw new Error('Volum del xiulet no vàlid');
         const improv = settings.batucadaSurdo3 === 'improv' && !fx.tutti;
         // Frase del surdo 3 per a cada compàs: canvia cada dos compassos (sense repetir la d'abans)
         // i acaba cada frase de quatre compassos amb un redoble. Fluix, frases més senzilles.
@@ -2303,12 +2311,15 @@
         // i els xiulets sonen on s'han posat (curts, 0,12 s; llargs, temps i mig). Amb redoble, l'últim compàs creix.
         const opening = (bar, last) => {
             const o = fx.opening, roll = last && o.roll, figure = roll ? OPENING_ROLL : o.steps[Math.min(bar, o.steps.length - 1)];
+            // (Força de cada cop: la triada —accents—, si n'hi ha; si no, l'accent de cada temps. Més el volum del timbal.)
+            const accents = !roll && o.accents?.[Math.min(bar, o.accents.length - 1)], level = LEVEL_EXTRA[(o.level ?? 3) - 1];
             for (let step = 0; step < 16; step++) {
                 if (figure[step] !== '1') continue;
                 const note = o.row === TABAL_ROW ? tabalNote(bar, step, figure) : undefined;
-                add(bar, step, o.row, roll ? step * 3 - 18 : step % 4 === 0 ? 4 : 0, false, [0], note);
+                const extra = roll ? step * 3 - 18 : accents ? ACCENT_EXTRA[accents[step]] ?? 0 : step % 4 === 0 ? 4 : 0;
+                add(bar, step, o.row, extra + level, false, [0], note);
             }
-            for (const [b, step, kind] of o.whistles) if (b === bar) blow(bar, step, kind === 'long' ? beat * 1.5 : .12, kind === 'long' ? 8 : 6);
+            for (const [b, step, kind] of o.whistles) if (b === bar) blow(bar, step, kind === 'long' ? beat * 1.5 : .12, 0, WHISTLE_VELOCITY[(o.whistleLevel ?? 4) - 1]);
         };
         const INTRO_FIGURES = { caixa: ['1111111111111111', '1111111111111111'], repique: ['1011011010110110', '1011011011111111'] };
         const solo = (bar, last) => {
@@ -2354,10 +2365,12 @@
         // · Aturada (cop de tots i silenci, o compàs de silenci) a mitja cançó: un sol xiulet llarg a la segona meitat
         //   del penúltim compàs, que s'acaba just abans del cop.
         const halt = !fading && type !== 'outro' && bars > 1 && ['break', 'stop', 'silence'].includes(ending);
+        // (Força: la del volum de xiulet de la cançó —batucadaWhistleLevel, de l'inici compost—; si no n'hi ha, al màxim.)
+        const loud = WHISTLE_VELOCITY[(settings.batucadaWhistleLevel ?? 5) - 1];
         if (fx.signal) {
             const at = Math.max(0, halt ? bars - 2 : bars - 1);
-            blow(at, 0, beat * 1.5, 0, 127); blow(at, 8, .14, 0, 127); blow(at, 12, .14, 0, 127);
-        } else if (halt) blow(bars - 2, 8, beat * 1.9, 0, 127);
+            blow(at, 0, beat * 1.5, 0, loud); blow(at, 8, .14, 0, loud); blow(at, 12, .14, 0, loud);
+        } else if (halt) blow(bars - 2, 8, beat * 1.9, 0, loud);
         return line;
     }
 
