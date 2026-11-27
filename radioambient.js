@@ -1817,7 +1817,13 @@
             { name: 'Steppers · bombo a negres', kick: [0, 1, 2, 3], snare: [2], rim: true, hat: 'offbeat' },
             { name: 'Rocksteady', kick: [0, 2.5], snare: [1, 3], rim: true, hat: 'eighths' },
             { name: 'Ska-punk', kick: [0, 1.5, 2, 3.5], snare: [1, 3], hat: 'eighths' },
-            { name: 'Doble temps', kick: [0, 1, 2, 3], snare: [.5, 1.5, 2.5, 3.5], hat: 'quarters' }
+            { name: 'Doble temps', kick: [0, 1, 2, 3], snare: [.5, 1.5, 2.5, 3.5], hat: 'quarters' },
+            // Ska jamaicà amb notes fantasma: la caixa als contratemps però, entremig, cops molt fluixos a les semicorxeres.
+            { name: 'Ska amb fantasmes', kick: [0, 2], snare: [1, 3], hat: 'offbeat', ghosts: [.75, 1.75, 2.25, 3.75] },
+            // Shuffle de swing (ska-swing): el ride fa el «ding, ding-a» del jazz i la caixa, fantasmes a les tresets.
+            { name: 'Shuffle de swing', kick: [0, 2], snare: [1, 3], hat: 'ride', ghosts: [.67, 2.67] },
+            // Rockers (reggae dels 70): bombo a l'u i al tres, aro al tres i charles a semicorxeres.
+            { name: 'Rockers', kick: [0, 2], snare: [2], rim: true, hat: 'sixteenths', ghosts: [1.5, 3.5] }
         ],
         punk: [
             { name: 'Punk directe', kick: [0, 2, 2.5], snare: [1, 3], hat: 'eighths' },
@@ -1843,7 +1849,7 @@
     const skaGuitar = ['Contratemps', 'Contratemps amb doble cop', 'Contratemps espaiat', 'Contratemps desplaçat', 'Contratemps sincopat'];
     const SONG_GROOVES = {
         ska: { drums: DRUM_GROOVES.ska.map(g => g.name), guitar: skaGuitar,
-            bass: ['Caminant', 'Dub espaiat', 'Octaves', 'Melòdic', 'Sincopat'] },
+            bass: ['Caminant', 'Dub espaiat', 'Octaves', 'Melòdic', 'Sincopat', 'Caminant de jazz', 'Rocksteady'] },
         punk: { drums: DRUM_GROOVES.punk.map(g => g.name),
             guitar: ['Corxeres', 'Cops i corxeres', 'Sincopat', 'Galop', 'Obert'],
             bass: ['Corxeres', 'Mig temps', 'Galop', 'Riff', 'Sincopat'] },
@@ -2520,6 +2526,8 @@
             if (!build) g.snare.forEach(t => {
                 if (t < fillFrom) (drop || quiet || g.rim) ? hit(b, t, 37, drop || quiet ? 80 : 94) : hit(b, t, 38, 106);
             });
+            // Notes fantasma a la caixa (cops molt fluixos entre els accents): el bateria no toca de manera mecànica.
+            if (!build && !drop && !quiet && g.ghosts) g.ghosts.forEach(t => { if (t < fillFrom) hit(b, t, 38, 34 + Math.round(vary(b * 7 + t * 4) * 10)); });
             const hat = build ? 'eighths' : drop ? 'quarters' : g.hat;
             const steps = hat === 'sixteenths' ? 16 : hat === 'quarters' ? 4 : 8;
             for (let k = 0; k < steps; k++) {
@@ -2529,6 +2537,8 @@
                 else if (hat === 'toms') hit(b, t, k % 4 === 3 ? 45 : 43, k % 2 ? 68 : 88);
                 else if (hat === 'tribal') { hit(b, t, 41, k % 2 ? 70 : 98); if (k === 3 || k === 7) hit(b, t, 45, 86); }
                 else if (hat === 'crash') hit(b, t, k % 2 ? 51 : 49, k % 2 ? 62 : 82);
+                // Ride de swing: negres («ding») i la tercera corxera de treset abans del 2 i del 4 («ding-a»).
+                else if (hat === 'ride') { if (k % 2 === 0) hit(b, t, 51, k % 4 === 2 ? 86 : 74); if (k === 1 || k === 5) hit(b, t + .17, 51, 58); }
                 else if (hat === 'offbeat') hit(b, t, k % 2 && big ? 46 : 42, k % 2 ? 84 : 48);
                 else hit(b, t, k === 7 && !quiet && !build ? 46 : 42, k % 2 ? 56 : 76);
             }
@@ -2592,7 +2602,7 @@
     // Tempo, tonalitats, ritmes, balanceig, sons, efectes i progressions pròpies.
     const SUBGENRES = {
         jamaican: { name: 'Ska jamaicà (anys 60)', style: 'ska', bpm: [110, 128], swing: .45, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major'], [7, 'major']],
-            groove: { drums: [0, 3], bass: [0, 3], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'growly', trombone: 'vsco' }, humanize: .65,
+            groove: { drums: [0, 3, 6], bass: [0, 3, 5], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { drums: 'club', bass: 'growly', trombone: 'vsco' }, humanize: .65,
             description: 'Jazz i rhythm and blues jamaicà: balanceig, kit de club de jazz, baix de dits greu, acords de setena i secció de vents fent el tema.',
             harmony: { major: {
                 verse: [['I', 'vi', 'ii7', 'V7'], ['I', 'IV', 'I', 'V7'], ['Imaj7', 'vi7', 'ii7', 'V7'], ['I', 'I7', 'IV', 'iv'], ['I', 'V7/ii', 'ii7', 'V7'], ['I', 'V7/vi', 'vi7', 'V7/V']],
@@ -2601,7 +2611,7 @@
                 // Solos sobre una base diferent del tema (com els Skatalites): vamp de ii–V i girs de jazz.
                 solo: [['ii7', 'V7', 'I', 'vi7'], ['iii7', 'VI7', 'ii7', 'V7'], ['I', 'V7/IV', 'IV', 'iv']] } } },
         rocksteady: { name: 'Rocksteady', style: 'ska', bpm: [100, 108], swing: .15, keys: [[9, 'minor'], [2, 'minor'], [7, 'minor'], [0, 'minor'], [0, 'major'], [5, 'major']],
-            groove: { drums: [1, 3], bass: [1, 3], guitar: [2] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { trumpet: 'muted', bass: 'finger', drums: 'lofi' }, humanize: .7,
+            groove: { drums: [1, 3, 8], bass: [1, 3, 6], guitar: [2] }, base: ['drums', 'bass', 'guitar', 'organ'], timbres: { trumpet: 'muted', bass: 'finger', drums: 'lofi' }, humanize: .7,
             description: 'Més lent i greu que l’ska: one drop, baix dub en primer pla, orgue de fons i vents amb sordina.',
             harmony: { minor: {
                 verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'iv', 'bVII', 'bIII'], ['i7', 'iv7', 'i7', 'v7'], ['i', 'iv', 'bVII', 'i'], ['i', 'bVII', 'iv', 'i']],
@@ -2609,7 +2619,7 @@
                 bridge: [['iv', 'i', 'bVI', 'V7']], solo: [['i', 'iv', 'bVII', 'bIII'], ['iv7', 'bVII', 'i7', 'i7']] },
               major: { verse: [['I', 'vi', 'IV', 'V'], ['I', 'iii', 'IV', 'V']], chorus: [['IV', 'I', 'V', 'vi']], bridge: [['vi', 'IV', 'ii', 'V7']] } } },
         twotone: { name: 'Ska 2-tone', style: 'ska', bpm: [132, 156], swing: 0, keys: [[0, 'major'], [7, 'major'], [5, 'major'], [10, 'major'], [9, 'minor'], [2, 'minor'], [7, 'minor']],
-            groove: { drums: [0, 4], bass: [0, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar'], timbres: {}, humanize: .5,
+            groove: { drums: [0, 4, 6], bass: [0, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar'], timbres: {}, humanize: .5,
             description: 'L’ska britànic de finals dels 70: més ràpid i nerviós, guitarra a contratemps, orgue i metalls amb riffs.',
             harmony: { major: {
                 verse: [['I', 'vi', 'IV', 'V'], ['I', 'IV', 'I', 'V'], ['I', 'V7/vi', 'vi', 'IV']],
@@ -2617,7 +2627,7 @@
                 prechorus: [['ii', 'V', 'ii', 'V']], bridge: [['ii', 'V', 'I', 'vi'], ['IV', 'iv', 'I', 'I']] },
               minor: { verse: [['i', 'bVII', 'bVI', 'V7'], ['i', 'iv', 'bVII', 'i']], chorus: [['bVI', 'bVII', 'i', 'i'], ['i', 'bIII', 'bVII', 'iv']], bridge: [['iv', 'V7', 'i', 'bVI']] } } },
         nutty: { name: 'Nutty sound (estil Madness)', style: 'ska', bpm: [126, 152], swing: 0, keys: [[0, 'major'], [5, 'major'], [7, 'major'], [10, 'major'], [2, 'minor'], [9, 'minor'], [0, 'minor']],
-            groove: { drums: [0, 2], bass: [0, 3, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'piano'], timbres: { drums: 'real', bass: 'finger' }, humanize: .55,
+            groove: { drums: [0, 2, 6], bass: [0, 3, 2], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'piano'], timbres: { drums: 'real', bass: 'finger' }, humanize: .55,
             description: 'El so «nutty» del Londres del 79: ska 2-tone amb piano de pub, saxo tenor al davant, acords de music-hall i aturades de tota la banda.',
             harmony: { major: {
                 verse: [['I', 'VI7', 'ii', 'V7'], ['I', 'iii', 'IV', 'V'], ['I', 'I7', 'IV', 'iv'], ['I', 'bVII', 'IV', 'I']],
@@ -2627,14 +2637,14 @@
                 verse: [['i', 'bVII', 'bVI', 'V7'], ['i', 'iv', 'i', 'V7'], ['i', 'bIII', 'iv', 'V7']],
                 chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'V7', 'i', 'bVI'], ['i', 'bVII', 'bIII', 'V7']], bridge: [['iv', 'bVII', 'bIII', 'V7']] } } },
         bossreggae: { name: 'Early reggae (boss reggae del 69)', style: 'ska', bpm: [100, 116], swing: .2, keys: [[0, 'major'], [5, 'major'], [7, 'major'], [10, 'major'], [9, 'minor'], [2, 'minor']],
-            groove: { drums: [1, 3, 2], bass: [1, 3], guitar: [1, 0] }, base: ['drums', 'bass', 'guitar', 'organ', 'piano'], timbres: { drums: 'club', bass: 'finger', trumpet: 'muted' }, humanize: .65,
+            groove: { drums: [1, 3, 2, 8], bass: [1, 3, 6], guitar: [1, 0] }, base: ['drums', 'bass', 'guitar', 'organ', 'piano'], timbres: { drums: 'club', bass: 'finger', trumpet: 'muted' }, humanize: .65,
             description: 'El reggae primerenc dels sound systems del 69: més lent, orgue «bubble» fent de motor, piano i guitarra a contratemps i baix melòdic en primer pla.',
             harmony: { major: {
                 verse: [['I', 'IV', 'I', 'IV'], ['I', 'V', 'I', 'V'], ['I', 'ii', 'I', 'ii'], ['I', 'bVII', 'I', 'bVII']],
                 chorus: [['IV', 'V', 'I', 'I'], ['I', 'IV', 'V', 'IV'], ['IV', 'I', 'V', 'I']], bridge: [['vi', 'IV', 'vi', 'V']] },
               minor: { verse: [['i', 'iv', 'i', 'iv'], ['i', 'bVII', 'i', 'bVII']], chorus: [['bVI', 'bVII', 'i', 'i'], ['iv', 'i', 'bVII', 'i']], bridge: [['iv', 'iv', 'V7', 'V7']] } } },
         skaswing: { name: 'Ska-swing (jump blues)', style: 'ska', bpm: [150, 176], swing: .55, keys: [[5, 'major'], [10, 'major'], [3, 'major'], [0, 'major'], [7, 'major'], [7, 'minor'], [2, 'minor']],
-            groove: { drums: [0], bass: [0], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'piano'], timbres: { drums: 'jazz', bass: 'finger', trombone: 'vsco' }, humanize: .6, countIn: true,
+            groove: { drums: [0, 7], bass: [0, 5], guitar: [0, 1] }, base: ['drums', 'bass', 'guitar', 'piano'], timbres: { drums: 'jazz', bass: 'finger', trombone: 'vsco' }, humanize: .6, countIn: true,
             description: 'Ska a ritme de swing: balanceig marcat, baix caminant, piano de boogie i tota la secció de vents fent riffs de big band.',
             harmony: { major: {
                 verse: [['I', 'VI7', 'II7', 'V7'], ['I', 'I7', 'IV', 'iv'], ['I', 'IV', 'I', 'V7'], ['I', 'vi7', 'ii7', 'V7'], ['I', 'V7/IV', 'IV', 'V7/V']],
@@ -3412,7 +3422,11 @@
         if (palette) {
             // (Harmonia v2: la cançó tria la seva progressió de cada tipus de secció a partir de la llavor, no només
             // de la versió: amb més progressions, cada cançó en fa servir unes altres.)
-            const songPick = harmonyVersion >= 2 ? (Math.imul((settings.seed >>> 0) ^ 0x9e3779b9, family + 1) >>> 7) : 0;
+            let songPick = 0;
+            if (harmonyVersion >= 2) {
+                let h = Math.imul((settings.seed >>> 0) ^ Math.imul(family + 1, 0x27d4eb2d), 0x85ebca6b); h ^= h >>> 13;
+                h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; songPick = h >>> 0;
+            }
             // Blues de 12 compassos (secció «blues»): al jamaicà, l'ska-swing i el nutty, el blues de jazz (amb el IV al
             // segon compàs, el VI7 i el gir ii–V); als altres, el blues de sempre. En menor, el blues menor.
             const jazzy = ['jamaican', 'skaswing', 'nutty'].includes(settings.subgenre);
@@ -3602,6 +3616,16 @@
             [[0,'root',.65,1.19],[.75,'root',.48,.93],[1.5,'fifth',.42,1.01],
              [2,'root',.66,1.13],[2.75,'octave',.4,1.02],[3.25,'approach',.5,1.12]]
         ];
+        // Ska: baix caminant de jazz (6a línia, una nota per temps que camina per l'escala i els acords cap a la fonamental
+        // del compàs següent, tres maneres que s'alternen) i baix de rocksteady (7a: nota llarga a l'u, espai i una frase
+        // curta al final del compàs).
+        if (settings.style === 'ska') bassPatterns.push(
+            'walk',
+            [[0,'root',1.6,1.22],[2.5,'fifth',.4,.92],[3,'octave',.45,1.02],[3.5,'approach',.4,1.06]]);
+        const WALKS = [[[0,'root',.85,1.15],[1,'third',.8,.98],[2,'fifth',.8,1.05],[3,'approach',.75,1.04]],
+            [[0,'root',.85,1.15],[1,'step',.8,.96],[2,'third',.8,1.04],[3,'approach',.75,1.04]],
+            [[0,'root',.85,1.15],[1,'fifth',.8,.98],[2,'sixth',.8,1.02],[3,'approach',.75,1.05]]];
+        const scale = SCALES[mode].map(n => (tonic + n) % 12);
         const classic = settings.style === 'urban' ? bassPatterns[0] : settings.style === 'punk'
             ? [[0,'root',.42,1.1],[.5,'root',.42,.9],[1,'root',.42,1.05],[1.5,'root',.42,.9],
                [2,'root',.42,1.08],[2.5,'root',.42,.9],[3,'root',.42,1.08],[3.5,'root',.42,.9]]
@@ -3613,14 +3637,17 @@
             const root = part.pedal ? chord.root - ((((chord.root - tonic) % 12) + 18) % 12 - 6) : chord.root;
             const tones = { root, third: nearestTone(root+4,chord.pcs,root,root+12),
                 fifth: nearestTone(root+7,chord.pcs,root,root+12), octave: root+12,
-                approach: next===root ? root+7 : next+(next>root ? -1 : 1) };
+                approach: next===root ? root+7 : next+(next>root ? -1 : 1),
+                // (Baix caminant: el grau de l'escala de sobre la fonamental i la sexta.)
+                step: nearestTone(root+2,scale,root+1,root+3), sixth: nearestTone(root+9,scale,root+8,root+10) };
             const pattern = part.type==='outro' && b===bars-1 && part.closing !== 'fade'
-                ? [[0,'root',3.3,1.18]] : groove.bass>=0 ? bassPatterns[groove.bass] : classic;
+                ? [[0,'root',3.3,1.18]] : groove.bass>=0 ? (bassPatterns[groove.bass] === 'walk' ? WALKS[(b + (seed % 3)) % 3] : bassPatterns[groove.bass]) : classic;
             // (Acord partit: a la segona meitat del compàs, les notes de l'acord nou; i la nota d'aproximació, cap al
             // compàs següent.)
             const half = chord.half, halfRoot = half ? root + ((((half.root - root) % 12) + 18) % 12 - 6) : null;
             const halfTones = half ? { root: halfRoot, third: nearestTone(halfRoot+4,half.pcs,halfRoot,halfRoot+12), fifth: nearestTone(halfRoot+7,half.pcs,halfRoot,halfRoot+12),
-                octave: halfRoot+12, approach: (() => { const n = chords[(b+1)%bars].root; return n===halfRoot ? halfRoot+7 : n+(n>halfRoot ? -1 : 1); })() } : null;
+                octave: halfRoot+12, approach: (() => { const n = chords[(b+1)%bars].root; return n===halfRoot ? halfRoot+7 : n+(n>halfRoot ? -1 : 1); })(),
+                step: nearestTone(halfRoot+2,scale,halfRoot+1,halfRoot+3), sixth: nearestTone(halfRoot+9,scale,halfRoot+8,halfRoot+10) } : null;
             for (const [at,tone,length,strength] of pattern)
                 bassLine.push([b,at,(halfTones && at >= 2 ? halfTones : tones)[tone],Math.min(length,(halfTones && at < 2 ? 2 : 4)-at),strength]);
             // Punk: quan canvia l'acord, l'última nota del compàs (tres de cada quatre vegades) és una

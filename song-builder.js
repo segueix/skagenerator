@@ -391,8 +391,8 @@
         r(); r(); // abans es feien tres tirades (una per família): la resta de la cançó no canvia
         return { drums, bass, guitar };
       })();
-    // (harmony: 2, harmonia v2: més progressions, acords partits i girs de final de frase; vegeu radioambient.js.)
-    const settings = { style: sg.style, subgenre: key, harmony: 2, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
+    // (Ska: harmony 2, harmonia v2: més progressions, acords partits i girs de final de frase; vegeu radioambient.js.)
+    const settings = { style: sg.style, subgenre: key, ...(sg.style === 'ska' ? { harmony: 2 } : {}), bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
     // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
@@ -1483,7 +1483,7 @@
     return recent.slice(0, 12).reduce((total, other, i) => {
       if (!other) return total;
       const sameSub = print.subgenre && print.subgenre === other.subgenre;
-      const score = 3 * same(print.riff, other.riff) + same(print.key, other.key) + (Math.abs((print.bpm || 0) - (other.bpm || 0)) <= 4 ? .5 : 0)
+      const score = 5 * same(print.riff, other.riff) + same(print.key, other.key) + (Math.abs((print.bpm || 0) - (other.bpm || 0)) <= 4 ? .5 : 0)
         + .4 * same(print.drums, other.drums) + .4 * same(print.bass, other.bass) + .3 * same(print.guitar, other.guitar)
         + (sameSub ? .7 * same(print.verse, other.verse) + .9 * same(print.chorus, other.chorus) : 0)
         + .3 * same(print.opening, other.opening) + .3 * same(print.closing, other.closing);
