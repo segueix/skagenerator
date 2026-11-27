@@ -24,11 +24,11 @@ test('els reguladors generals arriben als dos tipus de bateria i baix sense afec
 });
 test('el banc conté les mostres enregistrades dels instruments i els tres kits requerits', () => {
   assert(raw.byteLength > 1000000 && raw.byteLength < 40 * 1024 * 1024);
-  assert.equal(bank.presets.length, 37);
+  assert.equal(bank.presets.length, 38);
   for (const program of [53, 73, 79]) assert(bank.presets.some(p => p.bankMSB === 0 && p.program === program), `veu GM ${program}`);
   assert(bank.presets.some(p => p.bankMSB === 2 && p.program === 71), 'clarinet gravat');
-  // Instruments gravats: VSCO 2 CE (banc 2 i staccato al 3), la trompeta 2 i el trombó 2 (banc 5), FreePats (banc 2) i el kit Muldjord (64).
-  for (const [bankMSB, program] of [[2, 16], [2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57], [5, 56], [5, 57]])
+  // Instruments gravats: VSCO 2 CE (banc 2 i staccato al 3), la trompeta 2, el trombó 2 i el trombó legato (banc 5), FreePats (banc 2) i el kit Muldjord (64).
+  for (const [bankMSB, program] of [[2, 16], [2, 27], [2, 33], [2, 34], [2, 56], [2, 57], [2, 66], [3, 56], [3, 57], [5, 56], [5, 57], [5, 58]])
     assert(bank.presets.some(p => p.bankMSB === bankMSB && p.program === program && !p.isGMGSDrum), `${bankMSB}:${program}`);
   assert(bank.presets.some(p => p.program === 69 && p.isGMGSDrum));
   for (const program of [16, 27, 28, 29, 30, 33, 34, 38, 56, 57, 59, 66, 81, 89]) assert(bank.presets.some(p => p.program === program && !p.isGMGSDrum));

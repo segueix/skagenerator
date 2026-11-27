@@ -126,6 +126,10 @@ function createPerformance(spec) {
   // la línia de la trompeta amb notes de l'acord, una octava avall (com quan no té línia pròpia).
   // Les gravacions del segon trombó van del Do3 al Do4: les notes de més amunt del Sol4 les toca una octava avall.
   const TB3 = PIANO + 10, TROMBONE3 = [5, 57];
+  // Trombó legato gravat (banc 5, programa 58): les notes lligades del trombó principal (sense cop de llengua) les toca
+  // aquest canal, amb mostres tretes d'un passatge legato; les altres notes, les de sempre. Només amb el so per defecte.
+  const TBL = PIANO + 11, LEGATO = {};
+  if (has('trombone') && !chosen('trombone')) { channels.push(patch(TBL, [5, 58], 79, 112)); instrumentOf[TBL] = 'trombone'; LEGATO[4] = TBL; }
   const third = pitch => pitch > 74 ? pitch - 12 : pitch;
   const unisonPitch = (channel, pitch) => channel === 3 ? third(pitch) : pitch > 67 ? pitch - 12 : pitch < 40 ? pitch + 12 : pitch;
   if (spec.style === 'ska') {
@@ -237,12 +241,12 @@ function createPerformance(spec) {
   // secció real. Comparteixen la deriva i la variació de cada cop (una per moment de la partitura);
   // cada músic només hi afegeix ±2 ms propis. Abans cada vent i cada canal d'staccato derivava per
   // separat i els cops del riff sortien desajustats fins a 26 ms.
-  const HORNS = new Set([3, 4, 8, 12, 13, T2, B2, S2, T2S, B2S, T3, TB3]), sectionHit = new Map();
+  const HORNS = new Set([3, 4, 8, 12, 13, T2, B2, S2, T2S, B2S, T3, TB3, TBL]), sectionHit = new Map();
   // Ska: cada músic de la secció té el seu lloc. La trompeta mana, el saxo va un pèl darrere i el
   // trombó (més greu i lent de resposta) una mica més; i cap no està afinat exactament igual
   // (uns pocs cents amunt o avall, en unitats de pitch bend: 41 ≈ 1 cent). Això fa el so de secció.
-  const HORN_SEAT = punk ? {} : { 3: 0, 12: 0, 8: 3, 4: 5, 13: 5, [T2]: 2, [T2S]: 2, [S2]: 4, [B2]: 7, [B2S]: 7, [T3]: 3, [TB3]: 6 };
-  const HORN_TUNE = punk || !human ? {} : { 3: 100, 12: 100, 8: 170, 4: -140, 13: -140, [T2]: -120, [T2S]: -120, [S2]: -150, [B2]: 110, [B2S]: 110, [T3]: -60, [TB3]: 70 };
+  const HORN_SEAT = punk ? {} : { 3: 0, 12: 0, 8: 3, 4: 5, 13: 5, [T2]: 2, [T2S]: 2, [S2]: 4, [B2]: 7, [B2S]: 7, [T3]: 3, [TB3]: 6, [TBL]: 5 };
+  const HORN_TUNE = punk || !human ? {} : { 3: 100, 12: 100, 8: 170, 4: -140, 13: -140, [T2]: -120, [T2S]: -120, [S2]: -150, [B2]: 110, [B2S]: 110, [T3]: -60, [TB3]: 70, [TBL]: -140 };
   // Atzar propi per al rasgueig i les caigudes: no altera la resta de la interpretació.
   const extraRandom = rng(seedBase * 71 + 5);
   function hornJitter(start) {
@@ -329,6 +333,8 @@ function createPerformance(spec) {
   function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false, connectedBefore = false, endsPhrase = false) {
     // Només els accents curts separats fan servir les mostres de staccato.
     if (realBrass[channel] && STACCATO[channel] !== undefined && duration < .3 && !connected) channel = STACCATO[channel];
+    // Nota lligada del trombó: les mostres legato (l'atac d'una nota lligada de debò).
+    if (slurred && LEGATO[channel] !== undefined) channel = LEGATO[channel];
     const at = Math.max(0, start), long = duration > beat * .9, center = 8192 + (HORN_TUNE[channel] || 0);
     // Nota lligada a l'anterior: atac suau (CC73, uns 30 ms) perquè no se senti el cop de llengua
     // de la mostra gravada; la resta de notes, atac natural.

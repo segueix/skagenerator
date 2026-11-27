@@ -209,6 +209,22 @@
         { "key": 59, "file": "trombo2-59.wav", "cents": -8 },
         { "key": 60, "file": "trombo2-60.wav", "cents": -3 }
       ]
+    },
+    {
+      "name": "Trombó legato (gravat)",
+      "about": "Cinc notes de trombó tocades lligades (Do3–Do4) aportades pel propietari del projecte: vegeu audio/samples/trombo-legato/FONT.txt. Les toca el trombó principal a les notes lligades (sense cop de llengua). «cents» és la desafinació mesurada de cada nota, que el build corregeix.",
+      "bank": 5,
+      "program": 58,
+      "directory": "audio/samples/trombo-legato/",
+      "release": 0.16,
+      "levelDb": -12,
+      "notes": [
+        { "key": 48, "file": "trombo-legato-48.wav", "cents": 20 },
+        { "key": 52, "file": "trombo-legato-52.wav", "cents": 28 },
+        { "key": 53, "file": "trombo-legato-53.wav", "cents": 16 },
+        { "key": 57, "file": "trombo-legato-57.wav", "cents": 1 },
+        { "key": 60, "file": "trombo-legato-60.wav", "cents": 12 }
+      ]
     }
   ],
   "freepats": [

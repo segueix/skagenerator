@@ -72,3 +72,18 @@ test('mà dreta de l\'ska: cops secs, oberts i apagats que es repeteixen cada qu
   for (const bar of [3, 7]) { assert(lastHit(verse, bar) < .1, `apagat ${bar}`); assert(lastHit(chorus, bar) > .3, `obert ${bar}`); }
   for (const bar of [0, 4]) assert(lastHit(verse, bar) > .1 && lastHit(verse, bar) < .3, `sec ${bar}`);
 });
+
+test('trombó legato gravat: les notes lligades (sense cop de llengua) les toca el canal legato', () => {
+  const real = require('../real-instruments.json').localHorns.find(h => h.program === 58);
+  assert.deepEqual([real.bank, real.program], [5, 58]);
+  for (const n of real.notes) assert(require('node:fs').existsSync(require('node:path').join(__dirname, '..', real.directory, n.file)), n.file);
+  const spec = engine.composeSongPart({ ...settings, instruments: ['trombone'] }, { type: 'chorus', bars: 2, energy: 80, revision: 1, layers: { trombone: 3 } });
+  // Do–re–mi lligades, després do–do (repetida: es torna a picar) i una nota separada.
+  spec.lines.trombone = [[0, 0, 60, 1], [0, 1, 62, 1], [0, 2, 64, 1], [0, 3, 64, 1], [1, 1, 67, 1]];
+  const perf = createPerformance(spec), legato = perf.channels.find(p => p.bank === 5 && p.program === 58).channel;
+  const on = perf.events.filter(e => e.type === 'on' && [4, 13, legato].includes(e.channel)).sort((a, b) => a.time - b.time);
+  assert.deepEqual(on.map(e => e.channel === legato), [false, true, true, false, false], 'lligades al legato; la primera, la repetida i la separada, amb llengua');
+  // Amb un altre so de trombó triat, no hi ha canal legato.
+  const other = engine.composeSongPart({ ...settings, instruments: ['trombone'], timbres: { trombone: 'vsco' } }, { type: 'chorus', bars: 2, energy: 80, revision: 1, layers: { trombone: 3 } });
+  assert(!createPerformance(other).channels.some(p => p.bank === 5 && p.program === 58));
+});

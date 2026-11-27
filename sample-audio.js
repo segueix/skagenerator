@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const base = document.currentScript.src;
-  const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.5-trombo2', base).href;
+  const bankURL = new URL('assets/generaluser-ska-punk.sf2?v=2.0.6-trombo-legato', base).href;
   // Bateries, baixos i piano gravats addicionals: fitxer a part que només es baixa si cal.
   const extraURL = new URL('assets/extra-instruments.sf2?v=20261111-extra', base).href;
   const EXTRA = { drums: ['rusty', 'club', 'lofi', 'surdo3', 'batucada'], bass: ['growly'] };
