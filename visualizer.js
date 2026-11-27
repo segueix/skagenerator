@@ -7,6 +7,16 @@
   // Dissenys: cada un és una funció que dibuixa un fotograma; se n'hi poden afegir més a DESIGNS.
   const PROJECT = 'VaTuCalla!';
   const FORMATS = { landscape: [1920, 1080, 'Horitzontal 16:9'], portrait: [1080, 1920, 'Vertical 9:16'], square: [1080, 1080, 'Quadrat 1:1'] };
+  // Qualitat (compressió) del vídeo: resolució (escala del format) i bits per segon de vídeo i d'àudio.
+  // A 10 Mb/s una Short d'un minut i mig feia més de 100 MB; per enviar-la per WhatsApp, «WhatsApp» o «Mínima».
+  const QUALITIES = {
+    alta: { name: 'Alta', scale: 1, video: 10_000_000, audio: 256_000 },
+    mitjana: { name: 'Mitjana', scale: 1, video: 3_000_000, audio: 160_000 },
+    whatsapp: { name: 'WhatsApp', scale: 2 / 3, video: 1_200_000, audio: 128_000 },
+    minima: { name: 'Mínima', scale: 4 / 9, video: 550_000, audio: 96_000 }
+  };
+  // Mida aproximada (MB) de cada minut de vídeo.
+  const mbPerMinute = q => (q.video + q.audio) / 8 * 60 / 1e6;
   const FONT = '"Archivo Black", "Manrope", system-ui, sans-serif';
   // Color de cada instrument (to HSL), en l'ordre de la graella de la batucada.
   const hueOf = row => (row * 137.5 + 20) % 360;
@@ -523,6 +533,8 @@
     ui.design.setAttribute('aria-label', 'Disseny');
     ui.format = $('select', { className: 'vtc-select' }, ...Object.entries(FORMATS).map(([key, [, , name]]) => new Option(name, key)));
     ui.format.setAttribute('aria-label', 'Format del vídeo');
+    ui.quality = $('select', { className: 'vtc-select' }, ...Object.entries(QUALITIES).map(([key, q]) => new Option(`${q.name} (≈ ${Math.round(mbPerMinute(q))} MB/min)`, key)));
+    ui.quality.setAttribute('aria-label', 'Qualitat i mida del vídeo');
     ui.play = $('button', { className: 'vtc-btn', type: 'button', textContent: '▶' });
     ui.play.setAttribute('aria-label', 'Reprodueix');
     ui.restart = $('button', { className: 'vtc-btn', type: 'button', textContent: '⏮' });
@@ -534,7 +546,7 @@
     ui.close.setAttribute('aria-label', 'Tanca el visualitzador');
     ui.time = $('span', { className: 'vtc-time', textContent: '0:00' });
     ui.status = $('p', { className: 'vtc-status', role: 'status' });
-    ui.bar = $('div', { className: 'vtc-bar' }, ui.title, ui.design, ui.format, ui.restart, ui.play, ui.time, ui.record, ui.full, ui.close);
+    ui.bar = $('div', { className: 'vtc-bar' }, ui.title, ui.design, ui.format, ui.quality, ui.restart, ui.play, ui.time, ui.record, ui.full, ui.close);
     root.append(canvas, ui.bar, ui.status);
     document.body.append(root);
     ui.play.addEventListener('click', () => (playing ? pause() : play()));
@@ -544,6 +556,9 @@
     // Format: el darrer triat o, la primera vegada, el de la pantalla (vertical al mòbil).
     ui.format.value = FORMATS[store.get('vatucalla-format')] ? store.get('vatucalla-format') : innerHeight > innerWidth ? 'portrait' : 'landscape';
     ui.format.addEventListener('change', () => { store.set('vatucalla-format', ui.format.value); if (!recorder) resize(); });
+    // Qualitat: la darrera triada (per defecte, mitjana); mostra quant ocuparà la cançó sencera.
+    ui.quality.value = QUALITIES[store.get('vatucalla-quality')] ? store.get('vatucalla-quality') : 'mitjana';
+    ui.quality.addEventListener('change', () => { store.set('vatucalla-quality', ui.quality.value); if (!recorder) { resize(); sizeHint(); } });
     // Disseny: el darrer triat; en canviar-lo, comença net (cada disseny té el seu estat).
     if (DESIGNS[store.get('vatucalla-design')]) ui.design.value = store.get('vatucalla-design');
     ui.design.addEventListener('change', () => { store.set('vatucalla-design', ui.design.value); resetState(); resize(); });
@@ -563,10 +578,18 @@
     hideTimer = setTimeout(() => { if (playing && document.activeElement !== ui.title) root.classList.add('vtc-idle'); }, 2500);
   }
   function resize() {
-    const [w, h] = FORMATS[ui.format.value];
+    // (La resolució del llenç és la de la qualitat triada: menys píxels, vídeo més lleuger.)
+    const scale = QUALITIES[ui.quality.value]?.scale ?? 1, [w, h] = FORMATS[ui.format.value].slice(0, 2).map(n => Math.round(n * scale / 2) * 2);
     canvas.width = w; canvas.height = h;
     scene ??= document.createElement('canvas'); scene.width = w; scene.height = h; sceneCtx = scene.getContext('2d');
     sceneCtx.fillStyle = '#06040e'; sceneCtx.fillRect(0, 0, w, h);
+  }
+
+  // Quant ocuparà el vídeo de la cançó sencera amb la qualitat triada.
+  function sizeHint() {
+    if (!buffer || recorder) return;
+    const q = QUALITIES[ui.quality.value] || QUALITIES.mitjana, mb = mbPerMinute(q) * buffer.duration / 60;
+    ui.status.textContent = `Vídeo de tota la cançó: ≈ ${mb < 10 ? mb.toFixed(1).replace('.', ',') : Math.round(mb)} MB (qualitat ${q.name.toLowerCase()}).`;
   }
 
   // ── So: la cançó, l'analitzador i la sortida per a la gravació ────────
@@ -666,22 +689,24 @@
     stopSource(); offset = 0; resize(); resetState();
     const stream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...recordDest.stream.getAudioTracks()]);
     const chunks = [];
-    recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 10_000_000, audioBitsPerSecond: 256_000 });
+    const quality = QUALITIES[ui.quality.value] || QUALITIES.mitjana;
+    recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: quality.video, audioBitsPerSecond: quality.audio });
     recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
       const keep = recorder?.keep; recorder = null;
-      ui.record.textContent = '● Grava vídeo'; ui.format.disabled = ui.design.disabled = false;
+      ui.record.textContent = '● Grava vídeo'; ui.format.disabled = ui.design.disabled = ui.quality.disabled = false;
       if (!keep) { ui.status.textContent = 'Gravació cancel·lada.'; return; }
       const ext = type.startsWith('video/mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type: type.split(';')[0] });
       const name = `${(ui.title.value.trim() || 'batucada').replace(/[^\p{L}\p{N} _-]+/gu, '').trim() || 'batucada'} - ${PROJECT.replace('!', '')}.${ext}`;
       const link = $('a', { href: URL.createObjectURL(blob), download: name });
       document.body.append(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(link.href), 60000);
-      ui.status.textContent = ext === 'mp4' ? `Vídeo desat: ${name}` : `Vídeo desat en WebM (aquest navegador no grava MP4): ${name}`;
+      const size = `${(blob.size / 1e6).toFixed(1).replace('.', ',')} MB`;
+      ui.status.textContent = ext === 'mp4' ? `Vídeo desat: ${name} (${size})` : `Vídeo desat en WebM (aquest navegador no grava MP4): ${name} (${size})`;
     };
     recorder.keep = false;
     recorder.start(1000);
-    ui.record.textContent = '■ Atura i desa'; ui.format.disabled = ui.design.disabled = true;
+    ui.record.textContent = '■ Atura i desa'; ui.format.disabled = ui.design.disabled = ui.quality.disabled = true;
     play();
   }
   // Atura la gravació i desa el vídeo (al final de la cançó o amb el botó); en tancar, es cancel·la.
@@ -709,7 +734,7 @@
     song = { id: input.id, hits: input.hits || [], names: input.names || [] };
     ui.title.value = store.get(`vatucalla-title-${input.id}`) ?? input.title ?? '';
     resize();
-    ui.status.textContent = '';
+    sizeHint();
     if (!frame) frame = requestAnimationFrame(draw);
     root.focus?.();
     root.requestFullscreen?.().catch(() => {});
