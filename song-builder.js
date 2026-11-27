@@ -171,7 +171,8 @@
     // El cop final és el final natural: un final especial només si val més que ell.
     if (closing && closeValue > (fit.close.hit || 0)) candidates.push({ kind: 'closing', name: closing, value: closeValue });
     // Silenci abans de l'última tornada (més valuós després d'un pont o un solo) i aturada abans d'una tornada anterior.
-    const before = sections.map((sec, i) => sections[i + 1]?.type === 'chorus' && sec !== first && sec.bars >= 2 ? sec : null).filter(Boolean);
+    // (No abans d'un tag: el tag és la tornada curta que continua l'última, sense silenci entremig.)
+    const before = sections.map((sec, i) => sections[i + 1]?.type === 'chorus' && !sections[i + 1].tag && sec !== first && sec.bars >= 2 ? sec : null).filter(Boolean);
     const choruses = sections.filter(s => s.type === 'chorus').length;
     if (before.length) {
       const target = before.at(-1);
@@ -293,7 +294,8 @@
       hit: () => true,
       fadeout: () => { last.fade = 'out'; if (outro) last.closing = 'fade'; return true; },
       cold: () => outro && (last.closing = 'cold', true),
-      ritard: () => !last.bpm && (last.bpm = Math.max(40, Math.round(st.bpm * .93)), true),
+      // (Arrodonit cap al tempo de la cançó: el canvi no passa mai del 7 %.)
+      ritard: () => !last.bpm && (last.bpm = Math.max(40, Math.ceil(st.bpm * .93)), true),
       ring: () => outro && last.bars >= 2 && (last.closing = 'ring', true),
       breakdown: () => {
         // Primer callen les capes de dalt, després la guitarra i el baix; la bateria fa el cop final.
@@ -389,7 +391,8 @@
         r(); r(); // abans es feien tres tirades (una per família): la resta de la cançó no canvia
         return { drums, bass, guitar };
       })();
-    const settings = { style: sg.style, subgenre: key, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
+    // (harmony: 2, harmonia v2: més progressions, acords partits i girs de final de frase; vegeu radioambient.js.)
+    const settings = { style: sg.style, subgenre: key, harmony: 2, bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
     // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
@@ -429,7 +432,7 @@
     // s'acosta a la durada demanada i s'assembla menys a les estructures de les últimes cançons.
     const target = minutes * 60;
     const form = sheet.length ? { plan: lyricsPlan(engine, sheet, { bpm, target, punk }), penalty: 0 }
-      : chooseForm({ key, style: sg.style, bpm, target, r, recent: options.recent || [], vary: options.vary !== false });
+      : chooseForm({ key, style: sg.style, bpm, target, r, recent: options.recent || [], vary: options.vary !== false, vocal });
     let plan = form.plan;
     const formPenalty = form.penalty;
     // Sense veu, sempre hi ha com a mínim un solo: el pont passa a ser-ho o se n'afegeix un.
@@ -457,7 +460,12 @@
       // Pont trencat («breakdown»): bateria i baix a mig temps, pesant. Riff: interludi curt amb el riff de la cançó.
       if (role === 'breakdown') { sec.feel = { drums: .5, bass: .5 }; sec.energy = 80; }
       if (role === 'riff') sec.energy = 85;
-      if (role) roles.set(sec, role);
+      // Dub: bateria i baix sols (la resta de la banda calla), més fluix; blues: 12 compassos amb els acords del blues;
+      // tag: la tornada curta que es repeteix abans del final, amb força.
+      if (role === 'dub') { sec.mute = ['guitar', 'guitar2', 'guitar3', 'organ', 'piano', 'trumpet', 'trombone', 'sax', 'vocal', 'synthPad', 'synthLead']; sec.energy = 50; }
+      if (role === 'blues') sec.form = 'blues';
+      if (role === 'tag') { sec.energy = 96; sec.tag = true; }
+      if (role && role !== 'blues') roles.set(sec, role);
       if (words) sec.lyrics = words;
       if (phraseBars) sec.phraseBars = phraseBars;
       sections.push(sec);
@@ -480,7 +488,8 @@
         settings.lang = options.autoLyrics;
       }
     }
-    const of = type => sections.filter(s => s.type === type), lastChorus = of('chorus').at(-1);
+    // (L'última tornada de debò: no el tag, la tornada curta que la repeteix abans del final.)
+    const of = type => sections.filter(s => s.type === type), lastChorus = of('chorus').filter(s => !s.tag).at(-1);
     if (skatalites) {
       // Solos sobre una base diferent: un altre ritme de bateria i una altra línia de baix (els acords
       // ja són els propis del solo). Els vents entren al tema just abans del temps, amb el redoble.
@@ -492,7 +501,7 @@
       });
     }
     // ── Moviments propis del subgènere (tempo, to, ritme) ─────────────
-    const tempo = (sec, factor) => { if (sec) sec.bpm = Math.max(40, Math.min(240, Math.round(bpm * factor))); };
+    const tempo = (sec, factor) => { if (sec) sec.bpm = Math.max(40, Math.min(240, (factor < 1 ? Math.ceil : Math.floor)(bpm * factor))); };
     // Canvis de tempo suaus (els salts grans sonaven bruscos): com a molt un 7 %. Per sonar
     // «més lent» sense canviar de tempo, la bateria i el baix van a mig temps.
     if (key === 'jamaican') { tempo(of('intro')[0], .94); }
@@ -1001,10 +1010,15 @@
     punk: ['IVCVCBCO', 'IVCVCCO', 'CVCVCBCO', 'IVPCVPCBCO', 'IVVCVCSCCO', 'IVCVCSCO', 'IVCSVCBCO', 'ICVCVCBCO', 'IVCVCBCCO',
       'IVCRVCKCO', 'VCVCKCCO', 'IVCVCKCO', 'IVVCVVCBCO', 'ICVCRVCCO', 'IVPCVPCSCO',
       'IVCVCRVCKCCO', 'IVVCVCKCCO', 'IVCVCKVCCO', 'ICVCVCKCCO', 'IVCRVCRVCBCO'],
-    ska: ['IVPCVPCSCO', 'IVCVCBSCO', 'IVCVCSCO', 'ICVCSVCCO', 'IVVCSVCO', 'IVPCVPCBCO', 'IVCSVCBCO', 'IVCRVCSCO', 'IVCVCBCCO', 'IVCVCRVCSCO'],
+    // (Ska: també AABA —estrofa, estrofa, pont, estrofa—, una secció «dub» —D: bateria i baix sols— i un «tag» final
+    // —T: la tornada curta, repetida, abans del final—.)
+    ska: ['IVPCVPCSCO', 'IVCVCBSCO', 'IVCVCSCO', 'ICVCSVCCO', 'IVVCSVCO', 'IVPCVPCBCO', 'IVCSVCBCO', 'IVCRVCSCO', 'IVCVCBCCO', 'IVCVCRVCSCO',
+      'IVVBVCSVBVCO', 'IVCVCDCO', 'IVCSVCDCTO', 'IVCVCDCTO', 'IVVBVCDCO', 'ICVCDVCTO'],
     urban: ['IVCVCBCO', 'IVCVCCO']
   };
-  const FORM_TYPES = { I: 'intro', V: 'verse', P: 'prechorus', C: 'chorus', B: 'bridge', K: 'bridge', S: 'solo', R: 'solo', O: 'outro' };
+  const FORM_TYPES = { I: 'intro', V: 'verse', P: 'prechorus', C: 'chorus', B: 'bridge', K: 'bridge', S: 'solo', R: 'solo', O: 'outro', D: 'bridge', T: 'chorus' };
+  // Paper especial de cada lletra de la plantilla (pont trencat, riff, dub i tag).
+  const FORM_ROLES = { K: 'breakdown', R: 'riff', D: 'dub', T: 'tag' };
   // Semblança entre dues estructures (0 = res a veure, 1 = idèntiques): ordre de les seccions i llargades.
   function editDistance(a, b) {
     const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
@@ -1132,9 +1146,13 @@
   }
   function skatalitesPlan(bpm, target, r) {
     const seconds = bars => bars * 240 / bpm;
+    // Una de cada tres vegades, sobre el blues de 12 compassos (com tants temes dels Skatalites): el tema A i els
+    // solos són blues; el B, una tornada normal.
+    const blues = r() < .35;
+    const A = bars => blues ? ['verse', 12, 'blues'] : ['verse', bars], SOLO = bars => blues ? ['solo', 12, 'blues'] : ['solo', bars];
     let best = null;
     for (const intro of [4, 8]) for (const a of [8, 16]) for (const b of [8, 16]) for (const solo of [8, 16]) for (const solos of [1, 2, 3]) for (const coda of [4, 8]) {
-      const plan = [['intro', intro], ['verse', a], ['chorus', b], ...Array.from({ length: solos }, () => ['solo', solo]), ['verse', a], ['chorus', b], ['outro', coda]];
+      const plan = [['intro', intro], A(a), ['chorus', b], ...Array.from({ length: solos }, () => SOLO(solo)), A(a), ['chorus', b], ['outro', coda]];
       const total = plan.reduce((t, [, bars]) => t + bars, 0);
       if (total > 256) continue;
       const score = Math.abs(seconds(total) - target) + r() * 12;
@@ -1142,25 +1160,31 @@
     }
     return best.plan;
   }
-  function chooseForm({ key, style, bpm, target, r, recent = [], vary = true }) {
+  function chooseForm({ key, style, bpm, target, r, recent = [], vary = true, vocal = true }) {
     const fast = bpm >= 160, punk = style === 'punk', pick = list => list[Math.floor(r() * list.length)];
     const lengths = {
       I: fast ? [4, 4, 8] : [4, 8, 8], V: fast ? [8, 16, 16] : [8, 8, 16], P: fast ? [4, 8] : [4, 4, 8], C: fast ? [8, 16, 16] : [8, 8, 16],
-      B: [8, 8, 16], K: fast ? [8, 16] : [8], S: fast ? [8, 16] : [8, 16], R: [4], O: fast ? [4, 4, 8] : [4, 8, 8]
+      B: [8, 8, 16], K: fast ? [8, 16] : [8], S: fast ? [8, 16] : [8, 16], R: [4], O: fast ? [4, 4, 8] : [4, 8, 8], D: [8], T: [4]
     };
+    // Ska sense veu: de vegades estrofes i tornades de 12 compassos (frases de tres) en lloc de 8 o 16.
+    if (!punk && !vocal) { lengths.V = [...lengths.V, 12]; lengths.C = [...lengths.C, 12]; }
     // Gèneres: el hardcore sense pretornada i amb breakdown; el rocksteady sense solos ràpids.
     let templates = FORMS[style] || FORMS.punk;
     if (key === 'hardcore') templates = templates.filter(t => !t.includes('P'));
     if (key === 'rocksteady' || key === 'bossreggae') templates = templates.filter(t => !t.includes('R'));
+    // L'ska-punk no fa dub; el rocksteady i l'early reggae, més sovint (hi és dues vegades).
+    if (key === 'skapunk') templates = templates.filter(t => !t.includes('D'));
+    if (key === 'rocksteady' || key === 'bossreggae') templates = [...templates, ...templates.filter(t => t.includes('D'))];
     const seconds = plan => plan.reduce((t, [, bars]) => t + bars * 240 / bpm, 0);
     const candidates = [];
     for (let k = 0; k < 160; k++) {
       const template = pick(templates), sizes = {};
       // Cada tipus de secció té la mateixa llargada a tota la cançó (com en una cançó real).
       // K i R porten un paper especial: pont trencat a mig temps i riff curt entre blocs.
-      const plan = [...template].map(token => [FORM_TYPES[token], sizes[token] ??= pick(lengths[token]), ...(token === 'K' ? ['breakdown'] : token === 'R' ? ['riff'] : [])]);
+      const plan = [...template].map(token => [FORM_TYPES[token], sizes[token] ??= pick(lengths[token]), ...(FORM_ROLES[token] ? [FORM_ROLES[token]] : [])]);
       // De vegades l'última tornada és doble (el doble de llarga), per acabar amb força.
-      if (r() < .25) { const last = plan.map(([t]) => t).lastIndexOf('chorus'); if (plan[last][1] <= 16) plan[last] = ['chorus', plan[last][1] * 2]; }
+      // (La tornada de veritat, no el tag; i les formes AABA no en tenen.)
+      if (r() < .25) { const last = plan.map(([t, , role]) => role ? '' : t).lastIndexOf('chorus'); if (last >= 0 && plan[last][1] <= 16) plan[last] = ['chorus', plan[last][1] * 2]; }
       const total = plan.reduce((t, [, bars]) => t + bars, 0), time = seconds(plan);
       if (plan.length > 24 || total > 256 || time < 125 || time > 235) continue;
       const penalty = vary ? formPenaltyOf(plan, recent, key, style) : 0;
@@ -1459,7 +1483,7 @@
     return recent.slice(0, 12).reduce((total, other, i) => {
       if (!other) return total;
       const sameSub = print.subgenre && print.subgenre === other.subgenre;
-      const score = 1.5 * same(print.riff, other.riff) + same(print.key, other.key) + (Math.abs((print.bpm || 0) - (other.bpm || 0)) <= 4 ? .5 : 0)
+      const score = 3 * same(print.riff, other.riff) + same(print.key, other.key) + (Math.abs((print.bpm || 0) - (other.bpm || 0)) <= 4 ? .5 : 0)
         + .4 * same(print.drums, other.drums) + .4 * same(print.bass, other.bass) + .3 * same(print.guitar, other.guitar)
         + (sameSub ? .7 * same(print.verse, other.verse) + .9 * same(print.chorus, other.chorus) : 0)
         + .3 * same(print.opening, other.opening) + .3 * same(print.closing, other.closing);

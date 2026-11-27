@@ -220,7 +220,18 @@ function createPerformance(spec, options = {}) {
   // quedarien en tresets. L'ska jamaicà el fa servir, el punk no.
   const swing = Number.isFinite(spec.swing) ? Math.max(0, Math.min(.7, spec.swing)) : 0;
   const swung = t => { if (!swing) return t; const pos = t / beat, frac = pos - Math.floor(pos); return Math.abs(frac - .5) < .04 ? t + swing * beat / 6 : t; };
+  // Acords partits (dos per compàs: chord.half, de la segona meitat): l'acompanyament (guitarres, orgue i piano) que
+  // cau a la segona meitat del compàs s'ajusta a l'acord nou. Les notes greus (la mà esquerra del piano) van a la
+  // fonamental més propera; la resta, a la nota de l'acord més propera (en una tríada sempre n'hi ha una a ±3).
+  function halfBar(channel, pitch, start) {
+    if (pitch === undefined || !(channel <= 1 || channel === 11 || channel === 14 || channel === 15 || channel === PIANO || takeChannels.has(channel))) return pitch;
+    const index = Math.floor(start / bar + 1e-6), half = spec.chords[index]?.half;
+    if (!half || start - index * bar < 2 * beat - .02) return pitch;
+    if (pitch < 52) { const pc = ((half.root % 12) + 12) % 12; return nearest(pitch, [pc], pitch - 6, pitch + 6); }
+    return half.pcs.includes(((pitch % 12) + 12) % 12) ? pitch : nearest(pitch, half.pcs, pitch - 3, pitch + 3);
+  }
   function note(channel, pitch, start, duration, velocity, jitter = .004, exact = false) {
+    pitch = halfBar(channel, pitch, start);
     for (const [at, length, tone] of feel(channel, swung(start), duration, pitch)) play(channel, tone, at, length, velocity, jitter, exact);
   }
   // ── Humanització del ritme ────────────────────────────────────────
@@ -530,9 +541,10 @@ function createPerformance(spec, options = {}) {
       const force = punk ? punkForce(t, hit, 100, 76) : ending ? 90 : Math.round(shape.force + (soft ? -6 : 0) + (human ? (extraRandom() - .5) * 8 * human : 0));
       // Acord gravat (si n'hi ha del seu tipus): la mostra sencera, alternant les dues variants; el cop sec dura com a mínim
       // 110 ms (el que recomana el paquet) i l'apagat és un cop molt curt i fluix.
-      const quality = SKANK_CHORDS && !ending ? chordQuality(chord) : null;
+      const sounding = t >= 2 && chord.half ? chord.half : chord;
+      const quality = SKANK_CHORDS && !ending ? chordQuality(sounding) : null;
       if (quality) {
-        const key = ((b + hit) % 2 ? 60 : 48) + ((chord.root % 12) + 12) % 12;
+        const key = ((b + hit) % 2 ? 60 : 48) + ((sounding.root % 12) + 12) % 12;
         const length = stroke === 'apagat' ? .045 : Math.max(.11, duration);
         note(CHORD_CHANNEL[quality], key, t0 + t * beat + jitter, length, stroke === 'apagat' ? force - 14 : force);
         return;

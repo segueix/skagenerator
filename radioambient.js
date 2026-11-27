@@ -2580,6 +2580,8 @@
         return { offset, quality };
     }
     function chordFromSymbol(tonic, symbol) {
+        // Acord partit («ii7|V7»): dos acords al mateix compàs; el segon (half) sona a la segona meitat.
+        if (symbol.includes('|')) { const [first, second] = symbol.split('|'); return { ...chordFromSymbol(tonic, first), symbol, half: chordFromSymbol(tonic, second) }; }
         const [main, target] = symbol.split('/');
         const base = target ? (tonic + parseChordSymbol(target).offset + 12) % 12 : tonic;
         const { offset, quality } = parseChordSymbol(main), root = (base + offset + 12) % 12;
@@ -2728,12 +2730,51 @@
                 verse: [['I', 'bVI', 'bVII', 'I'], ['I', 'bIII', 'IV', 'I']], chorus: [['I', 'bVI', 'bVII', 'I'], ['vi', 'IV', 'I', 'V']], bridge: [['bVI', 'bVII', 'I', 'I']] },
               minor: { verse: [['i', 'bVI', 'bIII', 'bVII']], chorus: [['i', 'bVII', 'bVI', 'V7']], bridge: [['iv', 'i', 'V7', 'i']] } } }
     };
-    function paletteFor(subgenre, mode, type) {
+    // ── Harmonia v2: més progressions per subgènere ───────────────────
+    // Cançons noves (settings.harmony = 2): a més de les progressions de sempre, aquestes, amb frases de vuit compassos,
+    // acords partits («ii7|V7»: dos acords al mateix compàs), vamps de dos acords i girs de jazz. Les cançons desades
+    // abans (sense harmony) sonen com sempre.
+    const HARMONY_V2 = {
+        jamaican: { major: {
+            verse: [['I', 'I', 'IV', 'IV', 'I', 'vi', 'ii7|V7', 'I|V7'], ['I', 'IV|V7', 'I', 'IV|V7'], ['I|vi', 'ii7|V7', 'I|vi', 'ii7|V7'], ['I', 'I7', 'IV', 'iv', 'I', 'VI7', 'ii7', 'V7']],
+            chorus: [['IV', 'IV', 'I', 'I', 'V7', 'IV', 'I', 'V7'], ['I|IV', 'I|V7', 'I|IV', 'V7'], ['IV', 'V7', 'iii7|VI7', 'ii7|V7']],
+            bridge: [['vi', 'vi', 'II7', 'II7', 'ii7', 'ii7', 'V7', 'V7']], solo: [['I|vi7', 'ii7|V7', 'iii7|VI7', 'ii7|V7']] },
+          minor: { verse: [['i', 'iv', 'i', 'V7'], ['i', 'bVI', 'V7', 'i'], ['i|iv', 'i|V7', 'i|iv', 'V7']], chorus: [['iv', 'i', 'bVI|V7', 'i'], ['bVI', 'V7', 'i', 'i']], bridge: [['iv', 'bVII', 'bIII', 'V7']] } },
+        rocksteady: { minor: {
+            verse: [['i', 'i', 'iv', 'iv', 'i', 'i', 'bVII', 'bVII'], ['i', 'bVII'], ['i7|iv7', 'i7|v7'], ['i', 'bIII', 'iv', 'bVII|V7']],
+            chorus: [['bVI', 'bVII', 'i', 'i', 'bVI', 'bVII', 'iv', 'V7'], ['iv7', 'i7'], ['bIII', 'bVII', 'i', 'bVII|V7']], bridge: [['bVI', 'bVI', 'bVII', 'bVII']] },
+          major: { verse: [['I', 'IV'], ['I', 'vi', 'ii', 'V'], ['I|vi', 'IV|V']], chorus: [['IV', 'V', 'I', 'vi'], ['I', 'IV', 'I', 'IV|V']] } },
+        twotone: { major: {
+            verse: [['I', 'IV'], ['I', 'I', 'IV', 'V', 'I', 'I', 'IV|V', 'I'], ['vi', 'IV', 'I', 'V'], ['I', 'bVII', 'IV', 'I']],
+            chorus: [['I', 'IV|V', 'I', 'IV|V'], ['IV', 'I', 'IV', 'V', 'IV', 'I', 'ii|V', 'I'], ['vi', 'V', 'IV', 'V']], bridge: [['bVI', 'bVII', 'I', 'I']] },
+          minor: { verse: [['i', 'iv'], ['i', 'bVII'], ['i', 'i', 'bVI', 'bVII', 'i', 'i', 'iv', 'V7']], chorus: [['bVI', 'bVII', 'i', 'iv'], ['iv', 'i', 'bVII', 'bIII'], ['i|bVII', 'bVI|V7']], bridge: [['bVI', 'bIII', 'bVII', 'V7']] } },
+        nutty: { major: {
+            verse: [['I', 'I7', 'IV', 'iv', 'I', 'VI7', 'ii7|V7', 'I'], ['I|vi', 'ii|V7', 'I|vi', 'ii|V7'], ['I', 'III7', 'IV', 'iv']],
+            chorus: [['IV', 'IV', 'I', 'VI7', 'II7', 'V7', 'I', 'I'], ['I|V7/vi', 'vi|IV', 'I|V7', 'I'], ['IV', 'V', 'iii', 'VI7']], bridge: [['bVI', 'bVII', 'I', 'VI7'], ['IV', 'IV', 'I', 'I', 'II7', 'II7', 'V7', 'V7']] },
+          minor: { verse: [['i', 'i', 'iv', 'iv', 'bVI', 'V7', 'i', 'V7'], ['i|bVII', 'bVI|V7']], chorus: [['iv', 'i', 'V7', 'i'], ['bVI', 'bIII', 'iv', 'V7']] } },
+        bossreggae: { major: {
+            verse: [['I', 'IV'], ['I', 'V'], ['I', 'ii'], ['I', 'I', 'IV', 'IV', 'V', 'V', 'IV', 'IV']], chorus: [['IV', 'V', 'I', 'vi'], ['I|IV', 'I|V']], bridge: [['ii', 'V', 'ii', 'V']] },
+          minor: { verse: [['i', 'iv'], ['i', 'bVII', 'bVI', 'bVII']], chorus: [['iv', 'bVII', 'i', 'i']] } },
+        skaswing: { major: {
+            verse: [['I|vi7', 'ii7|V7', 'I|vi7', 'ii7|V7', 'I|I7', 'IV|iv', 'I|V7', 'I'], ['I', 'IV7', 'I', 'I7', 'IV7', 'IV7', 'I', 'VI7'], ['iii7|VI7', 'ii7|V7', 'I', 'I']],
+            chorus: [['IV7', 'IV7', 'I', 'I', 'ii7|V7', 'iii7|VI7', 'ii7|V7', 'I'], ['I|VI7', 'ii7|V7', 'I|VI7', 'ii7|V7']], bridge: [['III7', 'III7', 'VI7', 'VI7', 'II7', 'II7', 'V7', 'V7']],
+            solo: [['I|vi7', 'ii7|V7'], ['ii7|V7', 'I', 'iii7|VI7', 'ii7|V7']] },
+          minor: { verse: [['i|iv', 'i|V7'], ['i', 'iv', 'bVI|V7', 'i']], chorus: [['iv', 'i', 'bII7|V7', 'i']] } },
+        skapunk: { major: {
+            verse: [['I', 'IV', 'V', 'V'], ['I', 'I', 'IV', 'IV', 'vi', 'IV', 'V', 'V'], ['I', 'V', 'vi', 'iii', 'IV', 'I', 'IV', 'V']],
+            chorus: [['IV', 'V', 'I', 'I'], ['vi', 'IV', 'I', 'V'], ['I', 'V', 'IV', 'IV|V']], bridge: [['ii', 'IV', 'V', 'V']] },
+          minor: { verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'iv']], chorus: [['bVI', 'bVII', 'i', 'i'], ['bIII', 'bVII', 'iv', 'bVI']] } }
+    };
+    function paletteFor(subgenre, mode, type, version = 1) {
         const pal = SUBGENRES[subgenre]?.harmony[mode] || Object.values(SUBGENRES[subgenre]?.harmony || {})[0];
         if (!pal) return null;
         // Els solos van sobre una base diferent de la del tema: sense progressió pròpia, la del pont.
         const fallback = { intro: 'verse', solo: 'bridge', outro: 'chorus', prechorus: 'chorus', bridge: 'verse' };
-        return pal[type] || pal[fallback[type]] || pal.verse;
+        const pick = set => set?.[type] || set?.[fallback[type]] || set?.verse;
+        const base = pick(pal);
+        if (version < 2) return base;
+        const extra = HARMONY_V2[subgenre]?.[mode] ? pick(HARMONY_V2[subgenre][mode]) || [] : [];
+        return [...(base || []), ...extra];
     }
     // ── Riff de la cançó ────────────────────────────────────────────────
     // Un motiu de dos compassos (ritme i contorn en graus de l'escala) que
@@ -3294,6 +3335,8 @@
         if (part.pickup !== undefined && typeof part.pickup !== 'boolean') throw new Error('Entrada dels vents no vàlida');
         // Gest de canvi de secció (baix, bombo i guitarra junts a l'últim compàs) i fonamental del primer acord que ve.
         if (part.push !== undefined && !SECTION_PUSHES.includes(part.push)) throw new Error('Gest de canvi de secció no vàlid');
+        // Forma de la secció: «blues» (blues de 12 compassos).
+        if (part.form !== undefined && part.form !== 'blues') throw new Error('Forma de secció no vàlida');
         if (part.nextRoot !== undefined && (!Number.isInteger(part.nextRoot) || part.nextRoot < 0 || part.nextRoot > 11)) throw new Error('Acord següent no vàlid');
         // Baix sol: als primers compassos (intro) o a l'últim compàs (abans de l'última tornada).
         if (part.bassSolo !== undefined && (!Number.isInteger(part.bassSolo) || part.bassSolo < 1 || part.bassSolo > 8)) throw new Error('Baix sol no vàlid');
@@ -3362,17 +3405,33 @@
         degrees = Array.from({ length: bars }, (_, i) => degrees[i % degrees.length]);
         if (part.type === 'outro') degrees[bars - 1] = 0;
         // Amb subgènere, les progressions surten del seu llenguatge harmònic.
-        const palette = settings.subgenre ? paletteFor(settings.subgenre, mode, part.type) : null;
+        const harmonyVersion = settings.harmony ?? 1;
+        if (![1, 2].includes(harmonyVersion)) throw new Error('Versió d’harmonia no vàlida');
+        const palette = settings.subgenre ? paletteFor(settings.subgenre, mode, part.type, harmonyVersion) : null;
         let chords;
         if (palette) {
-            const progression = palette[(variation >= 0 ? variation : (part.revision || 1) - 1) % palette.length];
+            // (Harmonia v2: la cançó tria la seva progressió de cada tipus de secció a partir de la llavor, no només
+            // de la versió: amb més progressions, cada cançó en fa servir unes altres.)
+            const songPick = harmonyVersion >= 2 ? (Math.imul((settings.seed >>> 0) ^ 0x9e3779b9, family + 1) >>> 7) : 0;
+            // Blues de 12 compassos (secció «blues»): al jamaicà, l'ska-swing i el nutty, el blues de jazz (amb el IV al
+            // segon compàs, el VI7 i el gir ii–V); als altres, el blues de sempre. En menor, el blues menor.
+            const jazzy = ['jamaican', 'skaswing', 'nutty'].includes(settings.subgenre);
+            const BLUES = mode === 'minor' ? ['i', 'iv', 'i', 'i', 'iv', 'iv', 'i', 'i', 'bVI7', 'V7', 'i', 'V7']
+                : jazzy ? ['I', 'IV7', 'I', 'I7', 'IV7', 'iv', 'I', 'VI7', 'ii7', 'V7', 'I|VI7', 'ii7|V7'] : ['I', 'I', 'I', 'I', 'IV', 'IV', 'I', 'I', 'V7', 'IV', 'I', 'V7'];
+            const progression = part.form === 'blues' ? BLUES : palette[((variation >= 0 ? variation : (part.revision || 1) - 1) + songPick) % palette.length];
             chords = Array.from({ length: bars }, (_, i) => chordFromSymbol(tonic, progression[i % progression.length]));
             if (part.type === 'outro') chords[bars - 1] = chordFromSymbol(tonic, mode === 'major' ? 'I' : 'i');
             // Ska jamaicà i ska-swing: les seccions llargues acaben amb un gir ii–V (iv–V en menor)
             // que porta de nou a la tònica de la secció següent.
-            if (['jamaican', 'skaswing'].includes(settings.subgenre) && bars >= 8 && bars % 4 === 0 && ['verse', 'chorus', 'solo', 'bridge'].includes(part.type)) {
+            if (part.form !== 'blues' && ['jamaican', 'skaswing'].includes(settings.subgenre) && bars >= 8 && bars % 4 === 0 && ['verse', 'chorus', 'solo', 'bridge'].includes(part.type)) {
                 chords[bars - 2] = chordFromSymbol(tonic, mode === 'major' ? 'ii7' : 'iv');
                 chords[bars - 1] = chordFromSymbol(tonic, 'V7');
+            }
+            // (Harmonia v2, els altres subgèneres: les seccions de vuit o més compassos de quatre acords tanquen sovint amb un gir
+            // al darrer compàs —dos acords: ii–V o IV–V; en menor, iv–V o bVI–bVII—, triat per la cançó.)
+            else if (harmonyVersion >= 2 && progression.length === 4 && bars >= 8 && bars % 4 === 0 && ['verse', 'chorus', 'solo'].includes(part.type)) {
+                const turn = (songPick >>> 3) % 3;
+                if (turn) chords[bars - 1] = chordFromSymbol(tonic, mode === 'major' ? (turn === 1 ? 'ii7|V7' : 'IV|V') : (turn === 1 ? 'iv|V7' : 'bVI|bVII'));
             }
         } else chords = degrees.map(d => buildChord(tonic, mode, d, { chordBase: 55 }, false));
         const ctx = { chords, scalePcs: SCALES[mode].map(n => (tonic + n) % 12), lo: 64, hi: part.type === 'chorus' ? 84 : 79, center: 72, maxJump: 3 };
@@ -3549,7 +3608,7 @@
             : [[0,'root',.8,1.1],[1,'third',.78,.98],[2,'fifth',.78,1.04],[3,'approach',.75,1.02]];
         const bassLine = [];
         for (let b = 0; b < bars; b++) {
-            const chord = chords[b], next = chords[(b+1)%bars].root;
+            const chord = chords[b], next = (chords[b].half || chords[(b+1)%bars]).root;
             // Pedal: la fonamental és la tònica (a l'octava més propera a la de l'acord).
             const root = part.pedal ? chord.root - ((((chord.root - tonic) % 12) + 18) % 12 - 6) : chord.root;
             const tones = { root, third: nearestTone(root+4,chord.pcs,root,root+12),
@@ -3557,8 +3616,13 @@
                 approach: next===root ? root+7 : next+(next>root ? -1 : 1) };
             const pattern = part.type==='outro' && b===bars-1 && part.closing !== 'fade'
                 ? [[0,'root',3.3,1.18]] : groove.bass>=0 ? bassPatterns[groove.bass] : classic;
+            // (Acord partit: a la segona meitat del compàs, les notes de l'acord nou; i la nota d'aproximació, cap al
+            // compàs següent.)
+            const half = chord.half, halfRoot = half ? root + ((((half.root - root) % 12) + 18) % 12 - 6) : null;
+            const halfTones = half ? { root: halfRoot, third: nearestTone(halfRoot+4,half.pcs,halfRoot,halfRoot+12), fifth: nearestTone(halfRoot+7,half.pcs,halfRoot,halfRoot+12),
+                octave: halfRoot+12, approach: (() => { const n = chords[(b+1)%bars].root; return n===halfRoot ? halfRoot+7 : n+(n>halfRoot ? -1 : 1); })() } : null;
             for (const [at,tone,length,strength] of pattern)
-                bassLine.push([b,at,tones[tone],Math.min(length,4-at),strength]);
+                bassLine.push([b,at,(halfTones && at >= 2 ? halfTones : tones)[tone],Math.min(length,(halfTones && at < 2 ? 2 : 4)-at),strength]);
             // Punk: quan canvia l'acord, l'última nota del compàs (tres de cada quatre vegades) és una
             // nota de pas cromàtica que porta a la fonamental del compàs següent.
             if (settings.style === 'punk' && !part.pedal && b < bars - 1 && next % 12 !== root % 12 && (seed + b * 7) % 4 !== 0) {
