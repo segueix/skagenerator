@@ -1502,10 +1502,89 @@
     ['crida', 'Crida de samba (curt, curt, llarg a cada compàs)', [['prev', 0, 'short'], ['prev', 2, 'short'], ['prev', 4, 'long'], ['last', 0, 'short'], ['last', 2, 'short'], ['last', 4, 'long']]],
     ['cap', 'Sense xiulets', []]
   ];
+  // ── Ritme gravat amb la veu («ta ta ta taaa») ─────────────────────
+  // extractVoiceRhythm: de l'àudio (mono, mostres en coma flotant) als cops: on comença cada «ta» (pujades de
+  // l'envolupant), la seva força (fluix, normal o fort, respecte del més fort) i si és llarg. El tempo és el que fa
+  // encaixar millor els intervals entre cops a la graella de semicorxeres (entre 80 i 150 BPM, preferint els
+  // propers a 120), i cada cop s'hi col·loca. La frase dura un o dos compassos. El timbal: amb molts cops seguits,
+  // caixa o repique (segons el to de la veu); amb pocs, bombo, surdo o tabal (veu greu, mitjana o aguda).
+  function extractVoiceRhythm(samples, rate) {
+    const hop = Math.max(1, Math.round(rate * .01)), frames = Math.floor(samples.length / hop), env = new Float32Array(frames);
+    for (let f = 0; f < frames; f++) { let e = 0; for (let i = f * hop; i < (f + 1) * hop; i++) e += samples[i] * samples[i]; env[f] = Math.sqrt(e / hop); }
+    const sorted = Float32Array.from(env).sort(), floor = sorted[Math.floor(frames * .3)] || 0, top = sorted[Math.floor(frames * .98)] || 0;
+    if (!top || top < floor * 3 || top < .005) return null;
+    const threshold = Math.max(floor * 3, top * .12);
+    // Inicis: on l'envolupant puja de cop (respecte del mínim dels últims 40 ms) per sobre del llindar, i com a mínim
+    // 60 ms després de l'anterior (així també es detecten els «tatata» seguits, sense silenci entre mig).
+    const hits = [];
+    for (let f = 4; f < frames - 1; f++) {
+      const before = Math.min(env[f - 1], env[f - 2], env[f - 3], env[f - 4]), rise = env[f] - before;
+      if (env[f] < threshold || rise < top * .07 || env[f] < before * 1.35) continue;
+      if (hits.length && f - hits.at(-1).frame < 6) continue;
+      // Força: el màxim dels primers 80 ms. Durada i to: de la vocal (a partir dels 30 ms, després de la consonant).
+      let peak = 0, vowel = 0;
+      for (let g = f; g < Math.min(frames, f + 8); g++) peak = Math.max(peak, env[g]);
+      for (let g = f + 3; g < Math.min(frames, f + 10); g++) vowel = Math.max(vowel, env[g]);
+      let end = f + 3;
+      while (end < frames - 1 && env[end] > vowel * .4) end++;
+      let zc = 0; const a = Math.min(samples.length - 1, (f + 3) * hop), b = Math.min(samples.length - 1, a + Math.round(rate * .05));
+      for (let i = a + 1; i <= b; i++) if ((samples[i - 1] < 0) !== (samples[i] < 0)) zc++;
+      hits.push({ frame: f, time: f * hop / rate, peak, length: (end - f) * hop / rate, pitch: zc * rate / 2 / Math.max(1, b - a) });
+    }
+    if (hits.length < 2) return null;
+    // (Un cop no dura més enllà de l'inici del següent: als «tatata» seguits, la vocal d'un s'encavalca amb l'altre.)
+    hits.forEach((h, i) => { if (hits[i + 1]) h.length = Math.min(h.length, hits[i + 1].time - h.time); });
+    // Tempo: la graella de semicorxeres que deixa els cops més a prop, tots alhora (no interval a interval: així els
+    // petits errors de temps d'una persona no s'acumulen). Per a cada tempo es prova d'on surt la graella (petits
+    // desplaçaments del primer cop) i es tria el que deixa menys error; a igualtat, el més proper a 120 BPM.
+    const times = hits.map(h => h.time - hits[0].time);
+    let best = null;
+    for (let bpm = 80; bpm <= 150; bpm++) {
+      const step = 60 / bpm / 4;
+      for (let shift = -.3; shift <= .3001; shift += .1) {
+        let error = 0;
+        const slots = new Set();
+        for (const t of times) { const x = t / step + shift, n = Math.round(x); error += Math.abs(x - n); slots.add(n); }
+        // (Dos cops a la mateixa caixeta no pot ser: penalitza.)
+        const score = error / times.length + (times.length - slots.size) * .5 + Math.abs(bpm - 120) / 900;
+        if (!best || score < best.score) best = { bpm, step, shift, score };
+      }
+    }
+    // Posicions a la graella (cada cop en una semicorxera pròpia), comptades des del primer cop.
+    const steps = [];
+    const first = Math.round(best.shift);
+    for (const t of times) {
+      let at = Math.round(t / best.step + best.shift) - first;
+      if (steps.length && at <= steps.at(-1)) at = steps.at(-1) + 1;
+      steps.push(at);
+    }
+    // Llargada de la frase: fins a l'últim cop (la cua d'un «taaa» final no la fa passar al compàs següent).
+    const used = Math.ceil((steps.at(-1) + 1) / 4) * 4, length = used <= 16 ? 16 : 32;
+    const strongest = Math.max(...hits.map(h => h.peak));
+    const notes = hits.map((h, i) => ({ step: steps[i], strength: h.peak / strongest > .78 ? 3 : h.peak / strongest < .5 ? 1 : 2, long: h.length / best.step >= 2.5 }))
+      .filter(n => n.step < length);
+    const pitch = hits.reduce((t, h) => t + h.pitch, 0) / hits.length, density = notes.length / (length / 4);
+    const row = density >= 2.2 ? (pitch > 900 ? 4 : 3) : pitch < 450 ? 11 : pitch < 650 ? 0 : 10;
+    return { bpm: best.bpm, length, notes, row, pitch: Math.round(pitch) };
+  }
+  // L'inici a partir del ritme gravat: la frase (un o dos compassos) es repeteix tres vegades si és d'un compàs i dues si
+  // és de dos, amb la força de cada cop, i un sol xiulet llarg abans d'acabar (a la segona meitat de l'últim compàs).
+  function voiceOpening(rhythm, { row = rhythm.row, level = 3, whistleLevel = 4 } = {}) {
+    const bars = rhythm.length / 16, reps = bars === 1 ? 3 : 2, steps = [], accents = [];
+    for (let rep = 0; rep < reps; rep++) for (let b = 0; b < bars; b++) {
+      let hit = '', accent = '';
+      for (let step = 0; step < 16; step++) {
+        const note = rhythm.notes.find(n => n.step === b * 16 + step);
+        hit += note ? '1' : '0'; accent += note ? String(note.strength) : '0';
+      }
+      steps.push(hit); accents.push(accent);
+    }
+    return { row, steps, accents, whistles: [[steps.length - 1, 8, 'long']], roll: false, level, whistleLevel };
+  }
   // Construeix l'inici (vegeu engine.validBatucadaOpening) a partir de les tries: timbal (fila), ritme, redoble
   // final i patró de xiulets. Els xiulets es col·loquen on cau un cop del timbal (a la mateixa caixeta o la més
   // propera, fins a dues), perquè sonin junts amb el fons sigui quin sigui el ritme.
-  function openingFrom(engine, { row = 0, rhythm = 'samba', roll = true, whistles = 'dos-curts-llarg' } = {}, bpm = 120) {
+  function openingFrom(engine, { row = 0, rhythm = 'samba', roll = true, whistles = 'dos-curts-llarg', level = 3, whistleLevel = 4 } = {}, bpm = 120) {
     const bars = openingBars(bpm), figure = (OPENING_RHYTHMS.find(([key]) => key === rhythm) || OPENING_RHYTHMS[1])[2];
     const pattern = (OPENING_WHISTLES.find(([key]) => key === whistles) || OPENING_WHISTLES[0])[2];
     const barOf = ref => ref === 'first' ? 0 : ref === 'prev' ? Math.max(0, bars - 2) : bars - 1;
@@ -1518,7 +1597,7 @@
       if (at === undefined) at = [0, 1, -1, 2, -2].map(d => step + d).find(free);
       if (at !== undefined) placed.set(`${bar}:${at}`, [bar, at, kind]);
     }
-    return { row, steps: Array.from({ length: bars }, () => figure), whistles: [...placed.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]), roll: !!roll };
+    return { row, steps: Array.from({ length: bars }, () => figure), whistles: [...placed.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]), roll: !!roll, level, whistleLevel };
   }
   function createBatucadaSong(engine, options = {}) {
     const seed = (options.seed >>> 0) || 1, r = rng(seed), pick = list => list[Math.floor(r() * list.length)];
@@ -1560,8 +1639,34 @@
     // Durada: entre 2 i 4 minuts (o la que es demani), sense passar dels límits de la cançó.
     const minutes = Math.max(1.5, Math.min(5, options.minutes ?? 2 + r() * 2));
     const barSeconds = 240 / bpm, target = Math.min(240, Math.round(minutes * 60 / barSeconds));
-    const openingBlock = () => ({ type: 'intro', bars: openingBars(bpm), energy: 90, pattern: base, rhythm, opening });
+    const openingBlock = () => ({ type: 'intro', bars: opening.steps.length, energy: 90, pattern: base, rhythm, opening });
     const plan = [opening ? openingBlock() : { type: 'intro', bars: 4, energy: 84, pattern: base, rhythm }];
+    // Forma Short: inici curt, el groove, un canvi de ritme, un respir de dos compassos (aturada), una convenção de
+    // tots, un altre canvi de ritme i la tornada final al màxim. Blocs de 4 i 8 compassos (cada ritme dura poc: la
+    // cançó no para de moure's) i, si cal, se n'afegeixen o s'escurcen fins que tot plegat (amb el final de quatre
+    // compassos) dura entre 60 i 90 segons. Intensa (energia alta) però no esgotadora (el respir del mig).
+    function shortPlan() {
+      const first = opening ? openingBlock() : alone ? { type: 'intro', bars: 2, energy: 94, pattern: base, rhythm, intro: r() < .5 ? 'caixa' : 'repique' }
+        : { type: 'intro', bars: 2, energy: 90, pattern: base, rhythm };
+      const one = others[0], two = others[1] ?? others[0];
+      const body = [
+        { type: 'verse', bars: 8, energy: 92, pattern: base, rhythm },
+        { type: 'chorus', bars: 8, energy: 96, pattern: otherPattern[one], rhythm: one },
+        { type: 'bridge', bars: 2, energy: 62, pattern: base, rhythm, ending: pick(['break', 'stop', 'silence']) },
+        { type: 'verse', bars: 4, energy: 96, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI) },
+        { type: 'chorus', bars: 8, energy: 98, pattern: otherPattern[two], rhythm: two },
+        { type: 'chorus', bars: 8, energy: 100, pattern: groove, rhythm }
+      ];
+      // (De vegades la convenção va abans del primer canvi de ritme: no totes les Short tenen el mateix ordre.)
+      if (r() < .4) body.splice(1, 0, ...body.splice(3, 1));
+      const secondsOf = list => [...list, { bars: 4, rhythm }].reduce((t, b) => t + b.bars * 240 / tempoOf(b.rhythm), 0);
+      // Massa llarga: s'escurcen els blocs de vuit (primer els del mig) i, si cal, el respir passa a fer-se amb la convenção.
+      for (const i of [1, 4, 0, 5]) if (secondsOf([first, ...body]) > 88) body[i].bars = 4;
+      if (secondsOf([first, ...body]) > 90) body.splice(3, 1);
+      // Massa curta: un canvi de ritme més abans de la tornada final.
+      for (let k = 0; secondsOf([first, ...body]) < 62 && k < 4; k++) body.splice(body.length - 1, 0, { type: 'chorus', bars: 4, energy: 96, pattern: otherPattern[others[k % others.length]], rhythm: others[k % others.length] });
+      return [first, ...body];
+    }
     // Entre volta i volta: canvi de ritme, paradinha, solo de repique, solo de cuíca o convenção.
     const change = others.map(key => () => ({ type: 'verse', bars: 8, energy: 90, pattern: otherPattern[key], rhythm: key }));
     // Solo de cuíca: les frases enregistrades, amb la batucada al darrere.
@@ -1582,7 +1687,12 @@
     // Diàlegs en què el grup que parla puja el volum i el que replica també (entre dos grups o afegint-n'hi un
     // tercer), aturades i represes amb tota la potència, canvis de ritme (amb el mateix tempo) i un final de
     // tots els instruments al màxim volum.
-    if (alone) {
+    // Short: 60–90 segons, intensa i amb canvis de ritme, però amb un respir al mig perquè no cansi (vegeu shortPlan).
+    if (options.short) {
+      plan.splice(0, plan.length, ...shortPlan());
+      bars = Infinity; // (cap volta més)
+    }
+    if (alone && !options.short) {
       plan.length = 0;
       const soloIntro = r() < .5 ? 'caixa' : 'repique';
       plan.push(opening ? openingBlock() : { type: 'intro', bars: 2, energy: 92, pattern: base, rhythm, intro: soloIntro });
@@ -1610,7 +1720,7 @@
       if (!plan.some(block => block.rhythm !== rhythm)) { const block = rhythmChange(); plan.splice(Math.min(plan.length, 4), 0, block); bars += block.bars; }
     }
     // Es van afegint voltes fins a arribar a la durada (amb l'outro de quatre compassos).
-    while (!alone && bars + 4 < target && plan.length < 24) {
+    while (!alone && !options.short && bars + 4 < target && plan.length < 24) {
       plan.push({ type: 'verse', bars: 8, energy: (alone ? 88 : 84) + round * 3, pattern: base, rhythm });
       plan.push({ type: 'chorus', bars: 8, energy: 92 + round * 2, pattern: groove, rhythm });
       bars += 16;
@@ -1681,6 +1791,9 @@
       // Les altres batucades, 2 dB per sota: amb tres músics per peça i el mode «foc», el final i els cops de tots
       // arribaven massa forts al limitador i es distorsionaven.
       mix: alone ? { drums: { low: 0, mid: 0, high: 2, volume: -3 } } : { drums: { low: 0, mid: 0, high: 0, volume: -3 } }, humanize: compact ? .1 : .3 };
+    // Inici compost amb volums propis: tota la colla s'adapta al volum del timbal i els xiulets de la cançó, al del xiulet.
+    if (opening?.level) settings.mix.drums.volume += [-9, -5, 0, 2, 4][opening.level - 1];
+    if (opening?.whistleLevel) settings.batucadaWhistleLevel = opening.whistleLevel;
     return { version: 3, title, settings, base: { instruments: ['drums'], revision: 1, generated: true }, harmony: {}, sections, clips: [] };
   }
   // Una cançó és de batucada si només hi sona el kit de batucada.
@@ -1698,5 +1811,5 @@
     }
     return best.song;
   }
-  return { openingBars, OPENING_RHYTHMS, OPENING_WHISTLES, openingFrom, LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { extractVoiceRhythm, voiceOpening, openingBars, OPENING_RHYTHMS, OPENING_WHISTLES, openingFrom, LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });

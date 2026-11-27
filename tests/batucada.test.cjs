@@ -647,3 +647,77 @@ test('inici en tres passos: timbal de fons, ritme fet i patró de xiulets que s\
   assert.deepEqual(def.whistles.map(w => w[2]), ['short', 'short', 'long']);
   assert(def.whistles.every(([bar, step]) => bar === def.steps.length - 1 && engine.OPENING_ROLL[step] === '1'));
 });
+
+test('short: cançons de 60–90 s, intenses i amb canvis de ritme (i formes que varien)', () => {
+  const builder = require('../song-builder.js'), forms = new Set();
+  for (let seed = 1; seed <= 60; seed++) for (const rhythm of [undefined, 'samba', 'reggae', 'percudium']) {
+    const song = builder.createBatucadaSong(engine, { seed, short: true, ...(rhythm ? { rhythm } : {}) });
+    const secs = song.sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || song.settings.bpm), 0);
+    assert(secs >= 58 && secs <= 92, `seed ${seed} ${rhythm}: ${secs.toFixed(1)} s`);
+    const energies = song.sections.filter(s => s.type !== 'intro' && s.type !== 'outro' && s.type !== 'bridge').map(s => s.energy);
+    assert(energies.every(e => e >= 90), `seed ${seed}: intensa`);
+    const patterns = new Set(song.sections.map(s => (s.batucadaPattern || song.settings.batucadaPattern).join()));
+    if (!builder.BATUCADA_STYLES[song.settings.batucadaRhythm]?.alone) assert(patterns.size >= 2, `seed ${seed}: canvis de ritme`);
+    forms.add(song.sections.map(s => `${s.type}${s.bars}${s.ending || ''}${s.batucada?.tutti || ''}${(s.batucadaPattern || song.settings.batucadaPattern)[0]}`).join());
+  }
+  assert(forms.size >= 20, `formes diferents: ${forms.size}`);
+});
+
+test('volums de l\'inici: timbal i xiulet de fluix a molt fort; la colla i els xiulets de la cançó s\'hi adapten', () => {
+  const builder = require('../song-builder.js'), W = engine.BATUCADA_WHISTLE.note;
+  const at = level => builder.openingFrom(engine, { row: 0, rhythm: 'samba', level, whistleLevel: level }, 120);
+  for (const level of [1, 2, 3, 4, 5]) assert(engine.validBatucadaOpening(at(level)));
+  assert(!engine.validBatucadaOpening({ ...at(3), level: 6 }) && !engine.validBatucadaOpening({ ...at(3), whistleLevel: 0 }));
+  const songs = [1, 5].map(level => builder.createBatucadaSong(engine, { seed: 4, rhythm: 'samba', bpm: 120, opening: at(level) }));
+  assert(songs[0].settings.mix.drums.volume < songs[1].settings.mix.drums.volume, 'la colla segueix el volum del timbal');
+  assert.deepEqual(songs.map(s => s.settings.batucadaWhistleLevel), [1, 5]);
+  const line = song => { const first = [...song.sections].sort((a, b) => a.start - b.start)[0];
+    return engine.composeSongPart(song.settings, { ...first, instruments: ['drums'], revision: 1 }).batucadaLine; };
+  const [soft, loud] = songs.map(line);
+  const vel = (l, f) => Math.max(...l.filter(f).map(h => h[3]));
+  assert(vel(soft, h => h[2] !== W) < vel(loud, h => h[2] !== W), 'timbal més fluix');
+  assert(vel(soft, h => h[2] === W) < vel(loud, h => h[2] === W), 'xiulet més fluix');
+});
+
+test('ritme gravat amb la veu: se n\'extreuen cops, força, llargs i tempo, i sona 2–3 vegades amb un xiulet llarg', () => {
+  const builder = require('../song-builder.js'), rate = 44100;
+  let r = 7; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
+  // «ta»: atac de soroll (la t) i una vocal amb harmònics; els llargs («taaa») s'allarguen.
+  const voice = (bpm, notes, pitch) => {
+    const step = 60 / bpm / 4, out = new Float32Array(Math.ceil(((notes.at(-1)[0] + 8) * step + 1.1) * rate));
+    for (let i = 0; i < out.length; i++) out[i] = (rnd() - .5) * .002;
+    for (const [s, amp, long] of notes) {
+      const t0 = .3 + s * step + (rnd() - .5) * .02, len = long ? step * 6 : step * 1.4;
+      for (let i = 0; i < len * rate; i++) {
+        const t = i / rate, k = Math.floor((t0 + t) * rate); if (k >= out.length) break;
+        const env = Math.min(1, t / .006) * (long ? (t < len - .05 ? .8 + .2 * Math.exp(-t * 8) : Math.max(0, (len - t) / .05)) : Math.exp(-t * 14));
+        let v = 0; for (let hh = 1; hh <= 6; hh++) v += Math.sin(2 * Math.PI * pitch * hh * t) / hh;
+        out[k] += amp * (env * .5 * v + (t < .015 ? (rnd() - .5) * 1.2 * (1 - t / .015) : 0));
+      }
+    }
+    return out;
+  };
+  const got = builder.extractVoiceRhythm(voice(120, [[0, .7], [4, .7], [8, .7], [12, 1, true]], 220), rate);
+  assert.equal(got.bpm, 120); assert.equal(got.length, 16);
+  assert.deepEqual(got.notes.map(n => n.step), [0, 4, 8, 12]);
+  assert.deepEqual(got.notes.map(n => n.long), [false, false, false, true]);
+  const two = builder.extractVoiceRhythm(voice(100, [[0, 1], [3, .45], [6, .8], [8, 1], [11, .45], [14, .8], [16, 1], [20, .8], [24, 1, true]], 130), rate);
+  assert.equal(two.length, 32); assert.deepEqual(two.notes.map(n => n.step), [0, 3, 6, 8, 11, 14, 16, 20, 24]);
+  assert.deepEqual(two.notes.map(n => n.strength), [3, 1, 2, 3, 1, 2, 3, 2, 3], 'uns cops més fluixos i uns més forts');
+  assert.equal(builder.extractVoiceRhythm(new Float32Array(rate * 3), rate), null);
+  // La frase es repeteix (3 vegades si és d'un compàs, 2 si és de dos) i un sol xiulet llarg tanca l'inici.
+  for (const [rhythm, bars] of [[got, 3], [two, 4]]) {
+    const opening = builder.voiceOpening(rhythm, { level: 4 });
+    assert(engine.validBatucadaOpening(opening)); assert.equal(opening.steps.length, bars);
+    assert.deepEqual(opening.whistles, [[bars - 1, 8, 'long']]); assert.equal(opening.roll, false);
+    const song = builder.createBatucadaSong(engine, { seed: 3, rhythm: 'samba', bpm: rhythm.bpm, opening });
+    const first = [...song.sections].sort((a, b) => a.start - b.start)[0];
+    assert.equal(first.bars, bars, 'l\'intro dura el que cal per sentir la frase');
+    const line = engine.composeSongPart(song.settings, { ...first, instruments: ['drums'], revision: 1 }).batucadaLine;
+    const hits = line.filter(h => h[2] !== engine.BATUCADA_WHISTLE.note);
+    assert.equal(hits.length, rhythm.notes.length * (rhythm.length === 16 ? 3 : 2));
+    const v = s => Math.max(...hits.filter(h => h[0] === 0 && h[1] * 4 === s).map(h => h[3]));
+    if (rhythm === two) assert(v(0) > v(6) && v(6) > v(3), 'forts, normals i fluixos');
+    assert.equal(line.filter(h => h[2] === engine.BATUCADA_WHISTLE.note).length, 1);
+  }
+});

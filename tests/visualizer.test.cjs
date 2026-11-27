@@ -18,8 +18,9 @@ test('visualitzador VaTuCalla!: es carrega a la web, es publica i es veu per sob
   assert.match(viz, /ctx\.textAlign = 'right'; ctx\.textBaseline = 'bottom'/);
   assert.match(viz, /ctx\.textAlign = 'center'; ctx\.textBaseline = 'top'/);
   assert.match(viz, /'video\/mp4;codecs=avc1\.640028,mp4a\.40\.2'/);
-  // Cinc dissenys: l'Infinit i quatre de brasilers i de dibuixos animats.
-  for (const design of ['infinit', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: \\{`), design);
+  // Cinc dissenys (l'Infinit ja no hi és: el substitueix la colla dels avis).
+  assert(!/\n    infinit: \{/.test(viz));
+  for (const design of ['colla', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: \\{`), design);
 });
 
 test('l’editor de l’inici és només dins de la Batucada, abans de començar, i es pot plegar', () => {
@@ -31,6 +32,6 @@ test('l’editor de l’inici és només dins de la Batucada, abans de començar
   // La targeta de la Batucada obre la preparació; les altres emissores comencen de seguida.
   assert.match(radio, /button\.dataset\.station === 'batucada' \? openBatucadaSetup\(\) : chooseStation\(button\.dataset\.station\)/);
   // L'inici només s'aplica a la primera cançó (i només si es fa servir).
-  assert.match(radio, /customOpening = design\.use !== false \?/);
+  assert.match(radio, /customOpening = design\.use !== false && \(design\.mode !== 'voice' \|\| design\.voice\) \?/);
   assert.match(radio, /const custom = customOpening; customOpening = null;/);
 });
