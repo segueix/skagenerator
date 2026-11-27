@@ -15,14 +15,15 @@ export const EQ_PRESETS = {
   vocal: [-4, 3, 2],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
-  guitar: [-6, 1, 3], skank: [-11, 2, 6], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1], piano: [-3, 0, 3],
+  guitar: [-6, 1, 3], skank: [-11, 2, 6], skankAcord: [-3, 2, 3], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1], piano: [-3, 0, 3],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
 // Presència de la trompeta (gravat VSCO i alternatives GM): el volum MIDI
 // ja és gairebé al màxim, així que es reforça el senyal sec sense saturar-lo.
 // El compressor i el limitador final continuen protegint la mescla.
 // La guitarra solista (punteig) quedava tapada per les guitarres rítmiques distorsionades.
-export const INSTRUMENT_GAIN_DB = { trumpet: 3, guitar3: 3 };
+// L'skank (guitarra rítmica de l'ska) quedava tapat pel baix i la bateria: les cordes soltes i els acords gravats, més forts.
+export const INSTRUMENT_GAIN_DB = { trumpet: 3, guitar3: 3, skank: 4, skankAcord: 5 };
 export const SONG_GAIN = 10 ** (5.5 / 20);
 export const EQ_BANDS = { low: 120, mid: 900, high: 6000 };
 // Reverberació: el baix sec, la bateria curta, metalls i orgue amb sala.

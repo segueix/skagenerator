@@ -121,7 +121,7 @@ function createPerformance(spec, options = {}) {
   const CHORD_CHANNEL = {};
   if (SKANK_CHORDS) ['maj', 'min', '7', 'm7'].forEach((quality, program) => {
     const channel = PIANO + 12 + program;
-    channels.push({ ...patch(channel, [6, program], 42, 110), reverb: 34 }); instrumentOf[channel] = 'guitar'; CHORD_CHANNEL[quality] = channel;
+    channels.push({ ...patch(channel, [6, program], 42, 127), reverb: 30, tone: 'skankAcord' }); instrumentOf[channel] = 'guitar'; CHORD_CHANNEL[quality] = channel;
   });
   // Ska: secció de vents doblada. Cada vent té un segon músic (trompeta 2, trombó 2 i saxo 2) que
   // toca la mateixa frase una tercera diatònica per sota, una mica més fluix i obert a l'altre costat:

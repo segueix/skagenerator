@@ -460,12 +460,42 @@ export function buildTonewheel(bank, spec, log) {
 const CHORD_ROOTS = ['C', 'Csharp', 'D', 'Eb', 'E', 'F', 'Fsharp', 'G', 'Ab', 'A', 'Bb', 'B'];
 const chordFiles = spec => Object.keys(spec.programs).flatMap(quality => CHORD_ROOTS.flatMap((root, pc) =>
   [1, 2].map(variant => ({ quality, pc, variant, file: `${root}_${quality}_0${variant}.wav` }))));
+// Poliment dels acords per a l'skank: comencen just a l'atac (2 ms abans), sense el retruny greu que tapa el baix
+// (pas alt de 2n ordre a 170 Hz), amb més presència (prestatge aguts +4 dB des de 2,5 kHz), un atac més definit
+// (realçador de transitoris: el cop de pua puja fins a 4 dB respecte de la ressonància) i una cua que s'apaga aviat.
+function biquad(data, rate, type, hz, gainDb = 0, q = .707) {
+  const w = 2 * Math.PI * hz / rate, cos = Math.cos(w), alpha = Math.sin(w) / (2 * q), A = 10 ** (gainDb / 40);
+  let b0, b1, b2, a0, a1, a2;
+  if (type === 'highpass') { b0 = (1 + cos) / 2; b1 = -(1 + cos); b2 = (1 + cos) / 2; a0 = 1 + alpha; a1 = -2 * cos; a2 = 1 - alpha; }
+  else { const s = 2 * Math.sqrt(A) * alpha; b0 = A * ((A + 1) + (A - 1) * cos + s); b1 = -2 * A * ((A - 1) + (A + 1) * cos); b2 = A * ((A + 1) + (A - 1) * cos - s);
+    a0 = (A + 1) - (A - 1) * cos + s; a1 = 2 * ((A - 1) - (A + 1) * cos); a2 = (A + 1) - (A - 1) * cos - s; }
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < data.length; i++) { const x = data[i], y = (b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0; x2 = x1; x1 = x; y2 = y1; y1 = y; data[i] = y; }
+  return data;
+}
+export function polishChord(input, rate) {
+  let peak = 0; for (const x of input) peak = Math.max(peak, Math.abs(x));
+  let onset = 0; while (onset < input.length && Math.abs(input[onset]) < peak * .1) onset++;
+  const data = input.slice(Math.max(0, onset - Math.round(rate * .002)));
+  biquad(data, rate, 'highpass', 170); biquad(data, rate, 'highshelf', 2500, 4);
+  // Transitoris: envolupant ràpida (1 ms) contra lenta (40 ms); on la ràpida passa la lenta, hi ha el cop.
+  const fast = Math.exp(-1 / (rate * .001)), slow = Math.exp(-1 / (rate * .04));
+  let ef = 0, es = 0;
+  for (let i = 0; i < data.length; i++) {
+    const a = Math.abs(data[i]); ef = Math.max(a, ef * fast); es = es * slow + a * (1 - slow);
+    data[i] *= Math.min(10 ** (4 / 20), Math.max(1, 1 + (ef - es) / (es + 1e-4) * .5));
+  }
+  // Cua: a partir de 180 ms s'apaga en 120 ms.
+  const from = Math.round(rate * .18), len = Math.round(rate * .12);
+  for (let i = from; i < data.length; i++) data[i] *= Math.max(0, 1 - (i - from) / len);
+  return data;
+}
 function buildSkankChords(bank, spec, log) {
   for (const [quality, program] of Object.entries(spec.programs)) {
     const instrument = new BasicInstrument(); instrument.name = `${spec.name} ${quality}`.slice(0, 19);
     for (const { pc, variant, file } of chordFiles(spec).filter(entry => entry.quality === quality)) {
       const wav = readWav(readFileSync(new URL('../' + spec.directory + file, import.meta.url)));
-      const data = trim(resample(wav.data, wav.rate, RATE), RATE, spec.seconds);
+      const data = trim(polishChord(resample(wav.data, wav.rate, RATE), RATE), RATE, spec.seconds);
       level(data, RATE, spec.levelDb);
       const key = (variant === 1 ? 48 : 60) + pc;
       const sample = makeSample(bank, `G6${program}${key}`, data, RATE, key, 0);
