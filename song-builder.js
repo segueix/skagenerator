@@ -1653,7 +1653,7 @@
         { type: 'verse', bars: 8, energy: 92, pattern: base, rhythm },
         { type: 'chorus', bars: 8, energy: 96, pattern: otherPattern[one], rhythm: one },
         { type: 'bridge', bars: 2, energy: 62, pattern: base, rhythm, ending: pick(['break', 'stop', 'silence']) },
-        { type: 'verse', bars: 4, energy: 96, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI) },
+        { ...soloBlock('dialog'), bars: 4, turnOne: true },
         { type: 'chorus', bars: 8, energy: 98, pattern: otherPattern[two], rhythm: two },
         { type: 'chorus', bars: 8, energy: 100, pattern: groove, rhythm }
       ];
@@ -1685,7 +1685,7 @@
       () => paradinhas++ ? (change[0] || (() => ({ type: 'solo', bars: 8, energy: 92, pattern: solo, rhythm })))() : { type: 'bridge', bars: 2, energy: 44, pattern: base, rhythm, ending: r() < .5 ? 'break' : 'stop' },
       () => ({ type: 'solo', bars: 8, energy: 92, pattern: solo, rhythm }),
       cuicaSolo, cuicaSolo, () => soloBlock(), () => soloBlock(),
-      ...(compact ? [0, 1, 2].map(() => () => ({ type: 'verse', bars: 4, energy: 94, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI), ending: 'break' })) : [])
+      ...(compact ? [0, 1, 2].map(() => () => ({ type: 'verse', bars: 4, energy: 94, pattern: groove, rhythm, ending: 'break' })) : [])
     ];
     // Solos d'instruments (amb un generador a part: la resta de la cançó no canvia). Tres menes: un instrument
     // completament sol (4 compassos), un solista amb els surdos o el bombo de fons (8) i un diàleg de dos o tres
@@ -1722,10 +1722,11 @@
       const cycle = [
         () => ({ type: 'verse', bars: 8, energy: 92, pattern: base, rhythm }),
         () => ({ type: 'chorus', bars: 8, energy: 96, pattern: groove, rhythm }),
+        () => soloBlock(),
         () => dialog(groove, 'break'),
         () => ({ type: 'chorus', bars: 8, energy: 98, pattern: variation(), rhythm }),
         rhythmChange,
-        () => ({ type: 'verse', bars: 4, energy: 96, pattern: groove, rhythm, tutti: pick(engine.BATUCADA_TUTTI), ending: pick(['break', 'silence']) }),
+        () => ({ type: 'verse', bars: 4, energy: 96, pattern: groove, rhythm, ending: pick(['break', 'silence']) }),
         () => dialog(base, pick(['break', 'stop'])),
         () => ({ type: 'solo', bars: 8, energy: 94, pattern: solo, rhythm }),
         () => soloBlock(),
@@ -1755,15 +1756,31 @@
       round++;
     }
     // Totes les cançons llargues tenen almenys un moment de solos (després de la primera tornada).
+    // (I, si la cançó és prou llarga, un altre poc abans de l'última tornada; just abans hi va la breca.)
     if (!options.short && !plan.some(block => block.solos)) {
       const at = plan.findIndex(block => block.type === 'chorus');
       if (at > 0) { const block = soloBlock(); plan.splice(at + 1, 0, block); bars += block.bars; }
     }
+    const choruses = plan.map((block, i) => block.type === 'chorus' ? i : -1).filter(i => i > 0);
+    if (!options.short && plan.filter(block => block.solos).length < 2 && choruses.length >= 2 && plan.length >= 6) {
+      const at = Math.max(1, choruses.at(-1) - 1); plan.splice(at, 0, soloBlock());
+    }
     // Una breca abans de l'última tornada.
-    const lastChorus = plan.map(b => b.type).lastIndexOf('chorus');
+    let lastChorus = plan.map(b => b.type).lastIndexOf('chorus');
     if (lastChorus > 1 && !plan[lastChorus - 1].ending && !plan[lastChorus - 1].solos) plan[lastChorus - 1].ending = r() < .5 ? 'break' : 'stop';
     const closing = alone ? 'hit' : pick(['hit', 'hit', 'ring', 'cold']);
     plan.push({ type: 'outro', bars: 4, energy: alone ? 100 : 98, pattern: groove, rhythm, ...(alone ? { finale: true } : {}) });
+    // Textura: perquè no toquin tots alhora tota l'estona, les estrofes de vuit compassos comencen amb poca gent
+    // (els surdos, la caixa, el tabal, el bombo i un dels petits: tamborim, agogô o xocalho) i les tornades (menys
+    // l'última), amb els surdos 1 i 2, el bombo, el repique i els petits; a la segona meitat hi entra tota la colla.
+    for (let i = plan.length - 1; i > 0; i--) {
+      const block = plan[i];
+      if (!['verse', 'chorus'].includes(block.type) || i === lastChorus || block.bars !== 8 || block.tutti || block.solos || block.dialog || block.opening) continue;
+      const keep = block.type === 'verse' ? [0, 1, 2, 3, 10, 11, spick([5, 6, 7])] : [0, 1, 4, 5, 6, 7, 11];
+      const thin = { ...block, bars: 4, energy: block.energy - 4, pattern: block.pattern.map((row, k) => keep.includes(k) ? row : '0'.repeat(16)), ending: 'none' };
+      plan.splice(i, 1, thin, { ...block, bars: 4 });
+    }
+    lastChorus = plan.map(b => b.type).lastIndexOf('chorus');
     // Moments clau, on la batucada puja molt: l'entrada de tots, la represa després de cada breca,
     // l'última tornada i el final. La resta de canvis de volum són petits.
     plan.forEach((block, i) => {
@@ -1787,7 +1804,7 @@
       // Abans d'un canvi de ritme, el mestre ho avisa amb un xiulet llarg i fort.
       const signal = !!next && next.rhythm !== block.rhythm;
       const fx = { ...(block.peak ? { peak: true } : {}), ...(whistle ? { whistle: true } : {}), ...(signal ? { signal: true } : {}), ...(block.tutti ? { tutti: block.tutti } : {}),
-        ...(block.intro ? { intro: block.intro } : {}), ...(block.opening ? { opening: block.opening } : {}), ...(block.dialog ? { dialog: block.dialog } : {}), ...(block.solos ? { solos: block.solos } : {}), ...(block.finale ? { finale: true } : {}),
+        ...(block.intro ? { intro: block.intro } : {}), ...(block.opening ? { opening: block.opening } : {}), ...(block.dialog ? { dialog: block.dialog } : {}), ...(block.solos ? { solos: block.turnOne ? { ...block.solos, turn: 1 } : block.solos } : {}), ...(block.finale ? { finale: true } : {}),
         ...(block.cuica !== undefined && !block.tutti ? { cuica: block.cuica } : {}),
         // Contraritmes: a la meitat de les seccions fortes, el segon músic fa una altra figura.
         // (Al Percudium, a totes: ritmes diferents alhora.)
