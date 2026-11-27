@@ -2438,6 +2438,30 @@
         return line;
     }
 
+    // Gestos de canvi de secció (ska): la secció rítmica prepara junta l'entrada de la següent a l'últim compàs.
+    // anticipa: el baix avança la fonamental del primer acord que ve a l'última corxera, el bombo hi pica i la guitarra
+    //   es menja l'últim contratemps; puja: el baix hi arriba per semitons (3 i 3½) amb el bombo; buit: tots fan un cop
+    //   al tercer temps i deixen el quart buit perquè la secció següent entri sobre el silenci.
+    const SECTION_PUSHES = ['anticipa', 'puja', 'buit'];
+    function sectionPush(push, bassLine, drumLine, chords, bars, nextRoot) {
+        const last = bars - 1, from = push === 'anticipa' ? 3.5 : 3;
+        const root = chords[last].root, target = nextRoot === undefined ? root : root - 6 + ((nextRoot - (root - 6)) % 12 + 12) % 12;
+        // Baix: el que sonava fins al gest es manté (escurçat perquè no s'hi encavalqui) i després, el gest.
+        for (let i = bassLine.length - 1; i >= 0; i--) {
+            const n = bassLine[i];
+            if (n[0] !== last) continue;
+            if (n[1] >= from) bassLine.splice(i, 1); else n[3] = Math.min(n[3], from - n[1] - .05);
+        }
+        if (push === 'anticipa') bassLine.push([last, 3.5, target, .5, 1.25]);
+        if (push === 'puja') bassLine.push([last, 3, target - 2, .45, 1.1], [last, 3.5, target - 1, .45, 1.2]);
+        if (push === 'buit') bassLine.push([last, 3, root, .3, 1.25]);
+        // Bateria: fora el redoble a partir del gest; el bombo (i la caixa al buit) marca el gest amb el baix.
+        for (let i = drumLine.length - 1; i >= 0; i--) if (drumLine[i][0] === last && drumLine[i][1] >= from) drumLine.splice(i, 1);
+        if (push === 'anticipa') drumLine.push([last, 3.5, 36, 118]);
+        if (push === 'puja') drumLine.push([last, 3, 36, 112], [last, 3.5, 36, 118], [last, 3.5, 38, 100]);
+        if (push === 'buit') drumLine.push([last, 3, 36, 120], [last, 3, 38, 112]);
+        drumLine.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    }
     function composeDrumLine(styleName, index, type, bars, energy, options = {}) {
         const g = DRUM_GROOVES[styleName][index], line = [];
         // Mida del redoble final segons el que ve després.
@@ -3268,6 +3292,9 @@
         if (part.hits !== undefined && typeof part.hits !== 'boolean') throw new Error('Cops de secció no vàlids');
         if (part.shout !== undefined && typeof part.shout !== 'boolean') throw new Error('Tornada shout no vàlida');
         if (part.pickup !== undefined && typeof part.pickup !== 'boolean') throw new Error('Entrada dels vents no vàlida');
+        // Gest de canvi de secció (baix, bombo i guitarra junts a l'últim compàs) i fonamental del primer acord que ve.
+        if (part.push !== undefined && !SECTION_PUSHES.includes(part.push)) throw new Error('Gest de canvi de secció no vàlid');
+        if (part.nextRoot !== undefined && (!Number.isInteger(part.nextRoot) || part.nextRoot < 0 || part.nextRoot > 11)) throw new Error('Acord següent no vàlid');
         // Baix sol: als primers compassos (intro) o a l'últim compàs (abans de l'última tornada).
         if (part.bassSolo !== undefined && (!Number.isInteger(part.bassSolo) || part.bassSolo < 1 || part.bassSolo > 8)) throw new Error('Baix sol no vàlid');
         if (part.bassBreak !== undefined && typeof part.bassBreak !== 'boolean') throw new Error('Compàs de baix sol no vàlid');
@@ -3618,11 +3645,16 @@
             if (batucadaStyle.room) drumOptions.batucadaRoom = batucadaStyle.room;
             if (batucadaStyle.spread) drumOptions.batucadaSpread = batucadaStyle.spread;
         }
-        return { ...drumOptions, style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
+        const drumLine = composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn, closing: part.type === 'outro' ? part.closing : undefined, offbeat: part.offbeat });
+        // Gest de canvi de secció: només a l'ska, cap a una altra secció (no al final ni amb aturades, talls o baix sol).
+        const push = part.push && settings.style === 'ska' && bars >= 2 && part.next && part.next !== 'end' && part.type !== 'outro'
+            && !['break', 'stop', 'silence'].includes(part.ending) && !part.hits && !part.bassBreak && !part.pickup ? part.push : null;
+        if (push) sectionPush(push, bassLine, drumLine, chords, bars, part.nextRoot);
+        return { ...drumOptions, ...(push ? { push } : {}), style: settings.style, type: part.type, seed, tonic, mode, bars, energy, beat: 60 / tempo, swing: settings.swing || 0,
             seconds: bars * 4 * 60 / tempo, chords, melody, bassLine, instruments: instruments.slice(), variation, groove, lines, layers: layerIndex,
             ranges: audibleRanges, guitarTakes: guitarTakes.map(take => ({ ...take })),
             guitarBase: part.guitarBase !== false,
-            drumLine: composeDrumLine(settings.style, groove.drums, part.type, bars, energy, { next: part.next, fill: part.fill, ending: part.ending, countIn: part.countIn, closing: part.type === 'outro' ? part.closing : undefined, offbeat: part.offbeat }),
+            drumLine,
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: addVolumes({ ...(settings.mix || {}), ...(part.mix || {}) }, settings.volumes, part.volumes),
             baseVolume: { ...baseVolume },
@@ -3727,7 +3759,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, SOLO_VOCAB, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        SECTION_PUSHES, BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, SOLO_VOCAB, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
