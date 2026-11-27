@@ -16,10 +16,9 @@
   // bigotis, barbes curtes i alguns amb ulleres), en formació: els surdos i el bombo al darrere; la caixa, el
   // repique, el tabal i el tamborim al mig; l'agogô, el xocalho i la cuíca al davant, i el mestre al capdavant,
   // amb el xiulet a la boca i el seu repique. Cadascú toca el seu instrument quan sona i en surt una bafarada
-  // amb el so (BUM!, TÁ!, FIUUU!…). Tres variants (look): samarretes de colors a la plaça, colla uniformada
-  // de nit i festa a l'escenari.
+  // amb el so (BUM!, TÁ!, FIUUU!…). Samarretes de colors, a la plaça.
   const INK = '#2a1d2e';
-  const SKIN = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#d9a066', '#b97a4a', '#f3c9a0', '#a0673d', '#eab38a', '#c98f5d', '#f6d0ad'];
+  const SKIN = ['#f6d5b8', '#f1c9a5', '#fadcc4', '#efc19c', '#f8d9bf', '#f3cdb0', '#f5d0ad', '#fbe0cb', '#eec4a2', '#f7d6bb', '#f2cbaa', '#f9dcc6'];
   const HAIR = ['#2b1d14', '#3b2a1e', '#1a1a1a', '#5a3d28', '#4a4038', '#2b1d14', '#6b4a2f', '#1a1a1a', '#3b2a1e', '#5f5650', '#2b1d14', '#4a3326'];
   // Trets de cada músic (fila de la graella): pentinat, pèl a la cara, ulleres i canes.
   const LOOKS = [
@@ -31,86 +30,31 @@
   const WORDS = ['BUM!', 'BOM!', 'DUM!', 'TÁ!', 'TRRÁ!', 'TIC!', 'DLING!', 'XIC-XIC!', 'UÍ-UÍ!', 'FIUUU!', 'PAM!', 'BOOM!'];
   const SECTION = row => row <= 2 || row === 11 ? 0 : [3, 4, 10].includes(row) ? 1 : row === 9 ? 3 : 2;
   const VARIANTS = {
-    colors: { head: 1, body: 1, bubble: 'round',
+    colors: { head: 1, body: 1,
       shirt: row => ['#e63946', '#2a9d8f', '#264653', '#f4a261', '#6a4c93', '#1d3557', '#ff7f11', '#06a77d', '#b5179e', '#3a86ff', '#8338ec', '#d62828'][row],
-      trousers: () => '#3d3a4b', hat: row => row === 2 ? 'gorra' : row === 8 ? 'barret' : null },
-    uniforme: { head: 1, body: 1.05, bubble: 'round',
-      shirt: () => '#f4f1ea', sash: row => ['#1d4ed8', '#dc2626', '#16a34a', '#eab308'][SECTION(row)],
-      trousers: () => '#1f2a44', hat: () => 'mocador' },
-    festa: { head: .86, body: 1.22, bubble: 'star',
-      shirt: row => ['#ff006e', '#3a86ff', '#ffbe0b', '#8338ec', '#fb5607', '#06d6a0', '#ef476f', '#118ab2', '#ffd166', '#e63946', '#00b4d8', '#9b5de5'][row],
-      stripes: true, trousers: () => '#222', hat: row => row === 5 ? 'gorra' : row === 1 ? 'barret' : null }
+      trousers: () => '#3d3a4b', hat: row => row === 2 ? 'gorra' : row === 8 ? 'barret' : null }
   };
 
-  function collaBackground(ctx, w, h, f, st, look, s, ground) {
-    if (look === 'colors') {
-      const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#7cc6ff'); sky.addColorStop(1, '#ffe7b0');
-      ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-      for (let i = 0, x = -s * .05; x < w; i++) {
-        const bw = s * (.2 + (i * 37 % 10) / 50), bh = s * (.2 + (i * 53 % 10) / 40);
-        ctx.fillStyle = ['#f4a261', '#e9c46a', '#e76f51', '#f6bd60', '#d4a373'][i % 5]; ctx.fillRect(x, ground - bh, bw, bh + 2);
-        ctx.fillStyle = 'rgba(40, 30, 60, .25)';
-        for (let wx = x + bw * .18; wx < x + bw * .8; wx += bw * .32) for (let wy = ground - bh + bh * .15; wy < ground - bh * .3; wy += bh * .3) ctx.fillRect(wx, wy, bw * .16, bh * .14);
-        x += bw;
-      }
-      ctx.strokeStyle = '#5b4636'; ctx.lineWidth = s * .003; ctx.beginPath(); ctx.moveTo(0, h * .2);
-      ctx.quadraticCurveTo(w / 2, h * .28 + f.bass * s * .03, w, h * .2); ctx.stroke();
-      for (let k = 0; k < 18; k++) {
-        const x = (k + .5) / 18 * w, tt = (k + .5) / 18, y = h * .2 + (h * .08 + f.bass * s * .03) * 2 * tt * (1 - tt);
-        ctx.fillStyle = ['#e63946', '#ffd23f', '#06d6a0', '#118ab2', '#ff7f11'][k % 5];
-        ctx.beginPath(); ctx.moveTo(x - s * .018, y); ctx.lineTo(x + s * .018, y); ctx.lineTo(x + Math.sin(st.sway + k) * s * .004, y + s * .04); ctx.closePath(); ctx.fill();
-      }
-      ctx.fillStyle = '#c9b18a'; ctx.fillRect(0, ground, w, h - ground);
-      ctx.fillStyle = 'rgba(120, 90, 60, .18)';
-      for (let y = ground + s * .03; y < h; y += s * .05) ctx.fillRect(0, y, w, s * .004);
-    } else if (look === 'uniforme') {
-      // Carrer de nit: façanes fosques amb finestres enceses i una garlanda de bombetes que bateguen amb els greus.
-      const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#0b1230'); sky.addColorStop(1, '#2a1f4a');
-      ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#fff8d6'; ctx.beginPath(); ctx.arc(w * .85, h * .12, s * .045, 0, Math.PI * 2); ctx.fill();
-      for (let i = 0, x = -s * .05; x < w; i++) {
-        const bw = s * (.18 + (i * 37 % 10) / 45), bh = s * (.25 + (i * 53 % 10) / 35);
-        ctx.fillStyle = ['#1c1b3a', '#24204a', '#191832'][i % 3]; ctx.fillRect(x, ground - bh, bw, bh + 2);
-        for (let wx = x + bw * .15, a = 0; wx < x + bw * .8; wx += bw * .3) for (let wy = ground - bh + bh * .12; wy < ground - bh * .25; wy += bh * .25, a++) {
-          ctx.fillStyle = (i * 7 + a * 3) % 5 < 3 ? '#ffd27a' : '#2e2a55'; ctx.fillRect(wx, wy, bw * .15, bh * .13);
-        }
-        x += bw;
-      }
-      for (const [y0, sag] of [[.17, .08], [.25, .06]]) {
-        ctx.strokeStyle = '#111'; ctx.lineWidth = s * .003; ctx.beginPath(); ctx.moveTo(0, h * y0); ctx.quadraticCurveTo(w / 2, h * (y0 + sag * 2), w, h * y0); ctx.stroke();
-        for (let k = 0; k < 22; k++) {
-          const tt = (k + .5) / 22, x = tt * w, y = h * y0 + h * sag * 4 * tt * (1 - tt) + s * .008, hue = ['#ffd23f', '#ff5d8f', '#4cc9f0', '#80ed99'][k % 4];
-          const g = ctx.createRadialGradient(x, y, 0, x, y, s * (.02 + f.bass * .02)); g.addColorStop(0, hue); g.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, s * (.02 + f.bass * .02), 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = hue; ctx.beginPath(); ctx.arc(x, y, s * .006, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      const floor = ctx.createLinearGradient(0, ground, 0, h); floor.addColorStop(0, '#3a3350'); floor.addColorStop(1, '#5a4d6e');
-      ctx.fillStyle = floor; ctx.fillRect(0, ground, w, h - ground);
-      ctx.fillStyle = 'rgba(255, 210, 122, .08)';
-      for (let y = ground + s * .04; y < h; y += s * .06) ctx.fillRect(0, y, w, s * .005);
-    } else {
-      // Escenari de festa major: fons morat, focus que s'escombren amb el ritme i taulons de fusta.
-      const bg = ctx.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#2b0a4a'); bg.addColorStop(1, '#6a1b6e');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-      ctx.globalCompositeOperation = 'lighter';
-      for (let k = 0; k < 5; k++) {
-        const x0 = w * (k + .5) / 5, a = Math.PI / 2 + Math.sin(st.sway * .5 + k * 1.3) * .45, len = h * 1.1;
-        ctx.fillStyle = `hsla(${(k * 70 + f.t * 20) % 360}, 90%, 65%, ${.08 + f.level * .12})`;
-        ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0 + Math.cos(a - .12) * len, Math.sin(a - .12) * len); ctx.lineTo(x0 + Math.cos(a + .12) * len, Math.sin(a + .12) * len); ctx.closePath(); ctx.fill();
-      }
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = '#ffd166'; ctx.font = `${Math.round(s * .05)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#c0392b'; ctx.fillRect(0, 0, w, h * .035);
-      for (let k = 0; k < 30; k++) { ctx.fillStyle = k % 2 ? '#a93226' : '#e74c3c'; ctx.beginPath(); ctx.arc((k + .5) / 30 * w, h * .035, w / 60, 0, Math.PI); ctx.fill(); }
-      const floor = ctx.createLinearGradient(0, ground, 0, h); floor.addColorStop(0, '#8a5a32'); floor.addColorStop(1, '#b07a45');
-      ctx.fillStyle = floor; ctx.fillRect(0, ground, w, h - ground);
-      ctx.strokeStyle = 'rgba(60, 30, 10, .35)'; ctx.lineWidth = s * .003;
-      for (let k = -10; k <= 10; k++) { ctx.beginPath(); ctx.moveTo(w / 2 + k * w * .03, ground); ctx.lineTo(w / 2 + k * w * .12, h); ctx.stroke(); }
-      for (const p of st.confetti) { p.y += p.v * f.dt; p.x += Math.sin(f.t * 2 + p.ph) * .3; ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, s * .008, s * .012); }
-      st.confetti = st.confetti.filter(p => p.y < h);
-      for (let i = 0; i < Math.round(f.bass * 3); i++) st.confetti.push({ x: Math.random() * w, y: -10, v: s * (.08 + Math.random() * .12), ph: Math.random() * 6, c: ['#ffd166', '#ef476f', '#06d6a0', '#4cc9f0'][i % 4] });
+  function collaBackground(ctx, w, h, f, st, s, ground) {
+    const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#7cc6ff'); sky.addColorStop(1, '#ffe7b0');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+    for (let i = 0, x = -s * .05; x < w; i++) {
+      const bw = s * (.2 + (i * 37 % 10) / 50), bh = s * (.2 + (i * 53 % 10) / 40);
+      ctx.fillStyle = ['#f4a261', '#e9c46a', '#e76f51', '#f6bd60', '#d4a373'][i % 5]; ctx.fillRect(x, ground - bh, bw, bh + 2);
+      ctx.fillStyle = 'rgba(40, 30, 60, .25)';
+      for (let wx = x + bw * .18; wx < x + bw * .8; wx += bw * .32) for (let wy = ground - bh + bh * .15; wy < ground - bh * .3; wy += bh * .3) ctx.fillRect(wx, wy, bw * .16, bh * .14);
+      x += bw;
     }
+    ctx.strokeStyle = '#5b4636'; ctx.lineWidth = s * .003; ctx.beginPath(); ctx.moveTo(0, h * .2);
+    ctx.quadraticCurveTo(w / 2, h * .28 + f.bass * s * .03, w, h * .2); ctx.stroke();
+    for (let k = 0; k < 18; k++) {
+      const x = (k + .5) / 18 * w, tt = (k + .5) / 18, y = h * .2 + (h * .08 + f.bass * s * .03) * 2 * tt * (1 - tt);
+      ctx.fillStyle = ['#e63946', '#ffd23f', '#06d6a0', '#118ab2', '#ff7f11'][k % 5];
+      ctx.beginPath(); ctx.moveTo(x - s * .018, y); ctx.lineTo(x + s * .018, y); ctx.lineTo(x + Math.sin(st.sway + k) * s * .004, y + s * .04); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#c9b18a'; ctx.fillRect(0, ground, w, h - ground);
+    ctx.fillStyle = 'rgba(120, 90, 60, .18)';
+    for (let y = ground + s * .03; y < h; y += s * .05) ctx.fillRect(0, y, w, s * .004);
   }
 
   // Un músic dret, amb els peus a (0, 0) i mida u; e = força del cop (1 just quan pica).
@@ -119,17 +63,11 @@
     const legs = u * .7 * B, top = -(legs + u * 1.8 * B), belly = -legs - u * .55 * B, chest = top + u * .55, shoulderY = top + u * .25;
     const shirt = V.shirt(row);
     ctx.lineJoin = ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = u * .09;
-    // Cames, sabates i cos (la samarreta, amb la faixa o les ratlles de la variant).
+    // Cames, sabates i cos (la samarreta).
     ctx.fillStyle = V.trousers(row); ctx.fillRect(-u * .55, -legs, u * .45, legs - u * .05); ctx.fillRect(u * .1, -legs, u * .45, legs - u * .05);
     ctx.fillStyle = '#20151c'; ctx.beginPath(); ctx.ellipse(-u * .38, -u * .05, u * .38, u * .14, 0, 0, Math.PI * 2); ctx.ellipse(u * .38, -u * .05, u * .38, u * .14, 0, 0, Math.PI * 2); ctx.fill();
     const torso = () => { ctx.beginPath(); ctx.moveTo(-u * .9, top); ctx.lineTo(u * .9, top); ctx.quadraticCurveTo(u * 1.25, (top - legs) / 2, u * .95, -legs); ctx.lineTo(-u * .95, -legs); ctx.quadraticCurveTo(-u * 1.25, (top - legs) / 2, -u * .9, top); ctx.closePath(); };
     ctx.fillStyle = shirt; torso(); ctx.fill();
-    if (V.stripes || V.sash) {
-      ctx.save(); torso(); ctx.clip();
-      if (V.stripes) { ctx.fillStyle = 'rgba(255,255,255,.35)'; for (let x = -u * 1.3; x < u * 1.3; x += u * .45) ctx.fillRect(x, top, u * .18, -legs - top); }
-      if (V.sash) { ctx.strokeStyle = V.sash(row); ctx.lineWidth = u * .38; ctx.beginPath(); ctx.moveTo(-u * 1, top); ctx.lineTo(u * 1.1, -legs); ctx.stroke(); }
-      ctx.restore();
-    }
     ctx.strokeStyle = INK; ctx.lineWidth = u * .09; torso(); ctx.stroke();
     // Coll en V.
     ctx.fillStyle = skin; ctx.beginPath(); ctx.moveTo(-u * .28, top); ctx.lineTo(0, top + u * .3); ctx.lineTo(u * .28, top); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -204,7 +142,7 @@
       ctx.beginPath(); ctx.ellipse(-u * 1.2, y, u * .2, u * .45, 0, 0, Math.PI * 2); ctx.fillStyle = '#c0c0c8'; ctx.fill(); ctx.stroke();
       arm(-u * .8, -u * .7 + rub, y - u * .1); arm(u * .8, u * .42, y - u * .15);
     }
-    // Cap (més petit a la variant de festa), orelles i pentinat.
+    // Cap, orelles i pentinat.
     const hr = u * 1.05 * V.head, hy = top - hr * .82;
     const head = () => { ctx.beginPath(); ctx.ellipse(0, hy, hr, hr * .95, 0, 0, Math.PI * 2); };
     ctx.fillStyle = skin; ctx.strokeStyle = INK; ctx.lineWidth = u * .08;
@@ -230,15 +168,10 @@
     if (L.hair === 'arrissat') { ctx.fillStyle = hair; for (let k = 0; k < 9; k++) { const a = Math.PI * (1.1 + k * .1); ctx.beginPath(); ctx.arc(Math.cos(a) * hr * .92, hy + Math.sin(a) * hr * .88, hr * .2, 0, Math.PI * 2); ctx.fill(); } }
     if (L.hair === 'cua') { ctx.fillStyle = hair; ctx.beginPath(); ctx.ellipse(-hr * 1.05, hy + hr * .1, hr * .16, hr * .35, .4, 0, Math.PI * 2); ctx.fill(); }
     ctx.strokeStyle = INK; ctx.lineWidth = u * .08; head(); ctx.stroke();
-    // Barret de la variant: gorra, barret de palla o mocador lligat (uniforme, del color de la secció).
+    // Barret: gorra o barret de palla.
     const hat = V.hat(row);
     if (hat === 'gorra') { ctx.fillStyle = '#4a5d23'; ctx.beginPath(); ctx.ellipse(0, hy - hr * .5, hr * .98, hr * .5, 0, Math.PI, 0); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.roundRect(-hr * .1, hy - hr * .58, hr * 1.25, hr * .14, hr * .07); ctx.fill(); ctx.stroke(); }
     else if (hat === 'barret') { ctx.fillStyle = '#f2e8cf'; ctx.beginPath(); ctx.ellipse(0, hy - hr * .6, hr * 1.25, hr * .18, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.roundRect(-hr * .6, hy - hr * 1.15, hr * 1.2, hr * .55, hr * .15); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#e63946'; ctx.fillRect(-hr * .6, hy - hr * .75, hr * 1.2, hr * .12); }
-    else if (hat === 'mocador') {
-      ctx.fillStyle = V.sash(row); ctx.save(); head(); ctx.clip(); ctx.fillRect(-hr * 1.1, hy - hr * 1.05, hr * 2.2, hr * .5); ctx.restore();
-      ctx.strokeStyle = INK; ctx.lineWidth = u * .06; ctx.beginPath(); ctx.moveTo(-hr * .99, hy - hr * .55); ctx.lineTo(hr * .99, hy - hr * .55); ctx.stroke();
-      ctx.fillStyle = V.sash(row); for (const a of [.5, -.2]) { ctx.save(); ctx.translate(hr * 1.02, hy - hr * .6); ctx.rotate(a + Math.sin(st.sway * 2) * .15); ctx.beginPath(); ctx.ellipse(hr * .25, 0, hr * .25, hr * .1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore(); }
-    }
     // Ulls (es tanquen quan pica fort), celles fosques, nas, ulleres i bigoti o perilla.
     for (const sx of [-1, 1]) {
       const ex = sx * hr * .34, ey = hy - hr * .02;
@@ -287,7 +220,7 @@
       st.sway += f.dt * (1.2 + f.level * 3);
       ctx.globalCompositeOperation = 'source-over';
       const ground = h * (wide ? .42 : .45);
-      collaBackground(ctx, w, h, f, st, look, s, ground);
+      collaBackground(ctx, w, h, f, st, s, ground);
       // Formació (de darrere a davant): les files es veuen escalonades perquè no es tapin, i la del davant deixa el
       // centre lliure per al mestre.
       const LINES = [[0, 1, 2, 11], [3, 4, 10, 5], [6, 7, 8], [9]];
@@ -313,16 +246,10 @@
         const tw = ctx.measureText(b.word).width + b.u * .7, th = b.u * 1.05;
         ctx.save(); ctx.translate(b.x, b.y - (1 - b.e) * b.u * .4); ctx.globalAlpha = Math.min(1, b.e * 2.5);
         ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = b.u * .08;
-        if (V.bubble === 'star') {
-          ctx.rotate(-.08 * b.side); ctx.beginPath();
-          for (let k = 0; k < 22; k++) { const a = k * Math.PI / 11, r = k % 2 ? .78 : 1; ctx.lineTo(Math.cos(a) * tw * .62 * r, Math.sin(a) * th * .85 * r); }
-          ctx.closePath(); ctx.fillStyle = '#ffe14d'; ctx.fill(); ctx.stroke();
-        } else {
           ctx.beginPath(); ctx.roundRect(-tw / 2, -th / 2, tw, th, th * .45);
           ctx.moveTo(b.side * tw * .12, th / 2 - 1); ctx.lineTo(b.side * tw * .32, th / 2 + b.u * .55); ctx.lineTo(b.side * tw * .3 - b.side * b.u * .35, th / 2 - 1);
           ctx.fill(); ctx.stroke();
           ctx.fillStyle = '#fff'; ctx.fillRect(b.side * tw * .14 - b.u * .25, th / 2 - b.u * .1, b.u * .5, b.u * .14);
-        }
         ctx.fillStyle = `hsl(${hueOf(b.row)}, 80%, 35%)`; ctx.fillText(b.word, 0, b.u * .03);
         ctx.restore();
       }
@@ -334,10 +261,7 @@
   // fresh (els cops que acaben de començar en aquest fotograma), names };
   // state és la memòria entre fotogrames (cada disseny hi guarda la seva sota el seu nom).
   const DESIGNS = {
-    // Tres propostes de la colla (se n'ha de triar una).
-    colla: collaDesign('Colla: samarretes a la plaça', 'colors'),
-    uniforme: collaDesign('Colla: uniformada de nit', 'uniforme'),
-    festa: collaDesign('Colla: festa a l’escenari', 'festa'),
+    colla: collaDesign('La colla', 'colors'),
 
     tambors: {
       name: 'Tambors animats', ownNames: true,

@@ -20,7 +20,7 @@ test('visualitzador VaTuCalla!: es carrega a la web, es publica i es veu per sob
   assert.match(viz, /'video\/mp4;codecs=avc1\.640028,mp4a\.40\.2'/);
   // Cinc dissenys (l'Infinit ja no hi és: el substitueix la colla dels avis).
   assert(!/\n    infinit: \{/.test(viz));
-  for (const design of ['colla', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: \\{`), design);
+  for (const design of ['colla', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: `), design);
 });
 
 test('l’editor de l’inici és només dins de la Batucada, abans de començar, i es pot plegar', () => {
