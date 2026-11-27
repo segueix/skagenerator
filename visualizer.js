@@ -587,7 +587,7 @@
         ctx.restore();
         ctx.restore();
         // ── Rètol: el temps que fa de debò, en lletres grans de colors (contradiu l'avís).
-        const REAL = { sol: 'Fa un sol de justícia', pluja: 'Plou a bots i barrals', neu: 'Neva a tot neva', arc: 'Cel net i arc de Sant Martí' };
+        const REAL = { sol: 'Fa un sol de justícia', pluja: 'Plou a bots i barrals', neu: 'Neva, a tot arreu neva', arc: 'Cel net i arc de Sant Martí' };
         const real = ending ? 'Avui fa el temps que fa' : REAL[st.weather], fs = Math.round(s * (wide ? .06 : .062));
         ctx.font = `${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const fit = Math.min(1, w * .9 / ctx.measureText(real).width), ry = wide ? h * .92 : h * .9;
