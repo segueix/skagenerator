@@ -139,3 +139,14 @@ test('guitarra d\'skank amb acords gravats: amb el banc de guitarres, l\'acord s
   assert(!createPerformance(spec).channels.some(c => c.bank === 6));
   assert(!createPerformance(engine.composeSongPart({ ...settings, instruments: ['guitar'], timbres: { guitar: 'jazz' } }, { type: 'verse', bars: 2, energy: 70, revision: 1 }), { chords: true }).channels.some(c => c.bank === 6));
 });
+
+test('orgue Hammond gravat: amb el banc de guitarres, el B3 amb Leslie en lloc de l\'orgue sintetitzat', () => {
+  const real = require('../real-instruments.json').rotorOrgan;
+  assert.deepEqual([real.bank, real.program], [7, 16]);
+  for (const key of real.keys) assert(require('node:fs').existsSync(require('node:path').join(__dirname, '..', real.directory, `orgue-rotor-${key}.wav`)), String(key));
+  const spec = engine.composeSongPart({ ...settings, instruments: ['organ'] }, { type: 'chorus', bars: 2, energy: 80, revision: 1 });
+  const hammond = createPerformance(spec, { organ: true }).channels.find(c => c.channel === 11);
+  assert.deepEqual([hammond.bank, hammond.program, hammond.leslie], [7, 16, undefined], 'el Leslie és el de la gravació');
+  const synth = createPerformance(spec).channels.find(c => c.channel === 11);
+  assert.deepEqual([synth.bank, synth.program, synth.leslie], [2, 16, 'fast']);
+});
