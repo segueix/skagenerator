@@ -268,10 +268,168 @@
 
   // ── Dissenys ──────────────────────────────────────────────────────────
   // draw(ctx, w, h, frame, state): frame = { t, dt, bass, mid, high, level, hits: [{ row, age }] (cops dels últims 0,9 s),
-  // fresh (els cops que acaben de començar en aquest fotograma), names };
+  // fresh (els cops que acaben de començar en aquest fotograma), names, duration (durada de la cançó, en segons) };
   // state és la memòria entre fotogrames (cada disseny hi guarda la seva sota el seu nom).
   const DESIGNS = {
     colla: collaDesign('La colla', 'colors'),
+
+    urna: {
+      name: 'La urna que balla', ownNames: true,
+      // Sàtira naïf de les eleccions a l'estat veí: una urna gegant, amb cara, al mig d'un paisatge de colors.
+      // A cada cop dels surdos i del bombo hi vola una papereta i s'empassa el vot; a cada cop de caixa, repique,
+      // tamborim o tabal en surt una promesa en una bafarada. Un marcador compta les promeses i les complertes
+      // (sempre zero). Als últims segons, la urna es buida: només en surt confeti i «Fins d'aquí a 4 anys!».
+      draw(ctx, w, h, f, state) {
+        const s = Math.min(w, h), wide = w >= h;
+        const st = state.urna ??= { ballots: [], promises: [], confetti: [], votes: 0, said: 0, squash: 0, next: 0, sway: 0 };
+        st.sway += f.dt * (1 + f.level * 2); st.squash = Math.max(0, st.squash - f.dt * 4);
+        const INK = '#2b1b3d', PAL = ['#ff5d8f', '#ffd23f', '#3ec1d3', '#7bd389', '#ff8c42', '#b388eb', '#f25f5c', '#4d9de0', '#e15fed', '#a3e635'];
+        const PROMISES = ['Baixarem impostos!', 'Habitatge per a tothom!', 'Ara sí que sí!', 'Trens puntuals!', 'Feina per a tothom!', 'Sanitat sense cues!',
+          'Més diàleg!', 'Ho arreglarem!', 'Aquesta vegada és diferent!', 'Ja ho veureu!', 'Escoles noves!', 'Res no canviarà… vull dir, tot!', 'Pujarem les pensions!', 'Llum més barata!'];
+        // Traç tremolós de dibuix d'infant: cada forma es dibuixa amb una mica de soroll que es mou poc a poc.
+        const wob = (k, a = 1) => Math.sin(k * 12.9898 + Math.floor(f.t * 6) * 1.7) * s * .004 * a;
+        const blob = (cx, cy, rx, ry, fill, seed = 0, n = 22) => {
+          ctx.beginPath();
+          for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2, k = 1 + Math.sin(a * 3 + seed) * .05; ctx.lineTo(cx + Math.cos(a) * rx * k + wob(i + seed), cy + Math.sin(a) * ry * k + wob(i * 2 + seed)); }
+          ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = s * .006; ctx.strokeStyle = INK; ctx.stroke();
+        };
+        const poly = (pts, fill, seed = 0) => {
+          ctx.beginPath(); pts.forEach(([x, y], i) => ctx.lineTo(x + wob(i + seed), y + wob(i * 3 + seed))); ctx.closePath();
+          ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = s * .006; ctx.strokeStyle = INK; ctx.stroke();
+        };
+        ctx.globalCompositeOperation = 'source-over'; ctx.lineJoin = ctx.lineCap = 'round';
+        // Cel a franges de colors, sol amb cara que somriu (i fa l'ullet amb els greus) i núvols.
+        const bands = ['#bde0fe', '#cdb4db', '#ffc8dd', '#ffafcc', '#fde68a'];
+        bands.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(0, h * .62 * i / bands.length, w, i === bands.length - 1 ? h : h * .62 / bands.length + 1); });
+        const sx = w * (wide ? .12 : .18), sy = h * (wide ? .2 : .26), sr = s * (.07 + f.bass * .015);
+        for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2 + st.sway * .3; poly([[sx + Math.cos(a - .1) * sr * 1.15, sy + Math.sin(a - .1) * sr * 1.15], [sx + Math.cos(a) * sr * 1.6, sy + Math.sin(a) * sr * 1.6], [sx + Math.cos(a + .1) * sr * 1.15, sy + Math.sin(a + .1) * sr * 1.15]], k % 2 ? '#ff8c42' : '#ffd23f', k); }
+        blob(sx, sy, sr, sr, '#ffd23f', 3);
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(sx - sr * .35, sy - sr * .15, sr * .09, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = s * .005; ctx.beginPath();
+        if (f.bass > .6) { ctx.moveTo(sx + sr * .22, sy - sr * .15); ctx.lineTo(sx + sr * .48, sy - sr * .15); } else ctx.arc(sx + sr * .35, sy - sr * .15, sr * .09, 0, Math.PI * 2);
+        f.bass > .6 ? ctx.stroke() : ctx.fill();
+        ctx.beginPath(); ctx.arc(sx, sy + sr * .1, sr * .45, .2, Math.PI - .2); ctx.stroke();
+        for (const [cx, cy, r] of [[.55, .1, .06], [.82, .16, .05], [.35, .24, .04]]) { const x = ((cx * w + st.sway * s * .02) % (w + s * .3)) - s * .1; blob(x, h * cy, s * r * 1.6, s * r, '#ffffff', cx * 9); }
+        // Turons de colors amb flors i casetes.
+        const hills = [['#7bd389', .62, .18], ['#a3e635', .7, .12], ['#3ec1d3', .78, .1]];
+        hills.forEach(([c, y, amp], i) => {
+          ctx.beginPath(); ctx.moveTo(0, h);
+          for (let x = 0; x <= w; x += w / 40) ctx.lineTo(x, h * y - Math.sin(x / w * Math.PI * (2 + i) + i) * h * amp * .4 + wob(x));
+          ctx.lineTo(w, h); ctx.closePath(); ctx.fillStyle = c; ctx.fill(); ctx.lineWidth = s * .006; ctx.strokeStyle = INK; ctx.stroke();
+        });
+        for (let k = 0; k < 7; k++) {
+          const x = w * (k + .5) / 7 + (k % 2 ? s * .03 : -s * .03), y = h * (.64 + (k % 3) * .015), hw = s * .035;
+          if (Math.abs(x - w / 2) < s * .25) continue;
+          poly([[x - hw, y], [x + hw, y], [x + hw, y - hw * 1.3], [x - hw, y - hw * 1.3]], PAL[(k * 3) % PAL.length], k);
+          poly([[x - hw * 1.25, y - hw * 1.3], [x, y - hw * 2.2], [x + hw * 1.25, y - hw * 1.3]], PAL[(k * 3 + 4) % PAL.length], k + 9);
+          ctx.fillStyle = INK; ctx.fillRect(x - hw * .25, y - hw * .7, hw * .5, hw * .7);
+        }
+        for (let k = 0; k < 26; k++) {
+          const x = (k * 97.3 % 100) / 100 * w, y = h * (.8 + (k * 37 % 17) / 100), r = s * (.012 + (k % 3) * .004) * (1 + f.mid * .4);
+          for (let p = 0; p < 5; p++) { const a = p / 5 * Math.PI * 2 + st.sway * .5; ctx.fillStyle = PAL[k % PAL.length]; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, r * .7, 0, Math.PI * 2); ctx.fill(); }
+          ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, r * .6, 0, Math.PI * 2); ctx.fill();
+        }
+        // Rètol de dalt, cada lletra d'un color i que salta amb el ritme. (Es dibuixa al damunt de les promeses.)
+        const banner = 'ELECCIONS A L’ESTAT VEÍ', by = h * (wide ? .17 : .14), fs = Math.round(s * (wide ? .062 : .068));
+        const drawBanner = () => {
+          ctx.font = `${fs}px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+          const total = ctx.measureText(banner).width, scale = Math.min(1, w * .92 / total);
+          ctx.save(); ctx.translate(w / 2 - total * scale / 2, by); ctx.scale(scale, scale);
+          let bx = 0;
+          [...banner].forEach((ch, i) => {
+            const jump = Math.max(0, Math.sin(st.sway * 3 + i * .6)) * fs * .12 * (.3 + f.level), cw = ctx.measureText(ch).width;
+            ctx.save(); ctx.translate(bx + cw / 2, -jump); ctx.rotate(Math.sin(i * 1.3 + st.sway) * .08);
+            ctx.lineWidth = fs * .14; ctx.strokeStyle = INK; ctx.strokeText(ch, -cw / 2, 0); ctx.fillStyle = PAL[i % PAL.length]; ctx.fillText(ch, -cw / 2, 0);
+            ctx.restore(); bx += cw;
+          });
+          ctx.restore();
+        };
+        // La urna: caixa de vidre de colors amb cara, ulls que segueixen les paperetes i boca-ranura a dalt.
+        const ending = f.duration && f.t > f.duration - 3.2, tilt = ending ? Math.min(1, (f.t - (f.duration - 3.2)) / .6) : 0;
+        const ux = w / 2, uy = h * (wide ? .6 : .58), uw = s * (wide ? .3 : .38), uh = uw * 1.05;
+        const sq = st.squash, bw = uw * (1 + sq * .08), bh = uh * (1 - sq * .08) + Math.sin(st.sway * 2) * s * .004;
+        ctx.save(); ctx.translate(ux, uy + uh / 2); ctx.rotate(Math.sin(st.sway) * .03 + tilt * -.35); ctx.translate(-ux, -(uy + uh / 2));
+        const top = uy + uh / 2 - bh;
+        poly([[ux - bw / 2, uy + uh / 2], [ux + bw / 2, uy + uh / 2], [ux + bw / 2, top], [ux - bw / 2, top]], 'rgba(255, 255, 255, .55)', 1);
+        // Franges de colors dins la urna (i les paperetes que hi ha caigut: s'omple a poc a poc).
+        const fill = ending ? Math.max(0, 1 - tilt) * Math.min(.85, st.votes / 220) : Math.min(.85, st.votes / 220);
+        for (let i = 0; i < 6; i++) { ctx.fillStyle = PAL[(i * 2 + 1) % PAL.length] + '55'; ctx.fillRect(ux - bw / 2 + bw * i / 6, top, bw / 6, bh); }
+        ctx.fillStyle = '#fff8e7'; ctx.fillRect(ux - bw / 2 + s * .006, uy + uh / 2 - bh * fill, bw - s * .012, bh * fill);
+        for (let i = 0; i < Math.round(fill * 40); i++) { ctx.fillStyle = PAL[i % PAL.length]; ctx.fillRect(ux - bw / 2 + ((i * 53) % 97) / 97 * (bw - s * .04) + s * .01, uy + uh / 2 - bh * fill * ((i * 31 % 89) / 89) - s * .01, s * .025, s * .006); }
+        poly([[ux - bw / 2, uy + uh / 2], [ux + bw / 2, uy + uh / 2], [ux + bw / 2, top], [ux - bw / 2, top]], 'rgba(0,0,0,0)', 1);
+        // Tapa de color amb la ranura (la boca), que s'obre quan el mestre xiula i al final.
+        const whistle = f.hits.some(x => x.row === 9 && x.age < .3), open = Math.max(whistle ? .8 : 0, tilt);
+        poly([[ux - bw * .56, top], [ux + bw * .56, top], [ux + bw * .48, top - uh * .12], [ux - bw * .48, top - uh * .12]], '#ff5d8f', 2);
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.ellipse(ux, top - uh * .06, bw * .22, uh * (.018 + open * .05), 0, 0, Math.PI * 2); ctx.fill();
+        // Cara a la urna.
+        const look = st.ballots.length ? Math.sign(st.ballots[0].x - ux) * s * .006 : Math.sin(st.sway) * s * .004;
+        for (const dx of [-.18, .18]) { blob(ux + bw * dx, top + bh * .32, s * .03, s * .036, '#ffffff', dx * 10); ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(ux + bw * dx + look, top + bh * .33, s * .013, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#ff8fab'; for (const dx of [-.3, .3]) { ctx.beginPath(); ctx.arc(ux + bw * dx, top + bh * .48, s * .022, 0, Math.PI * 2); ctx.fill(); }
+        ctx.strokeStyle = INK; ctx.lineWidth = s * .006; ctx.beginPath(); ctx.arc(ux, top + bh * .45, bw * .14, .15 * Math.PI, .85 * Math.PI); ctx.stroke();
+        ctx.font = `${Math.round(s * .03)}px ${FONT}`; ctx.textAlign = 'center'; ctx.fillStyle = INK; ctx.fillText('VOTA!', ux, uy + uh / 2 - bh * .18);
+        ctx.restore();
+        // Paperetes: volen des dels costats fins a la ranura en una corba i hi entren.
+        const slot = [ux, top - uh * .06];
+        for (const hit of f.fresh) {
+          if (ending) break;
+          if ([0, 1, 2, 11].includes(hit.row) && st.ballots.length < 18) {
+            const left = Math.random() < .5, x0 = left ? -s * .05 : w + s * .05, y0 = h * (.35 + Math.random() * .4);
+            st.ballots.push({ x0, y0, x: x0, y: y0, p: 0, c: PAL[Math.floor(Math.random() * PAL.length)], spin: (Math.random() - .5) * 8 });
+          }
+          if ([3, 4, 5, 10].includes(hit.row) && f.t >= st.next) {
+            st.next = f.t + .45; st.said++;
+            const text = PROMISES[(st.said * 5 + hit.row) % PROMISES.length], side = st.said % 2 ? 1 : -1;
+            st.promises.push({ text, x: ux + side * uw * (.55 + Math.random() * .25), y: top - uh * .05, vx: side * s * .04, life: 2.4, c: PAL[st.said % PAL.length] });
+          }
+        }
+        for (const b of st.ballots) {
+          b.p += f.dt / .7; const p = Math.min(1, b.p);
+          b.x = b.x0 + (slot[0] - b.x0) * p; b.y = b.y0 + (slot[1] - b.y0) * p - Math.sin(p * Math.PI) * s * .25;
+          ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.spin * p * (1 - p) + (p > .85 ? 0 : .2));
+          ctx.scale(1 - p * .4, 1 - p * .4);
+          poly([[-s * .045, -s * .03], [s * .045, -s * .03], [s * .045, s * .03], [-s * .045, s * .03]], '#ffffff', b.x0);
+          ctx.fillStyle = b.c; ctx.fillRect(-s * .045, -s * .03, s * .018, s * .06);
+          ctx.strokeStyle = INK; ctx.lineWidth = s * .006; ctx.beginPath(); ctx.moveTo(s * .0, -s * .012); ctx.lineTo(s * .024, s * .012); ctx.moveTo(s * .024, -s * .012); ctx.lineTo(s * .0, s * .012); ctx.stroke();
+          ctx.restore();
+          if (b.p >= 1 && !b.done) { b.done = true; st.votes++; st.squash = 1; }
+        }
+        st.ballots = st.ballots.filter(b => !b.done);
+        // Promeses: bafarades que surten de la urna, pugen i s'esvaeixen.
+        for (const pr of st.promises) {
+          pr.life -= f.dt; pr.y -= s * .09 * f.dt; pr.x += pr.vx * f.dt;
+          // (Quan arriben al rètol, s'esvaeixen: el text de dalt sempre es llegeix.)
+          if (pr.y < by + fs * 1.4) pr.life = Math.min(pr.life, .3);
+          const a = Math.min(1, pr.life / .5, (2.4 - pr.life) / .15);
+          ctx.save(); ctx.globalAlpha = Math.max(0, a);
+          ctx.font = `${Math.round(s * .034)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          const tw = ctx.measureText(pr.text).width + s * .05, th = s * .07;
+          const bx2 = Math.max(tw / 2 + s * .01, Math.min(w - tw / 2 - s * .01, pr.x));
+          blob(bx2, pr.y, tw / 2, th / 2, pr.c, pr.text.length);
+          ctx.fillStyle = INK; ctx.fillText(pr.text, bx2, pr.y + s * .002);
+          ctx.restore();
+        }
+        st.promises = st.promises.filter(pr => pr.life > 0);
+        drawBanner();
+        // Marcador: promeses fetes i complertes (zero).
+        const mx = wide ? w * .84 : w * .5, my = wide ? h * .5 : h * .87, mw = s * (wide ? .26 : .5), mh = s * .18;
+        poly([[mx - mw / 2, my - mh / 2], [mx + mw / 2, my - mh / 2], [mx + mw / 2, my + mh / 2], [mx - mw / 2, my + mh / 2]], '#fff8e7', 4);
+        ctx.font = `${Math.round(s * .028)}px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#2a9d5c'; ctx.fillText(`Vots: ${st.votes}`, mx - mw / 2 + s * .02, my - mh * .28);
+        ctx.fillStyle = '#f25f5c'; ctx.fillText(`Promeses: ${st.said}`, mx - mw / 2 + s * .02, my);
+        ctx.fillStyle = '#4d9de0'; ctx.fillText('Complertes: 0', mx - mw / 2 + s * .02, my + mh * .28);
+        // Final: la urna es buida i només en surt confeti.
+        if (ending) {
+          for (let i = 0; i < 6; i++) st.confetti.push({ x: slot[0], y: slot[1], vx: (Math.random() - .5) * s * 1.2, vy: -s * (.4 + Math.random() * .6), c: PAL[Math.floor(Math.random() * PAL.length)], life: 2 });
+          const msg = 'FINS D’AQUÍ A 4 ANYS!', fs2 = Math.round(s * (wide ? .08 : .085));
+          ctx.font = `${fs2}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          const sc = Math.min(1, w * .92 / ctx.measureText(msg).width) * (1 + Math.sin(f.t * 8) * .03);
+          ctx.save(); ctx.translate(w / 2, h * (wide ? .36 : .34)); ctx.scale(sc * Math.min(1, tilt * 1.5), sc * Math.min(1, tilt * 1.5)); ctx.rotate(-.04);
+          ctx.lineWidth = fs2 * .16; ctx.strokeStyle = INK; ctx.strokeText(msg, 0, 0); ctx.fillStyle = '#ffd23f'; ctx.fillText(msg, 0, 0); ctx.restore();
+        }
+        for (const c of st.confetti) { c.vy += s * 1.2 * f.dt; c.x += c.vx * f.dt; c.y += c.vy * f.dt; c.life -= f.dt; ctx.fillStyle = c.c; ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.life * 6); ctx.fillRect(-s * .008, -s * .004, s * .016, s * .008); ctx.restore(); }
+        st.confetti = st.confetti.filter(c => c.life > 0 && c.y < h + 20);
+      }
+    },
 
     tambors: {
       name: 'Tambors animats', ownNames: true,
@@ -671,7 +829,7 @@
     if (t + .02 < lastT - .05) lastT = t - 1 / 60;
     const fresh = hits.filter(hit => hit.at > lastT); lastT = Math.max(lastT, t + .02);
     const design = DESIGNS[ui.design.value] || DESIGNS.colla;
-    design.draw(sceneCtx, scene.width, scene.height, { t, dt, ...bands, hits, fresh, names: song.names }, state);
+    design.draw(sceneCtx, scene.width, scene.height, { t, dt, ...bands, hits, fresh, names: song.names, duration: buffer.duration }, state);
     ctx.globalCompositeOperation = 'copy'; ctx.drawImage(scene, 0, 0); ctx.globalCompositeOperation = 'source-over';
     overlay(canvas.width, canvas.height, hits, design);
     ui.time.textContent = `${clock(t)} / ${clock(buffer.duration)}`;

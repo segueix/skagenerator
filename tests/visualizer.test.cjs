@@ -26,7 +26,9 @@ test('visualitzador VaTuCalla!: es carrega a la web, es publica i es veu per sob
   assert(wa && (Number(wa[1].replace(/_/g, '')) + Number(wa[2].replace(/_/g, ''))) / 8 * 90 / 1e6 < 16);
   // Cinc dissenys (l'Infinit ja no hi és: el substitueix la colla dels avis).
   assert(!/\n    infinit: \{/.test(viz));
-  for (const design of ['colla', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: `), design);
+  // La urna que balla (sàtira naïf de les eleccions a l'estat veí): coneix la durada de la cançó per fer el final.
+  assert.match(viz, /ELECCIONS A L’ESTAT VEÍ/); assert.match(viz, /duration: buffer\.duration/);
+  for (const design of ['colla', 'urna', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: `), design);
 });
 
 test('l’editor de l’inici és només dins de la Batucada, abans de començar, i es pot plegar', () => {
