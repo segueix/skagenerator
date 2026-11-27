@@ -108,6 +108,9 @@ function createPerformance(spec) {
     instrumentOf[channel] = family;
     takeChannels.set(channel, take);
   }
+  // So de l'skank (ska, guitarra rítmica per defecte): més prima i brillant —sense el cos greu que xoca amb el baix i
+  // l'orgue, amb presència als aguts— i una mica més de reverberació (com la de molla d'un amplificador de guitarra).
+  if (!punk && !misfits && !chosen('guitar') && spec.style === 'ska') Object.assign(channels.find(c => c.channel === 0), { tone: 'skank', reverb: 38 });
   // Piano vertical gravat (VSCO 2 CE): canal propi, després de les preses de guitarra.
   const PIANO = 17 + guitarTakes.length;
   if (has('piano')) { channels.push(patch(PIANO, [2, 0], 74, 94)); instrumentOf[PIANO] = 'piano'; }
@@ -411,6 +414,47 @@ function createPerformance(spec) {
     for (let n = lo; n <= hi; n++) if (pcs.includes(n % 12) && Math.abs(n - target) < dist) { result = n; dist = Math.abs(n - target); }
     return result;
   };
+  // ── Posicions d'acord de guitarra (ska) ────────────────────────────────
+  // Una guitarra no toca l'acord com un teclat (tres notes juntes): fa una posició a les quatre cordes agudes (Re, Sol,
+  // Si i Mi), amb les notes més obertes i alguna de repetida, i passa d'un acord a l'altre movent-se al mínim pel mànec.
+  // Es busquen totes les posicions possibles (trast 0–12, com a molt 4 trasts d'obertura) que tinguin la fonamental i la
+  // tercera, i es tria la més propera a l'anterior (i, a la primera, la de la zona del mànec on toca el guitarrista).
+  const SKANK_STRINGS = [50, 55, 59, 64];
+  let lastVoicing = null;
+  const voicingCache = new Map();
+  function guitarVoicing(chord) {
+    const pcs = chord.pcs, rootPc = ((chord.root % 12) + 12) % 12, thirdPc = ((chord.notes[1] % 12) + 12) % 12;
+    const key = `${pcs.join('.')}:${rootPc}:${lastVoicing?.join('.')}`;
+    if (voicingCache.has(key)) return (lastVoicing = voicingCache.get(key));
+    let best = null, bestScore = Infinity;
+    const frets = [0, 0, 0, 0];
+    const search = string => {
+      if (string === 4) {
+        const used = frets.filter(f => f > 0), span = used.length ? Math.max(...used) - Math.min(...used) : 0;
+        if (span > 3) return;
+        const notes = frets.map((f, i) => SKANK_STRINGS[i] + f), have = new Set(notes.map(n => n % 12));
+        if (!have.has(rootPc) || !have.has(thirdPc) || have.size < Math.min(3, pcs.length)) return;
+        const centre = used.length ? used.reduce((t, f) => t + f, 0) / used.length : 0;
+        // Prop de l'acord anterior; si no n'hi ha, cap al 5è trast (el so de l'skank, ni greu ni massa agut).
+        let score = lastVoicing ? notes.reduce((t, n, i) => t + Math.abs(n - lastVoicing[i]), 0) : Math.abs(centre - 5) * 2;
+        score += span * .5 + (frets.includes(0) ? 1.5 : 0) + (notes[0] % 12 === rootPc ? -1 : 0);
+        if (score < bestScore) { bestScore = score; best = notes.slice(); }
+        return;
+      }
+      for (let f = 0; f <= 12; f++) if (pcs.includes((SKANK_STRINGS[string] + f) % 12)) { frets[string] = f; search(string + 1); }
+    };
+    search(0);
+    const voicing = best || chord.notes.slice();
+    voicingCache.set(key, voicing);
+    return (lastVoicing = voicing);
+  }
+  // Cop de l'skank: de la corda aguda a la greu (cop amunt, el del contratemps), 8–12 ms entre corda i corda, les
+  // últimes una mica més fluixes i curtes; i, just abans, el «xic» de les cordes apagades sota la mà (canal 1).
+  function skank(pitches, start, duration, velocity, muted) {
+    const spread = .008 + (human ? extraRandom() * .004 : .002), order = pitches.slice().sort((a, b) => b - a);
+    if (!muted) note(1, order[0], start - .006, .025, Math.round(velocity * .45), .002);
+    order.forEach((pitch, k) => note(0, pitch, start + k * spread, duration * (1 - .05 * k), velocity * (1 - .07 * k)));
+  }
   // Mà dreta del guitarrista d'ska: tres gestos (sec, obert i apagat) i una manera de tocar per secció que es repeteix
   // cada quatre compassos. A l'estrofa, contratemps secs i, al quart compàs, l'últim apagat (o els dos últims); a la
   // tornada, aquell mateix cop s'obre. Cada tipus de secció de la cançó en tria una (la mateixa cada vegada que torna).
@@ -457,7 +501,7 @@ function createPerformance(spec) {
       // Gest de canvi de secció: la guitarra es menja l'últim contratemps (i, al «buit», tot el quart temps).
       const lastBar = b === spec.chords.length - 1;
       if (!punk && lastBar && spec.push && t >= (spec.push === 'buit' ? 3 : 3.5)) return;
-      const pitches = punk ? (palm ? [chord.root + 12, chord.root + 19] : [chord.root + 12, chord.root + 19, chord.root + 24]) : chord.notes.slice().reverse();
+      const pitches = punk ? (palm ? [chord.root + 12, chord.root + 19] : [chord.root + 12, chord.root + 19, chord.root + 24]) : guitarVoicing(chord);
       // Mà dreta de l'ska: cada cop és sec, obert o apagat segons la manera de tocar de la secció, que es repeteix
       // cada quatre compassos (vegeu skaStroke), amb una mica de variació de força i de temps, com una mà de debò.
       const stroke = !punk && !ending ? skaStroke(b, hit, hits.length) : null;
@@ -465,7 +509,8 @@ function createPerformance(spec) {
       const jitter = shape && human ? (extraRandom() - .5) * .008 * human : 0;
       const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * shape.length;
       const force = punk ? punkForce(t, hit, 100, 76) : ending ? 90 : Math.round(shape.force + (soft ? -6 : 0) + (human ? (extraRandom() - .5) * 8 * human : 0));
-      strum(0, stroke === 'apagat' ? pitches.slice(0, 3) : pitches, t0 + t * beat + jitter, duration, force, stroke === 'apagat' ? .004 : .007);
+      if (punk || ending) strum(0, pitches, t0 + t * beat + jitter, duration, force, .007);
+      else skank(stroke === 'apagat' ? pitches.slice(1) : pitches, t0 + t * beat + jitter, duration, force, stroke === 'apagat');
       // La segona presa de la mateixa part, a la dreta, uns 14 ms més tard i una mica més fluixa.
       if (doubleRhythm) strum(1, pitches, t0 + t * beat + .014, duration, punkForce(t, hit, 100, 76) - 3, .007);
       // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.

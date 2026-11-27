@@ -15,7 +15,7 @@ export const EQ_PRESETS = {
   vocal: [-4, 3, 2],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
-  guitar: [-6, 1, 3], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1], piano: [-3, 0, 3],
+  guitar: [-6, 1, 3], skank: [-11, 2, 6], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1], piano: [-3, 0, 3],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
 // Presència de la trompeta (gravat VSCO i alternatives GM): el volum MIDI
@@ -321,7 +321,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       // gainDb: guany fix del so triat (calibrat perquè tots els kits i baixos sonin al mateix nivell).
       const totalTrim = (patch.gainDb || 0) + baseVolumeDb(score, patch.instrument);
       const user = totalTrim ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + totalTrim } : score.mix[patch.instrument];
-      const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, user, sampleRate);
+      const eq = createEqualizer(patch.tone || (patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument), user, sampleRate);
       // Cadena: efecte de guitarra → altaveu rotatori (orgue) → efecte de color → equalitzador.
       const chain = [createGuitarFx(fxFor(score, patch), sampleRate), createLeslie(patch.leslie, sampleRate), createColorFx(colorFor(score, patch), sampleRate), eq].filter(Boolean);
       if (chain.length) eqs.set(patch.channel, chain.length === 1 ? chain[0] : { process: (side, x) => chain.reduce((y, stage) => stage.process(side, y), x) });

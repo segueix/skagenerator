@@ -87,3 +87,31 @@ test('trombó legato gravat: les notes lligades (sense cop de llengua) les toca 
   const other = engine.composeSongPart({ ...settings, instruments: ['trombone'], timbres: { trombone: 'vsco' } }, { type: 'chorus', bars: 2, energy: 80, revision: 1, layers: { trombone: 3 } });
   assert(!createPerformance(other).channels.some(p => p.bank === 5 && p.program === 58));
 });
+
+test('guitarra d\'skank: posicions de guitarra a les quatre cordes agudes, cop amunt i so brillant', () => {
+  const spec = engine.composeSongPart({ ...settings, instruments: ['guitar'] }, { type: 'verse', bars: 8, energy: 70, revision: 1 });
+  const perf = createPerformance(spec), on = perf.events.filter(e => e.type === 'on' && e.channel === 0).sort((a, b) => a.time - b.time);
+  const strokes = [];
+  for (const e of on) { const last = strokes.at(-1); if (last && e.time - last[0].time < .06) last.push(e); else strokes.push([e]); }
+  const strings = [50, 55, 59, 64];
+  let moves = 0;
+  strokes.forEach((stroke, i) => {
+    const bar = Math.min(spec.chords.length - 1, Math.floor(stroke[0].time / (spec.beat * 4) + 1e-6)), chord = spec.chords[bar];
+    const notes = stroke.map(e => e.note), sorted = notes.slice().sort((a, b) => a - b);
+    // Cop amunt: de l'aguda a la greu.
+    assert.deepEqual(notes, sorted.slice().reverse(), 'cop amunt');
+    // Cada nota és d'una corda (Re, Sol, Si, Mi) entre el trast 0 i el 12, i de l'acord; hi ha la fonamental i la tercera.
+    if (sorted.length === 4) {
+      const frets = sorted.map((n, k) => n - strings[k]);
+      assert(frets.every(f => f >= 0 && f <= 12), `trasts ${frets}`);
+      const used = frets.filter(f => f > 0); assert(!used.length || Math.max(...used) - Math.min(...used) <= 3, `obertura ${frets}`);
+      assert(sorted.every(n => chord.pcs.includes(n % 12)));
+      assert(sorted.some(n => n % 12 === chord.root % 12) && sorted.some(n => n % 12 === chord.notes[1] % 12));
+      if (i && strokes[i - 1].length === 4) moves += sorted.reduce((t, n, k) => t + Math.abs(n - strokes[i - 1].map(e => e.note).sort((a, b) => a - b)[k]), 0);
+    }
+  });
+  // D'un acord a l'altre la mà es mou poc (de mitjana, menys de 3 semitons per corda i cop).
+  assert(moves / strokes.length / 4 < 3, `moviment ${moves / strokes.length / 4}`);
+  // So de l'skank: equalitzador propi i una mica més de reverberació.
+  assert.equal(perf.channels.find(c => c.channel === 0).tone, 'skank');
+});
