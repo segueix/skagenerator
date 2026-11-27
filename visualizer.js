@@ -445,7 +445,7 @@
       // i un bot), mentre al fons fa just el temps contrari del que diu l'avís. Un vianant va equipat per a l'avís
       // (paraigua sota un sol de justícia, ventall sota la neu…). Els avisos canvien cada pocs segons, amb un cop de
       // caixa, repique, tamborim, tabal o un xiulet; els surdos i el bombo fan vibrar el mòbil. Als últims segons
-      // arriba l'avís final: «Mireu per la finestra».
+      // arriba l'avís final: «Mireu per la finestra». A baix, l'avís es repeteix en lletres grans, sobre el temps contrari.
       draw(ctx, w, h, f, state) {
         const s = Math.min(w, h), wide = w >= h, INK = '#2b1b3d';
         const ALERTS = [
@@ -586,13 +586,13 @@
         for (const [k, old] of st.history.entries()) { if (ending) break; y += card(y, old, .82, .75 - k * .2, false) * 1 + phW * .04; }
         ctx.restore();
         ctx.restore();
-        // ── Rètol: el temps que fa de debò, en lletres grans de colors (contradiu l'avís).
-        const REAL = { sol: 'Fa un sol de justícia', pluja: 'Plou a bots i barrals', neu: 'Neva, a tot arreu neva', arc: 'Cel net i arc de Sant Martí' };
-        const real = ending ? 'Avui fa el temps que fa' : REAL[st.weather], fs = Math.round(s * (wide ? .06 : .062));
+        // ── Rètol: repeteix l'avís en lletres grans, just a sobre del temps que fa (que és el contrari): així es veu de
+        // seguida que l'avís no té res a veure amb el temps. Al final, «Mireu per la finestra!».
+        const real = ending ? 'Mireu per la finestra!' : alert[0], fs = Math.round(s * (wide ? .06 : .062));
         ctx.font = `${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const fit = Math.min(1, w * .9 / ctx.measureText(real).width), ry = wide ? h * .92 : h * .9;
         ctx.save(); ctx.translate(wide ? w * .3 : w / 2, ry); ctx.scale(fit * (wide ? Math.min(1, w * .5 / (ctx.measureText(real).width * fit)) : 1), fit * (wide ? Math.min(1, w * .5 / (ctx.measureText(real).width * fit)) : 1));
-        ctx.lineWidth = fs * .18; ctx.strokeStyle = INK; ctx.strokeText(real, 0, 0); ctx.fillStyle = { sol: '#ffd23f', pluja: '#9fd3ff', neu: '#ffffff', arc: '#7bd389' }[st.weather]; ctx.fillText(real, 0, 0);
+        ctx.lineWidth = fs * .18; ctx.strokeStyle = INK; ctx.strokeText(real, 0, 0); ctx.fillStyle = '#ff4d4d'; ctx.fillText(real, 0, 0);
         ctx.restore();
       }
     },
