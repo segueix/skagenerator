@@ -2017,6 +2017,27 @@
                 && Number.isInteger(w[1]) && w[1] >= 0 && w[1] < 16 && ['short', 'long'].includes(w[2]))
             && (o.roll === undefined || typeof o.roll === 'boolean');
     }
+    // Solos: un, dos o tres instruments que improvisen frases seves (pregunta i resposta) mentre la resta calla.
+    // bed: el fons, res (l'instrument sol), els surdos 1 i 2 o el bombo; turn: compassos de cada torn quan dialoguen.
+    // Cada figura té 16 passos: X accent, x normal, o cop fluix (fantasma), m surdo apagat, g campana greu de l'agogô
+    // (G, accentuada) i . silenci. Les primeres de cada llista són preguntes (acaben obertes) i les altres, respostes.
+    const SOLO_VOCAB = {
+        2: ['X..mX.X.X..mX.x.', 'X.mmX..xX.mmX...', 'X..xX.xxX..xXXX.', 'X.m.X.mxX.XmX.X.'],
+        3: ['X.oxX.oxX.oxXxxx', 'XooxooXoXooxooXo', 'oxoXoxoXoxoXXxXx', 'X.x.X.x.XxxxX...', 'X..xX..xX.xxX...', 'XooXooXoXoXoX...'],
+        4: ['X.xX.xX.X.xX.xX.', 'XxX.XxX.XxX.Xxxx', 'X..X..X.X.X.XXX.', 'X.XX.X.XX.XX.X..', 'XXX.XXX.XXX.X...', 'X..xx.X.X..xx.X.'],
+        5: ['X.XX.X.XX.X.XX.X', 'X.xX.xX.X.xX.xXx', 'XxXxX.X.XxXxX.X.', 'X.X.XX.XX.X.X...', 'X.XX.XX.X.XX.X..', 'XX.XX.XX.X.X.X..'],
+        6: ['X.g.X.gxX.g.Xxg.', 'XxG.XxG.Xx.gX.G.', 'X.xgX.xgX.xgXxxg', 'X.g.XgX.X.g.G...', 'XxgxXxgxX.G.X...', 'G.X.G.XxG.X.X...'],
+        7: ['XxxxXxxxXxxxXxXx', 'X.xxX.xxX.xxXxxx', 'XxXxXxXxXxXxXXXX', 'Xxx.Xxx.Xxx.X...', 'XxxxX.xxXxxxX...', 'X.X.XxxxX.X.X...'],
+        8: ['X.x.XxX.X.x.XxXx', 'XxX..xX.XxX..xXx', 'X..xX..xXxXxX...', 'X.xxX.xxX.x.X...', 'XxXxX...XxXxX...', 'X..XX..XX.xXX...'],
+        10: ['X.x.X.xxX.x.Xx..', 'X..xX.x.X..xXxX.', 'XxX.XxX.X.X.Xxxx', 'X.x.X.x.X...X...', 'X..xX..xX.xxX...', 'XxxxX.X.X.X.X...'],
+        11: ['X...X.x.X...X.xx', 'X..xX...X..xX.X.', 'X.x.X.x.XxX.X...', 'X...X.xxX...X...', 'X..xX..xX.X.X...', 'X.X.X.X.X...X...']
+    };
+    const SOLO_ROWS = Object.keys(SOLO_VOCAB).map(Number), SOLO_BEDS = ['none', 'surdos', 'bombo'];
+    const validBatucadaSolos = o => !!o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(key => ['players', 'bed', 'turn'].includes(key))
+        && Array.isArray(o.players) && o.players.length >= 1 && o.players.length <= 3 && new Set(o.players).size === o.players.length
+        && o.players.every(row => SOLO_ROWS.includes(row)) && SOLO_BEDS.includes(o.bed) && [1, 2].includes(o.turn)
+        // (Amb fons de surdos o de bombo, el solista no pot ser un surdo ni el bombo.)
+        && (o.bed === 'none' || o.players.every(row => row !== 2 && row !== BOMBO_ROW));
     function validBatucadaFx(fx) {
         return fx === undefined || !!fx && typeof fx === 'object' && !Array.isArray(fx) && Object.entries(fx).every(([key, value]) =>
             key === 'peak' || key === 'whistle' ? typeof value === 'boolean'
@@ -2027,6 +2048,7 @@
                 : key === 'opening' ? validBatucadaOpening(value)
                 : key === 'signal' ? typeof value === 'boolean'
                 : key === 'dialog' ? value === 1 || value === 2 || value === 3
+                : key === 'solos' ? validBatucadaSolos(value)
                 : key === 'finale' ? typeof value === 'boolean' : false);
     }
     // Diàleg: grups que es responen (surdos / caixa i repique / tamborim, agogô i xocalho). Tots continuen
@@ -2328,8 +2350,44 @@
             blow(bar, from, .12, 6); blow(bar, from + 2, .12, 6); blow(bar, from + 4, beat * (last ? .9 : 1.4), 8);
             for (let step = 0; step < 16; step++) if (figure[step] === '1') add(bar, step, row, last ? step * 1.5 : 0, false, [0]);
         };
+        // Solos: en cada compàs parla un solista (amb diversos, es van passant la paraula: torns de `turn` compassos i,
+        // a la segona meitat, d'un compàs, perquè el diàleg s'escalfi). Cada solista tria una pregunta o una resposta
+        // del seu vocabulari i, per sota, sona el fons triat, més fluix. A l'últim compàs, tots els solistes junts fan
+        // un redoble que creix i el fons fa la crida: a la secció següent torna a entrar tota la colla.
+        const soloBar = (bar, last) => {
+            const o = fx.solos, n = o.players.length, half = Math.max(o.turn, Math.floor(bars / 2 / o.turn) * o.turn);
+            const who = n === 1 ? 0 : bar < half ? Math.floor(bar / o.turn) % n : (Math.floor(half / o.turn) + bar - half) % n;
+            const bed = o.bed === 'surdos' ? [[0, rows[0].includes('1') ? rows[0] : '1000000010000000'], [1, rows[1].includes('1') ? rows[1] : '0000100000001000']]
+                : o.bed === 'bombo' ? [[BOMBO_ROW, pattern[BOMBO_ROW]?.includes('1') ? pattern[BOMBO_ROW] : '1000100010001000']] : [];
+            for (const [row, figure] of bed) for (let step = 0; step < (last ? 12 : 16); step++) if (figure[step] === '1') add(bar, step, row, -8, false, [0]);
+            if (last && o.bed === 'bombo') pickup(bar);
+            if (last && o.bed === 'surdos') { add(bar, 12, 0, 6, true, [0]); add(bar, 12, 1, 6, true, [0]); }
+            const strike = (row, step, mark, extra = 0) => {
+                if (mark === '.') return;
+                const force = { X: 12, x: 0, o: -22, m: -6, g: 0, G: 12 }[mark] ?? 0;
+                const note = row === TABAL_ROW ? (step < 15 && 'Xxo'.includes(soloFigure(row, bar)[step + 1]) ? TABAL_CORXERA : TABAL_NEGRA)
+                    : row === BOMBO_ROW ? bomboNote(bar, step) : row === 2 && mark === 'm' ? SURDO_MUTED[2]
+                    : row === 6 ? ('gG'.includes(mark) ? AGOGO_LOW : BATUCADA[6].note)
+                    : row === 8 ? CUICA_CHAINS[soloChain][soloCuica++ % CUICA_CHAINS[soloChain].length] : undefined;
+                add(bar, step, row, 8 + force + extra, false, [0], note);
+            };
+            if (last) {
+                for (const row of o.players) for (let step = 0; step < 16; step++) strike(row, step, step < 8 ? soloFigure(row, bar)[step] : 'x', step >= 8 ? (step - 8) * 2.5 - 6 : 0);
+                return;
+            }
+            const row = o.players[who];
+            for (let step = 0; step < 16; step++) strike(row, step, soloFigure(row, bar)[step]);
+        };
+        // Figura de cada compàs: preguntes als compassos parells del torn i respostes als senars (sense repetir-ne cap seguida).
+        const soloFigure = (row, bar) => {
+            const list = SOLO_VOCAB[row], answer = bar % 2 === 1, pool = answer ? list.slice(3) : list.slice(0, 3);
+            return pool[(mix(bar * 7 + row) >>> 3) % pool.length];
+        };
+        const soloChain = (salt >>> 5) % CUICA_CHAINS.length;
+        let soloCuica = 0;
         for (let bar = 0; bar < bars; bar++) {
             if (fx.opening) { opening(bar, bar === bars - 1); continue; }
+            if (fx.solos) { soloBar(bar, bar === bars - 1); continue; }
             if (fx.intro === 'caixa' || fx.intro === 'repique') { solo(bar, bar === bars - 1); continue; }
             if (fx.intro === 'timbal') { timbal(bar, bar === bars - 1); continue; }
             if (fx.finale && type === 'outro') { finale(bar); continue; }
@@ -3663,7 +3721,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, SOLO_VOCAB, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,

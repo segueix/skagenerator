@@ -440,7 +440,7 @@ test('Percudium: dens, als mitjos, amb accents sincopats, arrossegaments i sala,
     assert.equal(song.settings.batucadaBand, 3);
     assert(song.settings.bpm >= 100 && secs.every(sec => (sec.bpm ?? song.settings.bpm) >= 94 && (sec.bpm ?? song.settings.bpm) <= 108));
     assert(song.settings.mix.drums.low === 0 && song.settings.mix.drums.high > 0);
-    assert(secs.filter(sec => sec.energy >= 84 && sec.type !== 'intro' && !sec.batucada?.tutti && !sec.batucada?.finale).every(sec => sec.batucada?.counter !== undefined));
+    assert(secs.filter(sec => sec.energy >= 84 && sec.type !== 'intro' && !sec.batucada?.tutti && !sec.batucada?.finale && !sec.batucada?.solos).every(sec => sec.batucada?.counter !== undefined));
     // La caixa contínua es manté a totes les variacions.
     assert([song.settings.batucadaPattern, ...secs.map(sec => sec.batucadaPattern).filter(Boolean)].every(p => p[3] === '1'.repeat(16) || p[4] !== undefined));
   }
@@ -654,7 +654,7 @@ test('short: cançons de 60–90 s, intenses i amb canvis de ritme (i formes que
     const song = builder.createBatucadaSong(engine, { seed, short: true, ...(rhythm ? { rhythm } : {}) });
     const secs = song.sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || song.settings.bpm), 0);
     assert(secs >= 58 && secs <= 92, `seed ${seed} ${rhythm}: ${secs.toFixed(1)} s`);
-    const energies = song.sections.filter(s => s.type !== 'intro' && s.type !== 'outro' && s.type !== 'bridge').map(s => s.energy);
+    const energies = song.sections.filter(s => s.type !== 'intro' && s.type !== 'outro' && s.type !== 'bridge' && !s.batucada?.solos).map(s => s.energy);
     assert(energies.every(e => e >= 90), `seed ${seed}: intensa`);
     const patterns = new Set(song.sections.map(s => (s.batucadaPattern || song.settings.batucadaPattern).join()));
     if (!builder.BATUCADA_STYLES[song.settings.batucadaRhythm]?.alone) assert(patterns.size >= 2, `seed ${seed}: canvis de ritme`);
@@ -720,4 +720,44 @@ test('ritme gravat amb la veu: se n\'extreuen cops, força, llargs i tempo, i so
     if (rhythm === two) assert(v(0) > v(6) && v(6) > v(3), 'forts, normals i fluixos');
     assert.equal(line.filter(h => h[2] === engine.BATUCADA_WHISTLE.note).length, 1);
   }
+});
+
+test('solos: un instrument sol, amb surdos o bombo de fons, o dos i tres solistes que dialoguen', () => {
+  const builder = require('../song-builder.js'), kinds = new Set();
+  let checked = 0;
+  for (let seed = 1; seed <= 80; seed++) for (const short of [false, true]) {
+    const song = builder.createBatucadaSong(engine, { seed, short });
+    if (!short) assert(song.sections.some(s => s.batucada?.solos), `seed ${seed}: hi ha solos`);
+    for (const sec of song.sections.filter(s => s.batucada?.solos)) {
+      const { players, bed, turn } = sec.batucada.solos;
+      kinds.add(`${players.length}-${bed}`);
+      const line = engine.composeSongPart(song.settings, { ...sec, instruments: ['drums'], revision: 1 }).batucadaLine;
+      const rowsOf = l => new Set(l.map(h => engine.batucadaRowOf(h[2])));
+      // Només sonen els solistes, el fons triat (i el xiulet, si avisa d'un canvi de ritme).
+      const allowed = new Set([...players, ...(bed === 'surdos' ? [0, 1] : bed === 'bombo' ? [11] : []), 9]);
+      assert([...rowsOf(line)].every(row => allowed.has(row)), `seed ${seed}: ${[...rowsOf(line)]}`);
+      // Cada compàs (menys l'últim) parla un sol solista; amb diversos, es van passant la paraula.
+      const speakers = [];
+      for (let bar = 0; bar < sec.bars - 1; bar++) {
+        const who = [...rowsOf(line.filter(h => h[0] === bar))].filter(row => players.includes(row));
+        assert.equal(who.length, 1, `seed ${seed} compàs ${bar}`); speakers.push(who[0]);
+      }
+      if (players.length > 1) assert.equal(new Set(speakers).size, players.length, 'tots parlen');
+      if (players.length > 1) assert(speakers.slice(0, turn).every(p => p === speakers[0]), 'torns');
+      // A l'últim compàs, tots els solistes junts, creixent.
+      const end = line.filter(h => h[0] === sec.bars - 1 && players.includes(engine.batucadaRowOf(h[2])));
+      assert.equal(new Set(end.map(h => engine.batucadaRowOf(h[2]))).size, players.length);
+      // El fons, més fluix que el solista.
+      if (bed !== 'none') {
+        const top = rows => Math.max(...line.filter(h => h[0] < sec.bars - 1 && rows.includes(engine.batucadaRowOf(h[2]))).map(h => h[3]));
+        assert(top(bed === 'bombo' ? [11] : [0, 1]) < top(players) + 20);
+      }
+      checked++;
+    }
+  }
+  for (const kind of ['1-none', '1-surdos', '2-none', '3-surdos']) assert(kinds.has(kind), kind);
+  assert(checked > 60, `solos: ${checked}`);
+  assert(!engine.validBatucadaFx({ solos: { players: [9], bed: 'none', turn: 2 } }), 'el xiulet no fa solos');
+  assert(!engine.validBatucadaFx({ solos: { players: [0, 3], bed: 'surdos', turn: 2 } }), 'amb fons de surdos, cap surdo solista');
+  assert(!engine.validBatucadaFx({ solos: { players: [3, 4, 5, 6], bed: 'none', turn: 2 } }), 'tres solistes com a molt');
 });
