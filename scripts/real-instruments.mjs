@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, readdir, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import ROUND_ROBIN from '../round-robin.json' with { type: 'json' };
 import {
   BasicInstrument, BasicPreset, BasicSoundBank, EmptySample, GeneratorTypes, SampleTypes, SoundBankLoader, SpessaLog
@@ -540,6 +540,16 @@ function buildRotorOrgan(bank, spec, log) {
     zone.keyRange = { min: i ? Math.floor((keys[i - 1] + key) / 2) + 1 : 0, max: i < keys.length - 1 ? Math.floor((key + keys[i + 1]) / 2) : 127 };
     zone.setGenerator(GeneratorTypes.sampleModes, 1);
     zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+    // Percussió del 3r harmònic (si n'hi ha): una capa sense bucle a l'atac de la nota, igualada amb la nota i més fluixa.
+    const percussion = new URL('../' + spec.directory + `orgue-rotor-perc-${key}.wav`, import.meta.url);
+    if (spec.percussionDb !== undefined && existsSync(percussion)) {
+      const hitWav = readWav(readFileSync(percussion)), hit = resample(hitWav.data, hitWav.rate, RATE);
+      level(hit, RATE, spec.levelDb);
+      const perc = instrument.createZone(makeSample(bank, `P7${key}`, hit, RATE, key, 0));
+      perc.keyRange = zone.keyRange;
+      perc.setGenerator(GeneratorTypes.initialAttenuation, Math.round(-spec.percussionDb * 10));
+      perc.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+    }
   });
   bank.addInstruments(instrument);
   const preset = new BasicPreset(bank); preset.name = instrument.name; preset.program = spec.program; preset.bankMSB = spec.bank;
@@ -551,7 +561,7 @@ export async function buildGuitarInstruments(entries, log = console.log, chords 
   await mkdir(CACHE, { recursive: true });
   // (També el contingut dels acords propis: si se'n canvia un, el banc es torna a construir.)
   const chordHashes = chords ? chordFiles(chords).map(({ file }) => sha(readFileSync(new URL('../' + chords.directory + file, import.meta.url)))) : [];
-  const organHashes = organ ? organ.keys.map(key => sha(readFileSync(new URL('../' + organ.directory + `orgue-rotor-${key}.wav`, import.meta.url)))) : [];
+  const organHashes = organ ? organ.keys.flatMap(key => [`orgue-rotor-${key}.wav`, `orgue-rotor-perc-${key}.wav`]).filter(file => existsSync(new URL('../' + organ.directory + file, import.meta.url))).map(file => sha(readFileSync(new URL('../' + organ.directory + file, import.meta.url)))) : [];
   const fingerprint = sha(JSON.stringify(entries) + JSON.stringify(chords) + JSON.stringify(organ) + await readFile(new URL(import.meta.url)) + chordHashes.join('') + organHashes.join(''));
   const cached = join(CACHE, `guitars-${fingerprint.slice(0, 16)}.sf2`);
   try { return new Uint8Array(await readFile(cached)); } catch { /* Es construeix. */ }

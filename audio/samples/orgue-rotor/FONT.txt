@@ -5,3 +5,6 @@ Notes: el so sostingut sense vibrato («RelRtr_RK_*»), una de cada tres semiton
 paquet, «C2» = 48). Al repositori: barreja mono dels dos canals (estèreo 24 bits originals), 16 bits, 44,1 kHz, els
 3 primers segons amb un fos de 20 ms al final. El build hi busca un bucle d'1,3–2,5 s (aproximadament una volta del
 rotor) amb un encreuament de 40 ms, perquè el gir del Leslie no es talli.
+Percussió del 3r harmònic («RelRtr_PRC3_*», les mateixes 13 notes): fitxers «orgue-rotor-perc-<clau>.wav», barreja mono,
+16 bits, 44,1 kHz, 0,5 s amb un fos de 20 ms. Sona com una capa a l'atac de cada nota (sense bucle), 3 dB per sota
+de la nota sostinguda (al paquet original, la percussió té un volum de grup més baix que el so sostingut).

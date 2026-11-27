@@ -307,13 +307,14 @@
   ],
   "rotorOrgan": {
     "name": "Orgue Hammond (rotor)",
-    "about": "Hammond B3 gravat amb Leslie («Real Rotor Organ», Indiginus): vegeu audio/samples/orgue-rotor/FONT.txt. Al banc de guitarres (banc 7, programa 16). Substitueix l'orgue sintetitzat quan el banc hi és.",
+    "about": "Hammond B3 gravat amb Leslie («Real Rotor Organ», Indiginus): vegeu audio/samples/orgue-rotor/FONT.txt. Al banc de guitarres (banc 7, programa 16). Amb la percussió del 3r harmònic com a capa a l'atac. Substitueix l'orgue sintetitzat quan el banc hi és.",
     "bank": 7,
     "program": 16,
     "directory": "audio/samples/orgue-rotor/",
     "keys": [48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84],
     "release": 0.08,
-    "levelDb": -12
+    "levelDb": -12,
+    "percussionDb": -3
   },
   "skankChords": {
     "name": "Guitarra skank (acords)",

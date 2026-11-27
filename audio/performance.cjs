@@ -85,7 +85,7 @@ function createPerformance(spec, options = {}) {
     // Orgue de rodes sintetitzat (banc 2) amb altaveu rotatori: lent a les estrofes, ràpid a tornades i solos.
     // Orgue: el Hammond gravat amb el Leslie girant (banc de guitarres, banc 7) si el banc hi és (options.organ); si no,
     // l'orgue sintetitzat amb l'altaveu rotatori simulat.
-    options.organ ? { channel: 11, bank: 7, program: 16, pan: 76, volume: 115 }
+    options.organ ? { channel: 11, bank: 7, program: 16, pan: 76, volume: 96 }
       : { channel: 11, bank: 2, program: 16, pan: 76, volume: 84, leslie: ['chorus', 'solo'].includes(spec.type) ? 'fast' : 'slow' },
     { channel: 5, program: 81, pan: 58, volume: 106 },
     { channel: 6, program: 89, pan: 76, volume: 90 },
