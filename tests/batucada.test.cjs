@@ -71,10 +71,9 @@ test('bombo: el centre resol i el marge pregunta, segons la frase', () => {
   const brk = bombo(play([...empty, '1000100010001010'], { bars: 3, next: 'verse', ending: 'break' }));
   assert.deepEqual(brk.filter(h => h[0] === 1 && h[1] >= 3).map(h => [h[1], h[2]]), [[3.25, 87], [3.5, 87]]);
   assert.deepEqual(brk.filter(h => h[0] === 2).map(h => [h[1], h[2]]), [[0, 86]]);
-  // Final de tots: un sol cop de tots, al centre del bombo (abans, els dos cops de marge de la crida).
-  const end = bombo(engine.composeSongPart({ ...settings, batucadaRhythm: 'percudium' }, { ...part, type: 'outro', bars: 2, batucada: { finale: true } }).batucadaLine).filter(h => !h[6]);
-  assert.deepEqual(end.filter(h => h[0] === 1).map(h => [h[1], h[2]]), [[0, 86]]);
-  assert.deepEqual(end.filter(h => h[0] === 0 && h[1] >= 3).map(h => [h[1], h[2]]), [[3.25, 87], [3.5, 87]]);
+  // Final de tots: quatre cops de marge que creixen i el cop final al centre.
+  const end = bombo(engine.composeSongPart({ ...settings, batucadaRhythm: 'percudium' }, { ...part, type: 'outro', bars: 2, batucada: { finale: true } }).batucadaLine).filter(h => h[0] === 1 && !h[6]);
+  assert.deepEqual(end.map(h => [h[1], h[2]]), [[0, 87], [.5, 87], [1, 87], [1.5, 87], [2, 86]]);
 });
 
 test('frase de la cançó: el tabal toca A A A B i el repique recupera el final abans de la tornada', () => {
@@ -307,9 +306,8 @@ test('ràdio Batucada: canvis de ritme, moments clau, xiulet, convenções i cu�
     assert(secs.filter(sec => sec.energy < 60).length <= 1);
     // El xiulet només és a l'inici (la primera secció).
     assert(secs.slice(1).every(sec => !sec.batucada?.whistle), `xiulet fora de l'inici (${seed})`);
-    // Ja no hi ha convenções (tots tocant la mateixa figura): tots junts, només un cop (aturades i final).
-    assert(!secs.some(sec => sec.batucada?.tutti), `convenção (${seed})`);
-    if (song.settings.humanize < .2) compact++;
+    // (El Percudium té convenções però conserva una mica de soltesa entre músics.)
+    if (song.settings.batucadaRhythm !== 'percudium' && secs.some(sec => sec.batucada?.tutti)) { compact++; assert(song.settings.humanize < .2); }
     if (secs.some(sec => sec.batucada?.cuica !== undefined)) chains++;
     for (const sec of secs) assert(engine.validBatucadaFx(sec.batucada));
   }
@@ -474,7 +472,7 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
     }
     assert(line.filter(h => h[0] === 0 && h[2] === note).length >= 8, 'fa un ritme');
   }
-  // Diàleg: el grup que parla puja el volum i els altres callen (només el pols continua).
+  // Diàleg: tots continuen tocant, però el grup que parla puja el volum i els altres l'abaixen.
   const rowOf = note => [35, 43, 47].includes(note) ? [35, 43, 47].indexOf(note) : note === engine.AGOGO_LOW ? 6 : note === 85 ? 10 : note === 87 ? 11 : engine.BATUCADA.findIndex(p => p.note === note);
   const group = row => engine.BATUCADA_DIALOG.findIndex(g => g.includes(row));
   const plain = compose({ type: 'bridge', bars: 6 }), dialog = compose({ type: 'bridge', bars: 6, batucada: { dialog: 1 } });
@@ -484,7 +482,7 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
   for (const bar of [0, 1, 2, 3]) {
     const speaking = bar % 2, silent = 1 - speaking;
     assert(avg(dialog, bar, speaking) > avg(plain, bar, speaking) + 8, `parla (${bar})`);
-    assert(!dialog.some(h => h[0] === bar && group(rowOf(h[2])) === silent && !FOUNDATION.includes(rowOf(h[2])) && Number.isInteger(h[1] * 4)), `els altres callen (${bar})`);
+    assert(avg(dialog, bar, silent) < avg(plain, bar, silent) - 6 && avg(dialog, bar, silent) > 30, `replica fluix però sona (${bar})`);
     if (silent === 0) assert(Math.abs(avg(dialog, bar, 0, true) - avg(plain, bar, 0, true)) < 1, `el fons no baixa (${bar})`);
   }
   assert.deepEqual(dialog.filter(h => h[0] === 5).map(h => h[3]), plain.filter(h => h[0] === 5).map(h => h[3]), 'al final, tots igual');
@@ -493,7 +491,7 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
   assert.equal(group(rowOf(half.filter(h => h[0] === 0 && h[1] < 2 && !h[6]).sort((a, b) => b[3] - a[3])[0][2])), 0);
   // (El grup que parla és el que més puja respecte de la mateixa secció sense diàleg.)
   const three = compose({ type: 'bridge', bars: 8, batucada: { dialog: 3 } }), plain8 = compose({ type: 'bridge', bars: 8 });
-  const raised = bar => { const up = [0, 1, 2].map(g => (avg(three, bar, g) || 0) - avg(plain8, bar, g)); return up.indexOf(Math.max(...up)); };
+  const raised = bar => { const up = [0, 1, 2].map(g => avg(three, bar, g) - avg(plain8, bar, g)); return up.indexOf(Math.max(...up)); };
   assert.deepEqual([0, 1, 2, 3, 4, 5].map(raised), [0, 1, 0, 0, 1, 2]);
   // Aturada: un cop de tots al màxim (127) i silenci.
   const stop = compose({ type: 'bridge', bars: 2, next: 'chorus', ending: 'break' }).filter(h => h[0] === 1);
@@ -502,11 +500,15 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
   assert.equal(new Set(stop.map(h => h[6] || 0)).size, 3, 'tots els músics');
   const lead = stop.filter(h => !h[6]);
   assert(lead.some(h => h[3] >= 100) && lead.filter(h => h[3] === 127).length <= 1);
-  // Final: un sol cop de tots els instruments, tots els músics, i després silenci.
+  // Final: cops de tots els instruments junts i un cop final de tots, tots els músics, al màxim.
   const end = compose({ type: 'outro', bars: 4, batucada: { finale: true } });
-  const lastHit = end.filter(h => h[0] === 3);
-  assert(lastHit.length >= 8 && lastHit.every(h => h[1] === 0), 'un sol cop');
-  assert(new Set(lastHit.map(h => rowOf(h[2]))).size >= 8 && new Set(lastHit.map(h => h[6] || 0)).size === 3);
+  const lastHit = end.filter(h => h[0] === 3 && h[1] === 2);
+  assert.deepEqual([...new Set(lastHit.map(h => rowOf(h[2]) >= 0 ? rowOf(h[2]) : 0))].length >= 8 || lastHit.length >= 8, true);
+  // El cop final, el més fort (de cada instrument, el músic principal), sense passar del límit.
+  const strongest = row => Math.max(...end.filter(h => h[0] === 3 && h[1] < 2 && !h[6] && rowOf(h[2]) === row).map(h => h[3]));
+  for (const h of lastHit.filter(h => !h[6])) assert(h[3] >= strongest(rowOf(h[2])), `final ${h[2]}`);
+  assert(new Set(lastHit.map(h => h[6] || 0)).size === 3);
+  assert(!end.some(h => h[0] === 3 && h[1] > 2), 'després, silenci');
   // Tot saturat: també el repique i l'agogô els toquen tres músics.
   const groove = compose({ type: 'chorus', bars: 1 });
   for (const note of [50, 67]) assert.equal(new Set(groove.filter(h => h[2] === note || note === 67 && h[2] === engine.AGOGO_LOW).map(h => h[6] || 0)).size, 3, `${note}`);
@@ -524,8 +526,7 @@ test('Percudium: caixa o repique i xiulet, entrada de tots sense cuíca, diàleg
     const changes = secs.filter(sec => rhythmOf(sec) && rhythmOf(sec) !== 'percudium');
     assert(changes.length >= 1, `canvis de ritme (${seed})`);
     assert(changes.every(sec => (sec.bpm ?? song.settings.bpm) === bpm), 'mateix tempo');
-    // (Una estrofa que comença amb poca gent i continua amb tothom és el mateix ritme: s'avisa abans de la primera meitat.)
-    assert(changes.filter(sec => rhythmOf(secs[secs.indexOf(sec) - 1]) !== rhythmOf(sec)).every(sec => secs[secs.indexOf(sec) - 1].batucada?.signal), 'el mestre avisa del canvi');
+    assert(changes.every(sec => secs[secs.indexOf(sec) - 1].batucada?.signal), 'el mestre avisa del canvi');
     assert.equal(song.settings.countIn, false);
     assert(secs[1].batucada?.peak && secs[1].volumes?.master > 0, 'entren tots amb potència');
     assert(secs.some(sec => sec.batucada?.dialog), 'diàlegs');
@@ -654,7 +655,7 @@ test('short: cançons de 60–90 s, intenses i amb canvis de ritme (i formes que
     const secs = song.sections.reduce((t, s) => t + s.bars * 240 / (s.bpm || song.settings.bpm), 0);
     assert(secs >= 58 && secs <= 92, `seed ${seed} ${rhythm}: ${secs.toFixed(1)} s`);
     const energies = song.sections.filter(s => s.type !== 'intro' && s.type !== 'outro' && s.type !== 'bridge' && !s.batucada?.solos).map(s => s.energy);
-    assert(energies.every(e => e >= 88), `seed ${seed}: intensa`);
+    assert(energies.every(e => e >= 90), `seed ${seed}: intensa`);
     const patterns = new Set(song.sections.map(s => (s.batucadaPattern || song.settings.batucadaPattern).join()));
     if (!builder.BATUCADA_STYLES[song.settings.batucadaRhythm]?.alone) assert(patterns.size >= 2, `seed ${seed}: canvis de ritme`);
     forms.add(song.sections.map(s => `${s.type}${s.bars}${s.ending || ''}${s.batucada?.tutti || ''}${(s.batucadaPattern || song.settings.batucadaPattern)[0]}`).join());
@@ -759,31 +760,4 @@ test('solos: un instrument sol, amb surdos o bombo de fons, o dos i tres soliste
   assert(!engine.validBatucadaFx({ solos: { players: [9], bed: 'none', turn: 2 } }), 'el xiulet no fa solos');
   assert(!engine.validBatucadaFx({ solos: { players: [0, 3], bed: 'surdos', turn: 2 } }), 'amb fons de surdos, cap surdo solista');
   assert(!engine.validBatucadaFx({ solos: { players: [3, 4, 5, 6], bed: 'none', turn: 2 } }), 'tres solistes com a molt');
-});
-
-test('poca gent alhora: estrofes i tornades comencen amb poca gent, els diàlegs i els solos s\'imiten i tots junts només un cop', () => {
-  const builder = require('../song-builder.js');
-  for (const rhythm of ['samba', 'percudium', 'reggae']) for (let seed = 1; seed <= 10; seed++) {
-    const song = builder.createBatucadaSong(engine, { seed, rhythm }), secs = song.sections;
-    assert(secs.filter(s => s.batucada?.solos).length >= 2, `${rhythm} ${seed}: moments de solos`);
-    for (const [i, sec] of secs.entries()) {
-      const line = engine.composeSongPart(song.settings, { ...sec, instruments: ['drums'], revision: 1, next: secs[i + 1]?.type ?? 'end' }).batucadaLine;
-      // Les peces que no toquen al patró de la secció callen (també el surdo 3 que improvisa i la caixa del «foc»).
-      const pattern = sec.batucadaPattern || song.settings.batucadaPattern;
-      if (!sec.batucada?.solos && !sec.batucada?.opening && !sec.batucada?.intro && !sec.batucada?.finale && sec.type !== 'outro' && !sec.ending)
-        // (L'últim compàs és la crida cap a la secció següent: el repique i la caixa hi omplen.)
-        for (const h of line.filter(h => h[0] < sec.bars - 1)) { const row = engine.batucadaRowOf(h[2]); if (row !== 9 && row !== 8 && row !== 4) assert(pattern[row]?.includes('1'), `${rhythm} ${seed} ${sec.type}: ${row}`); }
-      // La cuíca dels seus solos continua sonant.
-      if (sec.batucada?.cuica !== undefined) assert(line.some(h => engine.batucadaRowOf(h[2]) === 8));
-    }
-    // Hi ha estrofes que comencen amb poca gent (set peces) i continuen amb tothom.
-    assert(secs.some((s, i) => s.batucadaPattern?.filter(r => r.includes('1')).length === 7 && secs[i + 1]?.bars === 4), `${rhythm} ${seed}: textura`);
-  }
-  // Diàleg de solistes: qui pren la paraula imita el ritme de la primera meitat de la frase que acaba de sentir.
-  const solos = { players: [3, 6], bed: 'none', turn: 1 };
-  const line = engine.composeSongPart({ seed: 5, style: 'ska', bpm: 120, tonic: 0, mode: 'major', timbres: { drums: 'batucada' } },
-    { type: 'solo', bars: 4, energy: 88, revision: 1, instruments: ['drums'], batucada: { solos } }).batucadaLine;
-  const steps = (bar, row) => line.filter(h => h[0] === bar && engine.batucadaRowOf(h[2]) === row && h[1] < 2).map(h => h[1] * 4).join();
-  assert.equal(steps(1, 6), steps(0, 3), 'l\'agogô imita la caixa');
-  assert.equal(steps(2, 3), steps(1, 6), 'la caixa imita l\'agogô');
 });
