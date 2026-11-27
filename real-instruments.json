@@ -305,6 +305,16 @@
       "levelDb": -14
     }
   ],
+  "skankChords": {
+    "name": "Guitarra skank (acords)",
+    "about": "Acords de guitarra d'ska per a la guitarra rítmica per defecte: vegeu audio/samples/guitarra-ska/FONT.txt. Banc 6, programes 0 (major), 1 (menor), 2 (7) i 3 (m7); tecla 48 + fonamental = variant 1, 60 + fonamental = variant 2.",
+    "bank": 6,
+    "programs": { "maj": 0, "min": 1, "7": 2, "m7": 3 },
+    "directory": "audio/samples/guitarra-ska/",
+    "seconds": 0.45,
+    "release": 0.035,
+    "levelDb": -7
+  },
   "guitars": [
     {
       "name": "Electric Guitar FSBS distorted 1 (bridge)",

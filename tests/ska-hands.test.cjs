@@ -115,3 +115,27 @@ test('guitarra d\'skank: posicions de guitarra a les quatre cordes agudes, cop a
   // So de l'skank: equalitzador propi i una mica més de reverberació.
   assert.equal(perf.channels.find(c => c.channel === 0).tone, 'skank');
 });
+
+test('guitarra d\'skank amb acords gravats: amb el banc de guitarres, l\'acord sencer del seu tipus', () => {
+  const real = require('../real-instruments.json').skankChords;
+  assert.equal(real.bank, 6); assert.deepEqual(real.programs, { maj: 0, min: 1, '7': 2, m7: 3 });
+  const fs = require('node:fs'), path = require('node:path');
+  const roots = ['C', 'Csharp', 'D', 'Eb', 'E', 'F', 'Fsharp', 'G', 'Ab', 'A', 'Bb', 'B'];
+  for (const q of Object.keys(real.programs)) for (const r of roots) for (const v of [1, 2]) assert(fs.existsSync(path.join(__dirname, '..', real.directory, `${r}_${q}_0${v}.wav`)), `${r} ${q} ${v}`);
+  const spec = engine.composeSongPart({ ...settings, instruments: ['guitar'] }, { type: 'verse', bars: 8, energy: 70, revision: 1 });
+  const perf = createPerformance(spec, { chords: true });
+  const chordChannels = perf.channels.filter(c => c.bank === 6);
+  assert.deepEqual(chordChannels.map(c => c.program), [0, 1, 2, 3]);
+  const hits = perf.events.filter(e => e.type === 'on' && chordChannels.some(c => c.channel === e.channel));
+  assert(hits.length >= 16, 'toca els acords');
+  for (const e of hits) {
+    const bar = Math.min(spec.chords.length - 1, Math.floor(e.time / (spec.beat * 4) + 1e-6)), chord = spec.chords[bar];
+    const program = chordChannels.find(c => c.channel === e.channel).program, rel = chord.pcs.map(pc => ((pc - chord.root) % 12 + 12) % 12);
+    assert.equal(e.note % 12, ((chord.root % 12) + 12) % 12, 'la tecla és la fonamental');
+    assert([48, 60].includes(e.note - e.note % 12) || [48, 60].includes(e.note - (e.note - 48) % 12), 'variant 1 o 2');
+    assert.equal(program, rel.includes(3) ? (rel.includes(10) ? 3 : 1) : (rel.includes(10) ? 2 : 0), 'tipus d\'acord');
+  }
+  // Sense el banc de guitarres (o amb un altre so triat), les cordes soltes de sempre.
+  assert(!createPerformance(spec).channels.some(c => c.bank === 6));
+  assert(!createPerformance(engine.composeSongPart({ ...settings, instruments: ['guitar'], timbres: { guitar: 'jazz' } }, { type: 'verse', bars: 2, energy: 70, revision: 1 }), { chords: true }).channels.some(c => c.bank === 6));
+});

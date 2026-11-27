@@ -453,13 +453,42 @@ export function buildTonewheel(bank, spec, log) {
 }
 
 // Guitarres solistes gravades (FreePats FSBS): banc a part que la web només baixa quan cal.
-export async function buildGuitarInstruments(entries, log = console.log) {
+// ── Acords de guitarra d'ska (skank) ──────────────────────────────────
+// Cada tipus d'acord és un programa (major, menor, 7 i m7) i cada fonamental, una tecla (48 + fonamental, variant 1;
+// 60 + fonamental, variant 2), sense transposar: cada tecla toca la seva mostra tal com és. Les mostres es retallen
+// (seconds), s'igualen a la mateixa sonoritat i s'apaguen en «release» segons quan la guitarra aixeca la mà.
+const CHORD_ROOTS = ['C', 'Csharp', 'D', 'Eb', 'E', 'F', 'Fsharp', 'G', 'Ab', 'A', 'Bb', 'B'];
+const chordFiles = spec => Object.keys(spec.programs).flatMap(quality => CHORD_ROOTS.flatMap((root, pc) =>
+  [1, 2].map(variant => ({ quality, pc, variant, file: `${root}_${quality}_0${variant}.wav` }))));
+function buildSkankChords(bank, spec, log) {
+  for (const [quality, program] of Object.entries(spec.programs)) {
+    const instrument = new BasicInstrument(); instrument.name = `${spec.name} ${quality}`.slice(0, 19);
+    for (const { pc, variant, file } of chordFiles(spec).filter(entry => entry.quality === quality)) {
+      const wav = readWav(readFileSync(new URL('../' + spec.directory + file, import.meta.url)));
+      const data = trim(resample(wav.data, wav.rate, RATE), RATE, spec.seconds);
+      level(data, RATE, spec.levelDb);
+      const key = (variant === 1 ? 48 : 60) + pc;
+      const sample = makeSample(bank, `G6${program}${key}`, data, RATE, key, 0);
+      const zone = instrument.createZone(sample);
+      zone.keyRange = { min: key, max: key };
+      zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+    }
+    bank.addInstruments(instrument);
+    const preset = new BasicPreset(bank); preset.name = instrument.name; preset.program = program; preset.bankMSB = spec.bank;
+    preset.createZone(instrument); bank.addPresets(preset);
+  }
+  log(`${spec.name}: ${chordFiles(spec).length} acords`);
+}
+export async function buildGuitarInstruments(entries, log = console.log, chords = null) {
   SpessaLog.setLogLevel(false, false, false);
   await mkdir(CACHE, { recursive: true });
-  const fingerprint = sha(JSON.stringify(entries) + await readFile(new URL(import.meta.url)));
+  // (També el contingut dels acords propis: si se'n canvia un, el banc es torna a construir.)
+  const chordHashes = chords ? chordFiles(chords).map(({ file }) => sha(readFileSync(new URL('../' + chords.directory + file, import.meta.url)))) : [];
+  const fingerprint = sha(JSON.stringify(entries) + JSON.stringify(chords) + await readFile(new URL(import.meta.url)) + chordHashes.join(''));
   const cached = join(CACHE, `guitars-${fingerprint.slice(0, 16)}.sf2`);
   try { return new Uint8Array(await readFile(cached)); } catch { /* Es construeix. */ }
   const banks = [];
+  if (chords) { const own = new BasicSoundBank(); buildSkankChords(own, chords, log); banks.push(own); }
   for (const entry of entries) banks.push(await importFreePats(entry, log));
   const merged = BasicSoundBank.mergeSoundBanks(...banks);
   merged.soundBankInfo.name = 'Ska Generator lead guitars';

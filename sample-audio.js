@@ -8,7 +8,9 @@
   // Guitarres gravades del banc de guitarres (assets/guitar-instruments.sf2).
   const GUITAR_SOUNDS = ['jazz', 'direct', 'dist1', 'dist2'];
   const guitarURL = new URL('assets/guitar-instruments.sf2?v=20261125-guitars', base).href;
+  // (També l'ska amb la guitarra rítmica per defecte: els acords d'skank gravats són al banc de guitarres.)
   const needsGuitars = spec => ['guitar', 'guitar2', 'guitar3'].some(name => GUITAR_SOUNDS.includes(spec?.timbres?.[name]))
+    || (spec?.style === 'ska' && !!spec?.instruments?.includes('guitar') && [undefined, 'auto'].includes(spec?.timbres?.guitar))
     || (spec?.guitarTakes || []).some(take => GUITAR_SOUNDS.includes(take.sound));
   const needsExtra = spec => EXTRA.drums.includes(spec?.timbres?.drums) || EXTRA.bass.includes(spec?.timbres?.bass) || !!spec?.instruments?.includes('piano');
   const workerURL = new URL('sample-worker.js?v=20261110-samples', base).href;

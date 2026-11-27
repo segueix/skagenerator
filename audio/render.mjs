@@ -276,7 +276,8 @@ export function limitPeaks(left, right, sampleRate, ceiling = .8) {
 
 export async function renderSampledPart(bank, spec, sampleRate = 44100, options = {}) {
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
-  const score = performance.createPerformance(spec);
+  // (Amb el banc de guitarres, la guitarra de l'ska fa servir els acords gravats.)
+  const score = performance.createPerformance(spec, { chords: !!options.guitars });
   const synth = new SpessaSynthProcessor(sampleRate, { eventsEnabled: false });
   try {
     synth.soundBankManager.addSoundBank(bank, 'generaluser');

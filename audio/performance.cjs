@@ -9,7 +9,7 @@ function rng(seed) {
   let a = seed >>> 0;
   return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-function createPerformance(spec) {
+function createPerformance(spec, options = {}) {
   if (!spec || !['ska', 'punk', 'urban'].includes(spec.style) || !Number.isFinite(spec.beat) || spec.beat <= 0
     || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 400 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
@@ -114,6 +114,15 @@ function createPerformance(spec) {
   // Piano vertical gravat (VSCO 2 CE): canal propi, després de les preses de guitarra.
   const PIANO = 17 + guitarTakes.length;
   if (has('piano')) { channels.push(patch(PIANO, [2, 0], 74, 94)); instrumentOf[PIANO] = 'piano'; }
+  // Acords de guitarra d'ska gravats (banc de guitarres, banc 6: un programa per tipus d'acord), si el banc hi és
+  // (options.chords): la guitarra rítmica per defecte de l'ska toca l'acord sencer de la mostra en lloc de les cordes
+  // soltes. Un canal per tipus (major, menor, 7 i m7); la resta d'acords continuen amb les cordes soltes.
+  const SKANK_CHORDS = !!options.chords && !punk && !misfits && !chosen('guitar') && spec.style === 'ska' && has('guitar');
+  const CHORD_CHANNEL = {};
+  if (SKANK_CHORDS) ['maj', 'min', '7', 'm7'].forEach((quality, program) => {
+    const channel = PIANO + 12 + program;
+    channels.push({ ...patch(channel, [6, program], 42, 110), reverb: 34 }); instrumentOf[channel] = 'guitar'; CHORD_CHANNEL[quality] = channel;
+  });
   // Ska: secció de vents doblada. Cada vent té un segon músic (trompeta 2, trombó 2 i saxo 2) que
   // toca la mateixa frase una tercera diatònica per sota, una mica més fluix i obert a l'altre costat:
   // la secció sona més plena i a diverses veus. Cada segon músic té canals propis (i staccato).
@@ -448,6 +457,13 @@ function createPerformance(spec) {
     voicingCache.set(key, voicing);
     return (lastVoicing = voicing);
   }
+  // Tipus d'acord per a les mostres gravades: major, menor, 7 o m7 (una altra cosa —disminuït, suspès…—, cap).
+  function chordQuality(chord) {
+    const rel = new Set(chord.pcs.map(pc => ((pc - chord.root) % 12 + 12) % 12));
+    const third = rel.has(4) && !rel.has(3) ? 'maj' : rel.has(3) && !rel.has(4) ? 'min' : null;
+    if (!third || !rel.has(7) || rel.has(6) || rel.has(8) || rel.has(11) || rel.has(9) || rel.has(2) || rel.has(5)) return null;
+    return rel.has(10) ? (third === 'maj' ? '7' : 'm7') : third;
+  }
   // Cop de l'skank: de la corda aguda a la greu (cop amunt, el del contratemps), 8–12 ms entre corda i corda, les
   // últimes una mica més fluixes i curtes; i, just abans, el «xic» de les cordes apagades sota la mà (canal 1).
   function skank(pitches, start, duration, velocity, muted) {
@@ -509,6 +525,15 @@ function createPerformance(spec) {
       const jitter = shape && human ? (extraRandom() - .5) * .008 * human : 0;
       const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * shape.length;
       const force = punk ? punkForce(t, hit, 100, 76) : ending ? 90 : Math.round(shape.force + (soft ? -6 : 0) + (human ? (extraRandom() - .5) * 8 * human : 0));
+      // Acord gravat (si n'hi ha del seu tipus): la mostra sencera, alternant les dues variants; el cop sec dura com a mínim
+      // 110 ms (el que recomana el paquet) i l'apagat és un cop molt curt i fluix.
+      const quality = SKANK_CHORDS && !ending ? chordQuality(chord) : null;
+      if (quality) {
+        const key = ((b + hit) % 2 ? 60 : 48) + ((chord.root % 12) + 12) % 12;
+        const length = stroke === 'apagat' ? .045 : Math.max(.11, duration);
+        note(CHORD_CHANNEL[quality], key, t0 + t * beat + jitter, length, stroke === 'apagat' ? force - 14 : force);
+        return;
+      }
       if (punk || ending) strum(0, pitches, t0 + t * beat + jitter, duration, force, .007);
       else skank(stroke === 'apagat' ? pitches.slice(1) : pitches, t0 + t * beat + jitter, duration, force, stroke === 'apagat');
       // La segona presa de la mateixa part, a la dreta, uns 14 ms més tard i una mica més fluixa.

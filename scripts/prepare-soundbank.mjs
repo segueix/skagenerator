@@ -48,8 +48,8 @@ export async function prepareSoundBank() {
   await writeFile('dist/assets/extra-instruments.sf2', extraBinary);
   info.extra = { bytes: extraBinary.byteLength, sha256: createHash('sha256').update(extraBinary).digest('hex'),
     presets: loadBank(Buffer.from(extraBinary)).presets.map(({ name, program, bankMSB, isGMGSDrum }) => ({ name, program, bank: bankMSB, drums: isGMGSDrum })) };
-  // Guitarres solistes gravades: un altre fitxer a part, només per a les cançons que les fan servir.
-  const guitarBinary = await buildGuitarInstruments(structuredClone(real.guitars || []));
+  // Guitarres solistes gravades i acords de l'skank: un altre fitxer a part, només per a les cançons que les fan servir.
+  const guitarBinary = await buildGuitarInstruments(structuredClone(real.guitars || []), console.log, real.skankChords ? structuredClone(real.skankChords) : null);
   if (guitarBinary.byteLength >= 20 * 1024 * 1024) throw new Error('El banc de guitarres supera el límit');
   await writeFile('dist/assets/guitar-instruments.sf2', guitarBinary);
   info.guitars = { bytes: guitarBinary.byteLength, sha256: createHash('sha256').update(guitarBinary).digest('hex'),
