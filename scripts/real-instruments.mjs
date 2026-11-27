@@ -270,7 +270,8 @@ export async function buildLocalHorns(bank, specs = [], log) {
     const notes = [...spec.notes].sort((a, b) => a.key - b.key);
     const made = notes.map(entry => {
       const wav = readWav(readFileSync(new URL('../' + spec.directory + entry.file, import.meta.url)));
-      const trimmed = trim(resample(wav.data, wav.rate, RATE), RATE, 10);
+      // (maxSeconds: només el principi de cada gravació —l'atac i el tros on es fa el bucle—, perquè el banc no creixi.)
+      const trimmed = trim(resample(wav.data, wav.rate, RATE), RATE, spec.maxSeconds ?? 10);
       // L'afinació mesurada de la gravació (cents per sobre de la nota): es corregeix aquí.
       const looped = findLoop(trimmed, RATE, 440 * 2 ** ((entry.key - 69) / 12 + entry.cents / 1200));
       if (!looped) throw new Error(`${spec.name}: no hi ha bucle per a la nota ${entry.key}`);

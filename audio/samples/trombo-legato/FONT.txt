@@ -1,13 +1,7 @@
-Cinc notes de trombó tocades lligades (legato, sense cop de llengua), aportades pel propietari del projecte
-(fitxer «trombo_legato_skagenerator.zip»). L'origen i la llicència de la gravació no s'han indicat.
-Són trossos d'un passatge legato (no notes aïllades ni transicions d'interval): l'atac és el d'una nota lligada.
+Trombó tocat lligat (legato, sense cop de llengua), cromàtic del La1 al La4 (37 notes, claus MIDI 33–69), aportat pel
+propietari del projecte («trombo_legato_notes_llargues.zip», fitxers «<Nota><octava>_legato.wav»).
+L'origen i la llicència de la gravació no s'han indicat.
+WAV mono, 48 kHz, 16 bits, 2,5 s cada nota. Afinació mesurada: entre −1 i +2 cèntims (es tracta com a afinada).
+Totes les notes duren exactament el mateix, cosa que fa pensar que s'han allargat o transposat a partir de menys
+preses originals. El build en fa servir el primer segon (atac i bucle de sosteniment).
 Es fan servir per a les notes lligades del trombó principal (vegeu audio/performance.cjs).
-WAV mono (barreja dels dos canals originals), 48 kHz, 16 bits; sense reafinar ni sintetitzar.
-De les vint-i-tres notes del paquet s'han triat les més llargues de cada altura (les de Sol3, Si♭3 i Re4 duren
-menys de 0,3 s i no fan bucle). Afinació mesurada (cèntims respecte de la nota), que el build corregeix:
-
-trombo-legato-48.wav  ← trombone_legato_C3_02.wav  (21,64–22,26 s)  Do3   +20
-trombo-legato-52.wav  ← trombone_legato_E3_01.wav  (10,12–10,94 s)  Mi3   +28
-trombo-legato-53.wav  ← trombone_legato_F3_01.wav  (19,78–21,40 s)  Fa3   +16
-trombo-legato-57.wav  ← trombone_legato_A3_02.wav  (22,55–23,98 s)  La3   +1
-trombo-legato-60.wav  ← trombone_legato_C4_01.wav  (6,93–8,28 s)    Do4   +12
