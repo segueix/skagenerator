@@ -18,6 +18,12 @@ test('visualitzador VaTuCalla!: es carrega a la web, es publica i es veu per sob
   assert.match(viz, /ctx\.textAlign = 'right'; ctx\.textBaseline = 'bottom'/);
   assert.match(viz, /ctx\.textAlign = 'center'; ctx\.textBaseline = 'top'/);
   assert.match(viz, /'video\/mp4;codecs=avc1\.640028,mp4a\.40\.2'/);
+  // Qualitat triable (compressió): de l'alta (10 Mb/s) a la mínima, perquè una Short es pugui enviar per WhatsApp.
+  for (const key of ['alta', 'mitjana', 'whatsapp', 'minima']) assert.match(viz, new RegExp(`\\n    ${key}: \\{ name: `), key);
+  assert.match(viz, /videoBitsPerSecond: quality\.video, audioBitsPerSecond: quality\.audio/);
+  // Una Short de 90 s amb la qualitat WhatsApp: menys de 16 MB.
+  const wa = viz.match(/whatsapp: \{ name: 'WhatsApp', scale: [^,]+, video: ([\d_]+), audio: ([\d_]+) \}/);
+  assert(wa && (Number(wa[1].replace(/_/g, '')) + Number(wa[2].replace(/_/g, ''))) / 8 * 90 / 1e6 < 16);
   // Cinc dissenys (l'Infinit ja no hi és: el substitueix la colla dels avis).
   assert(!/\n    infinit: \{/.test(viz));
   for (const design of ['colla', 'tambors', 'carnaval', 'calcadao', 'rio']) assert.match(viz, new RegExp(`\\n    ${design}: `), design);
