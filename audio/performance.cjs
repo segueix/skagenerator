@@ -405,6 +405,18 @@ function createPerformance(spec) {
     for (let n = lo; n <= hi; n++) if (pcs.includes(n % 12) && Math.abs(n - target) < dist) { result = n; dist = Math.abs(n - target); }
     return result;
   };
+  // Mà dreta del guitarrista d'ska: tres gestos (sec, obert i apagat) i una manera de tocar per secció que es repeteix
+  // cada quatre compassos. A l'estrofa, contratemps secs i, al quart compàs, l'últim apagat (o els dos últims); a la
+  // tornada, aquell mateix cop s'obre. Cada tipus de secció de la cançó en tria una (la mateixa cada vegada que torna).
+  const STROKES = { sec: { length: .16, force: 90 }, obert: { length: .48, force: 98 }, apagat: { length: .05, force: 70 } };
+  const strokeStyle = spec.seed % 3, accentStroke = ['chorus', 'prechorus', 'outro'].includes(spec.type) ? 'obert' : 'apagat';
+  const skaStroke = (b, hit, count) => {
+    const lastOfBar = hit === count - 1, phraseEnd = b % 4 === 3;
+    if (strokeStyle === 0) return phraseEnd && lastOfBar ? accentStroke : 'sec';
+    if (strokeStyle === 1) return phraseEnd && hit >= count - 2 ? accentStroke : 'sec';
+    // (Tercera manera: a més, el segon cop de cada compàs parell, més curt i fluix: «xic-xac».)
+    return phraseEnd && lastOfBar ? accentStroke : b % 2 === 1 && hit === 1 ? 'apagat' : 'sec';
+  };
   for (let b = 0; b < spec.chords.length; b++) {
     const chord = spec.chords[b], t0 = b * bar, ending = finale && b === spec.chords.length - 1;
     const soft = spec.type === 'intro' || spec.type === 'bridge';
@@ -436,13 +448,23 @@ function createPerformance(spec) {
         note(1, pitch, t0 + t * beat + .009 + k * .004, length, force - 4, .002);
       }));
     } else if (has('guitar') && spec.guitarBase !== false) hits.forEach((t, hit) => {
+      // Gest de canvi de secció: la guitarra es menja l'últim contratemps (i, al «buit», tot el quart temps).
+      const lastBar = b === spec.chords.length - 1;
+      if (!punk && lastBar && spec.push && t >= (spec.push === 'buit' ? 3 : 3.5)) return;
       const pitches = punk ? (palm ? [chord.root + 12, chord.root + 19] : [chord.root + 12, chord.root + 19, chord.root + 24]) : chord.notes.slice().reverse();
-      const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * .18;
-      strum(0, pitches, t0 + t * beat, duration, punk ? punkForce(t, hit, 100, 76) : 90, .007);
+      // Mà dreta de l'ska: cada cop és sec, obert o apagat segons la manera de tocar de la secció, que es repeteix
+      // cada quatre compassos (vegeu skaStroke), amb una mica de variació de força i de temps, com una mà de debò.
+      const stroke = !punk && !ending ? skaStroke(b, hit, hits.length) : null;
+      const shape = stroke ? STROKES[stroke] : null;
+      const jitter = shape && human ? (extraRandom() - .5) * .008 * human : 0;
+      const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * shape.length;
+      const force = punk ? punkForce(t, hit, 100, 76) : ending ? 90 : Math.round(shape.force + (soft ? -6 : 0) + (human ? (extraRandom() - .5) * 8 * human : 0));
+      strum(0, stroke === 'apagat' ? pitches.slice(0, 3) : pitches, t0 + t * beat + jitter, duration, force, stroke === 'apagat' ? .004 : .007);
       // La segona presa de la mateixa part, a la dreta, uns 14 ms més tard i una mica més fluixa.
       if (doubleRhythm) strum(1, pitches, t0 + t * beat + .014, duration, punkForce(t, hit, 100, 76) - 3, .007);
       // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.
-      if (!punk && hit % 2 === 1) strum(1, pitches, t0 + t * beat + .012, duration * .85, 46, .006);
+      // (Els cops apagats no es doblen: són un cop sec de la mà, no un acord.)
+      if (!punk && hit % 2 === 1 && stroke !== 'apagat') strum(1, pitches, t0 + t * beat + .012 + jitter, duration * .85, 46, .006);
     });
     // Guitarra 2: rítmica aguda (acords una octava amunt) amb el seu propi patró.
     if (has('guitar2') && !guitarTakes.some(take => take.instrument === 'guitar2')) {

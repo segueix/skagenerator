@@ -945,6 +945,19 @@
       const stopTarget = vocal ? ordered.filter(sec => sec.type === 'verse')[1] : ordered.find(sec => sec.type === 'solo');
       if (stopTarget && stopTarget.bars >= 8 && band() < .45) stopTarget.stopTime = band() < .5 ? 2 : 4;
     }
+    // ── Gestos de canvi de secció (ska): baix, bombo i guitarra preparen junts l'entrada de la secció següent.
+    // Cada pas (p. ex. estrofa → tornada) tria un gest una sola vegada i el repeteix sempre que torna: sona assajat.
+    // (Atzar propi; no hi va on ja hi ha una aturada, un tall de vents, l'entrada dels vents o el baix sol.)
+    if (sg.style === 'ska') {
+      const pushRng = rng((seed ^ 0x2f6b5c11) >>> 0), chosen = new Map(), ordered = [...sections].sort((a, b) => a.start - b.start);
+      ordered.forEach((sec, i) => {
+        const next = ordered[i + 1];
+        if (!next || next.type === sec.type || sec.type === 'outro' || sec.bars < 2 || sec.ending || sec.hits || sec.pickup || sec.bassBreak) return;
+        const key = `${sec.type}>${next.type}`;
+        if (!chosen.has(key)) chosen.set(key, engine.SECTION_PUSHES[Math.floor(pushRng() * engine.SECTION_PUSHES.length)]);
+        sec.push = chosen.get(key);
+      });
+    }
     // La solista amb una altra guitarra: tots els seus clips sense so ni efecte propis.
     if (leadSound) for (const c of song.clips) if (c.instrument === 'guitar3' && !c.fx && !c.sound) c.sound = leadSound;
     if (highlights.color) {

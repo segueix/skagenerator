@@ -211,7 +211,7 @@
         || !Number.isInteger(s.start) || !Number.isInteger(s.bars) || s.bars < 1 || s.bars > MAX_SECTION || s.start < end
         || s.start + s.bars > st.bars || (s.transpose !== undefined && (!Number.isInteger(s.transpose) || s.transpose < -6 || s.transpose > 6))
         || (s.groove !== undefined && !validGroove(s.groove, st.style)) || (s.ending !== undefined && !['stop', 'none', 'break', 'silence'].includes(s.ending))
-        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || ['hits', 'shout', 'pickup', 'bassBreak', 'pedal'].some(f => s[f] !== undefined && typeof s[f] !== 'boolean') || (s.bassSolo !== undefined && (!Number.isInteger(s.bassSolo) || s.bassSolo < 1 || s.bassSolo > 8 || s.bassSolo > s.bars)) || (s.stopTime !== undefined && (!Number.isInteger(s.stopTime) || s.stopTime < 1 || s.stopTime > 8 || s.stopTime > s.bars)) || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
+        || (s.closing !== undefined && !['fade', 'cold', 'ring'].includes(s.closing)) || (s.offbeat !== undefined && typeof s.offbeat !== 'boolean') || ['hits', 'shout', 'pickup', 'bassBreak', 'pedal'].some(f => s[f] !== undefined && typeof s[f] !== 'boolean') || (s.push !== undefined && !engine.SECTION_PUSHES.includes(s.push)) || (s.bassSolo !== undefined && (!Number.isInteger(s.bassSolo) || s.bassSolo < 1 || s.bassSolo > 8 || s.bassSolo > s.bars)) || (s.stopTime !== undefined && (!Number.isInteger(s.stopTime) || s.stopTime < 1 || s.stopTime > 8 || s.stopTime > s.bars)) || (s.phraseBars !== undefined && ![2, 4].includes(s.phraseBars)) || (s.fade !== undefined && !['in', 'out'].includes(s.fade))
         || ['entrance', 'exit'].some(f => s[f] !== undefined && (!s[f] || typeof s[f] !== 'object' || Array.isArray(s[f]) || Object.entries(s[f]).some(([n, b]) => !Object.hasOwn(INSTRUMENTS, n) || !Number.isInteger(b) || b < 0 || b > MAX_SECTION))) || (s.cymbals !== undefined && !CYMBAL_MODES.some(([k]) => k === s.cymbals))
         || !validBaseEdits(s) || (s.batucadaPattern !== undefined && !engine.validBatucadaPattern(s.batucadaPattern)) || !engine.validBatucadaFx(s.batucada) || (s.bpm !== undefined && (!Number.isInteger(s.bpm) || s.bpm < 40 || s.bpm > 240))
         || (s.lines !== undefined && (!s.lines || typeof s.lines !== 'object' || Array.isArray(s.lines) || Object.entries(s.lines).some(([n, mode]) => !engine.validLineMode(n, mode))))
@@ -332,6 +332,12 @@
       if (!options.baseOnly) {
         const list = segmentsOf(s), index = list.findIndex(x => x.section === sec), after = list[index + 1];
         part.next = after ? after.section?.type ?? 'verse' : 'end';
+        // Gest de canvi de secció: amb la fonamental del primer acord de la secció que ve (per anticipar-la).
+        if (sec.push && after?.section) {
+          part.push = sec.push;
+          const nextChords = engine.composeSongPart(s.settings, { ...partFor(s, after, { baseOnly: true }), instruments: [] }).chords;
+          if (nextChords.length) part.nextRoot = ((nextChords[0].root % 12) + 12) % 12;
+        }
         part.fill = s.sections.indexOf(sec) % 1000;
         if (sec.ending) part.ending = sec.ending;
         if (sec.closing && sec.type === 'outro') part.closing = sec.closing;
