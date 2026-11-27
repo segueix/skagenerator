@@ -2314,18 +2314,12 @@
         // Final de tots al màxim (Percudium): convenção de tots junts i, a l'últim compàs, quatre cops
         // creixents i un cop final de tots els instruments, tots els músics, al màxim volum.
         const finale = bar => {
-            if (bar < bars - 1) {
-                // (Força moderada: 24 notes alhora ja sonen molt fort; més fort, el limitador hauria d'aixafar-les.)
-                for (let step = 0; step < 16; step++) if (BATUCADA_TUTTI[1][step] === '1') [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row =>
-                    add(bar, step, row, 0, true, everyone, row === TABAL_ROW ? tabalNote(bar, step, BATUCADA_TUTTI[1]) : undefined));
-                if (bar === bars - 2 && whistle) [8, 10, 12].forEach(step => blow(bar, step, .1, 8));
-                return;
-            }
-            // (El cop final, el més fort de tots, també per sobre dels accents dels cops que creixen.)
-            // (El bombo pregunta amb el marge als quatre cops que creixen i resol amb el centre al cop final.)
-            [0, 2, 4, 6].forEach((step, k) => [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row =>
-                add(bar, step, row, k * 3, true, everyone, row === TABAL_ROW ? TABAL_CORXERA : row === BOMBO_ROW ? BOMBO_MARGE : undefined)));
-            [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row => add(bar, 8, row, 24, true, everyone, row === TABAL_ROW ? TABAL_NEGRA : row === BOMBO_ROW ? BOMBO_CENTRAL : undefined));
+            // Tots junts, només de dos en dos o d'un en un (cap traca de cops de tots): el groove, la crida del repique
+            // i, a l'últim compàs, dos cops de tots: el primer pregunta (marge del bombo) i el segon, més fort, resol (centre).
+            if (bar < bars - 2) { groove(bar); return; }
+            if (bar === bars - 2) { call(bar); return; }
+            [[0, 4, BOMBO_MARGE, TABAL_CORXERA], [4, 20, BOMBO_CENTRAL, TABAL_NEGRA]].forEach(([step, extra, bombo, tabal]) =>
+                [0, 1, 2, 3, 4, 5, 6, 7, ...extraRows].forEach(row => add(bar, step, row, extra, true, everyone, row === TABAL_ROW ? tabal : row === BOMBO_ROW ? bombo : undefined)));
         };
         // Entrada de caixa o repique (Percudium): un sol músic fa un ritme i, alhora, el mestre xiula dos
         // xiulets curts i un de llarg; l'últim compàs creix i, a la secció següent, entren tots.
@@ -2354,37 +2348,49 @@
         // a la segona meitat, d'un compàs, perquè el diàleg s'escalfi). Cada solista tria una pregunta o una resposta
         // del seu vocabulari i, per sota, sona el fons triat, més fluix. A l'últim compàs, tots els solistes junts fan
         // un redoble que creix i el fons fa la crida: a la secció següent torna a entrar tota la colla.
+        // Solos com un diàleg: els solistes es passen la paraula (torns de `turn` compassos) sobre el fons de surdos o de
+        // bombo. Qui pren la paraula imita el ritme de la primera meitat de la frase que acaba de sentir i la contesta
+        // amb la segona meitat de la seva; cada solista té un motiu propi (pregunta i resposta) que varia amb un remat
+        // quan el repeteix, i el solo creix a poc a poc. A l'últim compàs, qui parla acaba mitja frase i tots els
+        // solistes, junts, fan dos cops (no una traca) abans que torni a entrar tota la colla.
         const soloBar = (bar, last) => {
-            const o = fx.solos, n = o.players.length, half = Math.max(o.turn, Math.floor(bars / 2 / o.turn) * o.turn);
-            const who = n === 1 ? 0 : bar < half ? Math.floor(bar / o.turn) % n : (Math.floor(half / o.turn) + bar - half) % n;
+            const o = fx.solos, n = o.players.length, who = Math.floor(bar / o.turn) % n;
             const bed = o.bed === 'surdos' ? [[0, rows[0].includes('1') ? rows[0] : '1000000010000000'], [1, rows[1].includes('1') ? rows[1] : '0000100000001000']]
                 : o.bed === 'bombo' ? [[BOMBO_ROW, pattern[BOMBO_ROW]?.includes('1') ? pattern[BOMBO_ROW] : '1000100010001000']] : [];
-            for (const [row, figure] of bed) for (let step = 0; step < (last ? 12 : 16); step++) if (figure[step] === '1') add(bar, step, row, -8, false, [0]);
-            if (last && o.bed === 'bombo') pickup(bar);
-            if (last && o.bed === 'surdos') { add(bar, 12, 0, 6, true, [0]); add(bar, 12, 1, 6, true, [0]); }
-            const strike = (row, step, mark, extra = 0) => {
+            for (const [row, figure] of bed) for (let step = 0; step < (last ? 8 : 16); step++) if (figure[step] === '1') add(bar, step, row, -8, false, [0]);
+            const grow = Math.round(bar / Math.max(1, bars - 1) * 8);
+            const strike = (row, step, mark, figure, extra = 0) => {
                 if (mark === '.') return;
                 const force = { X: 12, x: 0, o: -22, m: -6, g: 0, G: 12 }[mark] ?? 0;
-                const note = row === TABAL_ROW ? (step < 15 && 'Xxo'.includes(soloFigure(row, bar)[step + 1]) ? TABAL_CORXERA : TABAL_NEGRA)
+                const note = row === TABAL_ROW ? (step < 15 && figure[step + 1] !== '.' ? TABAL_CORXERA : TABAL_NEGRA)
                     : row === BOMBO_ROW ? bomboNote(bar, step) : row === 2 && mark === 'm' ? SURDO_MUTED[2]
                     : row === 6 ? ('gG'.includes(mark) ? AGOGO_LOW : BATUCADA[6].note)
                     : row === 8 ? CUICA_CHAINS[soloChain][soloCuica++ % CUICA_CHAINS[soloChain].length] : undefined;
-                add(bar, step, row, 8 + force + extra, false, [0], note);
+                add(bar, step, row, 8 + force + grow + extra, false, [0], note);
             };
+            const row = o.players[who], figure = soloFigure(row, n > 1 && soloPrev && soloPrev.row !== row ? soloPrev.figure : null);
+            soloPrev = { row, figure };
+            for (let step = 0; step < (last ? 8 : 16); step++) strike(row, step, figure[step], figure);
             if (last) {
-                for (const row of o.players) for (let step = 0; step < 16; step++) strike(row, step, step < 8 ? soloFigure(row, bar)[step] : 'x', step >= 8 ? (step - 8) * 2.5 - 6 : 0);
-                return;
+                // Dos cops de tots els solistes i el fons, junts: el segon, més fort.
+                [[8, 4], [12, 12]].forEach(([step, extra]) => {
+                    for (const p of o.players) add(bar, step, p, extra + grow, true, [0], p === TABAL_ROW ? TABAL_NEGRA : p === 6 ? AGOGO_LOW : undefined);
+                    for (const [b] of bed) add(bar, step, b, extra - 4, true, [0], b === BOMBO_ROW ? (step === 12 ? BOMBO_CENTRAL : BOMBO_MARGE) : undefined);
+                });
             }
-            const row = o.players[who];
-            for (let step = 0; step < 16; step++) strike(row, step, soloFigure(row, bar)[step]);
         };
-        // Figura de cada compàs: preguntes als compassos parells del torn i respostes als senars (sense repetir-ne cap seguida).
-        const soloFigure = (row, bar) => {
-            const list = SOLO_VOCAB[row], answer = bar % 2 === 1, pool = answer ? list.slice(3) : list.slice(0, 3);
-            return pool[(mix(bar * 7 + row) >>> 3) % pool.length];
+        const SOLO_FILLS = ['XxXx', 'X.XX', 'xXxX', 'XXX.', 'X.xX', 'XxX.'];
+        const soloFigure = (row, heard = null) => {
+            const list = SOLO_VOCAB[row], count = soloCount[row] = (soloCount[row] ?? -1) + 1;
+            const question = list[(mix(row * 13) >>> 3) % 3], answer = list[3 + (mix(row * 17) >>> 3) % (list.length - 3)];
+            let figure = count % 2 === 0 ? question : answer;
+            if (count % 4 >= 2) figure = figure.slice(0, 12) + SOLO_FILLS[(mix(row * 31 + count) >>> 3) % SOLO_FILLS.length];
+            // (La imitació conserva el ritme del que s'ha sentit, amb els cops del nou instrument: accentuats o normals.)
+            if (heard) figure = [...heard.slice(0, 8)].map(mark => mark === '.' ? '.' : 'XGm'.includes(mark) ? 'X' : 'x').join('') + figure.slice(8);
+            return figure;
         };
-        const soloChain = (salt >>> 5) % CUICA_CHAINS.length;
-        let soloCuica = 0;
+        const soloChain = (salt >>> 5) % CUICA_CHAINS.length, soloCount = {};
+        let soloCuica = 0, soloPrev = null;
         for (let bar = 0; bar < bars; bar++) {
             if (fx.opening) { opening(bar, bar === bars - 1); continue; }
             if (fx.solos) { soloBar(bar, bar === bars - 1); continue; }
