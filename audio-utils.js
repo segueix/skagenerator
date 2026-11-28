@@ -117,6 +117,7 @@
     for (const [key, type, hz] of [['low', 'lowshelf', 180], ['mid', 'peak', 1200], ['high', 'highshelf', 4500]])
       if (eq[key]) chain.push(voiceBiquad(type, hz, eq[key], rate, key === 'mid' ? 1 : .707));
     const result = new Float32Array(voice.length);
+    const saturation = createSaturation('vocal', rate, options.saturation);
     let held = 0;
     for (let i = 0; i < voice.length; i++) {
       // La saturació és abans del pas baix per evitar aguts artificials.
@@ -128,9 +129,47 @@
       }
       for (const f of chain) x = voiceTick(f, x);
       if (preset.robot) x *= .3 + .7 * Math.sin(2 * Math.PI * 52 * i / rate);
+      if (saturation) x = saturation.process(0, x);
       result[i] = Math.max(-1, Math.min(1, x));
     }
     return result;
+  }
+  // Límit de mescla saturada, tall de greus i tall d'aguts de cada família.
+  const SATURATION = {
+    guitar: [.12, 105, 4900], guitar2: [.09, 105, 4500], guitar3: [.11, 110, 5000],
+    organ: [.11, 115, 4300], piano: [.07, 130, 4700],
+    bass: [.08, 170, 2900], synthBass: [.06, 170, 3000],
+    drums: [.07, 175, 4400], electronicDrums: [.06, 160, 4300],
+    trumpet: [.036, 170, 4100], trombone: [.023, 140, 3400], sax: [.038, 160, 4000],
+    vocal: [.028, 160, 3800], synthLead: [.065, 140, 4500], synthPad: [.05, 145, 4200]
+  };
+  function createSaturation(instrument, rate, { seed, amount } = {}) {
+    if (!Object.hasOwn(SATURATION, instrument) || !Number.isFinite(amount) || amount <= 0) return null;
+    const [maxMix, highpass, lowpass] = SATURATION[instrument];
+    // Llavor de la cançó i nom de l'instrument. La revisió o el número de secció no hi intervenen.
+    let hash = seed >>> 0;
+    for (const letter of instrument) hash = Math.imul(hash ^ letter.charCodeAt(0), 0x01000193);
+    hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+    hash = (hash ^ (hash >>> 13)) >>> 0;
+    const variation = (hash & 0xffff) / 0xffff;
+    const mix = maxMix * Math.min(1, amount * (.55 + .45 * variation));
+    const drive = 16 + (hash >>> 16) / 0xffff * 24;
+    const cutoff = Math.min(rate * .34, lowpass * (.88 + .15 * amount + .07 * variation));
+    const low = voiceBiquad('highpass', highpass, 0, rate);
+    const high = voiceBiquad('lowpass', cutoff, 0, rate);
+    const side = () => ({ low: { ...low }, high: { ...high }, dryPower: 1e-6, wetPower: 1e-6 });
+    const sides = [side(), side()], follow = 1 - Math.exp(-1 / (.065 * rate));
+    return {
+      process(channel, x) {
+        const state = sides[channel], filtered = voiceTick(state.low, x), driven = filtered * drive;
+        const shaped = filtered / Math.sqrt(1 + driven * driven);
+        state.dryPower += follow * (filtered * filtered - state.dryPower);
+        state.wetPower += follow * (shaped * shaped - state.wetPower);
+        const gain = Math.sqrt(Math.min(3.24, (state.dryPower + 1e-8) / (state.wetPower + 1e-8)));
+        // Només afegim la diferència filtrada. El camí directe conserva els greus i l'atac.
+        return x + mix * voiceTick(state.high, shaped * gain - filtered);
+      }
+    };
   }
   // ── Veu gravada (mono, a la mateixa freqüència que la cançó) ──────────
   // Suma la veu, centrada i amb un filtre passaaltes de 80 Hz, a un tros de
@@ -195,5 +234,5 @@
     }
     return wav;
   }
-  return { joinStereo, mixSections, applyFade, mixVoice, processVoice, VOICE_EFFECTS, VOICE_EQ_KEYS, placeTake, levelTake, resampleLinear, encodeWav };
+  return { joinStereo, mixSections, applyFade, mixVoice, processVoice, createSaturation, VOICE_EFFECTS, VOICE_EQ_KEYS, placeTake, levelTake, resampleLinear, encodeWav };
 });

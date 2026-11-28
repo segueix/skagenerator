@@ -105,3 +105,23 @@ test('fos d’entrada i de sortida d’un tram, sense tocar l’original', () =>
   for (let k = 1; k < 1000; k++) assert(fadeOut[0][k] <= fadeOut[0][k - 1] && fadeIn[0][k] >= fadeIn[0][k - 1]);
   assert.throws(() => applyFade(part, 1000, 'x'), /Fos/); assert.throws(() => applyFade(part, 2000, 'in'), /Durada/);
 });
+
+test('la saturació suau varia amb la cançó, limita el canvi de nivell i protegeix els greus', () => {
+  const { createSaturation } = require('../audio-utils.js');
+  const rate = 44100, dry = tone(rate, .24, rate, 470);
+  const apply = (samples, instrument, seed) => {
+    const effect = createSaturation(instrument, rate, { seed, amount: 1 });
+    return samples.map(sample => effect.process(0, sample));
+  };
+  const rms = data => Math.sqrt(data.reduce((sum, x) => sum + x * x, 0) / data.length);
+  const relativeChange = (a, b) => rms(a.map((x, i) => x - b[i])) / rms(b);
+  const guitar = apply(dry, 'guitar', 308);
+  assert.deepEqual(guitar, apply(dry, 'guitar', 308));
+  assert(relativeChange(guitar, apply(dry, 'guitar', 817)) > .002);
+  assert(relativeChange(guitar, dry) > .008);
+  assert(Math.abs(20 * Math.log10(rms(guitar) / rms(dry))) < 1);
+  assert(relativeChange(apply(dry, 'trombone', 308), dry) < relativeChange(guitar, dry));
+  const low = tone(rate, .24, rate, 44);
+  assert(relativeChange(apply(low, 'bass', 308), low) < .005);
+  assert(relativeChange(apply(low, 'drums', 308), low) < .005);
+});
