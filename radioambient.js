@@ -3781,6 +3781,7 @@
             ranges: audibleRanges, guitarTakes: guitarTakes.map(take => ({ ...take })),
             guitarBase: part.guitarBase !== false,
             drumLine,
+            ...(settings.style === 'ska' && !drumOptions.batucadaLine && settings.bandProfile ? { bandProfile: settings.bandProfile } : {}),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: addVolumes({ ...(settings.mix || {}), ...(part.mix || {}) }, settings.volumes, part.volumes),
             baseVolume: { ...baseVolume },

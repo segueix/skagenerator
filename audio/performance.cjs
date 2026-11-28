@@ -1,4 +1,5 @@
 'use strict';
+const bands = require('../ska-bands.js');
 const ROUND_ROBIN = require('../round-robin.json');
 // Tecla d'una gravació alternada → peça original (per a la humanització).
 const ORIGINAL = {};
@@ -47,6 +48,7 @@ function createPerformance(spec, options = {}) {
   // Humanització: 0 = quantitzat (màquina), 1 = músics amb força personalitat.
   if (spec.humanize !== undefined && (!Number.isFinite(spec.humanize) || spec.humanize < 0 || spec.humanize > 1)) throw new Error('Humanització no vàlida');
   const random = rng(spec.seed), punk = spec.style === 'punk', beat = spec.beat, bar = beat * 4;
+  const band = spec.style === 'ska' ? bands.get(spec.bandProfile) : undefined;
   const has = name => spec.instruments.includes(name), energy = .55 + spec.energy / 200;
   const variation = Number.isInteger(spec.variation) && spec.variation >= 0 && spec.variation <= 4 ? spec.variation : -1;
   const events = [];
@@ -147,13 +149,13 @@ function createPerformance(spec, options = {}) {
   if (has('trombone') && !chosen('trombone')) { channels.push(patch(TBL, [5, 58], 79, 112)); instrumentOf[TBL] = 'trombone'; LEGATO[4] = TBL; }
   const third = pitch => pitch > 74 ? pitch - 12 : pitch;
   const unisonPitch = (channel, pitch) => channel === 3 ? third(pitch) : pitch > 67 ? pitch - 12 : pitch < 40 ? pitch + 12 : pitch;
-  if (spec.style === 'ska') {
+  if (spec.style === 'ska' && (!band || (band.doubles === 'chorus' && spec.type === 'chorus'))) {
     if (has('trumpet')) { channels.push(patch(T2, chosen('trumpet') ?? [2, 56], 72, 106), patch(T2S, [3, 56], 72, 106)); instrumentOf[T2] = instrumentOf[T2S] = 'trumpet'; SECOND[3] = T2; }
     if (has('trombone')) { channels.push(patch(B2, tromboneSound, 58, 102), patch(B2S, [3, 57], 58, 116)); instrumentOf[B2] = instrumentOf[B2S] = 'trombone'; SECOND[4] = B2; }
     if (has('sax')) { channels.push(patch(S2, [2, 66], 98, 86)); instrumentOf[S2] = 'sax'; SECOND[8] = S2; }
     realBrass[T2] = realBrass[3]; realBrass[B2] = realBrass[4];
     if (has('trumpet') && !chosen('trumpet')) { channels.push(patch(T3, TRUMPET3, 82, 110)); instrumentOf[T3] = 'trumpet'; UNISON[3] = T3; }
-    if (UNISON[3] !== undefined) { channels.push(patch(TB3, TROMBONE3, 46, 112)); instrumentOf[TB3] = 'trombone'; UNISON[4] = TB3; }
+    if (UNISON[3] !== undefined && (!band || has('trombone'))) { channels.push(patch(TB3, TROMBONE3, 46, 112)); instrumentOf[TB3] = 'trombone'; UNISON[4] = TB3; }
   }
   // Trombó que acompanya les dues trompetes encara que la secció no el porti.
   const autoTrombone = UNISON[4] !== undefined && !has('trombone');
@@ -243,8 +245,8 @@ function createPerformance(spec, options = {}) {
   const FEEL = {
     // Punk: la bateria empeny i respira més (menys mecànica); l'ska, més regular.
     drums: punk ? [-3, 5, 4.5, 11] : [0, 3, 2.6, 8], electronicDrums: [0, 0, .4, 3],
-    bass: [spec.style === 'ska' ? 9 : punk ? -1 : 4, 4, 3.5, 8], synthBass: [0, .5, .5, 2],
-    guitar: [punk ? -4 : 3, 4, 3.5, 9], guitar2: [punk ? -3 : 5, 4, 4.5, 9], guitar3: [2, 5, 6, 10], organ: [5, 4, 5, 8], piano: [4, 4, 5, 10],
+    bass: [spec.style === 'ska' ? band?.bassMs ?? 9 : punk ? -1 : 4, 4, 3.5, 8], synthBass: [0, .5, .5, 2],
+    guitar: [punk ? -4 : band?.guitarMs ?? 3, 4, 3.5, 9], guitar2: [punk ? -3 : 5, 4, 4.5, 9], guitar3: [2, 5, 6, 10], organ: [5, 4, 5, 8], piano: [4, 4, 5, 10],
     // Vents: mateix retard (relaxat) per a tota la secció i variació de força moderada dins de la frase.
     trumpet: [punk ? 3 : 10, 7, 8, 5], trombone: [punk ? 3 : 10, 7, 8, 5], sax: [punk ? 3 : 10, 7, 8, 5], vocal: [12, 8, 9, 9],
     synthLead: [0, 1, 1, 3], synthPad: [0, 0, 0, 0]
@@ -539,7 +541,7 @@ function createPerformance(spec, options = {}) {
       const stroke = !punk && !ending ? skaStroke(b, hit, hits.length) : null;
       const shape = stroke ? STROKES[stroke] : null;
       const jitter = shape && human ? (extraRandom() - .5) * .008 * human : 0;
-      const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * shape.length;
+      const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * shape.length * (band?.stroke ?? 1);
       const force = punk ? punkForce(t, hit, 100, 76) : ending ? 90 : Math.round(shape.force + (soft ? -6 : 0) + (human ? (extraRandom() - .5) * 8 * human : 0));
       // Acord gravat (si n'hi ha del seu tipus): la mostra sencera, alternant les dues variants; el cop sec dura com a mínim
       // 110 ms (el que recomana el paquet) i l'apagat és un cop molt curt i fluix.
@@ -547,7 +549,7 @@ function createPerformance(spec, options = {}) {
       const quality = SKANK_CHORDS && !ending ? chordQuality(sounding) : null;
       if (quality) {
         const key = ((b + hit) % 2 ? 60 : 48) + ((sounding.root % 12) + 12) % 12;
-        const length = stroke === 'apagat' ? .045 : Math.max(.11, duration);
+        const length = stroke === 'apagat' ? .045 : Math.max(.11 * (band?.stroke ?? 1), duration);
         note(CHORD_CHANNEL[quality], key, t0 + t * beat + jitter, length, stroke === 'apagat' ? force - 14 : force);
         return;
       }
@@ -557,7 +559,7 @@ function createPerformance(spec, options = {}) {
       if (doubleRhythm) strum(1, pitches, t0 + t * beat + .014, duration, punkForce(t, hit, 100, 76) - 3, .007);
       // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.
       // (Els cops apagats no es doblen: són un cop sec de la mà, no un acord.)
-      if (!punk && hit % 2 === 1 && stroke !== 'apagat') strum(1, pitches, t0 + t * beat + .012 + jitter, duration * .85, 46, .006);
+      if (!punk && !band && hit % 2 === 1 && stroke !== 'apagat') strum(1, pitches, t0 + t * beat + .012 + jitter, duration * .85, 46, .006);
     });
     // Guitarra 2: rítmica aguda (acords una octava amunt) amb el seu propi patró.
     if (has('guitar2') && !guitarTakes.some(take => take.instrument === 'guitar2')) {
@@ -711,10 +713,26 @@ function createPerformance(spec, options = {}) {
       note(bandChannel(player || 0), pitch, Math.max(0, (barIndex * 4 + step) * beat + offset), duration ?? .35, velocity / energy, duration == null && !tight ? .002 : 0);
     }
   }
+  // El baix del 2-tone recull el final de la frase del saxo cada quatre compassos.
+  // En aquesta finestra substitueix la línia d'acompanyament, perquè només hi ha un baixista.
+  const saxReplies = new Set();
+  if (band?.bassReply && has('sax') && has('bass') && !has('vocal') && ['theme', 'lead'].includes(spec.lineModes?.sax)) {
+    for (const entry of spec.lines?.sax || []) {
+      const [b, t, pitch, duration] = entry;
+      const at = (b * 4 + t) * beat;
+      if (b % 4 !== 3 || t < 2 || b === spec.chords.length - 1 || !audible(8, at) || !audible(2, at)
+        || silentBand(2, at) || breaks.some(window => at >= window.from && at < window.to)) continue;
+      saxReplies.add(entry);
+      note(2, 40 + ((pitch - 40) % 12 + 12) % 12, at, duration * beat * .78, 108, .002);
+    }
+  }
+  const replyAt = new Map();
+  for (const [b, t] of saxReplies) replyAt.set(b, Math.min(t, replyAt.get(b) ?? t));
   if ((has('bass') || has('synthBass')) && Array.isArray(spec.bassLine)) {
     for (const [b,t,pitch,length,strength] of spec.bassLine)
       {
-        if (has('bass')) note(2,pitch,(b*4+t)*beat,length*beat,Math.min(127,Math.round(113*strength)),.002);
+        const bassLength = Math.min(length, (replyAt.get(b) ?? Infinity) - t);
+        if (has('bass') && bassLength > .05) note(2,pitch,(b*4+t)*beat,bassLength*beat,Math.min(127,Math.round(113*strength)),.002);
         if (has('synthBass')) note(7,Math.max(24,pitch-12),(b*4+t)*beat,length*beat,Math.min(127,Math.round(105*strength)),0);
       }
   }
@@ -770,6 +788,7 @@ function createPerformance(spec, options = {}) {
       // La força depèn només de la intensitat de la secció (abans l'estrofa baixava uns 9 dB).
       const chord = spec.chords[b], velocity = 84;
       // Lliguem notes contigües, però preservem els silencis escrits i les respiracions.
+      if (instrument === 'sax' && saxReplies.has(line[index])) continue;
       const next = line[index + 1], previous = line[index - 1];
       const joins = (a, z) => a && z && Math.abs(a[0] * 4 + a[1] + a[3] - (z[0] * 4 + z[1])) < .01
         && Math.floor((a[0] * 4 + a[1]) / 16) === Math.floor((z[0] * 4 + z[1]) / 16);
@@ -781,7 +800,7 @@ function createPerformance(spec, options = {}) {
       // El balanceig endarrereix l'inici de les notes a contratemps: el final s'ha de moure igual,
       // si no les notes lligades quedaven separades (o trepitjades) fins a 50 ms.
       const nominalEnd = at + duration * beat, swingShift = (swung(nominalEnd) - nominalEnd) - (swung(at) - at);
-      const length = Math.max(.025, duration * beat - gap + swingShift);
+      const length = Math.max(.025, (duration * beat - gap + swingShift) * (band?.windLength ?? 1));
       const accent = !joinedPrevious && (t % 1 === 0 || duration >= 1);
       // Lligat (sense cop de llengua) només quan canvia l'altura: una nota repetida es torna a articular.
       const slurred = joinedPrevious && previous[2] !== pitch;
@@ -857,6 +876,7 @@ function createPerformance(spec, options = {}) {
     steps.forEach((top, i) => {
       const at = last * bar + (3 + i * .5) * beat;
       for (const [channel, pitch] of [[3, top], [8, thirdBelow(top, null, 55)], [4, thirdBelow(thirdBelow(top, null, 55), null, 48) - 12]]) {
+        if (band && !has(instrumentOf[channel])) continue;
         horn(channel, pitch, at, beat * .42, 96, i === 0);
         if (SECOND[channel] !== undefined) horn(SECOND[channel], pitch, at, beat * .42, 88, i === 0);
         if (UNISON[channel] !== undefined) horn(UNISON[channel], unisonPitch(channel, pitch), at, beat * .42, 92, i === 0);
@@ -913,7 +933,7 @@ function createPerformance(spec, options = {}) {
     }
     channels.find(c => c.channel === 1).fxTweak = { drive: -10, tone: 8 };
   }
-  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type,
+  return { channels, events, seconds: spec.seconds, seed: spec.seed, type: spec.type, ...(band ? { room: band.room } : {}),
     // (El trombó afegit a les trompetes fa part del seu so: segueix el volum i l'equalitzador de la trompeta.)
     mix: autoTrombone && spec.mix?.trumpet ? { ...spec.mix, trombone: spec.mix.trumpet } : spec.mix || {},
     baseVolume: spec.baseVolume || {}, fx: spec.fx || {}, colors: spec.colors || {} };

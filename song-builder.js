@@ -1,13 +1,15 @@
 (function (root, factory) {
   // Les lletres automàtiques (lyrics.js) s'obtenen del mòdul de Node o de la pàgina.
   const lyrics = () => (typeof module !== 'undefined' && module.exports ? require('./lyrics.js') : root.SkaLyrics);
-  const api = factory(lyrics);
+  const bands = () => (typeof module !== 'undefined' && module.exports ? require('./ska-bands.js') : root.SkaBands);
+  const api = factory(lyrics, bands);
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SkaSongBuilder = api;
-})(typeof self !== 'undefined' ? self : this, function (lyricsModule) {
+})(typeof self !== 'undefined' ? self : this, function (lyricsModule, bandsModule) {
   'use strict';
   // Cançó automàtica: a partir d'un subgènere, compon una cançó sencera de
   // 2 a 4 minuts (estructura, harmonia, arranjament, riff, respostes, canvis
   // de tempo i de to) i tria les millors melodies.
+  const bandName = id => bandsModule().get(id)?.name;
   const MELODIC = ['vocal', 'trumpet', 'trombone', 'sax', 'synthLead'];
   // La intro de ska la fa la secció de vents sencera (trompeta, saxo i trombó) amb el riff de la cançó.
   const SKA_OPENING_WINDS = ['trumpet', 'sax', 'trombone'];
@@ -241,11 +243,11 @@
     const playing = sec => [...new Set([...base, ...song.clips.filter(c => c.generated && inside(c, sec)).map(c => c.instrument)])]
       .sort((a, b) => LAYER_ORDER.indexOf(a) - LAYER_ORDER.indexOf(b));
     const drums = base.find(name => name === 'drums' || name === 'electronicDrums');
-    const riffer = punk ? 'guitar3' : 'trumpet', voice = options.vocal ?? song.clips.some(c => c.instrument === 'vocal');
-    // Ska instrumental amb protagonisme repartit (seccions amb «leads»): la intro és la del pla i, si comença
-    // amb el riff, el fan el saxo i el trombó (cap cançó no comença amb la trompeta de protagonista).
+    const band = bandsModule().get(st.bandProfile);
+    const riffer = punk ? 'guitar3' : band?.leads[0] ?? 'trumpet', voice = options.vocal ?? song.clips.some(c => c.instrument === 'vocal');
+    // La formació determina qui toca el riff d'entrada i de sortida.
     const planned = !punk && sections.some(sec => Array.isArray(sec.leads));
-    const openingRiff = punk ? [riffer] : planned ? ['sax', 'trombone'] : SKA_OPENING_WINDS;
+    const openingRiff = punk || band ? [riffer] : planned ? ['sax', 'trombone'] : SKA_OPENING_WINDS;
     // Només sonen els instruments triats. La bateria no calla del tot: entra a l'últim compàs amb
     // un redoble, perquè el pas a la secció següent no sigui brusc.
     const only = (sec, keep) => {
@@ -267,7 +269,7 @@
         revision: options.revisions?.[instrument] || 1, generated: true, edge: true, ...extra });
       return true;
     };
-    if (!punk && !planned) for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
+    if (!punk && !planned && !band) for (const instrument of SKA_OPENING_WINDS) ensure(first, instrument, { line: 'riff' });
     const outro = last.type === 'outro';
     const openings = {
       band: () => true,
@@ -319,7 +321,7 @@
       return Object.keys(table)[0];
     };
     if (!punk) for (const name of SOLO_OPENINGS) delete openings[name];
-    // (Amb el protagonisme repartit, la intro ja la decideix el pla: el riff obligat silenciaria qui porta la melodia.)
+    // Amb protagonisme repartit, la intro ja la decideix el pla.
     if (planned) delete openings.riff;
     const opening = choose(openings, options.opening, previous.opening);
     const closing = choose(closings, options.closing, previous.closing);
@@ -394,6 +396,13 @@
     // (Ska: harmony 3: les progressions de la v2 —acords partits i girs de final de frase— i les del corpus de 50 cançons; vegeu radioambient.js.)
     const settings = { style: sg.style, subgenre: key, ...(sg.style === 'ska' ? { harmony: 3 } : {}), bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
+    const band = bandsModule().get(options.bandProfile);
+    if (band) {
+      settings.bandProfile = options.bandProfile;
+      [groove.drums, groove.bass, groove.guitar] = band.groove;
+      settings.timbres = { ...settings.timbres, drums: band.drums, bass: band.bass, trumpet: band.trumpet || 'auto', trombone: 'auto' };
+      if (band.swing !== undefined) settings.swing = band.swing;
+    }
     // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
     if (fx) settings.fx = { guitar: { ...fx }, guitar2: { ...fx }, guitar3: { ...fx } };
@@ -425,6 +434,7 @@
     // Ska instrumental: el saxo i el trombó fan el tema i han de quedar per davant de la banda.
     if (!punk && !vocal) settings.volumes = { ...(settings.volumes || {}), sax: 2, trombone: 1 };
     for (const option of ['drumTune', 'humanize', 'cymbals', 'countIn']) if (sg[option] !== undefined) settings[option] = sg[option];
+    if (band?.cymbals) settings.cymbals = band.cymbals;
     if (settings.swing === 0) delete settings.swing;
 
     // ── Estructura de 2 a 4 minuts ────────────────────────────────────
@@ -497,7 +507,7 @@
       for (const sec of of('solo')) sec.groove = { drums: (groove.drums + 1) % kinds.drums.length, bass: (groove.bass + 1) % kinds.bass.length };
       sections.forEach((sec, i) => {
         const next = sections[i + 1];
-        if (next?.type === 'verse' && (sec.type === 'intro' || sec.type === 'solo')) sec.pickup = true;
+        if ((!band || band.chorus) && next?.type === 'verse' && (sec.type === 'intro' || sec.type === 'solo')) sec.pickup = true;
       });
     }
     // ── Moviments propis del subgènere (tempo, to, ritme) ─────────────
@@ -584,7 +594,7 @@
 
     // ── Arranjament: el riff identifica la cançó; els vents responen a la veu ──
     const register = key === 'rocksteady' || key === 'horrorpunk' || key === 'postpunk' ? -1 : key === 'poppunk' ? 1 : 0;
-    const base = sg.base, layersOf = [];
+    const base = band ? sg.base.filter(name => !['organ', 'piano'].includes(name)) : sg.base, layersOf = [];
     // Subgèneres lents: vents més escassos, excepte el duet inicial.
     const mellow = key === 'rocksteady' || key === 'bossreggae';
     // Punk: nombre de guitarres triat (1, 2 o 3); les que no hi són no s'afegeixen enlloc.
@@ -691,9 +701,11 @@
       }
       if (sec.type === 'outro') { add(sec, 'guitar3', { line: 'riff' }); add(sec, 'guitar2', { revision: 2 }); }
     };
-    if (instrumental) instrumentalSka();
+    if (band) {
+      arrangeSkaBand({ band, sections, leadPlan, roles, lastChorus, add, sheet, vocal });
+    } else if (instrumental) instrumentalSka();
     for (const sec of sections) {
-      if (instrumental) break;
+      if (band || instrumental) break;
       // Amb lletra, canten les seccions que en tenen; sense, les estrofes, pretornades i tornades.
       const sing = sheet.length ? !!sec.lyrics : vocal && ['verse', 'prechorus', 'chorus'].includes(sec.type) || vocal && key === 'horrorpunk' && sec.type === 'bridge';
       const role = roles.get(sec);
@@ -755,7 +767,7 @@
       }
     }
     // També les formes que comencen directament per estrofa o tornada obren amb el duet.
-    if (!punk && !instrumental) for (const instrument of SKA_OPENING_WINDS) {
+    if (!band && !punk && !instrumental) for (const instrument of SKA_OPENING_WINDS) {
       if (!layersOf.some(layer => layer.sec === sections[0] && layer.instrument === instrument)) add(sections[0], instrument, { line: 'riff' });
     }
     // ── Millor versió de cada línia pròpia (la mateixa per a seccions iguals) ──
@@ -869,7 +881,7 @@
     for (let tries = 0; !hook && taken.has(title.toLowerCase()) && tries < 40; tries++) title = `${pick(words[0])} ${pick(words[1])}`;
     const song = { version: 3, title, settings, base: { instruments: base.slice(), revision: 1 + Math.floor(r() * 50), generated: true }, harmony, sections, clips };
     // Si alguna secció s'alenteix, s'hi afegeix un instrument que sosté el so.
-    reinforceSlowdowns(song);
+    if (!band) reinforceSlowdowns(song);
     // ── Inici, final i silencis: una manera diferent a cada cançó ──
     const revisionsOf = Object.fromEntries(MELODIC.map(name => [name, chosen.get(`${name}:intro`) || chosen.get(`${name}:verse`) || chosen.get(`${name}:chorus`) || 1]));
     // Recursos especials: només els que aporten més en aquesta cançó (vegeu planHighlights).
@@ -982,9 +994,10 @@
         if (!next || next.type === sec.type || sec.type === 'outro' || sec.bars < 2 || sec.ending || sec.hits || sec.pickup || sec.bassBreak) return;
         const key = `${sec.type}>${next.type}`;
         if (!chosen.has(key)) chosen.set(key, engine.SECTION_PUSHES[Math.floor(pushRng() * engine.SECTION_PUSHES.length)]);
-        sec.push = chosen.get(key);
+        sec.push = band?.push ?? chosen.get(key);
       });
     }
+    if (band?.guitarLead) for (const c of song.clips) if (c.instrument === 'guitar3') c.sound = band.guitarLead;
     // La solista amb una altra guitarra: tots els seus clips sense so ni efecte propis.
     if (leadSound) for (const c of song.clips) if (c.instrument === 'guitar3' && !c.fx && !c.sound) c.sound = leadSound;
     if (highlights.color) {
@@ -1001,6 +1014,50 @@
       + (highlights.chosen.length ? .3 * highlights.chosen.reduce((t, c) => t + c.value, 0) / highlights.chosen.length : .2);
     return { song, score: rating };
   }
+  function arrangeSkaBand({ band, sections, leadPlan, roles, lastChorus, add, sheet, vocal }) {
+    const leadRole = name => name === 'organ' || name === 'piano' ? 'keys' : name === 'guitar3' ? 'guitar' : name;
+    let turn = 0;
+    for (const [index, sec] of sections.entries()) {
+      if (roles.get(sec) === 'dub') continue;
+      const intro = index === 0 || sec.type === 'intro';
+      const finale = sec.type === 'outro';
+      const sings = vocal && (sheet.length ? !!sec.lyrics : ['verse', 'prechorus', 'chorus'].includes(sec.type));
+      if (sings) add(sec, 'vocal');
+      if (band.heavy && sec.type === 'chorus') add(sec, 'guitar2', { revision: 2, fx: { type: 'distortion', drive: 60, tone: 55 } });
+
+      const slots = leadPlan.filter(unit => unit.sec === sec && unit.role !== 'rhythm');
+      const leader = band.leads[(intro || finale ? 0 : turn++) % band.leads.length];
+      const ensemble = band.chorus && sec.type === 'chorus';
+      const first = slots[0];
+      const offset = first?.offset ?? 0, length = slots.length ? slots.at(-1).offset + slots.at(-1).bars - offset : sec.bars;
+      const line = sings ? 'answer' : intro || finale || roles.get(sec) === 'riff' ? 'riff' : sec.type === 'solo' ? 'lead' : 'theme';
+      const solo = !vocal ? intro || finale || slots.length > 0 : !sings || ensemble || sec.type === 'chorus' || turn % 2 === 0;
+
+      if (solo) {
+        if (ensemble) {
+          sec.texture = sec === lastChorus ? 'harmony' : 'unison';
+          for (const instrument of band.leads) add(sec, instrument, { line, offset, length });
+        } else if (band.dialogue && length >= 4 && !sings) {
+          const half = Math.ceil(length / 2);
+          const other = band.leads[(band.leads.indexOf(leader) + 1) % band.leads.length];
+          add(sec, leader, { line, offset, length: half });
+          add(sec, other, { line, offset: offset + half, length: length - half });
+        } else {
+          add(sec, leader, { line, offset, length });
+          if (band.reply && !sings && sec.type !== 'outro') add(sec, band.reply, { line: 'answer', offset, length });
+        }
+        if (!vocal) sec.leads = [[offset, length, ensemble ? 'section' : leadRole(leader)]];
+        if (!sings) {
+          const levels = ensemble ? {} : { [leader]: 3 };
+          sec.volumes = { ...(sec.volumes || {}), ...levels };
+        }
+      } else if (!vocal) {
+        sec.leads = [[0, sec.bars, 'rhythm']];
+      }
+      if (band.keys) add(sec, band.keys, { revision: (sec.patterns?.[band.keys] ?? (sec.type === 'verse' ? 1 : 0)) + 1 });
+    }
+  }
+
   // ── Transicions i densitat (a partir dels comentaris de les cançons) ──
   // Quan la cançó s'alenteix d'una secció a l'altra, s'hi afegeix un instrument que
   // sosté el so (guitarra 2 al punk, orgue sostingut a l'ska o coixí si l'orgue ja
@@ -1523,7 +1580,7 @@
     const st = song?.settings || {};
     let riff = null;
     try { riff = JSON.stringify(engine.composeRiff(st.seed >>> 0, st.style === 'punk', st.subgenre).rhythm); } catch { /* sense riff */ }
-    return { subgenre: st.subgenre, style: st.style, key: `${st.tonic}:${st.mode}`, bpm: st.bpm, drums: st.groove?.drums, bass: st.groove?.bass, guitar: st.groove?.guitar,
+    return { subgenre: st.subgenre, style: st.style, bandProfile: st.bandProfile, key: `${st.tonic}:${st.mode}`, bpm: st.bpm, drums: st.groove?.drums, bass: st.groove?.bass, guitar: st.groove?.guitar,
       riff, verse: song?.harmony?.verse, chorus: song?.harmony?.chorus, opening: song?.edges?.opening, closing: song?.edges?.closing,
       // (Els acords de l'estrofa i la tornada, en graus: amb la harmonia v3 n'hi ha prou amb la versió per saber-los.)
       ...(st.harmony === 3 ? progressionPrint(engine, song) : {}) };
@@ -1930,12 +1987,14 @@
     const seed = (options.seed >>> 0) || 1, candidates = Math.max(1, Math.min(6, options.candidates ?? 3));
     // Empremtes de les últimes cançons (es calculen un sol cop per a tots els candidats).
     const recentPrints = options.recentPrints || (options.recent || []).map(entry => entry?.song ? fingerprintOf(engine, entry.song) : null);
+    const bandProfile = options.bandProfiles && engine.SUBGENRES[key]?.style === 'ska'
+      ? bandsModule().choose(key, recentPrints, rng(seed ^ 0xf4a61b3d)) : undefined;
     let best = null;
     for (let k = 0; k < candidates; k++) {
-      const attempt = composeAuto(engine, key, { ...options, recentPrints, seed: k ? (Math.imul(seed, 2246822519) + Math.imul(k, 3266489917)) >>> 0 || 1 : seed });
+      const attempt = composeAuto(engine, key, { ...options, recentPrints, bandProfile, seed: k ? (Math.imul(seed, 2246822519) + Math.imul(k, 3266489917)) >>> 0 || 1 : seed });
       if (!best || attempt.score > best.score) best = attempt;
     }
     return best.song;
   }
-  return { extractVoiceRhythm, voiceOpening, openingBars, OPENING_RHYTHMS, OPENING_WHISTLES, openingFrom, LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
+  return { bandName, extractVoiceRhythm, voiceOpening, openingBars, OPENING_RHYTHMS, OPENING_WHISTLES, openingFrom, LEAD_ROLES, LEAD_SHARE, WIND_ROLES, windShareOf, BATUCADA_STYLES, createBatucadaSong, isBatucadaSong, PUNK_LEAD_GUITARS, fingerprintOf, noveltyPenalty, createAutoSong, balanceProminentBass, parseLyricsSheet, lyricsPlan, GUITAR_SETUPS, lyricsTemplate, phrasesOf, chooseForm, formSimilarity, designEdges, planHighlights, reinforceSlowdowns, densityBoost, sectionWeight, cleanComments, feedbackReport, describeSong, COMMENT_TAGS, COMMENT_MOODS, lineScore, harmonyScore, OPENINGS, CLOSINGS, MIDDLES, MELODIC };
 });
