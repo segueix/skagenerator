@@ -306,7 +306,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       const level = Math.min(1, 10 ** (((score.mix[patch.instrument]?.volume || 0) + baseVolumeDb(score, patch.instrument)) / 20));
       // Amb distorsió, menys sala: la reverberació surt de la guitarra neta.
       const wet = (createGuitarFx(fxFor(score, patch), sampleRate)?.reverb ?? 1) * (createColorFx(colorFor(score, patch), sampleRate)?.reverb ?? 1);
-      synth.controllerChange(patch.channel, 91, Math.round((patch.reverb ?? REVERB[patch.instrument] ?? 20) * level * wet));
+      synth.controllerChange(patch.channel, 91, Math.round((patch.reverb ?? REVERB[patch.instrument] ?? 20) * (score.room ?? 1) * level * wet));
       synth.controllerChange(patch.channel, 93, 0);
     }
     // El xiulet sosté la nota fins al Note Off, que la percussió ignora per defecte.

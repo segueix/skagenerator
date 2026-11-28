@@ -76,7 +76,8 @@
   const subgenreName = key => engine.SUBGENRES[key]?.name || STATIONS[key] || engine.BATUCADA_RHYTHMS[key]?.name || key || '';
   // Subgènere d'una cançó (a les de batucada, el ritme).
   const kindOf = song => builder.isBatucadaSong(song) ? song.settings.batucadaRhythm || 'batucada' : song.settings.subgenre || '';
-  const songKind = song => builder.isBatucadaSong(song) ? `Batucada · ${subgenreName(kindOf(song))}` : subgenreName(song.settings.subgenre);
+  const songKind = song => builder.isBatucadaSong(song) ? `Batucada · ${subgenreName(kindOf(song))}`
+    : [subgenreName(song.settings.subgenre), builder.bandName(song.settings.bandProfile)].filter(Boolean).join(' · ');
   const keyName = s => `${NOTES[s.settings.tonic]} ${s.settings.mode === 'major' ? 'major' : 'menor'}`;
   // Deixa pintar la pantalla abans d'una feina llarga (i no s'encalla amb la pestanya amagada).
   const breathe = () => document.visibilityState === 'visible' ? new Promise(resolve => setTimeout(resolve, 0)) : Promise.resolve();
@@ -254,7 +255,7 @@
         song: e.song }));
     // Cada cançó nova porta lletra en català; la melodia de veu la segueix.
     // A la ràdio instrumental no n'hi ha: els vents porten el tema.
-    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: !instrumental, ...(instrumental ? {} : { autoLyrics: 'ca' }), seed: studio.newSeed(), vary: true, recent,
+    const options = { minutes: 2 + Math.floor(Math.random() * 7) * .25, vocal: !instrumental, bandProfiles: true, ...(instrumental ? {} : { autoLyrics: 'ca' }), seed: studio.newSeed(), vary: true, recent,
       // Títols de les últimes 150 cançons (i de les que esperen a la cua): no es repeteixen.
       avoidTitles: [...queue.map(t => t.song.title), ...all.slice(0, 150).map(e => e.title)].filter(Boolean),
       liked: all.filter(e => e.subgenre === subgenre && e.vote === 1).map(e => e.song) };
@@ -1156,7 +1157,7 @@
         head.append(pick);
       }
       text.append(make('strong', '', entry.title || 'Sense títol'),
-        make('small', '', [subgenreName(entry.subgenre || entry.style), clock(entry.seconds || 0), entry.song?.settings && !builder.isBatucadaSong(entry.song) ? keyName(entry.song) : '', dateText(entry.lastPlayed || entry.created),
+        make('small', '', [entry.song?.settings?.bandProfile ? songKind(entry.song) : subgenreName(entry.subgenre || entry.style), clock(entry.seconds || 0), entry.song?.settings && !builder.isBatucadaSong(entry.song) ? keyName(entry.song) : '', dateText(entry.lastPlayed || entry.created),
           entry.plays > 1 ? `sonada ${entry.plays} cops` : '', current?.id === entry.id ? 'sonant ara' : ''].filter(Boolean).join(' · ')));
       const votes = make('div', 'history-votes');
       for (const [value, icon, label] of [[1, '👍', 'M’agrada'], [-1, '👎', 'No m’agrada']]) {

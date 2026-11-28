@@ -192,6 +192,7 @@
     st.baseVolume = { ...defaultBaseVolume(), ...(st.baseVolume || {}) };
     migrateVolumes(value);
     if (st.countIn !== undefined && typeof st.countIn !== 'boolean') fail('Configuració no vàlida');
+    if (st.bandProfile !== undefined && (st.style !== 'ska' || !builder.bandName(st.bandProfile))) delete st.bandProfile;
     if (st.guitars !== undefined && ![1, 2, 3].includes(st.guitars)) fail('Configuració no vàlida');
     // Idioma de la lletra (per comptar síl·labes): català per defecte o anglès.
     if (st.lang !== undefined && !['ca', 'en'].includes(st.lang)) delete st.lang;
@@ -1275,7 +1276,7 @@
     const style = $('song-style').value, profile = STYLES[style];
     if (id === 'song-style') {
       song.settings = { ...st, style, bpm: profile.bpm.default, groove: defaultGroove() };
-      delete song.settings.subgenre; delete song.settings.swing;
+      delete song.settings.subgenre; delete song.settings.swing; delete song.settings.bandProfile;
       if (!profile.keys.some(([k, m]) => k === st.tonic && m === st.mode)) [song.settings.tonic, song.settings.mode] = profile.keys[0];
       applyBase(baseDefaults(style));
       song.settings.bars = Math.min(song.settings.bars, Math.floor(MAX_SECONDS / barSeconds()));
@@ -1311,6 +1312,7 @@
     else if (id.startsWith('timbre-')) st.timbres = { ...st.timbres, [id.slice(7)]: event.target.value };
     else if (id === 'song-subgenre') {
       const key = event.target.value, sg = engine.SUBGENRES[key];
+      delete st.bandProfile;
       if (!sg) { delete st.subgenre; delete st.swing; }
       else {
         // El subgènere decideix d'un cop harmonia, ritmes, balanceig, sons i efectes.
@@ -2213,7 +2215,7 @@
       const recent = readLibrary().filter(e => Array.isArray(e.song?.sections)).sort((a, b) => b.created - a.created).slice(0, 12)
         .map(e => ({ subgenre: e.subgenre, style: e.style, plan: [...e.song.sections].sort((a, b) => a.start - b.start).map(s => [s.type, s.bars]) }));
       const vary = $('auto-vary').checked, punkSong = engine.SUBGENRES[key].style === 'punk';
-      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, ...($('auto-english').checked && !lyricSheet.length ? { autoLyrics: 'ca' } : {}), seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(lyricSheet.length ? { lyrics: lyricSheet.map(({ type, text }) => ({ type, text })) } : {}), ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
+      const project = builder.createAutoSong(engine, key, { minutes: Number($('auto-minutes').value), vocal: $('auto-vocal').checked, bandProfiles: true, ...($('auto-english').checked && !lyricSheet.length ? { autoLyrics: 'ca' } : {}), seed: newSeed(), liked, vary, recent: vary ? recent : [], ...(lyricSheet.length ? { lyrics: lyricSheet.map(({ type, text }) => ({ type, text })) } : {}), ...(punkSong ? { guitars: Number($('auto-guitars').value) } : {}),
         ...(mode ? { key: [Number(tonic), mode] } : {}) });
       migrated = false;
       openSong(validateSong(project), '');
