@@ -391,8 +391,8 @@
         r(); r(); // abans es feien tres tirades (una per família): la resta de la cançó no canvia
         return { drums, bass, guitar };
       })();
-    // (Ska: harmony 2, harmonia v2: més progressions, acords partits i girs de final de frase; vegeu radioambient.js.)
-    const settings = { style: sg.style, subgenre: key, ...(sg.style === 'ska' ? { harmony: 2 } : {}), bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
+    // (Ska: harmony 3: les progressions de la v2 —acords partits i girs de final de frase— i les del corpus de 50 cançons; vegeu radioambient.js.)
+    const settings = { style: sg.style, subgenre: key, ...(sg.style === 'ska' ? { harmony: 3 } : {}), bpm, tonic, mode, seed: (seed * 2654435761 >>> 0) || 7, bars: 0, swing: sg.swing || 0,
       timbres: { guitar: 'auto', bass: 'auto', drums: 'auto', trumpet: 'auto', trombone: 'auto', vocal: 'auto', ...(sg.timbres || {}) }, groove };
     // So de guitarra: alguns subgèneres en tenen diversos (el punk del 77 no ha de sonar sempre igual).
     const fx = sg.fxChoices ? (([type, drive, tone]) => ({ type, drive, tone }))(pick(sg.fxChoices)) : sg.fx;
@@ -655,7 +655,10 @@
         } else if (role === 'guitar') {
           add(sec, 'guitar3', { line: mode, ...span });
           volume(sec, 'guitar3', 3);
-          if (!base.includes('organ') && play() < .5) add(sec, 'organ', { revision: 2, ...span });
+          // (Si a l'altra meitat de la secció l'orgue fa la melodia, aquí no fa el «bubble»: la primera capa de cada
+          // instrument mana a tota la secció, i la melodia es perdria.)
+          const organLeads = leadPlan.some(u => u.sec === sec && u.role === 'keys' && u.keys === 'organ');
+          if (!base.includes('organ') && !organLeads && play() < .5) add(sec, 'organ', { revision: 2, ...span });
           answer(null, .6);
         } else if (role === 'bass') {
           baseLine(sec, 'bass', mode);
@@ -773,19 +776,34 @@
     };
     // ── Harmonia: es proven diverses combinacions i es queda la que dona més forma a la cançó ──
     const kinds = Object.keys(harmony);
-    let bestHarmony = { ...harmony }, bestForm = -Infinity;
-    for (let c = 0; c < 8; c++) {
-      const trial = c === 0 ? { ...harmony } : Object.fromEntries(kinds.map(type => [type, 1 + Math.floor(r() * 5)]));
+    // (Harmonia v3: a més de la versió, es prova quina progressió de la paleta fa cada tipus de secció —settings.picks—;
+    // la paleta inclou les del corpus, i les progressions que han sonat a les últimes cançons resten molts punts.)
+    const corpusHarmony = settings.harmony === 3, paletteSize = type => engine.paletteFor(key, mode, type, 3)?.length || 1;
+    const cycleOf = list => list?.slice(0, 4).join(' ');
+    const recentChords = (options.recentPrints || []).filter(p => p && p.key?.endsWith(`:${mode}`)).slice(0, 8);
+    let bestHarmony = { ...harmony }, bestPicks = null, bestForm = -Infinity;
+    for (let c = 0; c < (corpusHarmony ? 24 : 8); c++) {
+      const trial = c === 0 || corpusHarmony ? { ...harmony } : Object.fromEntries(kinds.map(type => [type, 1 + Math.floor(r() * 5)]));
+      const picks = corpusHarmony ? Object.fromEntries(kinds.map(type => [type, Math.floor(r() * paletteSize(type))])) : null;
+      const trialSettings = picks ? { ...settings, picks } : settings;
       const chordsOf = type => {
         const sec = of(type)[0];
-        return sec ? engine.composeSongPart(settings, { ...partFor(sec, {}, null, trial[type]), instruments: [] }).chords.map(ch => ch.symbol || ch.pcs.join('-')) : null;
+        return sec ? engine.composeSongPart(trialSettings, { ...partFor(sec, {}, null, trial[type]), instruments: [] }).chords.map(ch => ch.symbol || ch.pcs.join('-')) : null;
       };
       // Les progressions de les últimes cançons del subgènere resten punts (si la tonalitat de mode coincideix).
       const reused = recentSame.filter(p => p.key?.endsWith(`:${mode}`));
-      const form = harmonyScore(chordsOf) - (reused.some(p => p.chorus === trial.chorus) ? 1.2 : 0) - (reused.some(p => p.verse === trial.verse) ? .7 : 0);
-      if (form > bestForm) { bestForm = form; bestHarmony = trial; }
+      let form = harmonyScore(chordsOf);
+      if (corpusHarmony) {
+        // (Els acords de veritat, en graus: una estrofa o una tornada que ja ha sonat en una de les últimes cançons, de
+        // qualsevol subgènere, gairebé no pot guanyar.)
+        const verse = cycleOf(chordsOf('verse')), chorus = cycleOf(chordsOf('chorus'));
+        form -= recentChords.reduce((t, p, i) => t + .9 ** i * ((chorus && [p.chorusChords, p.verseChords].includes(chorus) ? 2.5 : 0)
+          + (verse && [p.chorusChords, p.verseChords].includes(verse) ? 1.8 : 0)), 0);
+      } else form -= (reused.some(p => p.chorus === trial.chorus) ? 1.2 : 0) + (reused.some(p => p.verse === trial.verse) ? .7 : 0);
+      if (form > bestForm) { bestForm = form; bestHarmony = trial; bestPicks = picks; }
     }
     Object.assign(harmony, bestHarmony);
+    if (bestPicks) settings.picks = bestPicks;
 
     // ── Millor versió de cada línia pròpia (la mateixa per a seccions iguals) ──
     // Cada candidata es puntua dins de la seva secció: amb els acords i amb les
@@ -1016,6 +1034,31 @@
       'IVVBVCSVBVCO', 'IVCVCDCO', 'IVCSVCDCTO', 'IVCVCDCTO', 'IVVBVCDCO', 'ICVCDVCTO'],
     urban: ['IVCVCBCO', 'IVCVCCO']
   };
+  // Formes de cançons reals del corpus de 50 cançons d'ska (data/corpus-ska/): les documentades i les parcials que en
+  // tenen prou (l'«interludi» és R, un passatge curt de vents entre blocs; el «tema instrumental», S).
+  const CORPUS_FORMS = ['ICVCVCCO', 'ICVCVCSCVCSCO', 'IVCRVCCO', 'IVCRVCO', 'IVCRVCSVCVCO', 'IVCSVCO', 'IVCVCO', 'IVCVCSCO', 'IVCVCSSVCO',
+    'IVPCRVCRO', 'IVRVCRVCBCO', 'IVVCVCRVVCO'];
+  // Transicions entre seccions de les formes documentades del corpus (quantes vegades una secció va després d'una altra).
+  const CORPUS_TRANSITIONS = { I: { C: 1, V: 6 }, C: { V: 6, S: 5, O: 3, R: 3, C: 1, B: 1 }, V: { C: 16, S: 1, R: 1 }, S: { C: 3, O: 1, V: 2, S: 1 }, R: { V: 4 }, B: { C: 1 } };
+  // Una forma nova que segueix les transicions del corpus: comença per la intro, acaba amb tornada i final, té entre
+  // 6 i 12 seccions i com a mínim dues estrofes i dues tornades (cap secció no es repeteix més de dues vegades seguides).
+  function corpusWalk(r) {
+    for (let guard = 0; guard < 40; guard++) {
+      let form = 'I', at = 'I';
+      while (form.length < 13) {
+        const options = Object.entries(CORPUS_TRANSITIONS[at] || { C: 1 }).filter(([next]) => !(next === at && form.at(-2) === at));
+        const total = options.reduce((t, [, w]) => t + w, 0);
+        let roll = r() * total, next = options[0][0];
+        for (const [name, w] of options) { roll -= w; if (roll <= 0) { next = name; break; } }
+        if (next === 'O') break;
+        form += next; at = next;
+      }
+      const count = ch => [...form].filter(c => c === ch).length;
+      if (form.at(-1) !== 'C' || form.length < 6 || form.length > 12 || count('V') < 2 || count('C') < 2) continue;
+      return form + 'O';
+    }
+    return 'IVCVCSCO';
+  }
   const FORM_TYPES = { I: 'intro', V: 'verse', P: 'prechorus', C: 'chorus', B: 'bridge', K: 'bridge', S: 'solo', R: 'solo', O: 'outro', D: 'bridge', T: 'chorus' };
   // Paper especial de cada lletra de la plantilla (pont trencat, riff, dub i tag).
   const FORM_ROLES = { K: 'breakdown', R: 'riff', D: 'dub', T: 'tag' };
@@ -1175,6 +1218,12 @@
     // L'ska-punk no fa dub; el rocksteady i l'early reggae, més sovint (hi és dues vegades).
     if (key === 'skapunk') templates = templates.filter(t => !t.includes('D'));
     if (key === 'rocksteady' || key === 'bossreggae') templates = [...templates, ...templates.filter(t => t.includes('D'))];
+    // Ska: també les formes del corpus i quatre de noves fetes amb les seves transicions (cada cançó, unes altres).
+    if (style === 'ska') {
+      const corpus = [...CORPUS_FORMS, ...Array.from({ length: 4 }, () => corpusWalk(r))]
+        .filter(t => !(key === 'rocksteady' || key === 'bossreggae') || !t.includes('R'));
+      templates = [...templates, ...new Set(corpus)];
+    }
     const seconds = plan => plan.reduce((t, [, bars]) => t + bars * 240 / bpm, 0);
     const candidates = [];
     for (let k = 0; k < 160; k++) {
@@ -1475,7 +1524,21 @@
     let riff = null;
     try { riff = JSON.stringify(engine.composeRiff(st.seed >>> 0, st.style === 'punk', st.subgenre).rhythm); } catch { /* sense riff */ }
     return { subgenre: st.subgenre, style: st.style, key: `${st.tonic}:${st.mode}`, bpm: st.bpm, drums: st.groove?.drums, bass: st.groove?.bass, guitar: st.groove?.guitar,
-      riff, verse: song?.harmony?.verse, chorus: song?.harmony?.chorus, opening: song?.edges?.opening, closing: song?.edges?.closing };
+      riff, verse: song?.harmony?.verse, chorus: song?.harmony?.chorus, opening: song?.edges?.opening, closing: song?.edges?.closing,
+      // (Els acords de l'estrofa i la tornada, en graus: amb la harmonia v3 n'hi ha prou amb la versió per saber-los.)
+      ...(st.harmony === 3 ? progressionPrint(engine, song) : {}) };
+  }
+  function progressionPrint(engine, song) {
+    const out = {};
+    for (const type of ['verse', 'chorus']) {
+      const sec = song.sections?.find(s => s.type === type && !s.form);
+      if (!sec) continue;
+      try {
+        const part = { type, bars: sec.bars, energy: sec.energy ?? 50, revision: song.harmony?.[type] || 1, variantIndex: ((song.harmony?.[type] || 1) - 1) % 5, instruments: [] };
+        out[`${type}Chords`] = engine.composeSongPart(song.settings, part).chords.slice(0, 4).map(ch => ch.symbol).join(' ');
+      } catch { /* cançó antiga o incompleta */ }
+    }
+    return out;
   }
   // Semblança amb les últimes cançons (0 = cap, 1 = calcada a l'última), pesant més les més recents.
   function noveltyPenalty(print, recent) {
@@ -1486,7 +1549,9 @@
       const score = 5 * same(print.riff, other.riff) + same(print.key, other.key) + (Math.abs((print.bpm || 0) - (other.bpm || 0)) <= 4 ? .5 : 0)
         + .4 * same(print.drums, other.drums) + .4 * same(print.bass, other.bass) + .3 * same(print.guitar, other.guitar)
         + (sameSub ? .7 * same(print.verse, other.verse) + .9 * same(print.chorus, other.chorus) : 0)
-        + .3 * same(print.opening, other.opening) + .3 * same(print.closing, other.closing);
+        + .3 * same(print.opening, other.opening) + .3 * same(print.closing, other.closing)
+        // (Mateixos acords, en graus, encara que sigui en un altre subgènere: sona a la mateixa cançó.)
+        + .8 * same(print.verseChords, other.verseChords) + same(print.chorusChords, other.chorusChords);
       const weight = .85 ** i * (sameSub ? 1 : print.style === other.style ? .5 : .2);
       return total + weight * score / 6.3;
     }, 0);

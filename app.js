@@ -195,6 +195,9 @@
     if (st.guitars !== undefined && ![1, 2, 3].includes(st.guitars)) fail('Configuració no vàlida');
     // Idioma de la lletra (per comptar síl·labes): català per defecte o anglès.
     if (st.lang !== undefined && !['ca', 'en'].includes(st.lang)) delete st.lang;
+    // Progressió de cada tipus de secció (harmonia v3): índexs de la paleta; si no són vàlids, la cançó tria per la llavor.
+    if (st.picks !== undefined && (!st.picks || typeof st.picks !== 'object' || Array.isArray(st.picks)
+      || Object.entries(st.picks).some(([type, i]) => !Object.hasOwn(TYPES, type) || !Number.isInteger(i) || i < 0 || i > 999))) delete st.picks;
     st.timbres = { ...defaultTimbres(), ...(st.timbres || {}) }; st.groove = { ...defaultGroove(), ...(st.groove || {}) };
     if (st.mix !== undefined) engine.composeSongPart({ ...st }, { type: 'verse', bars: 1, energy: 50, revision: 1 });
     const base = value.base;

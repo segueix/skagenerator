@@ -2775,6 +2775,33 @@
             chorus: [['IV', 'V', 'I', 'I'], ['vi', 'IV', 'I', 'V'], ['I', 'V', 'IV', 'IV|V']], bridge: [['ii', 'IV', 'V', 'V']] },
           minor: { verse: [['i', 'bVII', 'bVI', 'bVII'], ['i', 'iv']], chorus: [['bVI', 'bVII', 'i', 'i'], ['bIII', 'bVII', 'iv', 'bVI']] } }
     };
+    // ── Harmonia v3: progressions del corpus de 50 cançons d'ska ────────
+    // (Corpus aportat: Jamaica i primer ska, 2 Tone, Països Catalans i revival internacional; vegeu data/corpus-ska/.)
+    // Les progressions reals de cada família, en graus, repartides pels subgèneres que s'hi assemblen; les de tres acords
+    // allarguen l'últim (I–IV–V–V) i les de cinc o sis s'estenen a vuit compassos. Cançons noves: settings.harmony = 3.
+    const CORPUS_HARMONY = {
+        rocksteady: {
+            major: { verse: [['I', 'IV', 'V', 'V'], ['I', 'V', 'IV', 'IV']], chorus: [['I', 'IV', 'V7', 'V7'], ['I', 'IV', 'V', 'I', 'bIII', 'bIII', 'bIII', 'bIII'], ['I', 'IV'], ['I', 'IV', 'V', 'V']] },
+            minor: { verse: [['i', 'V7']], chorus: [['i', 'i', 'i7', 'i']] } },
+        bossreggae: {
+            major: { verse: [['I', 'IV', 'V', 'V'], ['I', 'V', 'IV', 'IV'], ['I', 'V', 'I', 'IV'], ['ii7', 'V7']], chorus: [['I', 'IV', 'V7', 'V7'], ['I', 'IV', 'V', 'I', 'bIII', 'bIII', 'bIII', 'bIII'], ['I', 'IV'], ['I', 'IV', 'V', 'V'], ['I', 'V', 'I', 'IV'], ['I', 'ii', 'V', 'V'], ['I', 'vi']] },
+            minor: { verse: [['i', 'V7'], ['i', 'v', 'i', 'i'], ['i', 'bVI', 'V', 'V']], chorus: [['i', 'i', 'i7', 'i'], ['i', 'v', 'i', 'i'], ['i', 'iv', 'V', 'V'], ['V7', 'bVI', 'V7', 'V7']] } },
+        jamaican: {
+            major: { verse: [['I', 'IV', 'V7', 'V7'], ['I', 'IV', 'V', 'V'], ['I', 'IV'], ['I', 'IV', 'I', 'I'], ['I', 'II'], ['I7', 'IV7', 'I7', 'I7'], ['I', 'ii', 'V', 'I'], ['I', 'IV', 'ii', 'V'], ['I', 'bIII', 'IV', '#IV'], ['I', 'bVII']], chorus: [['I', 'IV', 'V7', 'V7'], ['I', 'IV', 'V', 'V'], ['I', 'ii', 'V', 'V'], ['I', 'V', 'V7', 'IV'], ['ii', 'V'], ['I', 'vi', 'II', 'II'], ['V7', 'IV', 'V7', 'V7'], ['I', 'ii', 'V', 'I'], ['IV', 'iv', 'I', 'I'], ['IV', 'bVII'], ['IV', 'I', 'IV', 'ii']], intro: [['#IV', 'IV', 'bIII', 'I'], ['I', 'IV', 'I', 'I'], ['I', 'IV', 'V', 'IV'], ['I', 'IV', 'V', 'V'], ['I', 'V', 'ii', 'vi', 'V', 'IV', 'IV', 'IV']], outro: [['I', 'bIII', 'IV', '#IV']], bridge: [['vi', 'vii', 'vi', '#iv'], ['IV', 'I', 'IV', 'II', 'V', 'V', 'V', 'V'], ['vi', 'IV', 'I', 'I']], solo: [['I', 'bVII']] },
+            minor: { verse: [['i', 'V', 'V7', 'V7'], ['i', 'V7'], ['i7', 'IV7'], ['i', 'bIII', 'bVI', 'bVI'], ['i', 'bVII', 'i', 'IV']], chorus: [['i', 'V', 'V7', 'V7'], ['i', 'iv'], ['i7', 'IV7'], ['i', 'bIII', 'bVI', 'bVI']], intro: [['i°', 'bii°', 'ii°', 'biii°']], bridge: [['i', 'i', 'i7', 'i']] } },
+        skaswing: {
+            major: { verse: [['I', 'IV', 'V7', 'V7'], ['I', 'IV', 'V', 'V'], ['I', 'IV'], ['I', 'IV', 'I', 'I'], ['I', 'II'], ['I7', 'IV7', 'I7', 'I7']], chorus: [['I', 'IV', 'V7', 'V7'], ['I', 'IV', 'V', 'V'], ['I', 'ii', 'V', 'V'], ['I', 'V', 'V7', 'IV'], ['ii', 'V'], ['I', 'vi', 'II', 'II'], ['V7', 'IV', 'V7', 'V7']] },
+            minor: { verse: [['i', 'V', 'V7', 'V7'], ['i', 'V7'], ['i7', 'IV7'], ['i', 'bIII', 'bVI', 'bVI']], chorus: [['i', 'V', 'V7', 'V7'], ['i', 'iv'], ['i7', 'IV7'], ['i', 'bIII', 'bVI', 'bVI']] } },
+        twotone: {
+            major: { verse: [['I', 'IV'], ['I', 'IV', 'I', 'V'], ['I', 'bIII', 'IV', '#IV'], ['I', 'IV', 'V', 'V'], ['I', 'ii', 'V', 'V'], ['I', 'IV', 'V', 'IV'], ['I', 'ii', 'I', 'ii'], ['I', 'V', 'IV', 'IV'], ['I', 'v7'], ['I', 'V', 'I', 'IV'], ['ii7', 'V7'], ['I', 'V', 'ii', 'ii'], ['V', 'I'], ['IV', 'I', 'bVII', 'I'], ['I', 'vi', 'IV', 'ii'], ['I', 'ii', 'V', 'I'], ['I', 'IV', 'ii', 'V'], ['I', 'IV', 'I', 'I'], ['I', 'bVII']], chorus: [['I', 'V'], ['I', 'ii'], ['IV', 'iv', 'I', 'I'], ['IV', 'I', 'IV', 'II', 'V', 'V', 'V', 'V'], ['I', 'ii', 'V7', 'V7'], ['I', 'IV', 'V', 'IV'], ['ii', 'vi', 'ii', 'ii'], ['I', 'IV', 'V', 'V'], ['I', 'bVII', 'I', 'IV'], ['IV', 'bVII7'], ['I', 'IV', 'I', 'V'], ['I', 'V', 'I', 'IV'], ['I', 'ii', 'V', 'V'], ['vi', 'V', 'IV', 'IV'], ['bVII', 'IV'], ['IV', 'I', 'bVII', 'I'], ['I', 'ii', 'V', 'I'], ['I', 'vi'], ['IV', 'bVII'], ['IV', 'I', 'IV', 'ii']], intro: [['#IV', 'IV', 'bIII', 'I'], ['I', 'IV', 'I', 'I'], ['I', 'IV', 'V', 'IV'], ['I', 'IV', 'V', 'V'], ['I', 'V', 'ii', 'vi', 'V', 'IV', 'IV', 'IV']], outro: [['I', 'bIII', 'IV', '#IV']], bridge: [['vi', 'vii', 'vi', '#iv'], ['IV', 'I', 'IV', 'II', 'V', 'V', 'V', 'V'], ['vi', 'IV', 'I', 'I']], solo: [['I', 'bVII']] },
+            minor: { verse: [['i', 'iv'], ['i', 'bVII', 'i', 'IV'], ['i', 'v', 'i', 'i'], ['i', 'bVI', 'V', 'V'], ['i', 'bVI', 'bVII', 'bVII'], ['i', 'V7'], ['i', 'bVII']], chorus: [['i', 'V', 'i', 'i'], ['i', 'IV', 'bIII', 'V7'], ['i', 'v', 'i', 'i'], ['i', 'iv', 'V', 'V'], ['V', 'bVI', 'bVII', 'i'], ['V7', 'bVI', 'V7', 'V7'], ['i', 'bVI', 'bVII', 'bVII']], intro: [['i°', 'bii°', 'ii°', 'biii°']], bridge: [['i', 'i', 'i7', 'i']] } },
+        nutty: {
+            major: { verse: [['I', 'IV'], ['I', 'IV', 'I', 'V'], ['I', 'bIII', 'IV', '#IV'], ['I', 'IV', 'V', 'V'], ['I', 'ii', 'V', 'V'], ['I', 'IV', 'V', 'IV'], ['I', 'ii', 'I', 'ii'], ['I', 'V', 'IV', 'IV'], ['I', 'v7'], ['I', 'IV', 'I', 'I'], ['I', 'bVII'], ['I', 'IV', 'ii', 'V']], chorus: [['I', 'V'], ['I', 'ii'], ['IV', 'iv', 'I', 'I'], ['IV', 'I', 'IV', 'II', 'V', 'V', 'V', 'V'], ['I', 'ii', 'V7', 'V7'], ['I', 'IV', 'V', 'IV'], ['ii', 'vi', 'ii', 'ii'], ['I', 'IV', 'V', 'V'], ['I', 'bVII', 'I', 'IV'], ['IV', 'bVII7'], ['I', 'IV', 'I', 'V'], ['IV', 'bVII'], ['IV', 'I', 'IV', 'ii']], intro: [['#IV', 'IV', 'bIII', 'I'], ['I', 'IV', 'I', 'I'], ['I', 'IV', 'V', 'IV'], ['I', 'IV', 'V', 'V'], ['I', 'V', 'ii', 'vi', 'V', 'IV', 'IV', 'IV']], outro: [['I', 'bIII', 'IV', '#IV']], bridge: [['vi', 'vii', 'vi', '#iv'], ['IV', 'I', 'IV', 'II', 'V', 'V', 'V', 'V'], ['vi', 'IV', 'I', 'I']], solo: [['I', 'bVII']] },
+            minor: { verse: [['i', 'iv'], ['i', 'bVII', 'i', 'IV'], ['i', 'V7']], chorus: [['i', 'V', 'i', 'i'], ['i', 'IV', 'bIII', 'V7']], intro: [['i°', 'bii°', 'ii°', 'biii°']], bridge: [['i', 'i', 'i7', 'i']] } },
+        skapunk: {
+            minor: { verse: [['i', 'bVI', 'bVII', 'bVII'], ['i', 'bVII'], ['i', 'bVII', 'i', 'IV'], ['i', 'V7']], chorus: [['V', 'bVI', 'bVII', 'i'], ['i', 'bVI', 'bVII', 'bVII']], intro: [['i°', 'bii°', 'ii°', 'biii°']], bridge: [['i', 'i', 'i7', 'i']] },
+            major: { verse: [['I', 'V', 'ii', 'ii'], ['I', 'IV', 'V', 'V'], ['V', 'I'], ['IV', 'I', 'bVII', 'I'], ['I', 'vi', 'IV', 'ii'], ['I', 'IV', 'ii', 'V'], ['I', 'V', 'I', 'iii', 'IV', 'vi', 'vi', 'vi'], ['I', 'bIII', 'IV', '#IV'], ['I', 'IV', 'I', 'I'], ['I', 'bVII']], chorus: [['vi', 'V', 'IV', 'IV'], ['I', 'IV', 'V', 'V'], ['bVII', 'IV'], ['IV', 'I', 'bVII', 'I'], ['IV', 'I', 'IV', 'ii'], ['ii', 'vi', 'IV', 'V', 'I', 'I', 'I', 'I'], ['IV', 'iv', 'I', 'I'], ['IV', 'bVII']], intro: [['#IV', 'IV', 'bIII', 'I'], ['I', 'IV', 'I', 'I'], ['I', 'IV', 'V', 'IV'], ['I', 'IV', 'V', 'V'], ['I', 'V', 'ii', 'vi', 'V', 'IV', 'IV', 'IV']], outro: [['I', 'bIII', 'IV', '#IV']], bridge: [['vi', 'vii', 'vi', '#iv'], ['IV', 'I', 'IV', 'II', 'V', 'V', 'V', 'V'], ['vi', 'IV', 'I', 'I']], solo: [['I', 'bVII']] } }
+    };
     function paletteFor(subgenre, mode, type, version = 1) {
         const pal = SUBGENRES[subgenre]?.harmony[mode] || Object.values(SUBGENRES[subgenre]?.harmony || {})[0];
         if (!pal) return null;
@@ -2784,7 +2811,13 @@
         const base = pick(pal);
         if (version < 2) return base;
         const extra = HARMONY_V2[subgenre]?.[mode] ? pick(HARMONY_V2[subgenre][mode]) || [] : [];
-        return [...(base || []), ...extra];
+        if (version < 3) return [...(base || []), ...extra];
+        // (v3: a més, les del corpus per a aquest tipus de secció, o les de la secció de referència.)
+        const corpus = CORPUS_HARMONY[subgenre]?.[mode];
+        const own = corpus?.[type] || corpus?.[{ intro: 'verse', solo: 'verse', outro: 'chorus', prechorus: 'chorus', bridge: 'verse' }[type]] || [];
+        const all = [...(base || []), ...extra];
+        for (const p of own) if (!all.some(q => q.join(' ') === p.join(' '))) all.push(p);
+        return all;
     }
     // ── Riff de la cançó ────────────────────────────────────────────────
     // Un motiu de dos compassos (ritme i contorn en graus de l'escala) que
@@ -3416,7 +3449,7 @@
         if (part.type === 'outro') degrees[bars - 1] = 0;
         // Amb subgènere, les progressions surten del seu llenguatge harmònic.
         const harmonyVersion = settings.harmony ?? 1;
-        if (![1, 2].includes(harmonyVersion)) throw new Error('Versió d’harmonia no vàlida');
+        if (![1, 2, 3].includes(harmonyVersion)) throw new Error('Versió d’harmonia no vàlida');
         const palette = settings.subgenre ? paletteFor(settings.subgenre, mode, part.type, harmonyVersion) : null;
         let chords;
         if (palette) {
@@ -3427,6 +3460,8 @@
                 let h = Math.imul((settings.seed >>> 0) ^ Math.imul(family + 1, 0x27d4eb2d), 0x85ebca6b); h ^= h >>> 13;
                 h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; songPick = h >>> 0;
             }
+            // (v3: la cançó pot dir quina progressió fa cada tipus de secció —settings.picks—, triada per no repetir les de les últimes cançons.)
+            if (harmonyVersion >= 3 && Number.isInteger(settings.picks?.[part.type])) songPick = settings.picks[part.type] >>> 0;
             // Blues de 12 compassos (secció «blues»): al jamaicà, l'ska-swing i el nutty, el blues de jazz (amb el IV al
             // segon compàs, el VI7 i el gir ii–V); als altres, el blues de sempre. En menor, el blues menor.
             const jazzy = ['jamaican', 'skaswing', 'nutty'].includes(settings.subgenre);
@@ -3850,7 +3885,7 @@
     }
 
     return { normalize, setAllowed, isAllowed, othersPlaying, canPlay, samples, samplesAsync, createPlayer, pickMelody, melodyId, melodyInfo,
-        SECTION_PUSHES, BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, SOLO_VOCAB, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
+        SECTION_PUSHES, BATUCADA, BATUCADA_RHYTHMS, BATUCADA_WHISTLE, batucadaRowOf, validBatucadaOpening, OPENING_ROLL, validLineMode, LINE_MODE_INSTRUMENTS, BATUCADA_MOTIFS, BATUCADA_ENDINGS, validBatucadaMotif, BATUCADA_TUTTI, SOLO_VOCAB, BATUCADA_BAND, BATUCADA_DIALOG, BATUCADA_FEEL, SURDO3_MODES, SURDO_MUTED, AGOGO_LOW, CUICA_VARIANTS, CUICA_CHAINS, validBatucadaPattern, validBatucadaFx, generateBatucadaPattern, SONG_PARTS, SONG_STYLES, SONG_INSTRUMENTS, SONG_GROOVES, MIX_LIMITS, VOLUME_LIMITS, GUITAR_FX, SUBGENRES, paletteFor, CORPUS_HARMONY, chordFromSymbol, composeRiff, analyzeLyrics, lyricWords, englishWord, catalanWord: wordStress, composeSongPart, SECTION_ENDINGS, SONG_CLOSINGS, COLOR_FX, COLOR_INSTRUMENTS, songPartSamples,
         MELODIES, LEVEL, DUCK, TARGET_RMS, THEME_SECONDS, MELODY_SECONDS,
         // Tornades de la lliga (pantalla entre partides).
         JINGLES, JINGLE_SECONDS, JINGLE_LEVEL, jingleId, jingleInfo, pickJingle, jingleSamples, jingleSamplesAsync, createJinglePlayer,
