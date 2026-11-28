@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, readdir, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import ROUND_ROBIN from '../round-robin.json' with { type: 'json' };
 import {
   BasicInstrument, BasicPreset, BasicSoundBank, EmptySample, GeneratorTypes, SampleTypes, SoundBankLoader, SpessaLog
@@ -270,7 +270,8 @@ export async function buildLocalHorns(bank, specs = [], log) {
     const notes = [...spec.notes].sort((a, b) => a.key - b.key);
     const made = notes.map(entry => {
       const wav = readWav(readFileSync(new URL('../' + spec.directory + entry.file, import.meta.url)));
-      const trimmed = trim(resample(wav.data, wav.rate, RATE), RATE, 10);
+      // (maxSeconds: només el principi de cada gravació —l'atac i el tros on es fa el bucle—, perquè el banc no creixi.)
+      const trimmed = trim(resample(wav.data, wav.rate, RATE), RATE, spec.maxSeconds ?? 10);
       // L'afinació mesurada de la gravació (cents per sobre de la nota): es corregeix aquí.
       const looped = findLoop(trimmed, RATE, 440 * 2 ** ((entry.key - 69) / 12 + entry.cents / 1200));
       if (!looped) throw new Error(`${spec.name}: no hi ha bucle per a la nota ${entry.key}`);
@@ -452,13 +453,126 @@ export function buildTonewheel(bank, spec, log) {
 }
 
 // Guitarres solistes gravades (FreePats FSBS): banc a part que la web només baixa quan cal.
-export async function buildGuitarInstruments(entries, log = console.log) {
+// ── Acords de guitarra d'ska (skank) ──────────────────────────────────
+// Cada tipus d'acord és un programa (major, menor, 7 i m7) i cada fonamental, una tecla (48 + fonamental, variant 1;
+// 60 + fonamental, variant 2), sense transposar: cada tecla toca la seva mostra tal com és. Les mostres es retallen
+// (seconds), s'igualen a la mateixa sonoritat i s'apaguen en «release» segons quan la guitarra aixeca la mà.
+const CHORD_ROOTS = ['C', 'Csharp', 'D', 'Eb', 'E', 'F', 'Fsharp', 'G', 'Ab', 'A', 'Bb', 'B'];
+const chordFiles = spec => Object.keys(spec.programs).flatMap(quality => CHORD_ROOTS.flatMap((root, pc) =>
+  [1, 2].map(variant => ({ quality, pc, variant, file: `${root}_${quality}_0${variant}.wav` }))));
+// Poliment dels acords per a l'skank: comencen just a l'atac (2 ms abans), sense el retruny greu que tapa el baix
+// (pas alt de 2n ordre a 170 Hz), amb més presència (prestatge aguts +4 dB des de 2,5 kHz), un atac més definit
+// (realçador de transitoris: el cop de pua puja fins a 4 dB respecte de la ressonància) i una cua que s'apaga aviat.
+function biquad(data, rate, type, hz, gainDb = 0, q = .707) {
+  const w = 2 * Math.PI * hz / rate, cos = Math.cos(w), alpha = Math.sin(w) / (2 * q), A = 10 ** (gainDb / 40);
+  let b0, b1, b2, a0, a1, a2;
+  if (type === 'highpass') { b0 = (1 + cos) / 2; b1 = -(1 + cos); b2 = (1 + cos) / 2; a0 = 1 + alpha; a1 = -2 * cos; a2 = 1 - alpha; }
+  else { const s = 2 * Math.sqrt(A) * alpha; b0 = A * ((A + 1) + (A - 1) * cos + s); b1 = -2 * A * ((A - 1) + (A + 1) * cos); b2 = A * ((A + 1) + (A - 1) * cos - s);
+    a0 = (A + 1) - (A - 1) * cos + s; a1 = 2 * ((A - 1) - (A + 1) * cos); a2 = (A + 1) - (A - 1) * cos - s; }
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < data.length; i++) { const x = data[i], y = (b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0; x2 = x1; x1 = x; y2 = y1; y1 = y; data[i] = y; }
+  return data;
+}
+export function polishChord(input, rate) {
+  let peak = 0; for (const x of input) peak = Math.max(peak, Math.abs(x));
+  let onset = 0; while (onset < input.length && Math.abs(input[onset]) < peak * .1) onset++;
+  const data = input.slice(Math.max(0, onset - Math.round(rate * .002)));
+  biquad(data, rate, 'highpass', 170); biquad(data, rate, 'highshelf', 2500, 4);
+  // Transitoris: envolupant ràpida (1 ms) contra lenta (40 ms); on la ràpida passa la lenta, hi ha el cop.
+  const fast = Math.exp(-1 / (rate * .001)), slow = Math.exp(-1 / (rate * .04));
+  let ef = 0, es = 0;
+  for (let i = 0; i < data.length; i++) {
+    const a = Math.abs(data[i]); ef = Math.max(a, ef * fast); es = es * slow + a * (1 - slow);
+    data[i] *= Math.min(10 ** (4 / 20), Math.max(1, 1 + (ef - es) / (es + 1e-4) * .5));
+  }
+  // Cua: a partir de 180 ms s'apaga en 120 ms.
+  const from = Math.round(rate * .18), len = Math.round(rate * .12);
+  for (let i = from; i < data.length; i++) data[i] *= Math.max(0, 1 - (i - from) / len);
+  return data;
+}
+function buildSkankChords(bank, spec, log) {
+  for (const [quality, program] of Object.entries(spec.programs)) {
+    const instrument = new BasicInstrument(); instrument.name = `${spec.name} ${quality}`.slice(0, 19);
+    for (const { pc, variant, file } of chordFiles(spec).filter(entry => entry.quality === quality)) {
+      const wav = readWav(readFileSync(new URL('../' + spec.directory + file, import.meta.url)));
+      const data = trim(polishChord(resample(wav.data, wav.rate, RATE), RATE), RATE, spec.seconds);
+      level(data, RATE, spec.levelDb);
+      const key = (variant === 1 ? 48 : 60) + pc;
+      // (Afinació: cada mostra es corregeix amb la seva desviació mesurada.)
+      const sample = makeSample(bank, `G6${program}${key}`, data, RATE, key, -(spec.cents?.[file] ?? 0));
+      const zone = instrument.createZone(sample);
+      zone.keyRange = { min: key, max: key };
+      zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+    }
+    bank.addInstruments(instrument);
+    const preset = new BasicPreset(bank); preset.name = instrument.name; preset.program = program; preset.bankMSB = spec.bank;
+    preset.createZone(instrument); bank.addPresets(preset);
+  }
+  log(`${spec.name}: ${chordFiles(spec).length} acords`);
+}
+// ── Orgue Hammond gravat amb el Leslie girant ─────────────────────────
+// El so canvia amb la volta del rotor: el bucle ha de durar més o menys una volta (1,3–2,5 s) i començar i acabar en un
+// punt semblant de l'ona (es busca entre els passos per zero) i, a més, s'encreuen els últims 40 ms amb els d'abans de
+// l'inici, perquè la volta continuï sense salt.
+function rotorLoop(data, rate) {
+  const start = Math.round(rate * .35), win = 512, fade = Math.round(rate * .04);
+  let best = null;
+  for (let end = Math.round(rate * 1.3); end < Math.min(data.length - win, Math.round(rate * 2.5)); end++) {
+    if (!(data[end - 1] <= 0 && data[end] > 0)) continue;
+    let error = 0, energy = 0;
+    for (let i = 0; i < win; i += 2) { error += (data[start + i] - data[end + i]) ** 2; energy += data[start + i] ** 2; }
+    error /= energy + 1e-9;
+    if (!best || error < best.error) best = { end, error };
+  }
+  let s = start; while (s < data.length - 1 && !(data[s - 1] <= 0 && data[s] > 0)) s++;
+  const end = best.end + (s - start), out = data.slice(0, end + 1);
+  for (let i = 0; i < fade; i++) { const w = (i + 1) / fade, at = end - fade + i + 1; out[at] = data[at] * (1 - w) + data[s - fade + i + 1] * w; }
+  return { data: out, loop: [s, end] };
+}
+function buildRotorOrgan(bank, spec, log) {
+  const instrument = new BasicInstrument(); instrument.name = spec.name.slice(0, 19);
+  const keys = [...spec.keys].sort((a, b) => a - b);
+  keys.forEach((key, i) => {
+    const wav = readWav(readFileSync(new URL('../' + spec.directory + `orgue-rotor-${key}.wav`, import.meta.url)));
+    const { data, loop } = rotorLoop(resample(wav.data, wav.rate, RATE), RATE);
+    level(data, RATE, spec.levelDb);
+    const sample = makeSample(bank, `O7${key}`, data, RATE, key, 0, loop);
+    const zone = instrument.createZone(sample);
+    zone.keyRange = { min: i ? Math.floor((keys[i - 1] + key) / 2) + 1 : 0, max: i < keys.length - 1 ? Math.floor((key + keys[i + 1]) / 2) : 127 };
+    zone.setGenerator(GeneratorTypes.sampleModes, 1);
+    zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+    // Percussió del 3r harmònic (si n'hi ha): una capa sense bucle a l'atac de la nota, igualada amb la nota i més fluixa.
+    const percussion = new URL('../' + spec.directory + `orgue-rotor-perc-${key}.wav`, import.meta.url);
+    if (spec.percussionDb !== undefined && existsSync(percussion)) {
+      const hitWav = readWav(readFileSync(percussion)), hit = resample(hitWav.data, hitWav.rate, RATE);
+      level(hit, RATE, spec.levelDb);
+      const perc = instrument.createZone(makeSample(bank, `P7${key}`, hit, RATE, key, 0));
+      perc.keyRange = zone.keyRange;
+      perc.setGenerator(GeneratorTypes.initialAttenuation, Math.round(-spec.percussionDb * 10));
+      perc.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));
+    }
+  });
+  bank.addInstruments(instrument);
+  const preset = new BasicPreset(bank); preset.name = instrument.name; preset.program = spec.program; preset.bankMSB = spec.bank;
+  preset.createZone(instrument); bank.addPresets(preset);
+  log(`${spec.name}: ${keys.length} notes amb bucle`);
+}
+export async function buildGuitarInstruments(entries, log = console.log, chords = null, organ = null) {
   SpessaLog.setLogLevel(false, false, false);
   await mkdir(CACHE, { recursive: true });
-  const fingerprint = sha(JSON.stringify(entries) + await readFile(new URL(import.meta.url)));
+  // (També el contingut dels acords propis: si se'n canvia un, el banc es torna a construir.)
+  const chordHashes = chords ? chordFiles(chords).map(({ file }) => sha(readFileSync(new URL('../' + chords.directory + file, import.meta.url)))) : [];
+  const organHashes = organ ? organ.keys.flatMap(key => [`orgue-rotor-${key}.wav`, `orgue-rotor-perc-${key}.wav`]).filter(file => existsSync(new URL('../' + organ.directory + file, import.meta.url))).map(file => sha(readFileSync(new URL('../' + organ.directory + file, import.meta.url)))) : [];
+  const fingerprint = sha(JSON.stringify(entries) + JSON.stringify(chords) + JSON.stringify(organ) + await readFile(new URL(import.meta.url)) + chordHashes.join('') + organHashes.join(''));
   const cached = join(CACHE, `guitars-${fingerprint.slice(0, 16)}.sf2`);
   try { return new Uint8Array(await readFile(cached)); } catch { /* Es construeix. */ }
   const banks = [];
+  if (chords || organ) {
+    const own = new BasicSoundBank();
+    if (chords) buildSkankChords(own, chords, log);
+    if (organ) buildRotorOrgan(own, organ, log);
+    banks.push(own);
+  }
   for (const entry of entries) banks.push(await importFreePats(entry, log));
   const merged = BasicSoundBank.mergeSoundBanks(...banks);
   merged.soundBankInfo.name = 'Ska Generator lead guitars';

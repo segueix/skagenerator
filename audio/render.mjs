@@ -15,14 +15,15 @@ export const EQ_PRESETS = {
   vocal: [-4, 3, 2],
   guitar2: [-6, 1, 4], guitar3: [-5, 2, 3],
   drums: [2, -2, 2], electronicDrums: [2, -1, 1], bass: [3, -2, -2], synthBass: [2, 0, -3],
-  guitar: [-6, 1, 3], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1], piano: [-3, 0, 3],
+  guitar: [-6, 1, 3], skank: [-11, 2, 6], skankAcord: [-3, 2, 3], trumpet: [-4, 2, 2], trombone: [-3, 3, 1], sax: [-5, 3, 3], organ: [-5, 1, 1], piano: [-3, 0, 3],
   synthLead: [-3, 0, 2], synthPad: [-4, 0, 1], master: [1, 0, 1]
 };
 // Presència de la trompeta (gravat VSCO i alternatives GM): el volum MIDI
 // ja és gairebé al màxim, així que es reforça el senyal sec sense saturar-lo.
 // El compressor i el limitador final continuen protegint la mescla.
 // La guitarra solista (punteig) quedava tapada per les guitarres rítmiques distorsionades.
-export const INSTRUMENT_GAIN_DB = { trumpet: 3, guitar3: 3 };
+// L'skank (guitarra rítmica de l'ska) quedava tapat pel baix i la bateria: les cordes soltes i els acords gravats, més forts.
+export const INSTRUMENT_GAIN_DB = { trumpet: 3, guitar3: 3, skank: 4, skankAcord: 5 };
 export const SONG_GAIN = 10 ** (5.5 / 20);
 export const EQ_BANDS = { low: 120, mid: 900, high: 6000 };
 // Reverberació: el baix sec, la bateria curta, metalls i orgue amb sala.
@@ -276,7 +277,8 @@ export function limitPeaks(left, right, sampleRate, ceiling = .8) {
 
 export async function renderSampledPart(bank, spec, sampleRate = 44100, options = {}) {
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000) throw new Error('Freqüència de mostreig no vàlida');
-  const score = performance.createPerformance(spec);
+  // (Amb el banc de guitarres, la guitarra de l'ska fa servir els acords gravats i l'orgue, el Hammond gravat.)
+  const score = performance.createPerformance(spec, { chords: !!options.guitars, organ: !!options.guitars });
   const synth = new SpessaSynthProcessor(sampleRate, { eventsEnabled: false });
   try {
     synth.soundBankManager.addSoundBank(bank, 'generaluser');
@@ -321,7 +323,7 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
       // gainDb: guany fix del so triat (calibrat perquè tots els kits i baixos sonin al mateix nivell).
       const totalTrim = (patch.gainDb || 0) + baseVolumeDb(score, patch.instrument);
       const user = totalTrim ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + totalTrim } : score.mix[patch.instrument];
-      const eq = createEqualizer(patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument, user, sampleRate);
+      const eq = createEqualizer(patch.tone || (patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument), user, sampleRate);
       // Cadena: efecte de guitarra → altaveu rotatori (orgue) → efecte de color → equalitzador.
       const chain = [createGuitarFx(fxFor(score, patch), sampleRate), createLeslie(patch.leslie, sampleRate), createColorFx(colorFor(score, patch), sampleRate), eq].filter(Boolean);
       if (chain.length) eqs.set(patch.channel, chain.length === 1 ? chain[0] : { process: (side, x) => chain.reduce((y, stage) => stage.process(side, y), x) });

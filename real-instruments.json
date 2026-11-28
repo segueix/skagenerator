@@ -209,6 +209,55 @@
         { "key": 59, "file": "trombo2-59.wav", "cents": -8 },
         { "key": 60, "file": "trombo2-60.wav", "cents": -3 }
       ]
+    },
+    {
+      "name": "Trombó legato (gravat)",
+      "about": "Trombó tocat lligat, cromàtic del La1 al La4 (37 notes), aportat pel propietari del projecte: vegeu audio/samples/trombo-legato/FONT.txt. Les toca el trombó principal a les notes lligades (sense cop de llengua). Les gravacions ja estan afinades (desviació mesurada de −1 a +2 cèntims) i només se'n fa servir el primer segon (atac i bucle).",
+      "bank": 5,
+      "program": 58,
+      "directory": "audio/samples/trombo-legato/",
+      "maxSeconds": 1,
+      "release": 0.16,
+      "levelDb": -12,
+      "notes": [
+        { "key": 33, "file": "trombo-legato-33.wav", "cents": 0 },
+        { "key": 34, "file": "trombo-legato-34.wav", "cents": 0 },
+        { "key": 35, "file": "trombo-legato-35.wav", "cents": 0 },
+        { "key": 36, "file": "trombo-legato-36.wav", "cents": 0 },
+        { "key": 37, "file": "trombo-legato-37.wav", "cents": 0 },
+        { "key": 38, "file": "trombo-legato-38.wav", "cents": 0 },
+        { "key": 39, "file": "trombo-legato-39.wav", "cents": 0 },
+        { "key": 40, "file": "trombo-legato-40.wav", "cents": 0 },
+        { "key": 41, "file": "trombo-legato-41.wav", "cents": 0 },
+        { "key": 42, "file": "trombo-legato-42.wav", "cents": 0 },
+        { "key": 43, "file": "trombo-legato-43.wav", "cents": 0 },
+        { "key": 44, "file": "trombo-legato-44.wav", "cents": 0 },
+        { "key": 45, "file": "trombo-legato-45.wav", "cents": 0 },
+        { "key": 46, "file": "trombo-legato-46.wav", "cents": 0 },
+        { "key": 47, "file": "trombo-legato-47.wav", "cents": 0 },
+        { "key": 48, "file": "trombo-legato-48.wav", "cents": 0 },
+        { "key": 49, "file": "trombo-legato-49.wav", "cents": 0 },
+        { "key": 50, "file": "trombo-legato-50.wav", "cents": 0 },
+        { "key": 51, "file": "trombo-legato-51.wav", "cents": 0 },
+        { "key": 52, "file": "trombo-legato-52.wav", "cents": 0 },
+        { "key": 53, "file": "trombo-legato-53.wav", "cents": 0 },
+        { "key": 54, "file": "trombo-legato-54.wav", "cents": 0 },
+        { "key": 55, "file": "trombo-legato-55.wav", "cents": 0 },
+        { "key": 56, "file": "trombo-legato-56.wav", "cents": 0 },
+        { "key": 57, "file": "trombo-legato-57.wav", "cents": 0 },
+        { "key": 58, "file": "trombo-legato-58.wav", "cents": 0 },
+        { "key": 59, "file": "trombo-legato-59.wav", "cents": 0 },
+        { "key": 60, "file": "trombo-legato-60.wav", "cents": 0 },
+        { "key": 61, "file": "trombo-legato-61.wav", "cents": 0 },
+        { "key": 62, "file": "trombo-legato-62.wav", "cents": 0 },
+        { "key": 63, "file": "trombo-legato-63.wav", "cents": 0 },
+        { "key": 64, "file": "trombo-legato-64.wav", "cents": 0 },
+        { "key": 65, "file": "trombo-legato-65.wav", "cents": 0 },
+        { "key": 66, "file": "trombo-legato-66.wav", "cents": 0 },
+        { "key": 67, "file": "trombo-legato-67.wav", "cents": 0 },
+        { "key": 68, "file": "trombo-legato-68.wav", "cents": 0 },
+        { "key": 69, "file": "trombo-legato-69.wav", "cents": 0 }
+      ]
     }
   ],
   "freepats": [
@@ -256,6 +305,28 @@
       "levelDb": -14
     }
   ],
+  "rotorOrgan": {
+    "name": "Orgue Hammond (rotor)",
+    "about": "Hammond B3 gravat amb Leslie («Real Rotor Organ», Indiginus): vegeu audio/samples/orgue-rotor/FONT.txt. Al banc de guitarres (banc 7, programa 16). Amb la percussió del 3r harmònic com a capa a l'atac. Substitueix l'orgue sintetitzat quan el banc hi és.",
+    "bank": 7,
+    "program": 16,
+    "directory": "audio/samples/orgue-rotor/",
+    "keys": [48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84],
+    "release": 0.08,
+    "levelDb": -12,
+    "percussionDb": -3
+  },
+  "skankChords": {
+    "name": "Guitarra skank (acords)",
+    "about": "Acords de guitarra d'ska per a la guitarra rítmica per defecte: vegeu audio/samples/guitarra-ska/FONT.txt. «cents»: afinació mesurada de cada mostra (moltes variants 02 són fins a 13 cèntims baixes), que el build corregeix. Banc 6, programes 0 (major), 1 (menor), 2 (7) i 3 (m7); tecla 48 + fonamental = variant 1, 60 + fonamental = variant 2.",
+    "bank": 6,
+    "programs": { "maj": 0, "min": 1, "7": 2, "m7": 3 },
+    "directory": "audio/samples/guitarra-ska/",
+    "seconds": 0.45,
+    "release": 0.035,
+    "levelDb": -7,
+    "cents": {"A_7_01.wav": -3, "A_7_02.wav": -6, "A_m7_01.wav": -6, "A_m7_02.wav": -5, "A_maj_01.wav": -3, "A_maj_02.wav": -9, "A_min_01.wav": -5, "A_min_02.wav": -3, "Ab_7_01.wav": -5, "Ab_7_02.wav": -6, "Ab_m7_01.wav": -4, "Ab_m7_02.wav": -6, "Ab_maj_01.wav": -5, "Ab_maj_02.wav": -8, "Ab_min_01.wav": -2, "Ab_min_02.wav": -5, "B_7_01.wav": 2, "B_7_02.wav": 0, "B_m7_01.wav": 2, "B_m7_02.wav": -1, "B_maj_01.wav": 1, "B_maj_02.wav": -1, "B_min_01.wav": 1, "B_min_02.wav": -1, "Bb_7_01.wav": 2, "Bb_7_02.wav": 0, "Bb_m7_01.wav": 2, "Bb_m7_02.wav": -1, "Bb_maj_01.wav": 1, "Bb_maj_02.wav": -2, "Bb_min_01.wav": 2, "Bb_min_02.wav": -1, "C_7_01.wav": 1, "C_7_02.wav": -1, "C_m7_01.wav": 1, "C_m7_02.wav": 0, "C_maj_01.wav": 1, "C_maj_02.wav": -1, "C_min_01.wav": 1, "C_min_02.wav": 0, "Csharp_7_01.wav": 0, "Csharp_7_02.wav": -9, "Csharp_m7_01.wav": 0, "Csharp_m7_02.wav": -6, "Csharp_maj_01.wav": -1, "Csharp_maj_02.wav": -12, "Csharp_min_01.wav": -1, "Csharp_min_02.wav": -8, "D_7_01.wav": 2, "D_7_02.wav": -5, "D_m7_01.wav": -1, "D_m7_02.wav": -8, "D_maj_01.wav": 0, "D_maj_02.wav": -13, "D_min_01.wav": -1, "D_min_02.wav": -7, "E_7_01.wav": 1, "E_7_02.wav": -6, "E_m7_01.wav": -1, "E_m7_02.wav": -8, "E_maj_01.wav": -3, "E_maj_02.wav": -9, "E_min_01.wav": -4, "E_min_02.wav": -7, "Eb_7_01.wav": 0, "Eb_7_02.wav": -7, "Eb_m7_01.wav": -1, "Eb_m7_02.wav": -9, "Eb_maj_01.wav": -3, "Eb_maj_02.wav": -12, "Eb_min_01.wav": -1, "Eb_min_02.wav": -5, "F_7_01.wav": -1, "F_7_02.wav": -6, "F_m7_01.wav": 0, "F_m7_02.wav": -8, "F_maj_01.wav": 6, "F_maj_02.wav": -9, "F_min_01.wav": 4, "F_min_02.wav": -7, "Fsharp_7_01.wav": -5, "Fsharp_7_02.wav": -4, "Fsharp_m7_01.wav": -6, "Fsharp_m7_02.wav": -8, "Fsharp_maj_01.wav": -3, "Fsharp_maj_02.wav": -8, "Fsharp_min_01.wav": -3, "Fsharp_min_02.wav": -6, "G_7_01.wav": -2, "G_7_02.wav": -7, "G_m7_01.wav": -3, "G_m7_02.wav": -6, "G_maj_01.wav": -5, "G_maj_02.wav": -5, "G_min_01.wav": -4, "G_min_02.wav": -7}
+  },
   "guitars": [
     {
       "name": "Electric Guitar FSBS distorted 1 (bridge)",

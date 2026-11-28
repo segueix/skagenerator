@@ -47,7 +47,8 @@ test('ska instrumental: el protagonisme passa d\'un músic a l\'altre per frases
       if (song.clips.some(c => inside(c, sec) && c.line === 'counter')) textures.add('counter');
       if (sec.type === 'solo' && ['sax', 'trombone', 'trumpet', 'keys', 'guitar', 'bass'].includes(lead)) solos++;
       // Orgue, piano, guitarra o baix porten la melodia: la guitarra base continua fent el contratemps.
-      if (sec.leads.some(l => ['keys', 'guitar', 'bass'].includes(l[2]))) {
+      // (Les seccions «dub» —bateria i baix sols— no tenen guitarra.)
+      if (sec.leads.some(l => ['keys', 'guitar', 'bass'].includes(l[2])) && !(sec.mute || []).includes('guitar')) {
         nonWind++;
         if (song.clips.some(c => inside(c, sec) && c.line === 'answer') || Object.values(sec.lines || {}).includes('answer')) answered++;
         const skank = music.events.filter(e => e.type === 'on' && e.channel === 0);

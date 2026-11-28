@@ -204,7 +204,9 @@ test('guitarra 3: arpegis, riffs i respostes sempre harmonitzen amb els acords',
 
 test('el trombó toca la seva línia tal com està composta, una octava avall', () => {
   const spec = engine.composeSongPart({ ...config, instruments: ['trombone'] }, { ...part, type: 'chorus', layers: { trombone: 3 } });
-  const notes = createPerformance(spec).events.filter(e => e.type === 'on' && (e.channel === 4 || e.channel === 13)).map(e => e.note);
+  // (Les notes lligades les toca el trombó legato gravat, banc 5 programa 58.)
+  const perf = createPerformance(spec), legato = perf.channels.find(p => p.bank === 5 && p.program === 58)?.channel;
+  const notes = perf.events.filter(e => e.type === 'on' && [4, 13, legato].includes(e.channel)).map(e => e.note);
   const line = spec.lines.trombone.map(([, , pitch]) => { let low = pitch - 12; while (low > 67) low -= 12; while (low < 45) low += 12; return low; });
   assert.deepEqual(notes, line);
 });
@@ -324,7 +326,8 @@ test('ska: amb les dues trompetes sempre sonen dos trombons (el principal i el g
     const spec = engine.composeSongPart({ ...config, instruments }, { ...part, type: 'chorus', layers: { trumpet: 2, trombone: 3 } });
     const music = createPerformance(spec), tb = recorded(music);
     assert(tb && tb.instrument === 'trombone', `${instruments}: trombó gravat`);
-    const lead = on(music, [4, 13]), doubled = on(music, [tb.channel]);
+    const legato = music.channels.find(p => p.bank === 5 && p.program === 58)?.channel;
+    const lead = on(music, [4, 13, legato]), doubled = on(music, [tb.channel]);
     assert(lead.length > 0, `${instruments}: el trombó principal sona`);
     assert.equal(doubled.length, lead.length, 'el segon trombó toca cada nota del principal');
     doubled.forEach((e, i) => { assert(Math.abs(e.time - lead[i].time) < .03); assert.equal(e.note, lead[i].note > 67 ? lead[i].note - 12 : lead[i].note); });

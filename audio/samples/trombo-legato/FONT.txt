@@ -1,0 +1,7 @@
+Trombó tocat lligat (legato, sense cop de llengua), cromàtic del La1 al La4 (37 notes, claus MIDI 33–69), aportat pel
+propietari del projecte («trombo_legato_notes_llargues.zip», fitxers «<Nota><octava>_legato.wav»).
+L'origen i la llicència de la gravació no s'han indicat.
+WAV mono, 48 kHz, 16 bits, 2,5 s cada nota. Afinació mesurada: entre −1 i +2 cèntims (es tracta com a afinada).
+Totes les notes duren exactament el mateix, cosa que fa pensar que s'han allargat o transposat a partir de menys
+preses originals. El build en fa servir el primer segon (atac i bucle de sosteniment).
+Es fan servir per a les notes lligades del trombó principal (vegeu audio/performance.cjs).

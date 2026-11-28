@@ -72,3 +72,81 @@ test('mà dreta de l\'ska: cops secs, oberts i apagats que es repeteixen cada qu
   for (const bar of [3, 7]) { assert(lastHit(verse, bar) < .1, `apagat ${bar}`); assert(lastHit(chorus, bar) > .3, `obert ${bar}`); }
   for (const bar of [0, 4]) assert(lastHit(verse, bar) > .1 && lastHit(verse, bar) < .3, `sec ${bar}`);
 });
+
+test('trombó legato gravat: les notes lligades (sense cop de llengua) les toca el canal legato', () => {
+  const real = require('../real-instruments.json').localHorns.find(h => h.program === 58);
+  assert.deepEqual([real.bank, real.program], [5, 58]);
+  for (const n of real.notes) assert(require('node:fs').existsSync(require('node:path').join(__dirname, '..', real.directory, n.file)), n.file);
+  const spec = engine.composeSongPart({ ...settings, instruments: ['trombone'] }, { type: 'chorus', bars: 2, energy: 80, revision: 1, layers: { trombone: 3 } });
+  // Do–re–mi lligades, després do–do (repetida: es torna a picar) i una nota separada.
+  spec.lines.trombone = [[0, 0, 60, 1], [0, 1, 62, 1], [0, 2, 64, 1], [0, 3, 64, 1], [1, 1, 67, 1]];
+  const perf = createPerformance(spec), legato = perf.channels.find(p => p.bank === 5 && p.program === 58).channel;
+  const on = perf.events.filter(e => e.type === 'on' && [4, 13, legato].includes(e.channel)).sort((a, b) => a.time - b.time);
+  assert.deepEqual(on.map(e => e.channel === legato), [false, true, true, false, false], 'lligades al legato; la primera, la repetida i la separada, amb llengua');
+  // Amb un altre so de trombó triat, no hi ha canal legato.
+  const other = engine.composeSongPart({ ...settings, instruments: ['trombone'], timbres: { trombone: 'vsco' } }, { type: 'chorus', bars: 2, energy: 80, revision: 1, layers: { trombone: 3 } });
+  assert(!createPerformance(other).channels.some(p => p.bank === 5 && p.program === 58));
+});
+
+test('guitarra d\'skank: posicions de guitarra a les quatre cordes agudes, cop amunt i so brillant', () => {
+  const spec = engine.composeSongPart({ ...settings, instruments: ['guitar'] }, { type: 'verse', bars: 8, energy: 70, revision: 1 });
+  const perf = createPerformance(spec), on = perf.events.filter(e => e.type === 'on' && e.channel === 0).sort((a, b) => a.time - b.time);
+  const strokes = [];
+  for (const e of on) { const last = strokes.at(-1); if (last && e.time - last[0].time < .06) last.push(e); else strokes.push([e]); }
+  const strings = [50, 55, 59, 64];
+  let moves = 0;
+  strokes.forEach((stroke, i) => {
+    const bar = Math.min(spec.chords.length - 1, Math.floor(stroke[0].time / (spec.beat * 4) + 1e-6)), chord = spec.chords[bar];
+    const notes = stroke.map(e => e.note), sorted = notes.slice().sort((a, b) => a - b);
+    // Cop amunt: de l'aguda a la greu.
+    assert.deepEqual(notes, sorted.slice().reverse(), 'cop amunt');
+    // Cada nota és d'una corda (Re, Sol, Si, Mi) entre el trast 0 i el 12, i de l'acord; hi ha la fonamental i la tercera.
+    if (sorted.length === 4) {
+      const frets = sorted.map((n, k) => n - strings[k]);
+      assert(frets.every(f => f >= 0 && f <= 12), `trasts ${frets}`);
+      const used = frets.filter(f => f > 0); assert(!used.length || Math.max(...used) - Math.min(...used) <= 3, `obertura ${frets}`);
+      assert(sorted.every(n => chord.pcs.includes(n % 12)));
+      assert(sorted.some(n => n % 12 === chord.root % 12) && sorted.some(n => n % 12 === chord.notes[1] % 12));
+      if (i && strokes[i - 1].length === 4) moves += sorted.reduce((t, n, k) => t + Math.abs(n - strokes[i - 1].map(e => e.note).sort((a, b) => a - b)[k]), 0);
+    }
+  });
+  // D'un acord a l'altre la mà es mou poc (de mitjana, menys de 3 semitons per corda i cop).
+  assert(moves / strokes.length / 4 < 3, `moviment ${moves / strokes.length / 4}`);
+  // So de l'skank: equalitzador propi i una mica més de reverberació.
+  assert.equal(perf.channels.find(c => c.channel === 0).tone, 'skank');
+});
+
+test('guitarra d\'skank amb acords gravats: amb el banc de guitarres, l\'acord sencer del seu tipus', () => {
+  const real = require('../real-instruments.json').skankChords;
+  assert.equal(real.bank, 6); assert.deepEqual(real.programs, { maj: 0, min: 1, '7': 2, m7: 3 });
+  const fs = require('node:fs'), path = require('node:path');
+  const roots = ['C', 'Csharp', 'D', 'Eb', 'E', 'F', 'Fsharp', 'G', 'Ab', 'A', 'Bb', 'B'];
+  for (const q of Object.keys(real.programs)) for (const r of roots) for (const v of [1, 2]) assert(fs.existsSync(path.join(__dirname, '..', real.directory, `${r}_${q}_0${v}.wav`)), `${r} ${q} ${v}`);
+  const spec = engine.composeSongPart({ ...settings, instruments: ['guitar'] }, { type: 'verse', bars: 8, energy: 70, revision: 1 });
+  const perf = createPerformance(spec, { chords: true });
+  const chordChannels = perf.channels.filter(c => c.bank === 6);
+  assert.deepEqual(chordChannels.map(c => c.program), [0, 1, 2, 3]);
+  const hits = perf.events.filter(e => e.type === 'on' && chordChannels.some(c => c.channel === e.channel));
+  assert(hits.length >= 16, 'toca els acords');
+  for (const e of hits) {
+    const bar = Math.min(spec.chords.length - 1, Math.floor(e.time / (spec.beat * 4) + 1e-6)), chord = spec.chords[bar];
+    const program = chordChannels.find(c => c.channel === e.channel).program, rel = chord.pcs.map(pc => ((pc - chord.root) % 12 + 12) % 12);
+    assert.equal(e.note % 12, ((chord.root % 12) + 12) % 12, 'la tecla és la fonamental');
+    assert([48, 60].includes(e.note - e.note % 12) || [48, 60].includes(e.note - (e.note - 48) % 12), 'variant 1 o 2');
+    assert.equal(program, rel.includes(3) ? (rel.includes(10) ? 3 : 1) : (rel.includes(10) ? 2 : 0), 'tipus d\'acord');
+  }
+  // Sense el banc de guitarres (o amb un altre so triat), les cordes soltes de sempre.
+  assert(!createPerformance(spec).channels.some(c => c.bank === 6));
+  assert(!createPerformance(engine.composeSongPart({ ...settings, instruments: ['guitar'], timbres: { guitar: 'jazz' } }, { type: 'verse', bars: 2, energy: 70, revision: 1 }), { chords: true }).channels.some(c => c.bank === 6));
+});
+
+test('orgue Hammond gravat: amb el banc de guitarres, el B3 amb Leslie en lloc de l\'orgue sintetitzat', () => {
+  const real = require('../real-instruments.json').rotorOrgan;
+  assert.deepEqual([real.bank, real.program], [7, 16]);
+  for (const key of real.keys) assert(require('node:fs').existsSync(require('node:path').join(__dirname, '..', real.directory, `orgue-rotor-${key}.wav`)), String(key));
+  const spec = engine.composeSongPart({ ...settings, instruments: ['organ'] }, { type: 'chorus', bars: 2, energy: 80, revision: 1 });
+  const hammond = createPerformance(spec, { organ: true }).channels.find(c => c.channel === 11);
+  assert.deepEqual([hammond.bank, hammond.program, hammond.leslie], [7, 16, undefined], 'el Leslie és el de la gravació');
+  const synth = createPerformance(spec).channels.find(c => c.channel === 11);
+  assert.deepEqual([synth.bank, synth.program, synth.leslie], [2, 16, 'fast']);
+});

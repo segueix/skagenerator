@@ -182,7 +182,7 @@ test('la base rítmica es manté en les cinc versions i es pot canviar per secci
       .events.filter(e => e.type === 'on' && e.channel === 0).length);
     assert(new Set(guitars).size > 1);
   }
-  for (const groove of [{ drums: 6 }, { bass: -1 }, { guitar: 1.5 }, { piano: 0 }, [], null, 'ska'])
+  for (const groove of [{ drums: 12 }, { bass: -1 }, { guitar: 1.5 }, { piano: 0 }, [], null, 'ska'])
     assert.throws(() => engine.composeSongPart({ ...settings, groove }, part('verse')), /Base rítmica/);
   assert.throws(() => engine.composeSongPart(settings, { ...part('verse'), groove: { drums: 9 } }), /Base rítmica/);
 });

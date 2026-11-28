@@ -9,7 +9,7 @@ function rng(seed) {
   let a = seed >>> 0;
   return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-function createPerformance(spec) {
+function createPerformance(spec, options = {}) {
   if (!spec || !['ska', 'punk', 'urban'].includes(spec.style) || !Number.isFinite(spec.beat) || spec.beat <= 0
     || !Number.isFinite(spec.seconds) || spec.seconds <= 0 || spec.seconds > 400 || !Array.isArray(spec.chords)
     || !Array.isArray(spec.melody) || !Array.isArray(spec.instruments) || !spec.instruments.length
@@ -83,7 +83,10 @@ function createPerformance(spec) {
     patch(14, palm ? MUTED : chosen('guitar2') ?? (punk && !amped('guitar2') ? [0, 30] : [2, 27]), wideRhythm ? 112 : 96, 84), patch(15, chosen('guitar3') ?? [2, 27], 30, 80),
     patch(8, [2, 66], 30, 94),
     // Orgue de rodes sintetitzat (banc 2) amb altaveu rotatori: lent a les estrofes, ràpid a tornades i solos.
-    { channel: 11, bank: 2, program: 16, pan: 76, volume: 84, leslie: ['chorus', 'solo'].includes(spec.type) ? 'fast' : 'slow' },
+    // Orgue: el Hammond gravat amb el Leslie girant (banc de guitarres, banc 7) si el banc hi és (options.organ); si no,
+    // l'orgue sintetitzat amb l'altaveu rotatori simulat.
+    options.organ ? { channel: 11, bank: 7, program: 16, pan: 76, volume: 96 }
+      : { channel: 11, bank: 2, program: 16, pan: 76, volume: 84, leslie: ['chorus', 'solo'].includes(spec.type) ? 'fast' : 'slow' },
     { channel: 5, program: 81, pan: 58, volume: 106 },
     { channel: 6, program: 89, pan: 76, volume: 90 },
     { channel: 7, program: 38, pan: 64, volume: 110 },
@@ -108,9 +111,21 @@ function createPerformance(spec) {
     instrumentOf[channel] = family;
     takeChannels.set(channel, take);
   }
+  // So de l'skank (ska, guitarra rítmica per defecte): més prima i brillant —sense el cos greu que xoca amb el baix i
+  // l'orgue, amb presència als aguts— i una mica més de reverberació (com la de molla d'un amplificador de guitarra).
+  if (!punk && !misfits && !chosen('guitar') && spec.style === 'ska') Object.assign(channels.find(c => c.channel === 0), { tone: 'skank', reverb: 38 });
   // Piano vertical gravat (VSCO 2 CE): canal propi, després de les preses de guitarra.
   const PIANO = 17 + guitarTakes.length;
   if (has('piano')) { channels.push(patch(PIANO, [2, 0], 74, 94)); instrumentOf[PIANO] = 'piano'; }
+  // Acords de guitarra d'ska gravats (banc de guitarres, banc 6: un programa per tipus d'acord), si el banc hi és
+  // (options.chords): la guitarra rítmica per defecte de l'ska toca l'acord sencer de la mostra en lloc de les cordes
+  // soltes. Un canal per tipus (major, menor, 7 i m7); la resta d'acords continuen amb les cordes soltes.
+  const SKANK_CHORDS = !!options.chords && !punk && !misfits && !chosen('guitar') && spec.style === 'ska' && has('guitar');
+  const CHORD_CHANNEL = {};
+  if (SKANK_CHORDS) ['maj', 'min', '7', 'm7'].forEach((quality, program) => {
+    const channel = PIANO + 12 + program;
+    channels.push({ ...patch(channel, [6, program], 42, 127), reverb: 30, tone: 'skankAcord' }); instrumentOf[channel] = 'guitar'; CHORD_CHANNEL[quality] = channel;
+  });
   // Ska: secció de vents doblada. Cada vent té un segon músic (trompeta 2, trombó 2 i saxo 2) que
   // toca la mateixa frase una tercera diatònica per sota, una mica més fluix i obert a l'altre costat:
   // la secció sona més plena i a diverses veus. Cada segon músic té canals propis (i staccato).
@@ -126,6 +141,10 @@ function createPerformance(spec) {
   // la línia de la trompeta amb notes de l'acord, una octava avall (com quan no té línia pròpia).
   // Les gravacions del segon trombó van del Do3 al Do4: les notes de més amunt del Sol4 les toca una octava avall.
   const TB3 = PIANO + 10, TROMBONE3 = [5, 57];
+  // Trombó legato gravat (banc 5, programa 58): les notes lligades del trombó principal (sense cop de llengua) les toca
+  // aquest canal, amb mostres tretes d'un passatge legato; les altres notes, les de sempre. Només amb el so per defecte.
+  const TBL = PIANO + 11, LEGATO = {};
+  if (has('trombone') && !chosen('trombone')) { channels.push(patch(TBL, [5, 58], 79, 112)); instrumentOf[TBL] = 'trombone'; LEGATO[4] = TBL; }
   const third = pitch => pitch > 74 ? pitch - 12 : pitch;
   const unisonPitch = (channel, pitch) => channel === 3 ? third(pitch) : pitch > 67 ? pitch - 12 : pitch < 40 ? pitch + 12 : pitch;
   if (spec.style === 'ska') {
@@ -201,7 +220,18 @@ function createPerformance(spec) {
   // quedarien en tresets. L'ska jamaicà el fa servir, el punk no.
   const swing = Number.isFinite(spec.swing) ? Math.max(0, Math.min(.7, spec.swing)) : 0;
   const swung = t => { if (!swing) return t; const pos = t / beat, frac = pos - Math.floor(pos); return Math.abs(frac - .5) < .04 ? t + swing * beat / 6 : t; };
+  // Acords partits (dos per compàs: chord.half, de la segona meitat): l'acompanyament (guitarres, orgue i piano) que
+  // cau a la segona meitat del compàs s'ajusta a l'acord nou. Les notes greus (la mà esquerra del piano) van a la
+  // fonamental més propera; la resta, a la nota de l'acord més propera (en una tríada sempre n'hi ha una a ±3).
+  function halfBar(channel, pitch, start) {
+    if (pitch === undefined || !(channel <= 1 || channel === 11 || channel === 14 || channel === 15 || channel === PIANO || takeChannels.has(channel))) return pitch;
+    const index = Math.floor(start / bar + 1e-6), half = spec.chords[index]?.half;
+    if (!half || start - index * bar < 2 * beat - .02) return pitch;
+    if (pitch < 52) { const pc = ((half.root % 12) + 12) % 12; return nearest(pitch, [pc], pitch - 6, pitch + 6); }
+    return half.pcs.includes(((pitch % 12) + 12) % 12) ? pitch : nearest(pitch, half.pcs, pitch - 3, pitch + 3);
+  }
   function note(channel, pitch, start, duration, velocity, jitter = .004, exact = false) {
+    pitch = halfBar(channel, pitch, start);
     for (const [at, length, tone] of feel(channel, swung(start), duration, pitch)) play(channel, tone, at, length, velocity, jitter, exact);
   }
   // ── Humanització del ritme ────────────────────────────────────────
@@ -237,12 +267,12 @@ function createPerformance(spec) {
   // secció real. Comparteixen la deriva i la variació de cada cop (una per moment de la partitura);
   // cada músic només hi afegeix ±2 ms propis. Abans cada vent i cada canal d'staccato derivava per
   // separat i els cops del riff sortien desajustats fins a 26 ms.
-  const HORNS = new Set([3, 4, 8, 12, 13, T2, B2, S2, T2S, B2S, T3, TB3]), sectionHit = new Map();
+  const HORNS = new Set([3, 4, 8, 12, 13, T2, B2, S2, T2S, B2S, T3, TB3, TBL]), sectionHit = new Map();
   // Ska: cada músic de la secció té el seu lloc. La trompeta mana, el saxo va un pèl darrere i el
   // trombó (més greu i lent de resposta) una mica més; i cap no està afinat exactament igual
   // (uns pocs cents amunt o avall, en unitats de pitch bend: 41 ≈ 1 cent). Això fa el so de secció.
-  const HORN_SEAT = punk ? {} : { 3: 0, 12: 0, 8: 3, 4: 5, 13: 5, [T2]: 2, [T2S]: 2, [S2]: 4, [B2]: 7, [B2S]: 7, [T3]: 3, [TB3]: 6 };
-  const HORN_TUNE = punk || !human ? {} : { 3: 100, 12: 100, 8: 170, 4: -140, 13: -140, [T2]: -120, [T2S]: -120, [S2]: -150, [B2]: 110, [B2S]: 110, [T3]: -60, [TB3]: 70 };
+  const HORN_SEAT = punk ? {} : { 3: 0, 12: 0, 8: 3, 4: 5, 13: 5, [T2]: 2, [T2S]: 2, [S2]: 4, [B2]: 7, [B2S]: 7, [T3]: 3, [TB3]: 6, [TBL]: 5 };
+  const HORN_TUNE = punk || !human ? {} : { 3: 100, 12: 100, 8: 170, 4: -140, 13: -140, [T2]: -120, [T2S]: -120, [S2]: -150, [B2]: 110, [B2S]: 110, [T3]: -60, [TB3]: 70, [TBL]: -140 };
   // Atzar propi per al rasgueig i les caigudes: no altera la resta de la interpretació.
   const extraRandom = rng(seedBase * 71 + 5);
   function hornJitter(start) {
@@ -329,6 +359,8 @@ function createPerformance(spec) {
   function horn(channel, pitch, start, duration, velocity, accent, connected = false, slurred = false, connectedBefore = false, endsPhrase = false) {
     // Només els accents curts separats fan servir les mostres de staccato.
     if (realBrass[channel] && STACCATO[channel] !== undefined && duration < .3 && !connected) channel = STACCATO[channel];
+    // Nota lligada del trombó: les mostres legato (l'atac d'una nota lligada de debò).
+    if (slurred && LEGATO[channel] !== undefined) channel = LEGATO[channel];
     const at = Math.max(0, start), long = duration > beat * .9, center = 8192 + (HORN_TUNE[channel] || 0);
     // Nota lligada a l'anterior: atac suau (CC73, uns 30 ms) perquè no se senti el cop de llengua
     // de la mostra gravada; la resta de notes, atac natural.
@@ -405,6 +437,56 @@ function createPerformance(spec) {
     for (let n = lo; n <= hi; n++) if (pcs.includes(n % 12) && Math.abs(n - target) < dist) { result = n; dist = Math.abs(n - target); }
     return result;
   };
+  // ── Posicions d'acord de guitarra (ska) ────────────────────────────────
+  // Una guitarra no toca l'acord com un teclat (tres notes juntes): fa una posició a les quatre cordes agudes (Re, Sol,
+  // Si i Mi), amb les notes més obertes i alguna de repetida, i passa d'un acord a l'altre movent-se al mínim pel mànec.
+  // Es busquen totes les posicions possibles (trast 0–12, com a molt 4 trasts d'obertura) que tinguin la fonamental i la
+  // tercera, i es tria la més propera a l'anterior (i, a la primera, la de la zona del mànec on toca el guitarrista).
+  const SKANK_STRINGS = [50, 55, 59, 64];
+  let lastVoicing = null;
+  const voicingCache = new Map();
+  function guitarVoicing(chord) {
+    const pcs = chord.pcs, rootPc = ((chord.root % 12) + 12) % 12, thirdPc = ((chord.notes[1] % 12) + 12) % 12;
+    const key = `${pcs.join('.')}:${rootPc}:${lastVoicing?.join('.')}`;
+    if (voicingCache.has(key)) return (lastVoicing = voicingCache.get(key));
+    let best = null, bestScore = Infinity;
+    const frets = [0, 0, 0, 0];
+    const search = string => {
+      if (string === 4) {
+        const used = frets.filter(f => f > 0), span = used.length ? Math.max(...used) - Math.min(...used) : 0;
+        if (span > 3) return;
+        const notes = frets.map((f, i) => SKANK_STRINGS[i] + f), have = new Set(notes.map(n => n % 12));
+        if (!have.has(rootPc) || !have.has(thirdPc) || have.size < Math.min(3, pcs.length)) return;
+        const centre = used.length ? used.reduce((t, f) => t + f, 0) / used.length : 0;
+        // Prop de l'acord anterior; si no n'hi ha, cap al 5è trast (el so de l'skank, ni greu ni massa agut).
+        let score = lastVoicing ? notes.reduce((t, n, i) => t + Math.abs(n - lastVoicing[i]), 0) : Math.abs(centre - 5) * 2;
+        score += span * .5 + (frets.includes(0) ? 1.5 : 0) + (notes[0] % 12 === rootPc ? -1 : 0);
+        if (score < bestScore) { bestScore = score; best = notes.slice(); }
+        return;
+      }
+      for (let f = 0; f <= 12; f++) if (pcs.includes((SKANK_STRINGS[string] + f) % 12)) { frets[string] = f; search(string + 1); }
+    };
+    search(0);
+    const voicing = best || chord.notes.slice();
+    voicingCache.set(key, voicing);
+    return (lastVoicing = voicing);
+  }
+  // Tipus d'acord per a les mostres gravades: major, menor, 7 o m7 (una altra cosa —disminuït, suspès…—, cap).
+  function chordQuality(chord) {
+    const rel = new Set(chord.pcs.map(pc => ((pc - chord.root) % 12 + 12) % 12));
+    // (Les extensions que no canvien la funció de l'acord —maj7, 6, 9— fan servir l'acord del seu tipus: major, menor, 7 o m7.
+    // Els disminuïts, augmentats i suspesos, que xocarien amb un acord major o menor, continuen amb les cordes soltes.)
+    const third = rel.has(4) && !rel.has(3) ? 'maj' : rel.has(3) && !rel.has(4) ? 'min' : null;
+    if (!third || !rel.has(7) || rel.has(6) || rel.has(8) || rel.has(5)) return null;
+    return rel.has(10) ? (third === 'maj' ? '7' : 'm7') : third;
+  }
+  // Cop de l'skank: de la corda aguda a la greu (cop amunt, el del contratemps), 8–12 ms entre corda i corda, les
+  // últimes una mica més fluixes i curtes; i, just abans, el «xic» de les cordes apagades sota la mà (canal 1).
+  function skank(pitches, start, duration, velocity, muted) {
+    const spread = .008 + (human ? extraRandom() * .004 : .002), order = pitches.slice().sort((a, b) => b - a);
+    if (!muted) note(1, order[0], start - .006, .025, Math.round(velocity * .45), .002);
+    order.forEach((pitch, k) => note(0, pitch, start + k * spread, duration * (1 - .05 * k), velocity * (1 - .07 * k)));
+  }
   // Mà dreta del guitarrista d'ska: tres gestos (sec, obert i apagat) i una manera de tocar per secció que es repeteix
   // cada quatre compassos. A l'estrofa, contratemps secs i, al quart compàs, l'últim apagat (o els dos últims); a la
   // tornada, aquell mateix cop s'obre. Cada tipus de secció de la cançó en tria una (la mateixa cada vegada que torna).
@@ -451,7 +533,7 @@ function createPerformance(spec) {
       // Gest de canvi de secció: la guitarra es menja l'últim contratemps (i, al «buit», tot el quart temps).
       const lastBar = b === spec.chords.length - 1;
       if (!punk && lastBar && spec.push && t >= (spec.push === 'buit' ? 3 : 3.5)) return;
-      const pitches = punk ? (palm ? [chord.root + 12, chord.root + 19] : [chord.root + 12, chord.root + 19, chord.root + 24]) : chord.notes.slice().reverse();
+      const pitches = punk ? (palm ? [chord.root + 12, chord.root + 19] : [chord.root + 12, chord.root + 19, chord.root + 24]) : guitarVoicing(chord);
       // Mà dreta de l'ska: cada cop és sec, obert o apagat segons la manera de tocar de la secció, que es repeteix
       // cada quatre compassos (vegeu skaStroke), amb una mica de variació de força i de temps, com una mà de debò.
       const stroke = !punk && !ending ? skaStroke(b, hit, hits.length) : null;
@@ -459,7 +541,18 @@ function createPerformance(spec) {
       const jitter = shape && human ? (extraRandom() - .5) * .008 * human : 0;
       const duration = ending ? bar * .75 : punk ? punkLength(t, beat * (restrained ? .23 : .46)) : beat * shape.length;
       const force = punk ? punkForce(t, hit, 100, 76) : ending ? 90 : Math.round(shape.force + (soft ? -6 : 0) + (human ? (extraRandom() - .5) * 8 * human : 0));
-      strum(0, stroke === 'apagat' ? pitches.slice(0, 3) : pitches, t0 + t * beat + jitter, duration, force, stroke === 'apagat' ? .004 : .007);
+      // Acord gravat (si n'hi ha del seu tipus): la mostra sencera, alternant les dues variants; el cop sec dura com a mínim
+      // 110 ms (el que recomana el paquet) i l'apagat és un cop molt curt i fluix.
+      const sounding = t >= 2 && chord.half ? chord.half : chord;
+      const quality = SKANK_CHORDS && !ending ? chordQuality(sounding) : null;
+      if (quality) {
+        const key = ((b + hit) % 2 ? 60 : 48) + ((sounding.root % 12) + 12) % 12;
+        const length = stroke === 'apagat' ? .045 : Math.max(.11, duration);
+        note(CHORD_CHANNEL[quality], key, t0 + t * beat + jitter, length, stroke === 'apagat' ? force - 14 : force);
+        return;
+      }
+      if (punk || ending) strum(0, pitches, t0 + t * beat + jitter, duration, force, .007);
+      else skank(stroke === 'apagat' ? pitches.slice(1) : pitches, t0 + t * beat + jitter, duration, force, stroke === 'apagat');
       // La segona presa de la mateixa part, a la dreta, uns 14 ms més tard i una mica més fluixa.
       if (doubleRhythm) strum(1, pitches, t0 + t * beat + .014, duration, punkForce(t, hit, 100, 76) - 3, .007);
       // El punk reserva la segona guitarra per a una capa explícita de l’arranjament.
