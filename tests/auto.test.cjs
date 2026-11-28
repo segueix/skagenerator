@@ -202,9 +202,11 @@ test('la cançó automàtica fa servir els recursos especials amb mesura i als m
   }
   assert(Object.keys(counts).length >= 3, `quantitats variades: ${JSON.stringify(counts)}`);
   // Els subgèneres lents tendeixen al fos; el hardcore, al tall en sec.
-  const closings = key => Array.from({ length: 8 }, (_, i) => builder.createAutoSong(engine, key, { seed: 100 + i, candidates: 1 }).edges.closing);
-  // (Amb les formes noves —dub i tag—, el rocksteady fa menys fosos, però encara és el final més habitual després del cop.)
-  assert(closings('rocksteady').filter(c => c === 'fadeout').length >= 3);
+  const closings = (key, n = 8) => Array.from({ length: n }, (_, i) => builder.createAutoSong(engine, key, { seed: 100 + i, candidates: 1 }).edges.closing);
+  // (Amb les formes noves —dub, tag i les del corpus—, el rocksteady fa menys fosos, però encara n'hi ha sovint i mai un tall en sec.)
+  const rocksteady = closings('rocksteady', 16);
+  assert(rocksteady.filter(c => c === 'fadeout').length >= 5, JSON.stringify(rocksteady));
+  assert(!rocksteady.includes('cold'));
   assert(closings('hardcore').filter(c => c === 'cold').length >= 5);
   assert(!closings('hardcore').includes('fadeout'));
 });

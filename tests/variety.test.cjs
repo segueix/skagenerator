@@ -30,7 +30,7 @@ test('harmonia v2: acords partits, més progressions per subgènere i les canço
   // Sense harmony (cançons desades abans), la progressió és la de sempre.
   const old = engine.composeSongPart({ ...base, seed: 3, subgenre: 'twotone' }, { type: 'verse', bars: 4, energy: 70, revision: 2, instruments: [] }).chords.map(c => c.symbol);
   assert.deepEqual(old, ['I', 'IV', 'I', 'V']);
-  assert.throws(() => engine.composeSongPart({ ...base, subgenre: 'twotone', harmony: 3 }, { type: 'verse', bars: 4, energy: 70, revision: 1, instruments: [] }), /harmonia/);
+  assert.throws(() => engine.composeSongPart({ ...base, subgenre: 'twotone', harmony: 4 }, { type: 'verse', bars: 4, energy: 70, revision: 1, instruments: [] }), /harmonia/);
 });
 
 test('formes: blues de 12 compassos, dub, tag i AABA a les cançons d\'ska', () => {

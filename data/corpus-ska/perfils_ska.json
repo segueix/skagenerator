@@ -1,0 +1,676 @@
+{
+  "versio": 1,
+  "general": {
+    "n_cancons": 50,
+    "n_artistes": 23,
+    "tempo_bpm_publicat": {
+      "n": 50,
+      "min": 74,
+      "mediana": 145.975,
+      "max": 188.0
+    },
+    "tempo_per_generar_provisional": {
+      "n": 41,
+      "min": 97.0,
+      "mediana": 144,
+      "max": 188.0,
+      "comptatge_per_trams_de_20": {
+        "80–<100": 2,
+        "100–<120": 3,
+        "120–<140": 11,
+        "140–<160": 16,
+        "160–<180": 4,
+        "180–<200": 5
+      }
+    },
+    "modes_amb_to_no_discrepant": {
+      "major": 34,
+      "menor": 12
+    },
+    "n_formes_per_estat": {
+      "parcial": 21,
+      "pendent": 20,
+      "documentada": 7,
+      "estimacio_automatica": 2
+    },
+    "progressions_observades": {
+      "I > IV > V": 9,
+      "I > IV": 4,
+      "I > ii > V": 3,
+      "I > IV > V7": 2,
+      "i > V7": 2,
+      "i > iv": 2,
+      "I > V > IV": 2,
+      "I > IV > I > V": 2,
+      "I > V > I > IV": 2,
+      "i > bVI > bVII": 2,
+      "I > IV > ii > V": 2,
+      "I > IV > V > I > bIII": 1,
+      "i > V > V7": 1,
+      "I > IV > I": 1,
+      "I > V > V7 > IV": 1,
+      "ii > V": 1,
+      "I > II": 1,
+      "I > vi > II": 1,
+      "I > V": 1,
+      "I > ii": 1,
+      "I > bIII > IV > #IV": 1,
+      "IV > iv > I": 1,
+      "IV > I > IV > II > V": 1,
+      "i > V > i": 1,
+      "I > ii > V7": 1,
+      "I > IV > V > IV": 1,
+      "I > ii > I > ii": 1,
+      "ii > vi > ii": 1,
+      "I > bVII > I > IV": 1,
+      "i > IV > bIII > V7": 1,
+      "i > VII > i > IV": 1,
+      "i > V7b9": 1,
+      "i > imaj7 > i7 > i6": 1,
+      "I > v7": 1,
+      "IV > bVII7": 1,
+      "i > v > i": 1,
+      "i > bVI > V": 1,
+      "i > iv > V": 1,
+      "V > bVI > bVII > i": 1,
+      "V7 > bVI > V7": 1,
+      "ii7 > V7": 1,
+      "I > V > ii": 1,
+      "vi > V > IV": 1,
+      "V > I": 1,
+      "bVII > IV": 1,
+      "IV > I > bVII > I": 1,
+      "I > vi > IV > ii": 1,
+      "i > bVII": 1,
+      "V7 > IV > V7": 1,
+      "I7 > IV7 > I7": 1,
+      "i7 > IV7": 1,
+      "I > ii > V > I": 1,
+      "IV > I > IV > ii": 1,
+      "I > V > I > iii > IV > vi": 1,
+      "ii > vi > IV > V > I": 1,
+      "I > vi": 1,
+      "i > bIII > bVI": 1
+    },
+    "progressions_per_seccio": {
+      "tornada": {
+        "IV > iv > I": 1,
+        "I > IV > V": 1,
+        "IV > bVII": 1,
+        "IV > I > IV > ii": 1
+      },
+      "intro": {
+        "#IV > IV > bIII > I": 1,
+        "I > IV > I": 1,
+        "I > IV > V > IV": 1,
+        "I > IV > V": 1,
+        "i° > bii° > ii° > biii°": 1,
+        "I > V > ii > vi > V > IV": 1
+      },
+      "coda": {
+        "I > bIII > IV > #IV": 1
+      },
+      "estrofa": {
+        "I > bIII > IV > #IV": 1,
+        "I > IV > I": 1,
+        "I > IV > V": 1,
+        "i > VII > i > IV": 1,
+        "i > V7b9": 1,
+        "I > bVII": 1,
+        "I > IV > ii > V": 1
+      },
+      "interludi": {
+        "vi > vii > vi > #iv": 1,
+        "i > imaj7 > i7 > i6": 1
+      },
+      "pont": {
+        "IV > I > IV > II > V": 1,
+        "vi > IV > I": 1
+      },
+      "solo": {
+        "I > bVII": 1
+      }
+    },
+    "n_cancons_amb_graus": 46,
+    "mida_mostra_timbre": 19,
+    "indicis_instrumentals_per_seccio": {
+      "interludi": {
+        "harmònica": 1,
+        "dolçaina": 1,
+        "grup instrumental": 1,
+        "vents": 1
+      },
+      "crida_parlada": {
+        "veu parlada": 1
+      },
+      "tema_instrumental": {
+        "trombó": 1,
+        "saxòfon": 1
+      },
+      "solo": {
+        "trompeta": 1,
+        "saxòfon": 2,
+        "teclats": 1,
+        "trombó": 1,
+        "baix": 1
+      },
+      "estrofa": {
+        "veu principal": 2,
+        "veu": 2,
+        "guitarra neta": 1
+      },
+      "intro": {
+        "baix": 1,
+        "guitarra": 3,
+        "bateria": 1,
+        "saxòfon": 1,
+        "sintetitzador": 1,
+        "grup instrumental": 1,
+        "vents": 1,
+        "trombó": 1
+      },
+      "coda": {
+        "sintetitzador": 1,
+        "bateria": 1,
+        "veus de suport": 1,
+        "baix": 1,
+        "grup instrumental": 1,
+        "veu parlada": 1
+      },
+      "pont": {
+        "veu principal": 1
+      },
+      "tornada": {
+        "veu": 3,
+        "guitarra neta": 1,
+        "segona veu": 1,
+        "veu principal": 1,
+        "trombó": 1
+      },
+      "bloc_vocal": {
+        "veu": 2
+      }
+    },
+    "compassos_documentats_per_seccio": {
+      "intro": {
+        "8": 1
+      }
+    },
+    "formes_documentades": {
+      "intro > tornada > estrofa > tornada > estrofa > tornada > solo > tornada > estrofa > tornada > solo > tornada > coda": 1,
+      "intro > estrofa > tema_instrumental > solo > coda": 1,
+      "intro > estrofa > tornada > estrofa > tornada > solo > tornada > coda": 1,
+      "intro > estrofa > tornada > interludi > estrofa > tornada > solo > estrofa > tornada > estrofa > tornada": 1,
+      "intro > estrofa > tornada > estrofa > tornada > solo > solo > estrofa > tornada": 1,
+      "intro > estrofa > tornada > interludi > estrofa > tornada > tornada > coda": 1,
+      "intro > estrofa > interludi > estrofa > tornada > interludi > estrofa > tornada > pont > tornada": 1
+    },
+    "transicions_de_seccions_documentades": {
+      "intro": {
+        "tornada": 1,
+        "estrofa": 6
+      },
+      "tornada": {
+        "estrofa": 6,
+        "solo": 5,
+        "coda": 3,
+        "interludi": 3,
+        "tornada": 1,
+        "pont": 1
+      },
+      "estrofa": {
+        "tornada": 16,
+        "tema_instrumental": 1,
+        "interludi": 1
+      },
+      "solo": {
+        "tornada": 3,
+        "coda": 1,
+        "estrofa": 2,
+        "solo": 1
+      },
+      "tema_instrumental": {
+        "solo": 1
+      },
+      "interludi": {
+        "estrofa": 4
+      },
+      "pont": {
+        "tornada": 1
+      }
+    }
+  },
+  "per_familia": {
+    "jamaica": {
+      "n_cancons": 12,
+      "n_artistes": 7,
+      "tempo_bpm_publicat": {
+        "n": 12,
+        "min": 91.0,
+        "mediana": 130.0,
+        "max": 188.0
+      },
+      "tempo_per_generar_provisional": {
+        "n": 11,
+        "min": 97.0,
+        "mediana": 130.0,
+        "max": 188.0,
+        "comptatge_per_trams_de_20": {
+          "80–<100": 1,
+          "120–<140": 6,
+          "140–<160": 3,
+          "180–<200": 1
+        }
+      },
+      "modes_amb_to_no_discrepant": {
+        "major": 9,
+        "menor": 2
+      },
+      "n_formes_per_estat": {
+        "parcial": 5,
+        "pendent": 7
+      },
+      "progressions_observades": {
+        "I > IV > V": 3,
+        "I > IV": 3,
+        "I > IV > V7": 2,
+        "I > IV > V > I > bIII": 1,
+        "I > ii > V": 1,
+        "i > V > V7": 1,
+        "I > IV > I": 1,
+        "I > V > V7 > IV": 1,
+        "i > V7": 1,
+        "i > iv": 1,
+        "ii > V": 1,
+        "I > II": 1,
+        "I > vi > II": 1,
+        "I > V > IV": 1
+      },
+      "progressions_per_seccio": {},
+      "n_cancons_amb_graus": 11,
+      "mida_mostra_timbre": 3,
+      "indicis_instrumentals_per_seccio": {
+        "interludi": {
+          "harmònica": 1
+        },
+        "crida_parlada": {
+          "veu parlada": 1
+        },
+        "tema_instrumental": {
+          "trombó": 1
+        }
+      },
+      "compassos_documentats_per_seccio": {},
+      "formes_documentades": {},
+      "transicions_de_seccions_documentades": {}
+    },
+    "dos_tons": {
+      "n_cancons": 17,
+      "n_artistes": 5,
+      "tempo_bpm_publicat": {
+        "n": 17,
+        "min": 74,
+        "mediana": 156,
+        "max": 175.55
+      },
+      "tempo_per_generar_provisional": {
+        "n": 14,
+        "min": 103.0,
+        "mediana": 158.0,
+        "max": 175.55,
+        "comptatge_per_trams_de_20": {
+          "100–<120": 1,
+          "120–<140": 1,
+          "140–<160": 9,
+          "160–<180": 3
+        }
+      },
+      "modes_amb_to_no_discrepant": {
+        "major": 12,
+        "menor": 3
+      },
+      "n_formes_per_estat": {
+        "parcial": 10,
+        "documentada": 5,
+        "pendent": 1,
+        "estimacio_automatica": 1
+      },
+      "progressions_observades": {
+        "I > IV > V": 3,
+        "I > IV > I > V": 2,
+        "I > IV": 1,
+        "I > V": 1,
+        "I > ii": 1,
+        "I > bIII > IV > #IV": 1,
+        "IV > iv > I": 1,
+        "IV > I > IV > II > V": 1,
+        "i > V > i": 1,
+        "i > iv": 1,
+        "I > ii > V7": 1,
+        "I > ii > V": 1,
+        "I > IV > V > IV": 1,
+        "I > ii > I > ii": 1,
+        "ii > vi > ii": 1,
+        "I > bVII > I > IV": 1,
+        "I > V > IV": 1,
+        "i > IV > bIII > V7": 1,
+        "i > VII > i > IV": 1,
+        "i > V7b9": 1,
+        "i > imaj7 > i7 > i6": 1,
+        "I > v7": 1,
+        "IV > bVII7": 1
+      },
+      "progressions_per_seccio": {
+        "tornada": {
+          "IV > iv > I": 1,
+          "I > IV > V": 1,
+          "IV > bVII": 1
+        },
+        "intro": {
+          "#IV > IV > bIII > I": 1,
+          "I > IV > I": 1,
+          "I > IV > V > IV": 1,
+          "I > IV > V": 1,
+          "i° > bii° > ii° > biii°": 1
+        },
+        "coda": {
+          "I > bIII > IV > #IV": 1
+        },
+        "estrofa": {
+          "I > bIII > IV > #IV": 1,
+          "I > IV > I": 1,
+          "I > IV > V": 1,
+          "i > VII > i > IV": 1,
+          "i > V7b9": 1,
+          "I > bVII": 1
+        },
+        "interludi": {
+          "vi > vii > vi > #iv": 1,
+          "i > imaj7 > i7 > i6": 1
+        },
+        "pont": {
+          "IV > I > IV > II > V": 1
+        },
+        "solo": {
+          "I > bVII": 1
+        }
+      },
+      "n_cancons_amb_graus": 15,
+      "mida_mostra_timbre": 8,
+      "indicis_instrumentals_per_seccio": {
+        "solo": {
+          "trompeta": 1,
+          "saxòfon": 2,
+          "teclats": 1,
+          "trombó": 1,
+          "baix": 1
+        },
+        "estrofa": {
+          "veu principal": 1
+        },
+        "tema_instrumental": {
+          "saxòfon": 1
+        },
+        "intro": {
+          "baix": 1,
+          "guitarra": 1,
+          "bateria": 1,
+          "saxòfon": 1,
+          "sintetitzador": 1
+        },
+        "coda": {
+          "sintetitzador": 1,
+          "bateria": 1,
+          "veus de suport": 1,
+          "baix": 1
+        },
+        "pont": {
+          "veu principal": 1
+        }
+      },
+      "compassos_documentats_per_seccio": {
+        "intro": {
+          "8": 1
+        }
+      },
+      "formes_documentades": {
+        "intro > tornada > estrofa > tornada > estrofa > tornada > solo > tornada > estrofa > tornada > solo > tornada > coda": 1,
+        "intro > estrofa > tema_instrumental > solo > coda": 1,
+        "intro > estrofa > tornada > estrofa > tornada > solo > tornada > coda": 1,
+        "intro > estrofa > tornada > interludi > estrofa > tornada > solo > estrofa > tornada > estrofa > tornada": 1,
+        "intro > estrofa > tornada > estrofa > tornada > solo > solo > estrofa > tornada": 1
+      },
+      "transicions_de_seccions_documentades": {
+        "intro": {
+          "tornada": 1,
+          "estrofa": 4
+        },
+        "tornada": {
+          "estrofa": 6,
+          "solo": 5,
+          "coda": 2,
+          "interludi": 1
+        },
+        "estrofa": {
+          "tornada": 12,
+          "tema_instrumental": 1
+        },
+        "solo": {
+          "tornada": 3,
+          "coda": 1,
+          "estrofa": 2,
+          "solo": 1
+        },
+        "tema_instrumental": {
+          "solo": 1
+        },
+        "interludi": {
+          "estrofa": 1
+        }
+      }
+    },
+    "paisos_catalans": {
+      "n_cancons": 14,
+      "n_artistes": 4,
+      "tempo_bpm_publicat": {
+        "n": 14,
+        "min": 97.0,
+        "mediana": 167.0,
+        "max": 188.0
+      },
+      "tempo_per_generar_provisional": {
+        "n": 10,
+        "min": 97.0,
+        "mediana": 143.0,
+        "max": 188.0,
+        "comptatge_per_trams_de_20": {
+          "80–<100": 1,
+          "100–<120": 1,
+          "120–<140": 2,
+          "140–<160": 3,
+          "180–<200": 3
+        }
+      },
+      "modes_amb_to_no_discrepant": {
+        "menor": 6,
+        "major": 8
+      },
+      "n_formes_per_estat": {
+        "parcial": 4,
+        "pendent": 9,
+        "documentada": 1
+      },
+      "progressions_observades": {
+        "i > bVI > bVII": 2,
+        "I > IV > V": 2,
+        "i > v > i": 1,
+        "i > bVI > V": 1,
+        "i > iv > V": 1,
+        "I > V > I > IV": 1,
+        "V > bVI > bVII > i": 1,
+        "i > V7": 1,
+        "V7 > bVI > V7": 1,
+        "ii7 > V7": 1,
+        "I > ii > V": 1,
+        "I > V > ii": 1,
+        "vi > V > IV": 1,
+        "V > I": 1,
+        "bVII > IV": 1,
+        "IV > I > bVII > I": 1,
+        "I > vi > IV > ii": 1,
+        "i > bVII": 1,
+        "V7 > IV > V7": 1,
+        "I7 > IV7 > I7": 1,
+        "i7 > IV7": 1
+      },
+      "progressions_per_seccio": {
+        "intro": {
+          "I > V > ii > vi > V > IV": 1
+        }
+      },
+      "n_cancons_amb_graus": 14,
+      "mida_mostra_timbre": 5,
+      "indicis_instrumentals_per_seccio": {
+        "estrofa": {
+          "veu": 2,
+          "veu principal": 1,
+          "guitarra neta": 1
+        },
+        "tornada": {
+          "veu": 2,
+          "guitarra neta": 1,
+          "segona veu": 1,
+          "veu principal": 1
+        },
+        "coda": {
+          "grup instrumental": 1,
+          "veu parlada": 1
+        },
+        "interludi": {
+          "dolçaina": 1,
+          "grup instrumental": 1
+        },
+        "intro": {
+          "grup instrumental": 1
+        },
+        "bloc_vocal": {
+          "veu": 2
+        }
+      },
+      "compassos_documentats_per_seccio": {},
+      "formes_documentades": {
+        "intro > estrofa > tornada > interludi > estrofa > tornada > tornada > coda": 1
+      },
+      "transicions_de_seccions_documentades": {
+        "intro": {
+          "estrofa": 1
+        },
+        "estrofa": {
+          "tornada": 2
+        },
+        "tornada": {
+          "interludi": 1,
+          "tornada": 1,
+          "coda": 1
+        },
+        "interludi": {
+          "estrofa": 1
+        }
+      }
+    },
+    "internacional": {
+      "n_cancons": 7,
+      "n_artistes": 7,
+      "tempo_bpm_publicat": {
+        "n": 7,
+        "min": 90,
+        "mediana": 136.0,
+        "max": 182.0
+      },
+      "tempo_per_generar_provisional": {
+        "n": 6,
+        "min": 103,
+        "mediana": 140.975,
+        "max": 182.0,
+        "comptatge_per_trams_de_20": {
+          "100–<120": 1,
+          "120–<140": 2,
+          "140–<160": 1,
+          "160–<180": 1,
+          "180–<200": 1
+        }
+      },
+      "modes_amb_to_no_discrepant": {
+        "major": 5,
+        "menor": 1
+      },
+      "n_formes_per_estat": {
+        "pendent": 3,
+        "documentada": 1,
+        "parcial": 2,
+        "estimacio_automatica": 1
+      },
+      "progressions_observades": {
+        "I > IV > ii > V": 2,
+        "I > ii > V > I": 1,
+        "IV > I > IV > ii": 1,
+        "I > V > I > iii > IV > vi": 1,
+        "ii > vi > IV > V > I": 1,
+        "I > vi": 1,
+        "I > V > I > IV": 1,
+        "I > IV > V": 1,
+        "i > bIII > bVI": 1
+      },
+      "progressions_per_seccio": {
+        "tornada": {
+          "IV > I > IV > ii": 1
+        },
+        "estrofa": {
+          "I > IV > ii > V": 1
+        },
+        "pont": {
+          "vi > IV > I": 1
+        }
+      },
+      "n_cancons_amb_graus": 6,
+      "mida_mostra_timbre": 3,
+      "indicis_instrumentals_per_seccio": {
+        "intro": {
+          "guitarra": 2,
+          "vents": 1,
+          "trombó": 1
+        },
+        "interludi": {
+          "vents": 1
+        },
+        "tornada": {
+          "trombó": 1,
+          "veu": 1
+        }
+      },
+      "compassos_documentats_per_seccio": {},
+      "formes_documentades": {
+        "intro > estrofa > interludi > estrofa > tornada > interludi > estrofa > tornada > pont > tornada": 1
+      },
+      "transicions_de_seccions_documentades": {
+        "intro": {
+          "estrofa": 1
+        },
+        "estrofa": {
+          "interludi": 1,
+          "tornada": 2
+        },
+        "interludi": {
+          "estrofa": 2
+        },
+        "tornada": {
+          "interludi": 1,
+          "pont": 1
+        },
+        "pont": {
+          "tornada": 1
+        }
+      }
+    }
+  }
+}
