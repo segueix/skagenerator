@@ -318,13 +318,14 @@
   },
   "skankChords": {
     "name": "Guitarra skank (acords)",
-    "about": "Acords de guitarra d'ska per a la guitarra rítmica per defecte: vegeu audio/samples/guitarra-ska/FONT.txt. Banc 6, programes 0 (major), 1 (menor), 2 (7) i 3 (m7); tecla 48 + fonamental = variant 1, 60 + fonamental = variant 2.",
+    "about": "Acords de guitarra d'ska per a la guitarra rítmica per defecte: vegeu audio/samples/guitarra-ska/FONT.txt. «cents»: afinació mesurada de cada mostra (moltes variants 02 són fins a 13 cèntims baixes), que el build corregeix. Banc 6, programes 0 (major), 1 (menor), 2 (7) i 3 (m7); tecla 48 + fonamental = variant 1, 60 + fonamental = variant 2.",
     "bank": 6,
     "programs": { "maj": 0, "min": 1, "7": 2, "m7": 3 },
     "directory": "audio/samples/guitarra-ska/",
     "seconds": 0.45,
     "release": 0.035,
-    "levelDb": -7
+    "levelDb": -7,
+    "cents": {"A_7_01.wav": -3, "A_7_02.wav": -6, "A_m7_01.wav": -6, "A_m7_02.wav": -5, "A_maj_01.wav": -3, "A_maj_02.wav": -9, "A_min_01.wav": -5, "A_min_02.wav": -3, "Ab_7_01.wav": -5, "Ab_7_02.wav": -6, "Ab_m7_01.wav": -4, "Ab_m7_02.wav": -6, "Ab_maj_01.wav": -5, "Ab_maj_02.wav": -8, "Ab_min_01.wav": -2, "Ab_min_02.wav": -5, "B_7_01.wav": 2, "B_7_02.wav": 0, "B_m7_01.wav": 2, "B_m7_02.wav": -1, "B_maj_01.wav": 1, "B_maj_02.wav": -1, "B_min_01.wav": 1, "B_min_02.wav": -1, "Bb_7_01.wav": 2, "Bb_7_02.wav": 0, "Bb_m7_01.wav": 2, "Bb_m7_02.wav": -1, "Bb_maj_01.wav": 1, "Bb_maj_02.wav": -2, "Bb_min_01.wav": 2, "Bb_min_02.wav": -1, "C_7_01.wav": 1, "C_7_02.wav": -1, "C_m7_01.wav": 1, "C_m7_02.wav": 0, "C_maj_01.wav": 1, "C_maj_02.wav": -1, "C_min_01.wav": 1, "C_min_02.wav": 0, "Csharp_7_01.wav": 0, "Csharp_7_02.wav": -9, "Csharp_m7_01.wav": 0, "Csharp_m7_02.wav": -6, "Csharp_maj_01.wav": -1, "Csharp_maj_02.wav": -12, "Csharp_min_01.wav": -1, "Csharp_min_02.wav": -8, "D_7_01.wav": 2, "D_7_02.wav": -5, "D_m7_01.wav": -1, "D_m7_02.wav": -8, "D_maj_01.wav": 0, "D_maj_02.wav": -13, "D_min_01.wav": -1, "D_min_02.wav": -7, "E_7_01.wav": 1, "E_7_02.wav": -6, "E_m7_01.wav": -1, "E_m7_02.wav": -8, "E_maj_01.wav": -3, "E_maj_02.wav": -9, "E_min_01.wav": -4, "E_min_02.wav": -7, "Eb_7_01.wav": 0, "Eb_7_02.wav": -7, "Eb_m7_01.wav": -1, "Eb_m7_02.wav": -9, "Eb_maj_01.wav": -3, "Eb_maj_02.wav": -12, "Eb_min_01.wav": -1, "Eb_min_02.wav": -5, "F_7_01.wav": -1, "F_7_02.wav": -6, "F_m7_01.wav": 0, "F_m7_02.wav": -8, "F_maj_01.wav": 6, "F_maj_02.wav": -9, "F_min_01.wav": 4, "F_min_02.wav": -7, "Fsharp_7_01.wav": -5, "Fsharp_7_02.wav": -4, "Fsharp_m7_01.wav": -6, "Fsharp_m7_02.wav": -8, "Fsharp_maj_01.wav": -3, "Fsharp_maj_02.wav": -8, "Fsharp_min_01.wav": -3, "Fsharp_min_02.wav": -6, "G_7_01.wav": -2, "G_7_02.wav": -7, "G_m7_01.wav": -3, "G_m7_02.wav": -6, "G_maj_01.wav": -5, "G_maj_02.wav": -5, "G_min_01.wav": -4, "G_min_02.wav": -7}
   },
   "guitars": [
     {

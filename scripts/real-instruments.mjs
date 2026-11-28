@@ -498,7 +498,8 @@ function buildSkankChords(bank, spec, log) {
       const data = trim(polishChord(resample(wav.data, wav.rate, RATE), RATE), RATE, spec.seconds);
       level(data, RATE, spec.levelDb);
       const key = (variant === 1 ? 48 : 60) + pc;
-      const sample = makeSample(bank, `G6${program}${key}`, data, RATE, key, 0);
+      // (Afinació: cada mostra es corregeix amb la seva desviació mesurada.)
+      const sample = makeSample(bank, `G6${program}${key}`, data, RATE, key, -(spec.cents?.[file] ?? 0));
       const zone = instrument.createZone(sample);
       zone.keyRange = { min: key, max: key };
       zone.setGenerator(GeneratorTypes.releaseVolEnv, timecents(spec.release));

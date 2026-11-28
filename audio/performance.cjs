@@ -474,8 +474,10 @@ function createPerformance(spec, options = {}) {
   // Tipus d'acord per a les mostres gravades: major, menor, 7 o m7 (una altra cosa —disminuït, suspès…—, cap).
   function chordQuality(chord) {
     const rel = new Set(chord.pcs.map(pc => ((pc - chord.root) % 12 + 12) % 12));
+    // (Les extensions que no canvien la funció de l'acord —maj7, 6, 9— fan servir l'acord del seu tipus: major, menor, 7 o m7.
+    // Els disminuïts, augmentats i suspesos, que xocarien amb un acord major o menor, continuen amb les cordes soltes.)
     const third = rel.has(4) && !rel.has(3) ? 'maj' : rel.has(3) && !rel.has(4) ? 'min' : null;
-    if (!third || !rel.has(7) || rel.has(6) || rel.has(8) || rel.has(11) || rel.has(9) || rel.has(2) || rel.has(5)) return null;
+    if (!third || !rel.has(7) || rel.has(6) || rel.has(8) || rel.has(5)) return null;
     return rel.has(10) ? (third === 'maj' ? '7' : 'm7') : third;
   }
   // Cop de l'skank: de la corda aguda a la greu (cop amunt, el del contratemps), 8–12 ms entre corda i corda, les
