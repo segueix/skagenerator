@@ -193,6 +193,7 @@
     migrateVolumes(value);
     if (st.countIn !== undefined && typeof st.countIn !== 'boolean') fail('Configuració no vàlida');
     if (st.bandProfile !== undefined && (st.style !== 'ska' || !builder.bandName(st.bandProfile))) delete st.bandProfile;
+    if (st.saturation !== undefined && (st.style !== 'ska' || !Number.isFinite(st.saturation) || st.saturation < 0 || st.saturation > 1.25)) delete st.saturation;
     if (st.guitars !== undefined && ![1, 2, 3].includes(st.guitars)) fail('Configuració no vàlida');
     // Idioma de la lletra (per comptar síl·labes): català per defecte o anglès.
     if (st.lang !== undefined && !['ca', 'en'].includes(st.lang)) delete st.lang;
@@ -730,10 +731,12 @@
   }
   function filteredVoice() {
     if (!voiceData) return null;
-    const key = JSON.stringify([song.voice?.effect || 'clean', song.voice?.eq || flatVoiceEq()]);
+    const { seed, saturation: amount } = song.settings;
+    const saturation = amount ? { seed, amount } : undefined;
+    const key = JSON.stringify([song.voice?.effect || 'clean', song.voice?.eq || flatVoiceEq(), saturation]);
     if (processedVoiceCache?.source === voiceData && processedVoiceCache?.key === key)
       return processedVoiceCache.data;
-    const data = audioUtils.processVoice(voiceData, { effect: song.voice?.effect || 'clean', eq: song.voice?.eq || flatVoiceEq(), rate: RATE });
+    const data = audioUtils.processVoice(voiceData, { effect: song.voice?.effect || 'clean', eq: song.voice?.eq || flatVoiceEq(), rate: RATE, saturation });
     processedVoiceCache = { source: voiceData, key, data };
     return data;
   }
@@ -1276,7 +1279,7 @@
     const style = $('song-style').value, profile = STYLES[style];
     if (id === 'song-style') {
       song.settings = { ...st, style, bpm: profile.bpm.default, groove: defaultGroove() };
-      delete song.settings.subgenre; delete song.settings.swing; delete song.settings.bandProfile;
+      delete song.settings.subgenre; delete song.settings.swing; delete song.settings.bandProfile; delete song.settings.saturation;
       if (!profile.keys.some(([k, m]) => k === st.tonic && m === st.mode)) [song.settings.tonic, song.settings.mode] = profile.keys[0];
       applyBase(baseDefaults(style));
       song.settings.bars = Math.min(song.settings.bars, Math.floor(MAX_SECONDS / barSeconds()));
@@ -1313,6 +1316,7 @@
     else if (id === 'song-subgenre') {
       const key = event.target.value, sg = engine.SUBGENRES[key];
       delete st.bandProfile;
+      delete st.saturation;
       if (!sg) { delete st.subgenre; delete st.swing; }
       else {
         // El subgènere decideix d'un cop harmonia, ritmes, balanceig, sons i efectes.

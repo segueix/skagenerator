@@ -3781,6 +3781,9 @@
             ranges: audibleRanges, guitarTakes: guitarTakes.map(take => ({ ...take })),
             guitarBase: part.guitarBase !== false,
             drumLine,
+            ...(settings.style === 'ska' && !drumOptions.batucadaLine && Number.isFinite(settings.saturation)
+                && settings.saturation > 0 && settings.saturation <= 1.25
+                ? { saturation: { seed: settings.seed, amount: settings.saturation } } : {}),
             ...(settings.style === 'ska' && !drumOptions.batucadaLine && settings.bandProfile ? { bandProfile: settings.bandProfile } : {}),
             timbres: { ...(settings.timbres || {}), ...(part.timbres || {}) },
             mix: addVolumes({ ...(settings.mix || {}), ...(part.mix || {}) }, settings.volumes, part.volumes),

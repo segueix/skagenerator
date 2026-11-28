@@ -178,8 +178,8 @@
         return { result, subgenre, timbre: { name: 'Umidaji ' + voice.name + ' · Team BRAPA' } };
       },
       // Mescla una veu (acabada de cantar o desada) amb la banda, amb el filtre del subgènere.
-      mix(pcm, band, subgenre) {
-        const voice = voiceFor(subgenre), vocal = audioUtils.processVoice(pcm, { effect: voice.effect, eq: voice.eq });
+      mix(pcm, band, subgenre, saturation) {
+        const voice = voiceFor(subgenre), vocal = audioUtils.processVoice(pcm, { effect: voice.effect, eq: voice.eq, saturation });
         audioUtils.levelTake(vocal, -16);
         return audioUtils.mixVoice(band, vocal, { processed: true });
       },

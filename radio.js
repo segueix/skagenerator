@@ -381,8 +381,8 @@
   }
 
   async function renderTrack(choice, { band, timeline }, pcm) {
-    const subgenre = choice.song.settings.subgenre;
-    const mixed = pcm ? browserSinger.mix(pcm, band, subgenre) : band;
+    const { subgenre, seed, saturation: amount } = choice.song.settings;
+    const mixed = pcm ? browserSinger.mix(pcm, band, subgenre, { seed, amount }) : band;
     const seconds = mixed[0].length / RATE, blob = await wavBlob(mixed, GAP_SECONDS);
     return { ...choice, sung: !!pcm, voiceTimbre: pcm ? browserSinger.timbreName(subgenre) : null, seconds, timeline, url: URL.createObjectURL(blob) };
   }

@@ -399,6 +399,7 @@
     const band = bandsModule().get(options.bandProfile);
     if (band) {
       settings.bandProfile = options.bandProfile;
+      settings.saturation = band.saturation ?? .85;
       [groove.drums, groove.bass, groove.guitar] = band.groove;
       settings.timbres = { ...settings.timbres, drums: band.drums, bass: band.bass, trumpet: band.trumpet || 'auto', trombone: 'auto' };
       if (band.swing !== undefined) settings.swing = band.swing;

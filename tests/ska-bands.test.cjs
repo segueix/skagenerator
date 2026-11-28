@@ -22,6 +22,11 @@ test('la ràdio alterna formacions i manté un perfil per cançó', () => {
   const song = builder.createAutoSong(engine, 'twotone', options);
   assert.equal(song.settings.bandProfile, [...ids][0]);
   assert.equal(builder.fingerprintOf(engine, song).bandProfile, song.settings.bandProfile);
+  const restored = JSON.parse(JSON.stringify(song));
+  for (const revision of [1, 2]) {
+    const spec = engine.composeSongPart(restored.settings, { type: 'verse', bars: 4, energy: 65, revision });
+    assert.deepEqual(spec.saturation, { seed: song.settings.seed, amount: song.settings.saturation });
+  }
 });
 
 test('els vents d’una formació petita sonen sols fins i tot amb una entrada de vents', () => {

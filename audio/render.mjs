@@ -1,5 +1,6 @@
 import { SoundBankLoader, SpessaSynthProcessor, SpessaLog } from 'spessasynth_core';
 import performance from './performance.cjs';
+import audioUtils from '../audio-utils.js';
 
 SpessaLog.setLogLevel(false, false, false);
 export function parseSoundBank(buffer) { return SoundBankLoader.fromArrayBuffer(buffer); }
@@ -318,14 +319,18 @@ export async function renderSampledPart(bank, spec, sampleRate = 44100, options 
     // La diferència (equalitzat − sec) se suma a la mescla, que ja conté la
     // reverberació: així l'equalitzador no deixa la sala sense efecte.
     const BLOCK = 128, eqs = new Map(), dummy = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
+    const sounding = spec.saturation ? new Set(score.events.filter(event => event.type === 'on').map(event => event.channel)) : null;
     for (const patch of score.channels) {
       // La segona veu de vent amb saxo fa servir la corba del saxo.
       // gainDb: guany fix del so triat (calibrat perquè tots els kits i baixos sonin al mateix nivell).
       const totalTrim = (patch.gainDb || 0) + baseVolumeDb(score, patch.instrument);
       const user = totalTrim ? { ...(score.mix[patch.instrument] || {}), volume: (score.mix[patch.instrument]?.volume || 0) + totalTrim } : score.mix[patch.instrument];
       const eq = createEqualizer(patch.tone || (patch.instrument === 'trombone' && patch.bank === 2 && patch.program === 66 ? 'sax' : patch.instrument), user, sampleRate);
-      // Cadena: efecte de guitarra → altaveu rotatori (orgue) → efecte de color → equalitzador.
-      const chain = [createGuitarFx(fxFor(score, patch), sampleRate), createLeslie(patch.leslie, sampleRate), createColorFx(colorFor(score, patch), sampleRate), eq].filter(Boolean);
+      // El color propi de la cançó s'aplica al senyal sec abans de l'equalitzador i del volum.
+      const saturation = sounding?.has(patch.channel)
+        ? audioUtils.createSaturation(patch.instrument, sampleRate, spec.saturation) : null;
+      const chain = [createGuitarFx(fxFor(score, patch), sampleRate), createLeslie(patch.leslie, sampleRate),
+        createColorFx(colorFor(score, patch), sampleRate), saturation, eq].filter(Boolean);
       if (chain.length) eqs.set(patch.channel, chain.length === 1 ? chain[0] : { process: (side, x) => chain.reduce((y, stage) => stage.process(side, y), x) });
     }
     const outputs = Array.from({ length: synth.midiChannels.length }, (_, channel) => eqs.has(channel) ? [new Float32Array(BLOCK), new Float32Array(BLOCK)] : dummy);
